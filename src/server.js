@@ -106,7 +106,7 @@ app.get('/login', (req, res) => {
   <div class="card narrow">
     <h1>Sign in</h1>
     <form method="post" action="/login">
-      <label>Email<input type="email" name="email" required autofocus></label>
+      <label>Email<input name="email" required autofocus autocomplete="username"></label>
       <label>Password<input type="password" name="password" required></label>
       <button>Sign in</button>
     </form>
