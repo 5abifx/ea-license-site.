@@ -1,0 +1,26 @@
+# One-click setup on Render: New > Blueprint > pick this repo
+services:
+  - type: web
+    name: ea-license-site
+    runtime: docker
+    plan: starter            # paid plan is required for the disk below
+    healthCheckPath: /login
+    disk:
+      name: data             # keeps the database and EA files between deploys
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /data
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false          # Render asks you for this when you create the Blueprint
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SIGNUP_MODE
+        value: approval
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: SITE_NAME
+        value: EA Licensing
