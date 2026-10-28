@@ -1,0 +1,599 @@
+// Load settings from .env (Node 20.12+)
+try { process.loadEnvFile(require('path').join(__dirname, '..', '.env')); } catch { /* no .env file */ }
+
+const path = require('path');
+const fs = require('fs');
+const express = require('express');
+const cookieSession = require('cookie-session');
+const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const { db, FILES_DIR } = require('./db');
+const { esc, fmtDate, layout } = require('./views');
+
+// ---------- config ----------
+const PORT = Number(process.env.PORT || 3000);
+// closed = only admin creates users, approval = users sign up but admin must approve, open = instant access
+const SIGNUP_MODE = process.env.SIGNUP_MODE || 'approval';
+const MAX_ACCOUNTS_DEFAULT = Number(process.env.MAX_ACCOUNTS || 10);
+const SESSION_SECRET = process.env.SESSION_SECRET;
+if (!SESSION_SECRET || SESSION_SECRET.length < 16) {
+  console.error('Set SESSION_SECRET (at least 16 random characters) in your environment / .env file.');
+  process.exit(1);
+}
+
+// First start: create the admin user from ADMIN_EMAIL / ADMIN_PASSWORD
+if (!db.prepare('SELECT 1 FROM users WHERE is_admin = 1').get()) {
+  const { ADMIN_EMAIL, ADMIN_PASSWORD } = process.env;
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+    console.error('No admin exists yet. Set ADMIN_EMAIL and ADMIN_PASSWORD for the first start.');
+    process.exit(1);
+  }
+  db.prepare(`INSERT INTO users (email, name, password_hash, is_admin, status) VALUES (?, 'Admin', ?, 1, 'active')`)
+    .run(ADMIN_EMAIL.trim(), bcrypt.hashSync(ADMIN_PASSWORD, 10));
+  console.log(`Admin user created: ${ADMIN_EMAIL}`);
+}
+
+const app = express();
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.use(express.urlencoded({ extended: false }));
+app.use((req, res, next) => { req.body = req.body || {}; next(); });
+app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(cookieSession({
+  name: 'eals',
+  secret: SESSION_SECRET,
+  maxAge: 7 * 24 * 3600 * 1000,
+  sameSite: 'lax',
+  httpOnly: true,
+  secure: process.env.COOKIE_SECURE === 'true',
+}));
+
+// Block cross-site form posts (simple CSRF protection on top of SameSite cookies)
+app.use((req, res, next) => {
+  if (req.method === 'POST' && !req.path.startsWith('/api/')) {
+    const origin = req.get('origin');
+    let host = null;
+    try { host = origin && new URL(origin).host; } catch { host = 'invalid'; }
+    if (origin && host !== req.get('host')) return res.status(403).send('Bad origin');
+  }
+  next();
+});
+
+// Load signed-in user
+app.use((req, res, next) => {
+  req.user = null;
+  if (req.session && req.session.uid) {
+    const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.uid);
+    if (u && u.status !== 'disabled') req.user = u;
+    else req.session = null;
+  }
+  next();
+});
+
+const flash = (req, type, msg) => { req.session.flash = { type, msg }; };
+const page = (req, res, title, body) => res.send(layout(req, title, body));
+const requireUser = (req, res, next) => (req.user ? next() : res.redirect('/login'));
+const requireAdmin = (req, res, next) =>
+  req.user && req.user.is_admin ? next() : res.status(404).send('Not found');
+
+function isExpired(u) {
+  return u.expires_at && new Date(u.expires_at + 'Z') < new Date();
+}
+function cleanAccount(v) {
+  const s = String(v || '').trim();
+  return /^\d{1,20}$/.test(s) ? s : null;
+}
+function grantAllActiveEas(userId) {
+  db.prepare(`INSERT OR IGNORE INTO user_eas (user_id, ea_id) SELECT ?, id FROM eas WHERE active = 1`).run(userId);
+}
+
+// Very small in-memory rate limiter for login / signup
+const hits = new Map();
+function rateLimit(key, max, windowMs) {
+  const now = Date.now();
+  const h = hits.get(key);
+  if (!h || h.reset < now) { hits.set(key, { n: 1, reset: now + windowMs }); return false; }
+  h.n += 1;
+  return h.n > max;
+}
+
+// ---------- auth ----------
+app.get('/', (req, res) => res.redirect(req.user ? '/dashboard' : '/login'));
+
+app.get('/login', (req, res) => {
+  if (req.user) return res.redirect('/dashboard');
+  page(req, res, 'Sign in', `
+  <div class="card narrow">
+    <h1>Sign in</h1>
+    <form method="post" action="/login">
+      <label>Email<input type="email" name="email" required autofocus></label>
+      <label>Password<input type="password" name="password" required></label>
+      <button>Sign in</button>
+    </form>
+    ${SIGNUP_MODE !== 'closed' ? '<p class="muted">No account yet? <a href="/signup">Create one</a></p>' : ''}
+  </div>`);
+});
+
+app.post('/login', (req, res) => {
+  if (rateLimit('login:' + req.ip, 10, 15 * 60 * 1000)) {
+    flash(req, 'error', 'Too many attempts. Try again in 15 minutes.');
+    return res.redirect('/login');
+  }
+  const u = db.prepare('SELECT * FROM users WHERE email = ?').get(String(req.body.email || '').trim());
+  if (!u || !bcrypt.compareSync(String(req.body.password || ''), u.password_hash)) {
+    flash(req, 'error', 'Wrong email or password.');
+    return res.redirect('/login');
+  }
+  if (u.status === 'disabled') {
+    flash(req, 'error', 'This account is disabled. Please contact support.');
+    return res.redirect('/login');
+  }
+  req.session.uid = u.id;
+  res.redirect(u.is_admin ? '/admin' : '/dashboard');
+});
+
+app.post('/logout', (req, res) => { req.session = null; res.redirect('/login'); });
+
+app.get('/signup', (req, res) => {
+  if (SIGNUP_MODE === 'closed') return res.redirect('/login');
+  page(req, res, 'Create account', `
+  <div class="card narrow">
+    <h1>Create account</h1>
+    <form method="post" action="/signup">
+      <label>Name<input name="name" required maxlength="80"></label>
+      <label>Email<input type="email" name="email" required maxlength="120"></label>
+      <label>Password<input type="password" name="password" required minlength="8"></label>
+      <button>Create account</button>
+    </form>
+    ${SIGNUP_MODE === 'approval' ? '<p class="muted">Your account will be activated after we confirm your purchase.</p>' : ''}
+  </div>`);
+});
+
+app.post('/signup', (req, res) => {
+  if (SIGNUP_MODE === 'closed') return res.redirect('/login');
+  if (rateLimit('signup:' + req.ip, 5, 60 * 60 * 1000)) {
+    flash(req, 'error', 'Too many sign ups from your network. Try again later.');
+    return res.redirect('/signup');
+  }
+  const name = String(req.body.name || '').trim().slice(0, 80);
+  const email = String(req.body.email || '').trim().slice(0, 120);
+  const password = String(req.body.password || '');
+  if (!name || !/^\S+@\S+\.\S+$/.test(email) || password.length < 8) {
+    flash(req, 'error', 'Please enter your name, a valid email and a password of at least 8 characters.');
+    return res.redirect('/signup');
+  }
+  if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(email)) {
+    flash(req, 'error', 'That email is already registered. Please sign in.');
+    return res.redirect('/login');
+  }
+  const status = SIGNUP_MODE === 'open' ? 'active' : 'pending';
+  const info = db.prepare('INSERT INTO users (email, name, password_hash, status, max_accounts) VALUES (?, ?, ?, ?, ?)')
+    .run(email, name, bcrypt.hashSync(password, 10), status, MAX_ACCOUNTS_DEFAULT);
+  if (status === 'active') grantAllActiveEas(info.lastInsertRowid);
+  req.session.uid = Number(info.lastInsertRowid);
+  res.redirect('/dashboard');
+});
+
+app.get('/password', requireUser, (req, res) => page(req, res, 'Change password', `
+  <div class="card narrow">
+    <h1>Change password</h1>
+    <form method="post" action="/password">
+      <label>Current password<input type="password" name="current" required></label>
+      <label>New password<input type="password" name="password" required minlength="8"></label>
+      <button>Save</button>
+    </form>
+  </div>`));
+
+app.post('/password', requireUser, (req, res) => {
+  const pw = String(req.body.password || '');
+  if (!bcrypt.compareSync(String(req.body.current || ''), req.user.password_hash) || pw.length < 8) {
+    flash(req, 'error', 'Current password is wrong or the new one is shorter than 8 characters.');
+    return res.redirect('/password');
+  }
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(pw, 10), req.user.id);
+  flash(req, 'ok', 'Password changed.');
+  res.redirect('/dashboard');
+});
+
+// ---------- customer dashboard ----------
+app.get('/dashboard', requireUser, (req, res) => {
+  const u = req.user;
+  if (u.status === 'pending') {
+    return page(req, res, 'Waiting for approval', `
+      <div class="card narrow"><h1>Almost there</h1>
+      <p>Your account is waiting for approval. Once it is activated you can download your EAs and register your MT5 accounts here.</p></div>`);
+  }
+  const eas = db.prepare(`SELECT e.* FROM eas e JOIN user_eas ue ON ue.ea_id = e.id
+                          WHERE ue.user_id = ? AND e.active = 1 ORDER BY e.name`).all(u.id);
+  const accounts = db.prepare('SELECT * FROM accounts WHERE user_id = ? ORDER BY created_at').all(u.id);
+  const full = accounts.length >= u.max_accounts;
+  const expired = isExpired(u);
+
+  page(req, res, 'My EAs', `
+  <h1>Welcome${u.name ? ', ' + esc(u.name) : ''}</h1>
+  ${expired ? '<div class="flash error">Your license has expired. Your EAs will stop working until it is renewed.</div>' : ''}
+  ${u.expires_at && !expired ? `<p class="muted">License valid until ${fmtDate(u.expires_at)} (UTC)</p>` : ''}
+
+  <section class="card">
+    <h2>1. Download your EA</h2>
+    ${eas.length ? `<div class="ea-list">${eas.map((e) => `
+      <div class="ea">
+        <div><strong>${esc(e.name)}</strong> <span class="tag">v${esc(e.version)}</span>
+        ${e.description ? `<p class="muted">${esc(e.description)}</p>` : ''}</div>
+        ${e.file_path ? `<a class="btn" href="/download/${e.id}">Download</a>` : '<span class="muted">Coming soon</span>'}
+      </div>`).join('')}</div>`
+    : '<p class="muted">No EAs are assigned to your account yet.</p>'}
+  </section>
+
+  <section class="card">
+    <h2>2. Add your MT5 account numbers <span class="tag">${accounts.length} / ${u.max_accounts}</span></h2>
+    <p class="muted">The EA only runs on the account numbers listed here. Find the number in MT5 under File → Login to Trade Account, or at the top of the Navigator window.</p>
+    ${full ? '<p class="muted">You have reached the maximum number of accounts. Remove one to add another.</p>' : `
+    <form method="post" action="/accounts" class="row">
+      <input name="account_number" placeholder="MT5 account number, e.g. 51234567" inputmode="numeric" pattern="[0-9]{1,20}" required>
+      <input name="label" placeholder="Note (optional), e.g. IC Markets live" maxlength="60">
+      <button>Add account</button>
+    </form>`}
+    ${accounts.length ? `<table><thead><tr><th>Account</th><th>Note</th><th>Last EA check</th><th></th></tr></thead><tbody>
+      ${accounts.map((a) => `<tr><td><strong>${esc(a.account_number)}</strong></td><td>${esc(a.label)}</td>
+        <td>${a.last_check_at ? fmtDate(a.last_check_at) : '<span class="muted">never</span>'}</td>
+        <td><form method="post" action="/accounts/${a.id}/delete" onsubmit="return confirm('Remove account ${esc(a.account_number)}? The EA will stop on it.')">
+        <button class="small danger">Remove</button></form></td></tr>`).join('')}
+    </tbody></table>` : ''}
+  </section>
+
+  <section class="card">
+    <h2>3. Allow the license check in MT5</h2>
+    <p>In MetaTrader 5 go to <strong>Tools → Options → Expert Advisors</strong>, tick <strong>Allow WebRequest for listed URL</strong> and add:</p>
+    <code class="block">${esc(req.protocol + '://' + req.get('host'))}</code>
+  </section>`);
+});
+
+app.post('/accounts', requireUser, (req, res) => {
+  const u = req.user;
+  if (u.status !== 'active') return res.redirect('/dashboard');
+  const num = cleanAccount(req.body.account_number);
+  if (!num) { flash(req, 'error', 'Account number must contain digits only.'); return res.redirect('/dashboard'); }
+  const count = db.prepare('SELECT COUNT(*) AS n FROM accounts WHERE user_id = ?').get(u.id).n;
+  if (count >= u.max_accounts) { flash(req, 'error', `You can register at most ${u.max_accounts} accounts.`); return res.redirect('/dashboard'); }
+  const r = db.prepare('INSERT OR IGNORE INTO accounts (user_id, account_number, label) VALUES (?, ?, ?)')
+    .run(u.id, num, String(req.body.label || '').trim().slice(0, 60));
+  flash(req, r.changes ? 'ok' : 'error', r.changes ? `Account ${num} added.` : `Account ${num} is already on your list.`);
+  res.redirect('/dashboard');
+});
+
+app.post('/accounts/:id/delete', requireUser, (req, res) => {
+  const r = db.prepare('DELETE FROM accounts WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+  if (r.changes) flash(req, 'ok', 'Account removed.');
+  res.redirect('/dashboard');
+});
+
+app.get('/download/:id', requireUser, (req, res) => {
+  const u = req.user;
+  const e = db.prepare(`SELECT e.* FROM eas e JOIN user_eas ue ON ue.ea_id = e.id
+                        WHERE e.id = ? AND ue.user_id = ? AND e.active = 1`).get(req.params.id, u.id);
+  if (u.status !== 'active' || !e || !e.file_path) return res.status(404).send('Not found');
+  res.download(path.join(FILES_DIR, e.file_path), e.file_name);
+});
+
+// ---------- license check API (called by the EA) ----------
+// GET /api/check?ea=CODE&account=12345678
+app.get('/api/check', (req, res) => {
+  const code = String(req.query.ea || '').trim();
+  const num = cleanAccount(req.query.account);
+  const reply = (valid, message, extra = {}) =>
+    res.json({ valid, message, ea: code, account: num || '', server_time: new Date().toISOString(), ...extra });
+
+  if (!code || !num) return reply(false, 'Missing ea or account');
+  const ea = db.prepare('SELECT * FROM eas WHERE code = ?').get(code);
+  if (!ea || !ea.active) return reply(false, 'Unknown or inactive EA');
+
+  const rows = db.prepare(`
+    SELECT a.id AS account_id, u.* FROM accounts a
+    JOIN users u ON u.id = a.user_id
+    JOIN user_eas ue ON ue.user_id = u.id AND ue.ea_id = ?
+    WHERE a.account_number = ? AND u.status = 'active'`).all(ea.id, num);
+  const ok = rows.find((u) => !isExpired(u));
+  if (!ok) {
+    return reply(false, rows.length ? 'License expired' : 'Account not registered for this EA',
+      { latest_version: ea.version });
+  }
+  db.prepare(`UPDATE accounts SET last_check_at = datetime('now'), last_check_ea = ? WHERE id = ?`).run(ea.code, ok.account_id);
+  reply(true, 'OK', { expires: ok.expires_at || '', latest_version: ea.version });
+});
+
+// ---------- admin ----------
+const upload = multer({
+  dest: FILES_DIR,
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
+
+app.get('/admin', requireAdmin, (req, res) => {
+  const q = String(req.query.q || '').trim();
+  const users = db.prepare(`
+    SELECT u.*, (SELECT COUNT(*) FROM accounts a WHERE a.user_id = u.id) AS n_acc,
+           (SELECT GROUP_CONCAT(e.code, ', ') FROM user_eas ue JOIN eas e ON e.id = ue.ea_id WHERE ue.user_id = u.id) AS ea_codes
+    FROM users u
+    WHERE (? = '' OR u.email LIKE ? OR u.name LIKE ?
+           OR u.id IN (SELECT user_id FROM accounts WHERE account_number LIKE ?))
+    ORDER BY CASE u.status WHEN 'pending' THEN 0 ELSE 1 END, u.created_at DESC`)
+    .all(q, `%${q}%`, `%${q}%`, `%${q}%`);
+  const eas = db.prepare('SELECT * FROM eas ORDER BY name').all();
+  const pending = users.filter((u) => u.status === 'pending').length;
+
+  page(req, res, 'Admin', `
+  <h1>Admin</h1>
+  <div class="tabs"><a class="on" href="/admin">Users</a><a href="/admin/eas">EAs (${eas.length})</a></div>
+
+  <section class="card">
+    <div class="row between">
+      <h2>Users ${pending ? `<span class="tag warn">${pending} waiting for approval</span>` : ''}</h2>
+      <form method="get" action="/admin" class="row"><input name="q" value="${esc(q)}" placeholder="Search email, name or account number"><button class="secondary">Search</button></form>
+    </div>
+    <table><thead><tr><th>User</th><th>Status</th><th>EAs</th><th>Accounts</th><th>Expires</th><th></th></tr></thead><tbody>
+    ${users.map((u) => `<tr>
+      <td><a href="/admin/users/${u.id}"><strong>${esc(u.name || '-')}</strong></a><br><span class="muted">${esc(u.email)}</span>${u.is_admin ? ' <span class="tag">admin</span>' : ''}</td>
+      <td><span class="status ${esc(u.status)}">${esc(u.status)}</span></td>
+      <td>${esc(u.ea_codes || '-')}</td>
+      <td>${u.n_acc} / ${u.max_accounts}</td>
+      <td>${u.expires_at ? fmtDate(u.expires_at) : 'never'}${isExpired(u) ? ' <span class="tag warn">expired</span>' : ''}</td>
+      <td class="nowrap">${u.status === 'pending' ? `<form method="post" action="/admin/users/${u.id}/approve" class="inline"><button class="small">Approve</button></form>` : ''}
+        <a class="btn small secondary" href="/admin/users/${u.id}">Manage</a></td>
+    </tr>`).join('') || '<tr><td colspan="6" class="muted">No users found.</td></tr>'}
+    </tbody></table>
+  </section>
+
+  <section class="card">
+    <h2>Add a user</h2>
+    <form method="post" action="/admin/users" class="grid">
+      <label>Name<input name="name" required></label>
+      <label>Email<input type="email" name="email" required></label>
+      <label>Password<input name="password" required minlength="8" placeholder="Give this to the customer"></label>
+      <label>Max accounts<input type="number" name="max_accounts" value="${MAX_ACCOUNTS_DEFAULT}" min="0" max="1000"></label>
+      <label>Expires (blank = never)<input type="date" name="expires_at"></label>
+      <fieldset><legend>EAs</legend>${eas.map((e) => `<label class="check"><input type="checkbox" name="ea" value="${e.id}" ${e.active ? 'checked' : ''}> ${esc(e.name)}</label>`).join('') || '<span class="muted">Add an EA first</span>'}</fieldset>
+      <div><button>Create user</button></div>
+    </form>
+  </section>`);
+});
+
+function parseExpiry(v) {
+  const s = String(v || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s} 23:59:59` : null;
+}
+function setUserEas(userId, eaIds) {
+  const ids = [].concat(eaIds || []).map(Number).filter(Boolean);
+  db.transaction(() => {
+    db.prepare('DELETE FROM user_eas WHERE user_id = ?').run(userId);
+    const ins = db.prepare('INSERT OR IGNORE INTO user_eas (user_id, ea_id) VALUES (?, ?)');
+    ids.forEach((id) => ins.run(userId, id));
+  })();
+}
+
+app.post('/admin/users', requireAdmin, (req, res) => {
+  const email = String(req.body.email || '').trim();
+  const pw = String(req.body.password || '');
+  if (!email || pw.length < 8) { flash(req, 'error', 'Email and a password of 8+ characters are required.'); return res.redirect('/admin'); }
+  if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(email)) { flash(req, 'error', 'That email already exists.'); return res.redirect('/admin'); }
+  const info = db.prepare(`INSERT INTO users (email, name, password_hash, status, max_accounts, expires_at) VALUES (?, ?, ?, 'active', ?, ?)`)
+    .run(email, String(req.body.name || '').trim(), bcrypt.hashSync(pw, 10),
+      Math.max(0, Number(req.body.max_accounts) || 0), parseExpiry(req.body.expires_at));
+  setUserEas(info.lastInsertRowid, req.body.ea);
+  flash(req, 'ok', `User ${email} created. Send them the website link, their email and password.`);
+  res.redirect('/admin');
+});
+
+app.post('/admin/users/:id/approve', requireAdmin, (req, res) => {
+  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+  if (u) {
+    db.prepare(`UPDATE users SET status = 'active' WHERE id = ?`).run(u.id);
+    const has = db.prepare('SELECT 1 FROM user_eas WHERE user_id = ?').get(u.id);
+    if (!has) grantAllActiveEas(u.id);
+    flash(req, 'ok', `${u.email} approved and given access to all active EAs.`);
+  }
+  res.redirect(req.get('referer') || '/admin');
+});
+
+app.get('/admin/users/:id', requireAdmin, (req, res) => {
+  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+  if (!u) return res.redirect('/admin');
+  const eas = db.prepare('SELECT e.*, EXISTS(SELECT 1 FROM user_eas WHERE user_id = ? AND ea_id = e.id) AS granted FROM eas e ORDER BY name').all(u.id);
+  const accounts = db.prepare('SELECT * FROM accounts WHERE user_id = ? ORDER BY created_at').all(u.id);
+  const expDate = u.expires_at ? u.expires_at.slice(0, 10) : '';
+
+  page(req, res, u.email, `
+  <p><a href="/admin">← All users</a></p>
+  <h1>${esc(u.name || u.email)} <span class="status ${esc(u.status)}">${esc(u.status)}</span></h1>
+  <p class="muted">${esc(u.email)} · joined ${fmtDate(u.created_at)}</p>
+
+  <section class="card">
+    <h2>License</h2>
+    <form method="post" action="/admin/users/${u.id}" class="grid">
+      <label>Name<input name="name" value="${esc(u.name)}"></label>
+      <label>Status<select name="status">${['pending', 'active', 'disabled'].map((s) => `<option ${s === u.status ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+      <label>Max accounts<input type="number" name="max_accounts" value="${u.max_accounts}" min="0" max="1000"></label>
+      <label>Expires (blank = never)<input type="date" name="expires_at" value="${esc(expDate)}"></label>
+      <fieldset><legend>EAs this user can download and run</legend>${eas.map((e) => `<label class="check"><input type="checkbox" name="ea" value="${e.id}" ${e.granted ? 'checked' : ''}> ${esc(e.name)} <span class="muted">(${esc(e.code)})</span></label>`).join('') || '<span class="muted">No EAs yet</span>'}</fieldset>
+      <div><button>Save</button></div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>MT5 accounts <span class="tag">${accounts.length} / ${u.max_accounts}</span></h2>
+    <form method="post" action="/admin/users/${u.id}/accounts" class="row">
+      <input name="account_number" placeholder="Add account number" pattern="[0-9]{1,20}" required>
+      <input name="label" placeholder="Note (optional)">
+      <button class="secondary">Add</button>
+    </form>
+    ${accounts.length ? `<table><thead><tr><th>Account</th><th>Note</th><th>Added</th><th>Last check</th><th></th></tr></thead><tbody>
+    ${accounts.map((a) => `<tr><td><strong>${esc(a.account_number)}</strong></td><td>${esc(a.label)}</td><td>${fmtDate(a.created_at)}</td>
+      <td>${a.last_check_at ? `${fmtDate(a.last_check_at)} <span class="muted">${esc(a.last_check_ea)}</span>` : '<span class="muted">never</span>'}</td>
+      <td><form method="post" action="/admin/accounts/${a.id}/delete"><button class="small danger">Remove</button></form></td></tr>`).join('')}
+    </tbody></table>` : '<p class="muted">No accounts registered.</p>'}
+  </section>
+
+  <section class="card">
+    <h2>Reset password</h2>
+    <form method="post" action="/admin/users/${u.id}/password" class="row">
+      <input name="password" minlength="8" required placeholder="New password">
+      <button class="secondary">Set password</button>
+    </form>
+  </section>
+
+  ${u.id !== req.user.id ? `<section class="card">
+    <h2>Delete user</h2>
+    <form method="post" action="/admin/users/${u.id}/delete" onsubmit="return confirm('Delete this user and all their accounts? This cannot be undone.')">
+      <button class="danger">Delete user</button>
+    </form>
+  </section>` : ''}`);
+});
+
+app.post('/admin/users/:id', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const status = ['pending', 'active', 'disabled'].includes(req.body.status) ? req.body.status : 'pending';
+  const self = id === req.user.id;
+  db.prepare('UPDATE users SET name = ?, status = ?, max_accounts = ?, expires_at = ? WHERE id = ?')
+    .run(String(req.body.name || '').trim(), self ? 'active' : status,
+      Math.max(0, Number(req.body.max_accounts) || 0), parseExpiry(req.body.expires_at), id);
+  setUserEas(id, req.body.ea);
+  flash(req, 'ok', 'Saved.');
+  res.redirect(`/admin/users/${id}`);
+});
+
+app.post('/admin/users/:id/accounts', requireAdmin, (req, res) => {
+  const num = cleanAccount(req.body.account_number);
+  if (!num) flash(req, 'error', 'Account number must be digits only.');
+  else {
+    db.prepare('INSERT OR IGNORE INTO accounts (user_id, account_number, label) VALUES (?, ?, ?)')
+      .run(req.params.id, num, String(req.body.label || '').trim().slice(0, 60));
+    flash(req, 'ok', `Account ${num} added.`);
+  }
+  res.redirect(`/admin/users/${req.params.id}`);
+});
+
+app.post('/admin/accounts/:id/delete', requireAdmin, (req, res) => {
+  const a = db.prepare('SELECT * FROM accounts WHERE id = ?').get(req.params.id);
+  if (a) db.prepare('DELETE FROM accounts WHERE id = ?').run(a.id);
+  res.redirect(a ? `/admin/users/${a.user_id}` : '/admin');
+});
+
+app.post('/admin/users/:id/password', requireAdmin, (req, res) => {
+  const pw = String(req.body.password || '');
+  if (pw.length < 8) flash(req, 'error', 'Password must be at least 8 characters.');
+  else {
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(pw, 10), req.params.id);
+    flash(req, 'ok', 'Password updated. Send the new password to the user.');
+  }
+  res.redirect(`/admin/users/${req.params.id}`);
+});
+
+app.post('/admin/users/:id/delete', requireAdmin, (req, res) => {
+  if (Number(req.params.id) !== req.user.id) {
+    db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
+    flash(req, 'ok', 'User deleted.');
+  }
+  res.redirect('/admin');
+});
+
+// --- EAs ---
+app.get('/admin/eas', requireAdmin, (req, res) => {
+  const eas = db.prepare(`SELECT e.*, (SELECT COUNT(*) FROM user_eas WHERE ea_id = e.id) AS n_users FROM eas e ORDER BY name`).all();
+  const eaForm = (e = {}) => `
+    <form method="post" action="${e.id ? `/admin/eas/${e.id}` : '/admin/eas'}" enctype="multipart/form-data" class="grid">
+      <label>Name<input name="name" value="${esc(e.name)}" required placeholder="Gold Scalper"></label>
+      <label>License code<input name="code" value="${esc(e.code)}" required pattern="[A-Za-z0-9_\\-]{2,40}" placeholder="GOLD_SCALPER"></label>
+      <label>Version<input name="version" value="${esc(e.version || '1.0')}" required></label>
+      <label>Description<input name="description" value="${esc(e.description)}"></label>
+      <label>File (.ex5 or .zip)${e.file_name ? ` <span class="muted">current: ${esc(e.file_name)}</span>` : ''}<input type="file" name="file" accept=".ex5,.zip,.set,.rar"></label>
+      <label class="check"><input type="checkbox" name="active" value="1" ${e.id === undefined || e.active ? 'checked' : ''}> Active</label>
+      ${e.id ? '' : '<label class="check"><input type="checkbox" name="grant_all" value="1" checked> Give to all active users</label>'}
+      <div><button>${e.id ? 'Save' : 'Add EA'}</button></div>
+    </form>`;
+
+  page(req, res, 'EAs', `
+  <h1>Admin</h1>
+  <div class="tabs"><a href="/admin">Users</a><a class="on" href="/admin/eas">EAs (${eas.length})</a></div>
+  ${eas.map((e) => `<section class="card">
+    <div class="row between"><h2>${esc(e.name)} <span class="tag">v${esc(e.version)}</span> ${e.active ? '' : '<span class="tag warn">inactive</span>'}</h2>
+    <span class="muted">${e.n_users} users · code <code>${esc(e.code)}</code></span></div>
+    ${eaForm(e)}
+    <form method="post" action="/admin/eas/${e.id}/grant-all" class="inline"><button class="small secondary">Give to all active users</button></form>
+    <form method="post" action="/admin/eas/${e.id}/delete" class="inline" onsubmit="return confirm('Delete this EA? Customers lose access to it.')"><button class="small danger">Delete EA</button></form>
+  </section>`).join('')}
+  <section class="card"><h2>Add a new EA</h2>
+    <p class="muted">The license code must match <code>EA_CODE</code> in the EA's MQL5 source.</p>
+    ${eaForm()}
+  </section>`);
+});
+
+function saveUpload(file, oldPath) {
+  if (!file) return null;
+  if (oldPath) fs.rm(path.join(FILES_DIR, oldPath), { force: true }, () => {});
+  return { file_path: path.basename(file.path), file_name: path.basename(file.originalname).replace(/[^\w.\- ]/g, '_') };
+}
+
+app.post('/admin/eas', requireAdmin, upload.single('file'), (req, res) => {
+  const code = String(req.body.code || '').trim();
+  if (!/^[A-Za-z0-9_-]{2,40}$/.test(code) || db.prepare('SELECT 1 FROM eas WHERE code = ?').get(code)) {
+    if (req.file) fs.rm(req.file.path, { force: true }, () => {});
+    flash(req, 'error', 'License code must be 2 to 40 letters, digits, _ or -, and unique.');
+    return res.redirect('/admin/eas');
+  }
+  const f = saveUpload(req.file) || {};
+  const info = db.prepare('INSERT INTO eas (code, name, version, description, file_name, file_path, active) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(code, String(req.body.name || code).trim(), String(req.body.version || '1.0').trim(),
+      String(req.body.description || '').trim(), f.file_name || null, f.file_path || null, req.body.active ? 1 : 0);
+  if (req.body.grant_all) {
+    db.prepare(`INSERT OR IGNORE INTO user_eas (user_id, ea_id) SELECT id, ? FROM users WHERE status = 'active'`).run(info.lastInsertRowid);
+  }
+  flash(req, 'ok', 'EA added.');
+  res.redirect('/admin/eas');
+});
+
+app.post('/admin/eas/:id', requireAdmin, upload.single('file'), (req, res) => {
+  const e = db.prepare('SELECT * FROM eas WHERE id = ?').get(req.params.id);
+  if (!e) return res.redirect('/admin/eas');
+  const code = String(req.body.code || '').trim();
+  const clash = db.prepare('SELECT 1 FROM eas WHERE code = ? AND id != ?').get(code, e.id);
+  if (!/^[A-Za-z0-9_-]{2,40}$/.test(code) || clash) {
+    if (req.file) fs.rm(req.file.path, { force: true }, () => {});
+    flash(req, 'error', 'License code must be 2 to 40 letters, digits, _ or -, and unique.');
+    return res.redirect('/admin/eas');
+  }
+  const f = saveUpload(req.file, e.file_path) || { file_name: e.file_name, file_path: e.file_path };
+  db.prepare(`UPDATE eas SET code = ?, name = ?, version = ?, description = ?, file_name = ?, file_path = ?, active = ?, updated_at = datetime('now') WHERE id = ?`)
+    .run(code, String(req.body.name || code).trim(), String(req.body.version || '1.0').trim(),
+      String(req.body.description || '').trim(), f.file_name, f.file_path, req.body.active ? 1 : 0, e.id);
+  flash(req, 'ok', `${e.name} saved.`);
+  res.redirect('/admin/eas');
+});
+
+app.post('/admin/eas/:id/grant-all', requireAdmin, (req, res) => {
+  const r = db.prepare(`INSERT OR IGNORE INTO user_eas (user_id, ea_id) SELECT id, ? FROM users WHERE status = 'active'`).run(req.params.id);
+  flash(req, 'ok', `Access given to ${r.changes} more users.`);
+  res.redirect('/admin/eas');
+});
+
+app.post('/admin/eas/:id/delete', requireAdmin, (req, res) => {
+  const e = db.prepare('SELECT * FROM eas WHERE id = ?').get(req.params.id);
+  if (e) {
+    if (e.file_path) fs.rm(path.join(FILES_DIR, e.file_path), { force: true }, () => {});
+    db.prepare('DELETE FROM eas WHERE id = ?').run(e.id);
+    flash(req, 'ok', `${e.name} deleted.`);
+  }
+  res.redirect('/admin/eas');
+});
+
+app.use((err, req, res, next) => {
+  console.error(err);
+  if (err instanceof multer.MulterError) {
+    flash(req, 'error', 'Upload failed: ' + err.message);
+    return res.redirect('/admin/eas');
+  }
+  res.status(500).send('Something went wrong.');
+});
+
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`EA licensing site running on http://localhost:${PORT} (signup mode: ${SIGNUP_MODE})`));
+}
+module.exports = app;

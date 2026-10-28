@@ -1,0 +1,21 @@
+{
+  "name": "ea-license-site",
+  "version": "1.0.0",
+  "description": "Simple licensing website for MT5 Expert Advisors",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node test/smoke.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.0.3",
+    "cookie-session": "^2.1.1",
+    "express": "^5.3.0",
+    "multer": "^2.5.0"
+  },
+  "engines": {
+    "node": ">=20.12"
+  },
+  "private": true
+}
