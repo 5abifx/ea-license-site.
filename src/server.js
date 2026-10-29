@@ -8,7 +8,7 @@ const cookieSession = require('cookie-session');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const { db, FILES_DIR } = require('./db');
-const { esc, fmtDate, layout } = require('./views');
+const { esc, fmtDate, layout, SITE_NAME } = require('./views');
 
 // ---------- config ----------
 const PORT = Number(process.env.PORT || 3000);
@@ -71,7 +71,7 @@ app.use((req, res, next) => {
 });
 
 const flash = (req, type, msg) => { req.session.flash = { type, msg }; };
-const page = (req, res, title, body) => res.send(layout(req, title, body));
+const page = (req, res, title, body, opts) => res.send(layout(req, title, body, opts));
 const requireUser = (req, res, next) => (req.user ? next() : res.redirect('/login'));
 const requireAdmin = (req, res, next) =>
   req.user && req.user.is_admin ? next() : res.status(404).send('Not found');
@@ -100,19 +100,78 @@ function rateLimit(key, max, windowMs) {
 require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount });
 
 // ---------- auth ----------
-app.get('/', (req, res) => res.redirect(req.user ? '/dashboard' : '/login'));
+app.get('/', (req, res) => {
+  if (req.user) return res.redirect('/dashboard');
+  const signup = SIGNUP_MODE !== 'closed';
+  page(req, res, 'Licensed Expert Advisors', `
+  <section class="hero wrap">
+    <span class="pill">${esc(SITE_NAME)} Licensing</span>
+    <h1>Activate. Bind. Trade.</h1>
+    <p class="lead">Every ${esc(SITE_NAME)} Expert Advisor, every license and every MT5 account, managed in one clean dashboard.</p>
+    <div class="cta">
+      ${signup ? '<a class="btn big" href="/signup">Create account</a>' : ''}
+      <a class="btn big secondary" href="/login">Sign in</a>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="preview" aria-label="Example of the license dashboard">
+      <div class="preview-head"><strong>My licenses</strong><span class="tag">Example</span></div>
+      <div class="scroll"><table>
+        <thead><tr><th>Expert Advisor</th><th>MT5 account</th><th>Status</th><th>Last EA check</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Your EA</strong></td><td>51234567</td><td><span class="badge ok">Active</span></td><td class="muted">Checked every hour</td></tr>
+          <tr><td><strong>Your EA</strong></td><td>51234568</td><td><span class="badge warn">Awaiting activation</span></td><td class="muted">-</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <section id="how" class="band">
+    <div class="wrap">
+      <h2 class="section">How it works</h2>
+      <div class="steps">
+        <div><span class="num">1</span><h3>Buy your EA</h3><p class="muted">Purchase the ${esc(SITE_NAME)} Expert Advisor that fits how you trade.</p></div>
+        <div><span class="num">2</span><h3>Create your account</h3><p class="muted">Sign up with the email you paid with.${SIGNUP_MODE === 'approval' ? ' We activate it as soon as your purchase is confirmed.' : ''}</p></div>
+        <div><span class="num">3</span><h3>Bind and download</h3><p class="muted">Add up to ${MAX_ACCOUNTS_DEFAULT} MT5 account numbers, download the EA and start trading.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap features">
+    <div><h3>Locked to your accounts</h3><p class="muted">The EA only runs on the MT5 account numbers you register, so your license stays yours.</p></div>
+    <div><h3>Always the latest build</h3><p class="muted">Download the newest version of every EA you own straight from your dashboard.</p></div>
+    <div><h3>Change accounts anytime</h3><p class="muted">Switched broker? Remove an old account and add the new one in seconds.</p></div>
+  </section>
+
+  <section class="wrap">
+    <div class="cta-card">
+      <div><h2>Ready to trade with ${esc(SITE_NAME)}?</h2><p>Already bought an EA? Create your account to get started.</p></div>
+      <div class="cta">
+        ${signup ? '<a class="btn big" href="/signup">Create account</a>' : ''}
+        <a class="btn big ghost" href="/login">Sign in</a>
+      </div>
+    </div>
+  </section>`, { wide: true });
+});
 
 app.get('/login', (req, res) => {
   if (req.user) return res.redirect('/dashboard');
   page(req, res, 'Sign in', `
-  <div class="card narrow">
-    <h1>Sign in</h1>
-    <form method="post" action="/login">
-      <label>Email<input name="email" required autofocus autocomplete="username"></label>
-      <label>Password<input type="password" name="password" required></label>
-      <button>Sign in</button>
-    </form>
-    ${SIGNUP_MODE !== 'closed' ? '<p class="muted">No account yet? <a href="/signup">Create one</a></p>' : ''}
+  <div class="auth">
+    <div class="auth-intro">
+      <h1>Welcome back</h1>
+      <p class="muted">Sign in to download your EAs, manage your MT5 accounts and check your license.</p>
+    </div>
+    <div class="card">
+      <h2>Sign in</h2>
+      <form method="post" action="/login">
+        <label>Email<input name="email" required autofocus autocomplete="username"></label>
+        <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
+        <button class="full">Sign in</button>
+      </form>
+      ${SIGNUP_MODE !== 'closed' ? '<p class="muted">No account yet? <a href="/signup">Create one</a></p>' : ''}
+    </div>
   </div>`);
 });
 
@@ -139,15 +198,22 @@ app.post('/logout', (req, res) => { req.session = null; res.redirect('/login'); 
 app.get('/signup', (req, res) => {
   if (SIGNUP_MODE === 'closed') return res.redirect('/login');
   page(req, res, 'Create account', `
-  <div class="card narrow">
-    <h1>Create account</h1>
-    <form method="post" action="/signup">
-      <label>Name<input name="name" required maxlength="80"></label>
-      <label>Email<input type="email" name="email" required maxlength="120"></label>
-      <label>Password<input type="password" name="password" required minlength="8"></label>
-      <button>Create account</button>
-    </form>
-    ${SIGNUP_MODE === 'approval' ? '<p class="muted">Your account will be activated after we confirm your purchase.</p>' : ''}
+  <div class="auth">
+    <div class="auth-intro">
+      <h1>Create your account</h1>
+      <p class="muted">Use the same email you paid with so we can match your purchase.</p>
+    </div>
+    <div class="card">
+      <h2>Create account</h2>
+      <form method="post" action="/signup">
+        <label>Name<input name="name" required maxlength="80" autocomplete="name"></label>
+        <label>Email<input type="email" name="email" required maxlength="120" autocomplete="email"></label>
+        <label>Password<input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters"></label>
+        <button class="full">Create account</button>
+      </form>
+      ${SIGNUP_MODE === 'approval' ? '<p class="muted">Your account will be activated after we confirm your purchase.</p>' : ''}
+      <p class="muted">Already have an account? <a href="/login">Sign in</a></p>
+    </div>
   </div>`);
 });
 
