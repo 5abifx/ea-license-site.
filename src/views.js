@@ -1,4 +1,7 @@
 const SITE_NAME = process.env.SITE_NAME || '5ABI.FX';
+const PRICE_TEXT = process.env.PRICE_TEXT || '$20/month';
+// Free trial for new sign ups (read on each request so it can be changed without code edits). 0 = no trial.
+const trialDays = () => Math.max(0, Number(process.env.TRIAL_DAYS ?? 15) || 0);
 
 function esc(v) {
   return String(v ?? '')
@@ -31,13 +34,25 @@ function layout(req, title, body, opts = {}) {
        ${u.is_admin ? '<a href="/admin">Admin</a>' : ''}
        <a href="/password">Password</a>
        <form method="post" action="/logout" class="inline"><button class="link">Sign out</button></form>`
-    : `<a href="/#how">How it works</a><a href="/#pricing">Pricing</a><a href="/login">Sign in</a>${signup ? '<a class="btn dark" href="/signup">Create account</a>' : ''}`;
+    : `<a href="/#how">How it works</a><a href="/#pricing">Pricing</a><a href="/faq">FAQ</a><a href="/login">Sign in</a>${signup ? '<a class="btn dark" href="/signup">Create account</a>' : ''}`;
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const trial = trialDays();
+  const desc = `Automated MT5 Expert Advisors that trade your rules 24/5.${trial ? ` ${trial}-day free trial, then ${PRICE_TEXT}.` : ` ${PRICE_TEXT}.`}`;
   const flashHtml = flash ? `<div class="flash ${esc(flash.type)}">${esc(flash.msg)}</div>` : '';
   return `<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)} · ${esc(SITE_NAME)}</title>
-<meta name="description" content="${esc(SITE_NAME)} Expert Advisors: download your EAs, register your MT5 accounts and manage your licenses.">
+<meta name="description" content="${esc(desc)}">
+<meta name="theme-color" content="#2346F5">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="${esc(SITE_NAME)}">
+<meta property="og:title" content="${esc(SITE_NAME)} · Activate. Bind. Trade.">
+<meta property="og:description" content="${esc(desc)}">
+<meta property="og:url" content="${esc(origin + req.path)}">
+<meta property="og:image" content="${esc(origin)}/og.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
@@ -49,9 +64,10 @@ ${opts.wide
     : `<main class="wrap">${flashHtml}${body}</main>`}
 <footer><div class="wrap foot">
 <span class="brand">${brandMark()}</span>
+<span class="foot-links"><a href="/faq">FAQ</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></span>
 <span class="muted">Trading forex and CFDs carries a high level of risk and may not be suitable for every investor. Past performance does not guarantee future results.</span>
 </div></footer>
 </body></html>`;
 }
 
-module.exports = { esc, fmtDate, layout, SITE_NAME };
+module.exports = { esc, fmtDate, layout, SITE_NAME, PRICE_TEXT, trialDays };

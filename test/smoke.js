@@ -116,6 +116,15 @@ function client(base) {
     assert.doesNotMatch((await tia.get('/dashboard')).text, /Free trial/);
     process.env.TRIAL_DAYS = '0';
 
+    // public info pages, 404 and link preview tags
+    const anon = client(base);
+    for (const u of ['/faq', '/terms', '/privacy']) assert.strictEqual((await anon.get(u)).status, 200, u);
+    r = await anon.get('/no-such-page');
+    assert.strictEqual(r.status, 404);
+    assert.match(r.text, /doesn&#39;t exist|doesn't exist/);
+    assert.match((await anon.get('/')).text, /property="og:image" content="http:\/\/127\.0\.0\.1:\d+\/og\.png"/);
+    assert.match((await fetch(base + '/robots.txt').then((x) => x.text())), /Disallow: \//);
+
     // cross-site post blocked
     const xr = await fetch(base + '/accounts', { method: 'POST', headers: { origin: 'https://evil.com' } });
     assert.strictEqual(xr.status, 403);

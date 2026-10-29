@@ -8,17 +8,14 @@ const cookieSession = require('cookie-session');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const { db, FILES_DIR } = require('./db');
-const { esc, fmtDate, layout, SITE_NAME } = require('./views');
+const { esc, fmtDate, layout, SITE_NAME, PRICE_TEXT, trialDays } = require('./views');
 
 // ---------- config ----------
 const PORT = Number(process.env.PORT || 3000);
 // closed = only admin creates users, approval = users sign up but admin must approve, open = instant access
 const SIGNUP_MODE = process.env.SIGNUP_MODE || 'approval';
 const MAX_ACCOUNTS_DEFAULT = Number(process.env.MAX_ACCOUNTS || 10);
-// Free trial for new sign ups (read on each request so it can be changed without code edits). 0 = no trial.
-const trialDays = () => Math.max(0, Number(process.env.TRIAL_DAYS ?? 15) || 0);
 const TRIAL_ACCOUNTS = Number(process.env.TRIAL_ACCOUNTS || 1);   // MT5 accounts a trial user may register
-const PRICE_TEXT = process.env.PRICE_TEXT || '$20/month';
 const PAID_DAYS = Number(process.env.PAID_DAYS || 30);           // days added by the admin "Mark as paid" button
 const PAYMENT_URL = process.env.PAYMENT_URL || '';               // where customers pay or ask to pay (e.g. Discord invite)
 const SESSION_SECRET = process.env.SESSION_SECRET;
@@ -766,6 +763,8 @@ app.post('/admin/eas/:id/delete', requireAdmin, (req, res) => {
   }
   res.redirect('/admin/eas');
 });
+
+require('./pages')(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, TRIAL_ACCOUNTS, MAX_ACCOUNTS_DEFAULT });
 
 app.use((err, req, res, next) => {
   console.error(err);

@@ -36,6 +36,7 @@ Everything (database + uploaded EA files) lives in the `data/` folder. **Back th
 | `PRICE_TEXT` | Price shown on the site, e.g. `$20/month`. |
 | `PAID_DAYS` | Days added when you click **Mark as paid** on a user in Admin (default 30). |
 | `PAYMENT_URL` | Optional link for the **Subscribe** button (payment page or Discord invite). |
+| `CONTACT_URL` | Optional "Contact us" link on the FAQ, Terms and Privacy pages. Defaults to `PAYMENT_URL`. |
 
 ## 2. Put it online
 
