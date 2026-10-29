@@ -1,5 +1,5 @@
-/* Trade cards: draws the result card and the chart card on a canvas.
-   Shared by the journal pages. Exposes window.TradeCards. */
+/* Trade cards: draws the 5ABI.FX result card and chart card (Katana design, 9:16) on a canvas.
+   Used by the journal trade page. Exposes window.TradeCards. */
 (function () {
 const SIZES = { story: 1920, post: 1350, square: 1080 };
 const state = { tpl: 'katana', size: 'story', mode: 'money', rm: true, candles: { data: [], example: false } };
@@ -82,6 +82,13 @@ function middle(ctx, W, y0, y1, need, draw) {
   draw();
   ctx.restore();
 }
+/* the 5ABI.FX wordmark, right- or left-aligned at x */
+function brand(ctx, x, y, ink, acc, align = "right", size = 44) {
+  const a = measure(ctx, "5ABI", 900, size, D, 2), b = measure(ctx, ".FX", 900, size, D, 2);
+  const x0 = align === "right" ? x - a - b : x;
+  text(ctx, "5ABI", x0, y, { w: 900, size, fam: D, color: ink, ls: 2 });
+  text(ctx, ".FX", x0 + a, y, { w: 900, size, fam: D, color: acc, ls: 2 });
+}
 function hash(s) { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 
 /* ---------- templates ---------- */
@@ -97,15 +104,15 @@ function drawKatana(ctx, W, H, t) {
   ctx.fillStyle = g;
   ctx.beginPath(); ctx.moveTo(W * 0.78, -20); ctx.lineTo(W * 1.02, -20); ctx.lineTo(W * 0.22, H + 20); ctx.lineTo(-W * 0.02, H + 20); ctx.closePath(); ctx.fill();
   ctx.strokeStyle = acc; ctx.lineWidth = 3; ctx.globalAlpha = 0.85;
-  ctx.beginPath(); ctx.moveTo(W * 0.92, -10); ctx.lineTo(W * 0.1, H + 10); ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.moveTo(W * 0.98, -10); ctx.lineTo(W * 0.16, H + 10); ctx.stroke(); ctx.globalAlpha = 1;
 
   text(ctx, t.handle || "", pad, pad + 24, { w: 700, size: 34, color: ink });
-  text(ctx, ("TRADE CLOSED · " + dayTxt(t.close)).trim(), W - pad, pad + 22, { w: 500, size: 24, fam: M, color: dim, align: "right", ls: 3 });
+  brand(ctx, W - pad, pad + 30, ink, acc);
   ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.fillRect(pad, pad + 52, W - 2 * pad, 2);
 
   const footY = H - pad;
   if (state.rm) text(ctx, `RISK ${num(t.risk) ?? "—"}% · PROTECTED BY KATANA`, pad, footY, { w: 600, size: 24, fam: M, color: acc, ls: 3 });
-  text(ctx, t.ticket ? "#" + t.ticket : "", W - pad, footY, { w: 500, size: 24, fam: M, color: dim, align: "right", ls: 2 });
+  text(ctx, dayTxt(t.close), W - pad, footY, { w: 500, size: 24, fam: M, color: dim, align: "right", ls: 3 });
   ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.fillRect(pad, footY - 50, W - 2 * pad, 2);
 
   middle(ctx, W, pad + 90, footY - 80, 910, () => {
@@ -284,7 +291,7 @@ function parsePartials(t) {
 }
 /* ---------- chart card (slide 2) ---------- */
 const PAL = {
-  katana: { bg: "#0d0e11", ink: "#f3efe6", dim: "#8d8b85", grid: "rgba(255,255,255,0.06)", up: "#e9e4d8", down: "#55534f", good: "#e3b341", bad: "#e5484d", entry: "#9db2d6", font: D },
+  katana: { bg: "#0d0e11", ink: "#f3efe6", dim: "#8d8b85", grid: "rgba(255,255,255,0.06)", up: "#26a69a", down: "#ef5350", good: "#e3b341", bad: "#e5484d", entry: "#9db2d6", font: D },
   map: { bg: "#0b1220", ink: "#e8edf6", dim: "#7d8aa5", grid: "rgba(125,138,165,0.12)", up: "#dfe6f2", down: "#3c4a66", good: "#34c77b", bad: "#f05252", entry: "#9db2d6", font: D },
   pass: { bg: "#f4efe4", ink: "#16181d", dim: "#7a756b", grid: "rgba(22,24,29,0.07)", up: "#f4efe4", down: "#16181d", good: "#1f8a5b", bad: "#c8372d", entry: "#2c5aa0", font: D },
   discipline: { bg: "#f1eee8", ink: "#121212", dim: "#6f6a60", grid: "rgba(18,18,18,0.07)", up: "#f1eee8", down: "#121212", good: "#1f7a50", bad: "#c8372d", entry: "#2c5aa0", font: D }
@@ -299,7 +306,7 @@ function drawChart(ctx, W, H, t) {
   const P = PAL[state.tpl] || PAL.katana, pad = 70, buy = t.side !== "SELL", win = isWin(t);
   ctx.fillStyle = P.bg; ctx.fillRect(0, 0, W, H);
   text(ctx, t.handle || "", pad, pad + 24, { w: 700, size: 34, color: P.ink });
-  text(ctx, "2 / 2  ·  THE TRADE", W - pad, pad + 22, { w: 500, size: 24, fam: M, color: P.dim, align: "right", ls: 3 });
+  brand(ctx, W - pad, pad + 30, P.ink, P.good === "#e3b341" ? P.good : P.ink);
   const sym = t.symbol || "", ss = fit(ctx, sym, 520, 104, 900, D, 3);
   text(ctx, sym, pad - 4, pad + 150, { w: 900, size: ss, fam: D, color: P.ink, ls: 3 });
   const sw = measure(ctx, sym, 900, ss, D, 3);
@@ -325,7 +332,18 @@ function drawChart(ctx, W, H, t) {
   const Y = p => y1 - (p - lo) / (hi - lo) * (y1 - y0), cw = (x1 - x0) / n, X = i => x0 + (i - a + 0.5) * cw;
   // grid
   ctx.strokeStyle = P.grid; ctx.lineWidth = 1;
-  for (let g = 0; g <= 6; g++) { const yy = y0 + (y1 - y0) * g / 6; ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke(); }
+  for (let g = 0; g <= 6; g++) {
+    const yy = y0 + (y1 - y0) * g / 6; ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
+    const pv = hi - (hi - lo) * g / 6, dg = Math.max(0, (String(t.entry).split(".")[1] || "").length);
+    text(ctx, pv.toFixed(dg), W - pad, yy + 7, { w: 500, size: 19, fam: M, color: P.dim, align: "right" });
+  }
+  // time axis: one label about every 12 candles
+  const step = Math.max(1, Math.round((b - a + 1) / 6));
+  for (let i = a; i <= b; i += step) {
+    const d = new Date(all.at(i).t), hh = String(d.getUTCHours()).padStart(2, "0"), mm = String(d.getUTCMinutes()).padStart(2, "0");
+    ctx.beginPath(); ctx.moveTo(X(i), y0); ctx.lineTo(X(i), y1); ctx.stroke();
+    text(ctx, `${hh}:${mm}`, X(i), y1 + 30, { w: 500, size: 19, fam: M, color: P.dim, align: "center" });
+  }
   // risk and reward boxes, like a position tool
   const bx0 = X(io), bx1 = X(ic);
   if (e !== null && tp !== null) { ctx.fillStyle = P.good + "26"; ctx.fillRect(bx0, Math.min(Y(e), Y(tp)), bx1 - bx0, Math.abs(Y(tp) - Y(e))); }
@@ -367,7 +385,7 @@ function drawChart(ctx, W, H, t) {
     ctx.strokeStyle = col; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(cx - 12, cy - 12); ctx.lineTo(cx + 12, cy + 12); ctx.moveTo(cx + 12, cy - 12); ctx.lineTo(cx - 12, cy + 12); ctx.stroke();
     callout(cx, cy, `EXIT ${t.exit}`, col, win ? buy : !buy);
   }
-  if (state.candles.example) text(ctx, "EXAMPLE CANDLES · NOT REAL PRICE DATA", x0, y1 + 34, { w: 600, size: 20, fam: M, color: P.dim, ls: 2 });
+  if (state.candles.example) text(ctx, "EXAMPLE CANDLES · NOT REAL PRICE DATA", x0, y0 - 14, { w: 600, size: 20, fam: M, color: P.dim, ls: 2 });
   // footer stats
   const rr = e !== null && sl !== null && tp !== null && Math.abs(e - sl) > 0 ? (Math.abs(tp - e) / Math.abs(e - sl)).toFixed(2) : "—";
   const stats = [["PLANNED R:R", `1 : ${rr}`], ["PARTIALS", String(parsePartials(t).length)], ["HELD", duration(t)]];
@@ -388,5 +406,5 @@ function render(resultCanvas, chartCanvas, trade, opts) {
   DRAW[state.tpl](resultCanvas.getContext('2d'), 1080, SIZES[state.size], trade);
   drawChart(chartCanvas.getContext('2d'), 1080, SIZES[state.size], trade);
 }
-window.TradeCards = { render, primary: t => primary(t), rTxt, num, duration };
+window.TradeCards = { render };
 })();
