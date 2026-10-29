@@ -94,6 +94,44 @@ function client(base) {
     const xr = await fetch(base + '/accounts', { method: 'POST', headers: { origin: 'https://evil.com' } });
     assert.strictEqual(xr.status, 403);
 
+    // ---------- trade journal ----------
+    const fdj = new FormData();
+    fdj.append('name', 'Trade Journal'); fdj.append('code', 'JOURNAL'); fdj.append('version', '1.0'); fdj.append('active', '1');
+    r = await admin.post('/admin/eas', fdj);
+    assert.match(r.text, /EA added/);
+    assert.doesNotMatch((await bob.get('/dashboard')).text, /href="\/journal"/);   // not licensed yet
+    assert.match((await bob.get('/journal')).text, /not part of your license/);
+    r = await admin.get('/admin');
+    const bobId = r.text.match(/\/admin\/users\/(\d+)">\s*<strong>Bob/)?.[1] || r.text.match(/href="\/admin\/users\/(\d+)"><strong>Bob/)[1];
+    await admin.post(`/admin/users/${bobId}`, [['name', 'Bob'], ['status', 'active'], ['max_accounts', '10'], ['expires_at', ''], ['ea', '1'], ['ea', '2']]);
+    r = await bob.get('/journal');
+    assert.match(r.text, /No trades yet/);
+    const key = r.text.match(/<code class="block">([0-9a-f]{32})<\/code>/)[1];
+
+    const send = (body) => fetch(`${base}/api/journal/trades`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const trade = { position_id: '777', symbol: 'XAUUSD', side: 'BUY', lots: 0.5, entry: 2641.2, exit: 2668.9, sl: 2631.2, tp: 2668.9, digits: 2,
+      open_time: '2026-10-28T14:32:00', close_time: '2026-10-28T16:05:00', profit: 1390, commission: -5, swap: 0, net: 1385,
+      pips: 277, r: 2.77, risk_money: 500, risk_pct: 1, pct: 2.77, tf: 'M5',
+      partials: [{ time: '2026-10-28T15:12:00', price: 2655, lots: 0.25, profit: 345 }, { time: '2026-10-28T16:05:00', price: 2668.9, lots: 0.25, profit: 1045 }],
+      candles: [[1793197800, 2640, 2642, 2639, 2641.5], [1793198100, 2641.5, 2650, 2641, 2649]] };
+    let jr = await send({ key: 'wrong', account: '1001', trade });
+    assert.strictEqual(jr.status, 403);
+    jr = await send({ key, account: '424242', trade });
+    assert.strictEqual(jr.status, 403);                        // account not registered
+    jr = await send({ key, account: '1001', currency: 'USD', trade });
+    assert.strictEqual(jr.status, 200, await jr.text());
+    jr = await send({ key, account: '1001', currency: 'USD', trade: { ...trade, net: 1390 } });   // resend updates, no duplicate
+    assert.strictEqual(jr.status, 200);
+    r = await bob.get('/journal');
+    assert.match(r.text, /XAUUSD/);
+    assert.strictEqual((r.text.match(/href="\/journal\/\d+"/g) || []).length, 1);
+    const tid = r.text.match(/href="\/journal\/(\d+)"/)[1];
+    r = await bob.post(`/journal/${tid}`, { setup: 'London breakout', emotion: 'Calm', rating: '5', notes: 'Clean <b>setup</b>' });
+    assert.match(r.text, /Notes saved/);
+    assert.match(r.text, /Clean &lt;b&gt;setup&lt;\/b&gt;/);
+    assert.match(r.text, /"partials":\[\{"time":"2026-10-28T15:12:00"/);          // final close is not a partial
+    assert.strictEqual((await eve.get(`/journal/${tid}`)).status !== 200 || !(await eve.get(`/journal/${tid}`)).text.includes('XAUUSD'), true);
+
     console.log('All smoke tests passed');
   } finally {
     server.close();
