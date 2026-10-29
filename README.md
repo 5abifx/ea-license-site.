@@ -81,7 +81,7 @@ A separate, read-only EA (`mql5/TradeJournal.mq5`) logs every closed trade to th
 2. Admin → EAs → add an EA named *Trade Journal* with license code `JOURNAL` and upload the `.ex5`.
 3. Give it to the customers who bought the journal (or to everyone, as a bundle with KATANA).
 
-**What the customer does:** downloads it from *My EAs*, attaches it to one chart per MT5 account, and pastes the *Journal key* shown on their **Journal** page into the EA inputs.
+**What the customer does:** downloads it from *My EAs*, attaches it to its own chart (MT5 runs one EA per chart, so a second chart next to KATANA, any symbol) once per MT5 account, and pastes the *Journal key* shown on their **Journal** page into the EA inputs.
 
 **What gets logged per trade:** symbol, side, lots, entry/exit, initial SL/TP, open/close time, net P&L with commission and swap, pips, R multiple, risk %, account %, best/worst price while open, magic number, every partial close, and the candles around the trade (40 before entry, 20 after exit, on the timeframe chosen in the inputs). Trades are re-sent once the candles after the exit exist, and trades closed while MT5 was offline are sent on the next start (`CatchUpDays`). A local copy is written to `MQL5/Files/Common/TradeJournal/`.
 

@@ -128,7 +128,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <section class="card">
       <h2>Connect the Trade Journal EA</h2>
       <ol class="steps">
-        <li>Download <strong>Trade Journal</strong> from <a href="/dashboard">My EAs</a> and attach it to <strong>one</strong> chart on each MT5 account. It only reads your trades, so it runs safely next to KATANA and any other EA.</li>
+        <li>Download <strong>Trade Journal</strong> from <a href="/dashboard">My EAs</a> and attach it to <strong>one extra chart</strong> on each MT5 account (MT5 allows one EA per chart, so open a new chart for it; any symbol works). It reads the whole account, so it logs every symbol and every EA, and it never trades, so it runs safely next to KATANA.</li>
         <li>Paste this key into the EA's <strong>Journal key</strong> input:
           <code class="block">${esc(key)}</code></li>
         <li>Make sure the account number is on <a href="/dashboard">My EAs</a>, and that MT5 allows <code>${esc(site)}</code> under Tools → Options → Expert Advisors → Allow WebRequest.</li>

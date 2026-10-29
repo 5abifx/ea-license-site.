@@ -3,7 +3,8 @@
 //|                                                                  |
 //| A separate, read-only EA: it never opens, changes or closes      |
 //| trades, so it runs safely next to KATANA or any other EA.        |
-//| Attach it to ONE chart per MT5 account. It logs trades from all  |
+//| MT5 runs one EA per chart: open a separate chart (any symbol) for |
+//| the journal, one per MT5 account. It logs trades from all        |
 //| symbols and all EAs on that account.                             |
 //+------------------------------------------------------------------+
 #property copyright "5ABI.FX"
