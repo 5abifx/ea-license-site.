@@ -4,15 +4,15 @@
   const c1 = document.getElementById('c1'), c2 = document.getElementById('c2');
   const val = (id) => document.getElementById(id);
   const draw = () => window.TradeCards.render(c1, c2, trade, {
-    tpl: val('tpl').value, size: val('size').value, mode: val('mode').value, rm: val('rm').checked,
+    tpl: 'katana', size: 'story', mode: val('mode').value, rm: val('rm').checked,
   });
-  ['tpl', 'size', 'mode', 'rm'].forEach((id) => val(id).addEventListener('change', draw));
+  ['mode', 'rm'].forEach((id) => val(id).addEventListener('change', draw));
   document.querySelectorAll('[data-save]').forEach((b) => b.addEventListener('click', () => {
     const cv = val(b.dataset.save);
     cv.toBlob((blob) => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `${trade.symbol}-${b.dataset.save === 'c1' ? 'result' : 'chart'}-${val('tpl').value}.png`;
+      a.download = `5ABIFX-${trade.symbol}-${b.dataset.save === 'c1' ? '1-result' : '2-chart'}.png`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     }, 'image/png');

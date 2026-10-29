@@ -167,10 +167,9 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <p class="muted">Account ${esc(t.account_number)} · position ${esc(t.position_id)} · ${fmtDate(t.open_time)} → ${fmtDate(t.close_time)} (broker time)</p>
 
     <section class="card">
-      <h2>Share cards</h2>
+      <h2>Share cards <span class="tag">5ABI.FX story · 9:16</span></h2>
+      <p class="muted">Swipe story: card 1 is the result, card 2 is the real MT5 chart of this trade.</p>
       <div class="row">
-        <select id="tpl"><option value="katana">Katana</option><option value="pass">Trade pass</option><option value="map">Trade map</option><option value="discipline">Discipline</option></select>
-        <select id="size"><option value="story">Story 9:16</option><option value="post">Post 4:5</option><option value="square">Square 1:1</option></select>
         <select id="mode"><option value="money">Show $ amount</option><option value="pct">Show % of account</option><option value="r">Show R multiple</option></select>
         <label class="check"><input type="checkbox" id="rm" checked> KATANA badge</label>
       </div>
