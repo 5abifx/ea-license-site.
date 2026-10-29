@@ -30,3 +30,7 @@ services:
         value: $20/month
       - key: PAYMENT_URL
         sync: false          # your payment page or Discord invite
+      - key: GOOGLE_CLIENT_ID
+        sync: false          # Sign in with Google (see README)
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false

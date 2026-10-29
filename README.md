@@ -37,6 +37,17 @@ Everything (database + uploaded EA files) lives in the `data/` folder. **Back th
 | `PAID_DAYS` | Days added when you click **Mark as paid** on a user in Admin (default 30). |
 | `PAYMENT_URL` | Optional link for the **Subscribe** button (payment page or Discord invite). |
 | `CONTACT_URL` | Optional "Contact us" link on the FAQ, Terms and Privacy pages. Defaults to `PAYMENT_URL`. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Turn on **Sign in with Google**. New accounts can then only be created with Google, which stops fake email sign ups for repeat trials. See below. |
+
+### Sign in with Google
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → create a project.
+2. **APIs & Services → OAuth consent screen**: choose *External*, fill in the app name and your email, and publish it.
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID** → *Web application*.
+   Under **Authorized redirect URIs** add `https://YOUR-SITE/auth/google/callback`.
+4. Copy the client ID and secret into `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` and restart.
+
+Existing users (and the admin) can still sign in with their password; if they use Google with the same email, the two are linked.
 
 ## 2. Put it online
 

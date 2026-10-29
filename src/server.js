@@ -2,6 +2,7 @@
 try { process.loadEnvFile(require('path').join(__dirname, '..', '.env')); } catch { /* no .env file */ }
 
 const path = require('path');
+const crypto = require('crypto');
 const fs = require('fs');
 const express = require('express');
 const cookieSession = require('cookie-session');
@@ -234,6 +235,7 @@ app.get('/login', (req, res) => {
     </div>
     <div class="card">
       <h2>Sign in</h2>
+      ${googleOn() ? `${googleButton('Sign in with Google')}<p class="or">or with email and password</p>` : ''}
       <form method="post" action="/login">
         <label>Email<input name="email" required autofocus autocomplete="username"></label>
         <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
@@ -275,20 +277,46 @@ app.get('/signup', (req, res) => {
     </div>
     <div class="card">
       <h2>Create account</h2>
+      ${googleOn() ? `${googleButton(trial ? 'Start free trial with Google' : 'Sign up with Google')}
+      <p class="muted">We use your Google account to keep one free trial per person. We only receive your name and email.</p>` : `
       <form method="post" action="/signup">
         <label>Name<input name="name" required maxlength="80" autocomplete="name"></label>
         <label>Email<input type="email" name="email" required maxlength="120" autocomplete="email"></label>
         <label>Password<input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters"></label>
         <button class="full">${trial ? 'Start free trial' : 'Create account'}</button>
-      </form>
+      </form>`}
       ${!trial && SIGNUP_MODE === 'approval' ? '<p class="muted">Your account will be activated after we confirm your purchase.</p>' : ''}
       <p class="muted">Already have an account? <a href="/login">Sign in</a></p>
     </div>
   </div>`);
 });
 
+// Creates a customer account: a free trial when TRIAL_DAYS is set, otherwise SIGNUP_MODE decides. Returns the new user id.
+function createCustomer(req, { name, email, passwordHash, googleSub = null }) {
+  const trial = trialDays();
+  let info;
+  if (trial) {
+    // Free trial: active right away, all EAs, expires after TRIAL_DAYS
+    info = db.prepare(`INSERT INTO users (email, name, password_hash, status, max_accounts, expires_at, trial, google_sub)
+                       VALUES (?, ?, ?, 'active', ?, datetime('now', ?), 1, ?)`)
+      .run(email, name, passwordHash, TRIAL_ACCOUNTS, `+${trial} days`, googleSub);
+    grantAllActiveEas(info.lastInsertRowid);
+    flash(req, 'ok', `Your ${trial}-day free trial has started. Add your MT5 account below to begin.`);
+  } else {
+    const status = SIGNUP_MODE === 'open' ? 'active' : 'pending';
+    info = db.prepare('INSERT INTO users (email, name, password_hash, status, max_accounts, google_sub) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(email, name, passwordHash, status, MAX_ACCOUNTS_DEFAULT, googleSub);
+    if (status === 'active') grantAllActiveEas(info.lastInsertRowid);
+  }
+  return Number(info.lastInsertRowid);
+}
+
 app.post('/signup', (req, res) => {
   if (SIGNUP_MODE === 'closed') return res.redirect('/login');
+  if (googleOn()) {
+    flash(req, 'error', 'Please sign up with your Google account.');
+    return res.redirect('/signup');
+  }
   if (rateLimit('signup:' + req.ip, 5, 60 * 60 * 1000)) {
     flash(req, 'error', 'Too many sign ups from your network. Try again later.');
     return res.redirect('/signup');
@@ -304,23 +332,72 @@ app.post('/signup', (req, res) => {
     flash(req, 'error', 'That email is already registered. Please sign in.');
     return res.redirect('/login');
   }
-  const trial = trialDays();
-  let info;
-  if (trial) {
-    // Free trial: active right away, all EAs, expires after TRIAL_DAYS
-    info = db.prepare(`INSERT INTO users (email, name, password_hash, status, max_accounts, expires_at, trial)
-                       VALUES (?, ?, ?, 'active', ?, datetime('now', ?), 1)`)
-      .run(email, name, bcrypt.hashSync(password, 10), TRIAL_ACCOUNTS, `+${trial} days`);
-    grantAllActiveEas(info.lastInsertRowid);
-    flash(req, 'ok', `Your ${trial}-day free trial has started. Add your MT5 account below to begin.`);
-  } else {
-    const status = SIGNUP_MODE === 'open' ? 'active' : 'pending';
-    info = db.prepare('INSERT INTO users (email, name, password_hash, status, max_accounts) VALUES (?, ?, ?, ?, ?)')
-      .run(email, name, bcrypt.hashSync(password, 10), status, MAX_ACCOUNTS_DEFAULT);
-    if (status === 'active') grantAllActiveEas(info.lastInsertRowid);
-  }
-  req.session.uid = Number(info.lastInsertRowid);
+  req.session.uid = createCustomer(req, { name, email, passwordHash: bcrypt.hashSync(password, 10) });
   res.redirect('/dashboard');
+});
+
+// ---------- Sign in with Google (OpenID Connect, authorization code flow) ----------
+// On when GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set; new accounts can then only be created with Google.
+const googleOn = () => Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+const googleRedirectUri = (req) => `${process.env.BASE_URL || `${req.protocol}://${req.get('host')}`}/auth/google/callback`;
+function googleButton(label) {
+  return `<a class="btn google full" href="/auth/google"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.7 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.4 5.7c4.3-4 6.9-9.9 6.9-17.2z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.2 0-11.5-4.1-13.4-9.9l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>${esc(label)}</a>`;
+}
+
+app.get('/auth/google', (req, res) => {
+  if (!googleOn()) return res.redirect('/login');
+  const state = crypto.randomBytes(16).toString('hex');
+  req.session.gstate = state;
+  const q = new URLSearchParams({
+    client_id: process.env.GOOGLE_CLIENT_ID, redirect_uri: googleRedirectUri(req), response_type: 'code',
+    scope: 'openid email profile', state, prompt: 'select_account',
+  });
+  res.redirect('https://accounts.google.com/o/oauth2/v2/auth?' + q);
+});
+
+app.get('/auth/google/callback', async (req, res) => {
+  const fail = (msg) => { flash(req, 'error', msg); res.redirect('/login'); };
+  const state = req.session.gstate;
+  req.session.gstate = null;
+  if (!googleOn() || !state || req.query.state !== state || !req.query.code) return fail('Google sign in failed. Please try again.');
+  let claims;
+  try {
+    const r = await fetch(process.env.GOOGLE_TOKEN_URL || 'https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code: String(req.query.code), client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: googleRedirectUri(req), grant_type: 'authorization_code',
+      }),
+    });
+    const tok = await r.json();
+    // The ID token comes straight from Google's token endpoint over TLS, so its claims can be read without a signature check
+    claims = JSON.parse(Buffer.from(String(tok.id_token).split('.')[1], 'base64url').toString());
+  } catch (e) {
+    console.error('Google token exchange failed:', e.message);
+    return fail('Google sign in failed. Please try again.');
+  }
+  if (claims.aud !== process.env.GOOGLE_CLIENT_ID || !['accounts.google.com', 'https://accounts.google.com'].includes(claims.iss)
+      || !(claims.exp * 1000 > Date.now()) || !claims.sub) return fail('Google sign in failed. Please try again.');
+  if (claims.email_verified !== true || !claims.email) return fail('Your Google email address is not verified.');
+
+  let u = db.prepare('SELECT * FROM users WHERE google_sub = ?').get(claims.sub);
+  if (!u) {
+    // Existing email account: link it to this Google account (Google has verified the email)
+    u = db.prepare('SELECT * FROM users WHERE email = ?').get(claims.email);
+    if (u) db.prepare('UPDATE users SET google_sub = ? WHERE id = ?').run(claims.sub, u.id);
+  }
+  if (!u) {
+    if (SIGNUP_MODE === 'closed') return fail('New sign ups are closed.');
+    const id = createCustomer(req, {
+      name: String(claims.name || claims.email.split('@')[0]).slice(0, 80), email: claims.email.slice(0, 120),
+      passwordHash: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10), googleSub: claims.sub,
+    });
+    u = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+  }
+  if (u.status === 'disabled') return fail('This account is disabled. Please contact support.');
+  req.session.uid = u.id;
+  res.redirect(u.is_admin ? '/admin' : '/dashboard');
 });
 
 app.get('/password', requireUser, (req, res) => page(req, res, 'Change password', `

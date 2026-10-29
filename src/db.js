@@ -82,6 +82,10 @@ CREATE INDEX IF NOT EXISTS idx_journal_user_close ON journal_trades(user_id, clo
 const userCols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
 if (!userCols.includes('journal_key')) db.exec('ALTER TABLE users ADD COLUMN journal_key TEXT');
 if (!userCols.includes('card_handle')) db.exec("ALTER TABLE users ADD COLUMN card_handle TEXT NOT NULL DEFAULT ''");
+if (!userCols.includes('google_sub')) {   // Google account id for "Sign in with Google"
+  db.exec('ALTER TABLE users ADD COLUMN google_sub TEXT');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google ON users(google_sub)');
+}
 if (!userCols.includes('trial')) db.exec('ALTER TABLE users ADD COLUMN trial INTEGER NOT NULL DEFAULT 0');   // 1 = on the free trial, not paid yet
 
 // Every MT5 account number ever used on a free trial, so one account cannot get a second trial with a new email

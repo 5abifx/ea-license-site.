@@ -189,3 +189,8 @@ p.small { font-size: 14px; }
 .faq p { margin: 0 0 18px; color: var(--muted); }
 .prose.center { text-align: center; padding: 48px 0; }
 .big404 { font-family: var(--display); font-size: 96px; font-weight: 700; color: var(--accent); margin: 0; line-height: 1; }
+
+/* Sign in with Google */
+.btn.google { display: flex; align-items: center; justify-content: center; gap: 10px; background: #fff; color: #1f1f1f; border: 1px solid #cbd5e1; padding: 13px; font-size: 16px; }
+.btn.google:hover { background: #f8fafc; }
+p.or { text-align: center; color: var(--muted); font-size: 13px; margin: 16px 0 !important; }

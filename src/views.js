@@ -32,7 +32,7 @@ function layout(req, title, body, opts = {}) {
     ? `<a href="/dashboard">My EAs</a>
        ${req.hasJournal ? '<a href="/journal">Journal</a>' : ''}
        ${u.is_admin ? '<a href="/admin">Admin</a>' : ''}
-       <a href="/password">Password</a>
+       ${u.google_sub ? '' : '<a href="/password">Password</a>'}
        <form method="post" action="/logout" class="inline"><button class="link">Sign out</button></form>`
     : `<a href="/#how">How it works</a><a href="/#pricing">Pricing</a><a href="/faq">FAQ</a><a href="/login">Sign in</a>${signup ? '<a class="btn dark" href="/signup">Create account</a>' : ''}`;
   const origin = `${req.protocol}://${req.get('host')}`;
