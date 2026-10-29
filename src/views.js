@@ -31,7 +31,7 @@ function layout(req, title, body, opts = {}) {
        ${u.is_admin ? '<a href="/admin">Admin</a>' : ''}
        <a href="/password">Password</a>
        <form method="post" action="/logout" class="inline"><button class="link">Sign out</button></form>`
-    : `<a href="/#how">How it works</a><a href="/login">Sign in</a>${signup ? '<a class="btn dark" href="/signup">Create account</a>' : ''}`;
+    : `<a href="/#how">How it works</a><a href="/#pricing">Pricing</a><a href="/login">Sign in</a>${signup ? '<a class="btn dark" href="/signup">Create account</a>' : ''}`;
   const flashHtml = flash ? `<div class="flash ${esc(flash.type)}">${esc(flash.msg)}</div>` : '';
   return `<!doctype html>
 <html lang="en"><head>

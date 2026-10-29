@@ -33,7 +33,7 @@ Everything (database + uploaded EA files) lives in the `data/` folder. **Back th
 | `SITE_NAME` | Name shown in the header. |
 | `TRIAL_DAYS` | Free trial for new sign ups, in days (default 15). Trial users are active straight away with every EA. `0` turns the trial off and `SIGNUP_MODE` decides instead. |
 | `TRIAL_ACCOUNTS` | MT5 accounts a trial user can register (default 1). Each MT5 account number can only be used for one trial. |
-| `PRICE_TEXT` | Price shown on the site, e.g. `$30/month`. |
+| `PRICE_TEXT` | Price shown on the site, e.g. `$20/month`. |
 | `PAID_DAYS` | Days added when you click **Mark as paid** on a user in Admin (default 30). |
 | `PAYMENT_URL` | Optional link for the **Subscribe** button (payment page or Discord invite). |
 

@@ -18,7 +18,7 @@ const MAX_ACCOUNTS_DEFAULT = Number(process.env.MAX_ACCOUNTS || 10);
 // Free trial for new sign ups (read on each request so it can be changed without code edits). 0 = no trial.
 const trialDays = () => Math.max(0, Number(process.env.TRIAL_DAYS ?? 15) || 0);
 const TRIAL_ACCOUNTS = Number(process.env.TRIAL_ACCOUNTS || 1);   // MT5 accounts a trial user may register
-const PRICE_TEXT = process.env.PRICE_TEXT || '$30/month';
+const PRICE_TEXT = process.env.PRICE_TEXT || '$20/month';
 const PAID_DAYS = Number(process.env.PAID_DAYS || 30);           // days added by the admin "Mark as paid" button
 const PAYMENT_URL = process.env.PAYMENT_URL || '';               // where customers pay or ask to pay (e.g. Discord invite)
 const SESSION_SECRET = process.env.SESSION_SECRET;
@@ -141,6 +141,31 @@ app.get('/', (req, res) => {
     </div>
   </section>
 
+  <section class="wrap why">
+    <h2 class="section">Most traders don't lose on their strategy. They lose on execution.</h2>
+    <p class="lead left">You know the setup. Then you hesitate on the entry, move your stop "just this once", close a winner too early, or wake up to a move you slept through. An Expert Advisor trades your rules the same way every time, with no fear, no revenge trades and no missed sessions.</p>
+    <div class="compare">
+      <div class="col bad">
+        <h3>Trading by hand</h3>
+        <ul>
+          <li>Emotions decide when you get in and out</li>
+          <li>Stops get moved, then hit bigger</li>
+          <li>Setups during Asia or London open are missed while you sleep or work</li>
+          <li>Hours a day watching charts</li>
+        </ul>
+      </div>
+      <div class="col good">
+        <h3>With a ${esc(SITE_NAME)} EA</h3>
+        <ul>
+          <li>Entries and exits follow fixed rules</li>
+          <li>The same risk rules applied on every trade</li>
+          <li>Watches the market 24/5 on your MT5 account</li>
+          <li>Set it up once, then check in when you want</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
   <section id="how" class="band">
     <div class="wrap">
       <h2 class="section">How it works</h2>
@@ -160,6 +185,35 @@ app.get('/', (req, res) => {
     <div><h3>Locked to your accounts</h3><p class="muted">The EA only runs on the MT5 account numbers you register, so your license stays yours.</p></div>
     <div><h3>Always the latest build</h3><p class="muted">Download the newest version of every EA you own straight from your dashboard.</p></div>
     <div><h3>Change accounts anytime</h3><p class="muted">Switched broker? Remove an old account and add the new one in seconds.</p></div>
+  </section>
+
+
+  <section id="pricing" class="band">
+    <div class="wrap pricing">
+      <div class="math">
+        <span class="pill">The simple math</span>
+        <h2 class="section">Costs less than one stop loss.</h2>
+        <p class="lead left">A single 0.10 lot EUR/USD trade stopped out 20 pips away loses about $20. That is the price of a whole month of ${esc(SITE_NAME)}.</p>
+        <div class="sl-vs">
+          <div><span class="muted">One small stop loss</span><strong>≈ $20</strong><span class="muted">0.10 lot × 20 pips, gone in minutes</span></div>
+          <div class="hi"><span>A month of ${esc(SITE_NAME)}</span><strong>${esc(PRICE_TEXT)}</strong><span>Every EA, every trading day</span></div>
+        </div>
+        <p class="muted small">If disciplined execution saves you from just one avoidable loss a month, it has paid for itself.</p>
+      </div>
+      <div class="plan">
+        <div class="plan-name">${esc(SITE_NAME)} Monthly</div>
+        <div class="plan-price">${esc(PRICE_TEXT)}</div>
+        ${trial ? `<div class="plan-note">First ${trial} days free. No payment to start.</div>` : ''}
+        <ul class="ticks">
+          <li>Every ${esc(SITE_NAME)} Expert Advisor</li>
+          <li>All updates and new versions included</li>
+          <li>License locked to your MT5 account</li>
+          <li>Switch broker or account anytime</li>
+          <li>Cancel anytime, no contract</li>
+        </ul>
+        ${signup ? `<a class="btn big full" href="/signup">${join}</a>` : ''}
+      </div>
+    </div>
   </section>
 
   <section class="wrap">
