@@ -58,3 +58,18 @@ code.block { display: block; padding: 10px 12px; background: var(--bg); border: 
 .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
 .tabs a { padding: 8px 14px; text-decoration: none; color: var(--muted); border-bottom: 2px solid transparent; }
 .tabs a.on { color: var(--text); border-color: var(--accent); font-weight: 600; }
+
+/* Trade Journal */
+.pos { color: var(--ok); } .neg { color: var(--danger); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.stats div { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.stats span { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.stats strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.cards figure { margin: 0; display: grid; gap: 8px; justify-items: center; }
+.cards canvas { width: 100%; max-width: 320px; height: auto; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+textarea { display: block; width: 100%; margin-top: 4px; padding: 9px 11px; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; }
+.grid .full { grid-column: 1 / -1; }
+ol.steps li { margin-bottom: 10px; }
+.row select { width: auto; margin: 0; }
+.row label.check { margin: 0; }

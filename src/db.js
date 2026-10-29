@@ -53,6 +53,34 @@ CREATE TABLE IF NOT EXISTS accounts (
   UNIQUE (user_id, account_number)
 );
 CREATE INDEX IF NOT EXISTS idx_accounts_number ON accounts(account_number);
+
+-- Trades sent by the Trade Journal EA (one row per closed position)
+CREATE TABLE IF NOT EXISTS journal_trades (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  account_number TEXT NOT NULL,
+  position_id    TEXT NOT NULL,
+  symbol         TEXT NOT NULL,
+  side           TEXT NOT NULL,                     -- BUY | SELL
+  lots           REAL, entry REAL, exit REAL, sl REAL, tp REAL, digits INTEGER,
+  open_time      TEXT, close_time TEXT,             -- broker time, ISO without zone
+  profit REAL, commission REAL, swap REAL, net REAL,
+  pips REAL, r REAL, risk_money REAL, risk_pct REAL, pct REAL, balance_after REAL,
+  mfe REAL, mae REAL, magic INTEGER, comment TEXT, currency TEXT, broker TEXT, tf TEXT,
+  partials       TEXT NOT NULL DEFAULT '[]',        -- JSON [{time, price, lots, profit}]
+  candles        TEXT NOT NULL DEFAULT '[]',        -- JSON [[unix, o, h, l, c]]
+  setup TEXT NOT NULL DEFAULT '', emotion TEXT NOT NULL DEFAULT '', mistakes TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '', rating INTEGER,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (user_id, account_number, position_id)
+);
+CREATE INDEX IF NOT EXISTS idx_journal_user_close ON journal_trades(user_id, close_time);
 `);
+
+// Columns added after the first release
+const userCols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+if (!userCols.includes('journal_key')) db.exec('ALTER TABLE users ADD COLUMN journal_key TEXT');
+if (!userCols.includes('card_handle')) db.exec("ALTER TABLE users ADD COLUMN card_handle TEXT NOT NULL DEFAULT ''");
 
 module.exports = { db, DATA_DIR, FILES_DIR: path.join(DATA_DIR, 'ea-files') };

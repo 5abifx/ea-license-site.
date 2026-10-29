@@ -97,6 +97,8 @@ function rateLimit(key, max, windowMs) {
   return h.n > max;
 }
 
+require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount });
+
 // ---------- auth ----------
 app.get('/', (req, res) => res.redirect(req.user ? '/dashboard' : '/login'));
 
@@ -246,7 +248,11 @@ app.get('/dashboard', requireUser, (req, res) => {
     <h2>3. Allow the license check in MT5</h2>
     <p>In MetaTrader 5 go to <strong>Tools → Options → Expert Advisors</strong>, tick <strong>Allow WebRequest for listed URL</strong> and add:</p>
     <code class="block">${esc(req.protocol + '://' + req.get('host'))}</code>
-  </section>`);
+  </section>
+  ${req.hasJournal ? `<section class="card">
+    <h2>4. Trade Journal</h2>
+    <p>Every trade you close is logged automatically and turned into share cards. <a href="/journal">Open your journal</a> to get your journal key and set up the Trade Journal EA.</p>
+  </section>` : ''}`);
 });
 
 app.post('/accounts', requireUser, (req, res) => {

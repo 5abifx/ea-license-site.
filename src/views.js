@@ -16,6 +16,7 @@ function layout(req, title, body) {
   req.session.flash = null;
   const nav = u
     ? `<a href="/dashboard">My EAs</a>
+       ${req.hasJournal ? '<a href="/journal">Journal</a>' : ''}
        ${u.is_admin ? '<a href="/admin">Admin</a>' : ''}
        <a href="/password">Password</a>
        <form method="post" action="/logout" class="inline"><button class="link">Sign out</button></form>`
