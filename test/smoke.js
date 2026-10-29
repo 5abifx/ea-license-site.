@@ -9,6 +9,7 @@ process.env.SESSION_SECRET = 'test-secret-1234567890';
 process.env.ADMIN_EMAIL = 'admin@test.com';
 process.env.ADMIN_PASSWORD = 'adminpass123';
 process.env.SIGNUP_MODE = 'approval';
+process.env.TRIAL_DAYS = '0';          // trial is switched on further down
 const app = require('../src/server');
 
 function client(base) {
@@ -89,6 +90,31 @@ function client(base) {
     await admin.post(`/admin/users/${eveId}`, { name: 'Eve', status: 'disabled', max_accounts: '10', expires_at: '', ea: '1' });
     assert.strictEqual((await check('GOLD_SCALPER', '5555')).valid, false);
     assert.match((await eve.get('/dashboard')).text, /Sign in/);
+
+    // free trial: instant access, one account, one trial per MT5 account, admin marks paid
+    process.env.TRIAL_DAYS = '15';
+    assert.match((await client(base).get('/')).text, /15-day free trial/);
+    const tia = client(base);
+    r = await tia.post('/signup', { name: 'Tia', email: 'tia@test.com', password: 'tiapass123' });
+    assert.match(r.text, /Free trial: 15 days left/);
+    await tia.post('/accounts', { account_number: '7777' });
+    assert.strictEqual((await check('GOLD_SCALPER', '7777')).valid, true);
+    r = await tia.post('/accounts', { account_number: '7778' });
+    assert.match(r.text, /at most 1 accounts/);
+    const tom = client(base);
+    await tom.post('/signup', { name: 'Tom', email: 'tom@test.com', password: 'tompass123' });
+    r = await tom.post('/accounts', { account_number: '7777' });
+    assert.match(r.text, /already used a free trial/);
+    r = await admin.get('/admin');
+    const tiaId = r.text.match(/href="\/admin\/users\/(\d+)"><strong>Tia/)[1];
+    await admin.post(`/admin/users/${tiaId}`, { name: 'Tia', status: 'active', max_accounts: '1', expires_at: '2020-01-01', ea: '1' });
+    assert.match((await tia.get('/dashboard')).text, /free trial has ended/);
+    assert.strictEqual((await check('GOLD_SCALPER', '7777')).valid, false);
+    r = await admin.post(`/admin/users/${tiaId}/paid`);
+    assert.match(r.text, /marked as paid/);
+    assert.strictEqual((await check('GOLD_SCALPER', '7777')).valid, true);
+    assert.doesNotMatch((await tia.get('/dashboard')).text, /Free trial/);
+    process.env.TRIAL_DAYS = '0';
 
     // cross-site post blocked
     const xr = await fetch(base + '/accounts', { method: 'POST', headers: { origin: 'https://evil.com' } });

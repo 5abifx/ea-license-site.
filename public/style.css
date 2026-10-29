@@ -139,3 +139,9 @@ h2.section { font-size: 36px; margin: 0 0 28px; }
 .cta-card p { margin: 0; color: #cbd5e1; }
 .btn.ghost { background: transparent; color: #fff; border: 1px solid #475569; }
 .btn.ghost:hover { background: #1e293b; }
+
+/* Trial / renewal notice on the dashboard */
+.notice { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; padding: 16px 20px; margin-bottom: 16px;
+  border-radius: var(--radius); background: var(--accent-soft); color: var(--text); }
+.notice.error { background: #fde8e8; }
+@media (prefers-color-scheme: dark) { .notice.error { background: #3a1414; } }

@@ -15,6 +15,12 @@ const PORT = Number(process.env.PORT || 3000);
 // closed = only admin creates users, approval = users sign up but admin must approve, open = instant access
 const SIGNUP_MODE = process.env.SIGNUP_MODE || 'approval';
 const MAX_ACCOUNTS_DEFAULT = Number(process.env.MAX_ACCOUNTS || 10);
+// Free trial for new sign ups (read on each request so it can be changed without code edits). 0 = no trial.
+const trialDays = () => Math.max(0, Number(process.env.TRIAL_DAYS ?? 15) || 0);
+const TRIAL_ACCOUNTS = Number(process.env.TRIAL_ACCOUNTS || 1);   // MT5 accounts a trial user may register
+const PRICE_TEXT = process.env.PRICE_TEXT || '$30/month';
+const PAID_DAYS = Number(process.env.PAID_DAYS || 30);           // days added by the admin "Mark as paid" button
+const PAYMENT_URL = process.env.PAYMENT_URL || '';               // where customers pay or ask to pay (e.g. Discord invite)
 const SESSION_SECRET = process.env.SESSION_SECRET;
 if (!SESSION_SECRET || SESSION_SECRET.length < 16) {
   console.error('Set SESSION_SECRET (at least 16 random characters) in your environment / .env file.');
@@ -83,6 +89,12 @@ function cleanAccount(v) {
   const s = String(v || '').trim();
   return /^\d{1,20}$/.test(s) ? s : null;
 }
+function daysLeft(u) {
+  return u.expires_at ? Math.max(0, Math.ceil((new Date(u.expires_at + 'Z') - Date.now()) / 86400000)) : null;
+}
+function payButton(label) {
+  return PAYMENT_URL ? `<a class="btn" href="${esc(PAYMENT_URL)}" target="_blank" rel="noopener">${esc(label)}</a>` : '';
+}
 function grantAllActiveEas(userId) {
   db.prepare(`INSERT OR IGNORE INTO user_eas (user_id, ea_id) SELECT ?, id FROM eas WHERE active = 1`).run(userId);
 }
@@ -103,13 +115,15 @@ require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccoun
 app.get('/', (req, res) => {
   if (req.user) return res.redirect('/dashboard');
   const signup = SIGNUP_MODE !== 'closed';
+  const trial = signup ? trialDays() : 0;
+  const join = trial ? 'Start free trial' : 'Create account';
   page(req, res, 'Licensed Expert Advisors', `
   <section class="hero wrap">
-    <span class="pill">${esc(SITE_NAME)} Licensing</span>
+    <span class="pill">${trial ? `${trial}-day free trial · then ${esc(PRICE_TEXT)}` : `${esc(SITE_NAME)} Licensing`}</span>
     <h1>Activate. Bind. Trade.</h1>
     <p class="lead">Every ${esc(SITE_NAME)} Expert Advisor, every license and every MT5 account, managed in one clean dashboard.</p>
     <div class="cta">
-      ${signup ? '<a class="btn big" href="/signup">Create account</a>' : ''}
+      ${signup ? `<a class="btn big" href="/signup">${join}</a>` : ''}
       <a class="btn big secondary" href="/login">Sign in</a>
     </div>
   </section>
@@ -131,9 +145,13 @@ app.get('/', (req, res) => {
     <div class="wrap">
       <h2 class="section">How it works</h2>
       <div class="steps">
+        ${trial ? `
+        <div><span class="num">1</span><h3>Create your account</h3><p class="muted">Sign up in seconds. Your ${trial}-day free trial starts right away, no payment needed.</p></div>
+        <div><span class="num">2</span><h3>Bind and download</h3><p class="muted">Add your MT5 account number, download the EA and start trading.</p></div>
+        <div><span class="num">3</span><h3>Keep trading</h3><p class="muted">Liked it? Stay on for ${esc(PRICE_TEXT)} when your trial ends.</p></div>` : `
         <div><span class="num">1</span><h3>Buy your EA</h3><p class="muted">Purchase the ${esc(SITE_NAME)} Expert Advisor that fits how you trade.</p></div>
         <div><span class="num">2</span><h3>Create your account</h3><p class="muted">Sign up with the email you paid with.${SIGNUP_MODE === 'approval' ? ' We activate it as soon as your purchase is confirmed.' : ''}</p></div>
-        <div><span class="num">3</span><h3>Bind and download</h3><p class="muted">Add up to ${MAX_ACCOUNTS_DEFAULT} MT5 account numbers, download the EA and start trading.</p></div>
+        <div><span class="num">3</span><h3>Bind and download</h3><p class="muted">Add up to ${MAX_ACCOUNTS_DEFAULT} MT5 account numbers, download the EA and start trading.</p></div>`}
       </div>
     </div>
   </section>
@@ -146,9 +164,9 @@ app.get('/', (req, res) => {
 
   <section class="wrap">
     <div class="cta-card">
-      <div><h2>Ready to trade with ${esc(SITE_NAME)}?</h2><p>Already bought an EA? Create your account to get started.</p></div>
+      <div><h2>Ready to trade with ${esc(SITE_NAME)}?</h2><p>${trial ? `Try every EA free for ${trial} days. After that it is ${esc(PRICE_TEXT)}.` : 'Already bought an EA? Create your account to get started.'}</p></div>
       <div class="cta">
-        ${signup ? '<a class="btn big" href="/signup">Create account</a>' : ''}
+        ${signup ? `<a class="btn big" href="/signup">${join}</a>` : ''}
         <a class="btn big ghost" href="/login">Sign in</a>
       </div>
     </div>
@@ -197,11 +215,12 @@ app.post('/logout', (req, res) => { req.session = null; res.redirect('/login'); 
 
 app.get('/signup', (req, res) => {
   if (SIGNUP_MODE === 'closed') return res.redirect('/login');
+  const trial = trialDays();
   page(req, res, 'Create account', `
   <div class="auth">
     <div class="auth-intro">
-      <h1>Create your account</h1>
-      <p class="muted">Use the same email you paid with so we can match your purchase.</p>
+      <h1>${trial ? `Start your ${trial}-day free trial` : 'Create your account'}</h1>
+      <p class="muted">${trial ? `Full access to every EA, no payment needed. After the trial it is ${esc(PRICE_TEXT)}.` : 'Use the same email you paid with so we can match your purchase.'}</p>
     </div>
     <div class="card">
       <h2>Create account</h2>
@@ -209,9 +228,9 @@ app.get('/signup', (req, res) => {
         <label>Name<input name="name" required maxlength="80" autocomplete="name"></label>
         <label>Email<input type="email" name="email" required maxlength="120" autocomplete="email"></label>
         <label>Password<input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters"></label>
-        <button class="full">Create account</button>
+        <button class="full">${trial ? 'Start free trial' : 'Create account'}</button>
       </form>
-      ${SIGNUP_MODE === 'approval' ? '<p class="muted">Your account will be activated after we confirm your purchase.</p>' : ''}
+      ${!trial && SIGNUP_MODE === 'approval' ? '<p class="muted">Your account will be activated after we confirm your purchase.</p>' : ''}
       <p class="muted">Already have an account? <a href="/login">Sign in</a></p>
     </div>
   </div>`);
@@ -234,10 +253,21 @@ app.post('/signup', (req, res) => {
     flash(req, 'error', 'That email is already registered. Please sign in.');
     return res.redirect('/login');
   }
-  const status = SIGNUP_MODE === 'open' ? 'active' : 'pending';
-  const info = db.prepare('INSERT INTO users (email, name, password_hash, status, max_accounts) VALUES (?, ?, ?, ?, ?)')
-    .run(email, name, bcrypt.hashSync(password, 10), status, MAX_ACCOUNTS_DEFAULT);
-  if (status === 'active') grantAllActiveEas(info.lastInsertRowid);
+  const trial = trialDays();
+  let info;
+  if (trial) {
+    // Free trial: active right away, all EAs, expires after TRIAL_DAYS
+    info = db.prepare(`INSERT INTO users (email, name, password_hash, status, max_accounts, expires_at, trial)
+                       VALUES (?, ?, ?, 'active', ?, datetime('now', ?), 1)`)
+      .run(email, name, bcrypt.hashSync(password, 10), TRIAL_ACCOUNTS, `+${trial} days`);
+    grantAllActiveEas(info.lastInsertRowid);
+    flash(req, 'ok', `Your ${trial}-day free trial has started. Add your MT5 account below to begin.`);
+  } else {
+    const status = SIGNUP_MODE === 'open' ? 'active' : 'pending';
+    info = db.prepare('INSERT INTO users (email, name, password_hash, status, max_accounts) VALUES (?, ?, ?, ?, ?)')
+      .run(email, name, bcrypt.hashSync(password, 10), status, MAX_ACCOUNTS_DEFAULT);
+    if (status === 'active') grantAllActiveEas(info.lastInsertRowid);
+  }
   req.session.uid = Number(info.lastInsertRowid);
   res.redirect('/dashboard');
 });
@@ -279,8 +309,11 @@ app.get('/dashboard', requireUser, (req, res) => {
 
   page(req, res, 'My EAs', `
   <h1>Welcome${u.name ? ', ' + esc(u.name) : ''}</h1>
-  ${expired ? '<div class="flash error">Your license has expired. Your EAs will stop working until it is renewed.</div>' : ''}
-  ${u.expires_at && !expired ? `<p class="muted">License valid until ${fmtDate(u.expires_at)} (UTC)</p>` : ''}
+  ${expired ? `<div class="notice error"><div><strong>${u.trial ? 'Your free trial has ended.' : 'Your license has expired.'}</strong>
+    Your EAs will stop working until you subscribe. It is ${esc(PRICE_TEXT)}.${PAYMENT_URL ? '' : ' Contact us to renew.'}</div>${payButton('Subscribe')}</div>` : ''}
+  ${u.trial && !expired ? `<div class="notice"><div><strong>Free trial: ${daysLeft(u)} day${daysLeft(u) === 1 ? '' : 's'} left</strong>
+    (until ${fmtDate(u.expires_at)} UTC). Keep trading after that for ${esc(PRICE_TEXT)}.</div>${payButton('Subscribe now')}</div>` : ''}
+  ${u.expires_at && !expired && !u.trial ? `<p class="muted">License valid until ${fmtDate(u.expires_at)} (UTC)</p>` : ''}
 
   <section class="card">
     <h2>1. Download your EA</h2>
@@ -328,8 +361,16 @@ app.post('/accounts', requireUser, (req, res) => {
   if (!num) { flash(req, 'error', 'Account number must contain digits only.'); return res.redirect('/dashboard'); }
   const count = db.prepare('SELECT COUNT(*) AS n FROM accounts WHERE user_id = ?').get(u.id).n;
   if (count >= u.max_accounts) { flash(req, 'error', `You can register at most ${u.max_accounts} accounts.`); return res.redirect('/dashboard'); }
+  if (u.trial) {
+    const used = db.prepare('SELECT user_id FROM trial_accounts WHERE account_number = ?').get(num);
+    if (used && used.user_id !== u.id) {
+      flash(req, 'error', `MT5 account ${num} has already used a free trial. Subscribe to keep using it.`);
+      return res.redirect('/dashboard');
+    }
+  }
   const r = db.prepare('INSERT OR IGNORE INTO accounts (user_id, account_number, label) VALUES (?, ?, ?)')
     .run(u.id, num, String(req.body.label || '').trim().slice(0, 60));
+  if (u.trial && r.changes) db.prepare('INSERT OR IGNORE INTO trial_accounts (account_number, user_id) VALUES (?, ?)').run(num, u.id);
   flash(req, r.changes ? 'ok' : 'error', r.changes ? `Account ${num} added.` : `Account ${num} is already on your list.`);
   res.redirect('/dashboard');
 });
@@ -405,7 +446,7 @@ app.get('/admin', requireAdmin, (req, res) => {
     <table><thead><tr><th>User</th><th>Status</th><th>EAs</th><th>Accounts</th><th>Expires</th><th></th></tr></thead><tbody>
     ${users.map((u) => `<tr>
       <td><a href="/admin/users/${u.id}"><strong>${esc(u.name || '-')}</strong></a><br><span class="muted">${esc(u.email)}</span>${u.is_admin ? ' <span class="tag">admin</span>' : ''}</td>
-      <td><span class="status ${esc(u.status)}">${esc(u.status)}</span></td>
+      <td><span class="status ${esc(u.status)}">${esc(u.status)}</span>${u.trial ? ' <span class="tag warn">trial</span>' : ''}</td>
       <td>${esc(u.ea_codes || '-')}</td>
       <td>${u.n_acc} / ${u.max_accounts}</td>
       <td>${u.expires_at ? fmtDate(u.expires_at) : 'never'}${isExpired(u) ? ' <span class="tag warn">expired</span>' : ''}</td>
@@ -479,7 +520,10 @@ app.get('/admin/users/:id', requireAdmin, (req, res) => {
   <p class="muted">${esc(u.email)} · joined ${fmtDate(u.created_at)}</p>
 
   <section class="card">
-    <h2>License</h2>
+    <div class="row between">
+      <h2>License ${u.trial ? '<span class="tag warn">free trial</span>' : ''}</h2>
+      <form method="post" action="/admin/users/${u.id}/paid" class="inline"><button class="small">Mark as paid (+${PAID_DAYS} days)</button></form>
+    </div>
     <form method="post" action="/admin/users/${u.id}" class="grid">
       <label>Name<input name="name" value="${esc(u.name)}"></label>
       <label>Status<select name="status">${['pending', 'active', 'disabled'].map((s) => `<option ${s === u.status ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
@@ -518,6 +562,19 @@ app.get('/admin/users/:id', requireAdmin, (req, res) => {
       <button class="danger">Delete user</button>
     </form>
   </section>` : ''}`);
+});
+
+// Customer paid: end the trial and extend from today or from the current expiry, whichever is later
+app.post('/admin/users/:id/paid', requireAdmin, (req, res) => {
+  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+  if (!u) return res.redirect('/admin');
+  const from = u.expires_at && !isExpired(u) ? u.expires_at : new Date().toISOString().slice(0, 19).replace('T', ' ');
+  db.prepare(`UPDATE users SET trial = 0, status = 'active', expires_at = datetime(?, ?),
+              max_accounts = MAX(max_accounts, ?) WHERE id = ?`).run(from, `+${PAID_DAYS} days`, MAX_ACCOUNTS_DEFAULT, u.id);
+  if (!db.prepare('SELECT 1 FROM user_eas WHERE user_id = ?').get(u.id)) grantAllActiveEas(u.id);
+  const after = db.prepare('SELECT expires_at FROM users WHERE id = ?').get(u.id).expires_at;
+  flash(req, 'ok', `${u.email} marked as paid. License now valid until ${after.slice(0, 16)} UTC.`);
+  res.redirect(`/admin/users/${u.id}`);
 });
 
 app.post('/admin/users/:id', requireAdmin, (req, res) => {
