@@ -184,6 +184,37 @@ app.get('/', (req, res) => {
     </div>
   </section>
 
+  <section class="wrap lp-sec">
+    <div class="lp-head"><span class="lp-kicker">Always on</span><h2>Three guards between you and your next bad decision.</h2>
+      <p>They watch the parts of trading you can't watch in the moment: risk, habits and your prop firm's rules.</p></div>
+    <div class="gd-grid">
+      <article class="gd">
+        <div class="gd-top"><span class="gd-ico a">⛨</span><span class="gd-pill">Guardrails</span></div>
+        <span class="gd-kind">KATANA risk manager</span>
+        <h3>Sits between you and the oversized trade.</h3>
+        <p>Sizes every lot from your risk %, places the stop and locks trading at your daily loss limit.</p>
+        <div class="gd-chat"><div>You're at <b>−2.1%</b> today. Next full loss hits your 3% cap.</div><div>Lot size set to <b>1.20</b> for 0.5% risk.</div><div class="me">New trades locked until tomorrow.</div></div>
+        <span class="gd-foot"><i></i>Guard active</span>
+      </article>
+      <article class="gd">
+        <div class="gd-top"><span class="gd-ico b">◎</span><span class="gd-pill">Discipline</span></div>
+        <span class="gd-kind">Journal insights</span>
+        <h3>Finds the habit that's costing you.</h3>
+        <p>Reads every closed trade and points at the leaks: revenge trades, bad hours, overtrading.</p>
+        <div class="gd-chat"><div><b>3 revenge trades</b> this week, all within 15 min of a stop-out.</div><div>Late-session trades lose <b>68%</b> of the time.</div><div class="me">Strongest setup: XAUUSD buys, <b>+11.2R</b>.</div></div>
+        <span class="gd-foot"><i></i>Guard active</span>
+      </article>
+      <article class="gd">
+        <div class="gd-top"><span class="gd-ico c">◆</span><span class="gd-pill">Prop rules</span></div>
+        <span class="gd-kind">Funded accounts</span>
+        <h3>Keeps the challenge alive.</h3>
+        <p>Set daily loss and max drawdown to your firm's numbers. If the firm blocks EAs, the support email is one click away.</p>
+        <div class="gd-chat"><div>Daily limit <b>5%</b> · Max drawdown <b>10%</b>.</div><div>Drawdown used: <b>$3,100</b> of $10,000.</div><div class="me">EA blocked by server? <a href="/help/ea-blocked">Copy the email</a></div></div>
+        <span class="gd-foot"><i></i>Guard active</span>
+      </article>
+    </div>
+  </section>
+
   <section class="wrap lp-sec lp-split">
     <div class="lp-head left">
       <span class="lp-kicker">Trade Journal</span>
@@ -197,6 +228,34 @@ app.get('/', (req, res) => {
       <div class="jc-grid">
         ${['Mo','Tu','We','Th','Fr'].map((d) => `<i>${d}</i>`).join('')}
         ${[312,-140,488,0,226,-95,640,175,-210,390,128,0,-60,515,244,402,-180,96,310,-45].map((v) => `<span class="${v > 0 ? 'w' : v < 0 ? 'l' : ''}">${v ? (v > 0 ? '+' : '−') + Math.abs(v) : '·'}</span>`).join('')}
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-coach">
+    <div class="wrap">
+      <div class="lp-head"><span class="lp-kicker">Journal insights</span><h2>Your journal, <em>reading you back.</em></h2>
+        <p>Every closed trade is checked for patterns. No spreadsheets, no guessing: just what your own numbers say.</p></div>
+      <div class="co-grid">
+        <div class="co-card">
+          <span class="co-label">Pattern detection</span>
+          <h3>See patterns you can't see.</h3>
+          <p>The leaks hiding in your last 90 days of trades.</p>
+          <div class="co-list">
+            <div><i class="r"></i><span>Time of day</span>You lose <b>64%</b> of trades opened after 17:00.</div>
+            <div><i class="r"></i><span>Behavior</span><b>7 revenge trades</b> cost <b>−$1,240</b> this month.</div>
+            <div><i class="g"></i><span>Edge</span>Strongest setup: <b>XAUUSD buys</b>, +18.4R.</div>
+            <div><i class="y"></i><span>Streak</span><b>6 winners in a row</b> on Tuesday mornings.</div>
+          </div>
+        </div>
+        <div class="co-card">
+          <span class="co-label">Sessions</span>
+          <h3>Know when you trade best.</h3>
+          <p>Net result by session, so you know when to sit on your hands.</p>
+          <div class="co-bars" aria-label="Example net result by session">
+            ${[['Asia', 180], ['London', 2310], ['New York', 940], ['Late', -1120]].map(([n, v]) => `<div><span>${n}</span><i class="${v < 0 ? 'neg' : ''}" style="--w:${Math.round(Math.abs(v) / 2310 * 100)}%"></i><b class="${v < 0 ? 'neg' : 'pos'}">${v < 0 ? '−' : '+'}$${Math.abs(v).toLocaleString('en-US')}</b></div>`).join('')}
+          </div>
+        </div>
       </div>
     </div>
   </section>

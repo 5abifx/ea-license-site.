@@ -1,5 +1,6 @@
 // Trade Journal: receives trades from the Trade Journal EA and shows them to the customer.
 const crypto = require('crypto');
+const { insights } = require('./insights');
 const express = require('express');
 const { esc, fmtDate } = require('./views');
 
@@ -168,6 +169,17 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         </tbody></table></div>`;
     }).join('');
 
+    // insights over the last 90 days of the shown accounts
+    const since = latest ? new Date(Date.parse(latest.slice(0, 10) + 'T00:00:00Z') - 89 * 864e5).toISOString().slice(0, 10) : '';
+    const ins = latest ? insights(db.prepare(`SELECT account_number, symbol, side, net, r, open_time, close_time
+        FROM journal_trades WHERE ${where} AND close_time >= ? ORDER BY close_time`).all(...args, since), { money: (v) => money(v, cur), esc }) : null;
+    const insightsHtml = !ins ? '' : `<section class="card insights">
+      <div class="row between"><h2>Insights</h2><span class="muted small">${ins.locked ? '' : `Last 90 days · ${ins.count} trades${sel ? '' : liveAccts.length > 1 ? ' · all accounts' : ''}`}</span></div>
+      ${ins.locked ? `<p class="muted">Insights unlock after ${ins.need} closed trades. ${ins.have} so far.</p>`
+        : ins.items.length ? `<div class="ins-grid">${ins.items.map((i) => `<div class="ins ${i.tone}"><span class="ins-tag"><i></i>${esc(i.tag)}</span><p>${i.html}</p></div>`).join('')}</div>`
+        : '<p class="muted">No clear patterns yet. Keep journaling and check back.</p>'}
+    </section>`;
+
     const chip = (a, label, sub, href, on) => `<a class="acct${a && a.removed ? ' removed' : ''}${on ? ' on' : ''}" href="${href}">
       <small>${label}</small><b class="${cls(a ? a.net : 0)}">${a ? money(a.net, a.cur) : ''}</b><small>${sub}</small></a>`;
     const allNet = liveAccts.reduce((s, a) => s + (a.net || 0), 0), allN = liveAccts.reduce((s, a) => s + a.n, 0);
@@ -207,6 +219,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       <aside class="card day-panel" aria-live="polite">${panels || `<p class="muted">${accts.length ? 'No trades this month. Use ‹ › to change month.' : 'Tap a day to see its trades.'}</p>`}</aside>
     </div>
     <script src="/calendar.js"></script>
+
+    ${insightsHtml}
 
     <section class="card">
       <h2>Connect the Trade Journal EA</h2>
