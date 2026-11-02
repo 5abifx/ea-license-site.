@@ -184,6 +184,20 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       </form>
     </section>
 
+    ${req.user.is_admin ? `<section class="card">
+      <h2>Story overlay <span class="tag">admin test · transparent PNG</span></h2>
+      <p class="muted">Text-only overlay for Instagram stories: lay it over your own photo or chart. No entry, SL or TP. Only admins see this for now.</p>
+      <div class="row">
+        <select id="ov-style">${Object.entries({ scalper: 'Scalper', trend: 'Trend following', counter: 'Counter trend', swing: 'Swing' }).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
+        <select id="ov-show"><option value="pct">Show %</option><option value="r">Show R</option><option value="pips">Show pips</option></select>
+        <label class="check"><input type="checkbox" id="ov-ad" checked> 5ABI.FX line</label>
+        <label class="check"><input type="checkbox" id="ov-scrim"> Dark fade</label>
+      </div>
+      <div class="cards">
+        <figure><canvas id="ov" class="overlay"></canvas><button class="small" data-save-ov>Save overlay PNG</button></figure>
+      </div>
+    </section>` : ''}
+
     <section class="card">
       <h2>Trade</h2>
       <table><tbody>
@@ -208,9 +222,10 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       </form>
     </section>
 
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800;900&family=Hanken+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800;900&family=Hanken+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@500;600${req.user.is_admin ? '&family=DM+Serif+Display:ital@0;1&family=Montserrat:wght@500;600' : ''}&display=swap">
     <script id="trade-data" type="application/json">${json}</script>
     <script src="/cards.js"></script>
+    ${req.user.is_admin ? '<script src="/overlay.js"></script>' : ''}
     <script src="/journal.js"></script>`);
   });
 
