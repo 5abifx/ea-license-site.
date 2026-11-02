@@ -215,6 +215,18 @@ function client(base) {
     assert.match(r.text, /"partials":\[\{"time":"2026-10-28T15:12:00"/);          // final close is not a partial
     assert.strictEqual((await eve.get(`/journal/${tid}`)).status !== 200 || !(await eve.get(`/journal/${tid}`)).text.includes('XAUUSD'), true);
 
+    // insights: locked under 10 trades, then a revenge-trade pattern shows up
+    assert.match((await bob.get('/journal')).text, /Insights unlock after 10 closed trades\. 1 so far/);
+    for (let i = 0; i < 6; i++) {
+      const d = String(10 + i).padStart(2, '0');
+      await send({ key, account: '1001', currency: 'USD', trade: { position_id: `L${i}`, symbol: 'EURUSD', side: 'SELL', lots: 1, net: -100, r: -1, open_time: `2026-10-${d}T18:00:00`, close_time: `2026-10-${d}T18:40:00` } });
+      await send({ key, account: '1001', currency: 'USD', trade: { position_id: `R${i}`, symbol: 'EURUSD', side: 'SELL', lots: 1, net: -50, r: -0.5, open_time: `2026-10-${d}T18:45:00`, close_time: `2026-10-${d}T19:00:00` } });
+    }
+    r = await bob.get('/journal');
+    assert.match(r.text, /<b>6 revenge trades<\/b>/);
+    assert.match(r.text, /Last 90 days · 13 trades/);
+    for (let i = 0; i < 6; i++) for (const p of ['L', 'R']) assert.ok(db.prepare("DELETE FROM journal_trades WHERE position_id = ?").run(p + i).changes);
+
     // calendar: the trade's day is on the October 2026 calendar
     r = await bob.get('/journal');
     assert.match(r.text, /October 2026/);
