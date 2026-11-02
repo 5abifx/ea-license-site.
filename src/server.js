@@ -944,6 +944,7 @@ app.post('/admin/eas/:id/delete', requireAdmin, (req, res) => {
 
 require('./help')(app, { db, page });
 require('./pricing')(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL: process.env.CONTACT_URL || '', refs });
+require('./mentorship')(app, { page, esc });
 require('./pages')(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, TRIAL_ACCOUNTS, MAX_ACCOUNTS_DEFAULT });
 
 app.use((err, req, res, next) => {

@@ -35,7 +35,7 @@ function layout(req, title, body, opts = {}) {
        ${u.is_admin ? link('/admin', 'Admin') : ''}
        ${u.google_sub ? '' : link('/password', 'Password')}
        <form method="post" action="/logout" class="inline"><button class="link">Sign out</button></form>`
-    : `<a href="/#how">How it works</a>${link('/pricing', 'Pricing')}${link('/faq', 'FAQ')}${link('/login', 'Sign in')}${signup ? '<a class="btn small" href="/signup">Create account</a>' : ''}`;
+    : `<a href="/#how">How it works</a>${link('/mentorship', 'Mentorship')}${link('/pricing', 'Pricing')}${link('/faq', 'FAQ')}${link('/login', 'Sign in')}${signup ? '<a class="btn small" href="/signup">Create account</a>' : ''}`;
   const origin = `${req.protocol}://${req.get('host')}`;
   const trial = trialDays();
   const desc = `Automated MT5 Expert Advisors that trade your rules 24/5.${trial ? ` ${trial}-day free trial, then plans from ${PRICE_TEXT}.` : ` Plans from ${PRICE_TEXT}.`}`;
