@@ -324,3 +324,13 @@ main.wide .wrap { max-width: 1120px; }
 .sl-vs .hi { background: var(--accent); color: #fff; border-color: var(--accent); }
 .foot .brand { font-size: 15px; }
 .auth-form .btn.google { width: 100%; margin-top: 6px; }
+
+/* EA blocked by broker help page */
+.eb .card h2 { margin: 0 0 8px; }
+.eb .lead { margin-bottom: 20px; }
+.eb-check { border-color: rgba(245,165,36,.45); }
+.eb-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 14px; }
+.eb-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.eb-head h2 { margin: 0; }
+.eb-subj { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; font-size: 14px; }
+.eb-text { white-space: pre-wrap; word-break: break-word; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin: 10px 0 0; font: 14px/1.6 Inter, system-ui, sans-serif; color: var(--text); }

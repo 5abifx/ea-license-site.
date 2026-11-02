@@ -120,6 +120,12 @@ function client(base) {
     // public info pages, 404 and link preview tags
     const anon = client(base);
     for (const u of ['/faq', '/terms', '/privacy']) assert.strictEqual((await anon.get(u)).status, 200, u);
+    r = await anon.get('/help/ea-blocked');
+    assert.strictEqual(r.status, 200);
+    assert.match(r.text, /AutoTrading disabled by server/);
+    r = await tia.get('/help/ea-blocked');
+    assert.match(r.text, /<option value="7777" selected/);
+    assert.match((await tia.get('/dashboard')).text, /help\/ea-blocked/);
     r = await anon.get('/no-such-page');
     assert.strictEqual(r.status, 404);
     assert.match(r.text, /doesn&#39;t exist|doesn't exist/);

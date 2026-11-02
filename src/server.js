@@ -460,6 +460,7 @@ app.get('/dashboard', requireUser, (req, res) => {
     <h2>3. Allow the license check in MT5</h2>
     <p>In MetaTrader 5 go to <strong>Tools → Options → Expert Advisors</strong>, tick <strong>Allow WebRequest for listed URL</strong> and add:</p>
     <code class="block">${esc(req.protocol + '://' + req.get('host'))}</code>
+    <p class="muted">Prop firm account says <strong>"AutoTrading disabled by server"</strong>? <a href="/help/ea-blocked">Get a ready-to-send email for their support</a>.</p>
   </section>
   ${req.hasJournal ? `<section class="card">
     <h2>4. Trade Journal</h2>
@@ -826,6 +827,7 @@ app.post('/admin/eas/:id/delete', requireAdmin, (req, res) => {
   res.redirect('/admin/eas');
 });
 
+require('./help')(app, { db, page });
 require('./pages')(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, TRIAL_ACCOUNTS, MAX_ACCOUNTS_DEFAULT });
 
 app.use((err, req, res, next) => {
