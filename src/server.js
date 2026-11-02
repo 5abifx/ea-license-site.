@@ -43,6 +43,16 @@ if (!db.prepare('SELECT 1 FROM users WHERE is_admin = 1').get()) {
 const app = express();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
+
+// Main domain: send people who open the old address (or www) to it. EA licence
+// calls (/api/...) are never redirected, so EAs built with the old address keep working.
+const CANONICAL_HOST = (process.env.CANONICAL_HOST || '').trim().toLowerCase();
+app.use((req, res, next) => {
+  const host = String(req.get('host') || '').toLowerCase();
+  if (!CANONICAL_HOST || host === CANONICAL_HOST || host.startsWith('localhost') || host.startsWith('127.')
+    || req.path.startsWith('/api/') || (req.method !== 'GET' && req.method !== 'HEAD')) return next();
+  res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
+});
 app.use(express.urlencoded({ extended: false }));
 app.use((req, res, next) => { req.body = req.body || {}; next(); });
 app.use(express.static(path.join(__dirname, '..', 'public')));
