@@ -19,19 +19,30 @@
   }));
   // admin-only story overlay (section exists only for admins)
   const ov = val('ov');
-  const drawOv = () => ov && window.StoryOverlay.render(ov, trade, {
-    style: val('ov-style').value, show: val('ov-show').value, ad: val('ov-ad').checked, scrim: val('ov-scrim').checked,
+  let quote = 0, photo = null;
+  const drawOv = (forSave) => ov && window.StoryOverlay.render(ov, trade, {
+    style: val('ov-style').value, quote, show: val('ov-show').value, ad: val('ov-ad').checked,
+    scrim: val('ov-scrim').checked, candles: val('ov-candles').checked,
+    photo: photo && (forSave !== true || val('ov-bake').checked) ? photo : null,
   });
   if (ov) {
     val('ov-style').value = window.StoryOverlay.suggest(trade);
-    ['ov-style', 'ov-show', 'ov-ad', 'ov-scrim'].forEach((id) => val(id).addEventListener('change', drawOv));
-    document.querySelector('[data-save-ov]').addEventListener('click', () => ov.toBlob((blob) => {
+    ['ov-style', 'ov-show', 'ov-ad', 'ov-scrim', 'ov-candles', 'ov-bake'].forEach((id) => val(id).addEventListener('change', () => drawOv()));
+    val('ov-style').addEventListener('change', () => { quote = 0; drawOv(); });
+    val('ov-next').addEventListener('click', () => { quote++; drawOv(); });
+    // the photo stays in the browser: it is only drawn on the canvas, never uploaded
+    val('ov-photo').addEventListener('change', (e) => {
+      const f = e.target.files[0]; if (!f) { photo = null; drawOv(); return; }
+      const img = new Image(); img.onload = () => { photo = img; drawOv(); }; img.src = URL.createObjectURL(f);
+    });
+    document.querySelector('[data-save-ov]').addEventListener('click', () => { drawOv(true); ov.toBlob((blob) => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `5ABIFX-${trade.symbol}-overlay-${val('ov-style').value}.png`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    }, 'image/png'));
+      drawOv();
+    }, 'image/png'); });
   }
   draw(); drawOv();
   if (document.fonts) {

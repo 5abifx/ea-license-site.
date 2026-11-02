@@ -186,12 +186,18 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
     ${req.user.is_admin ? `<section class="card">
       <h2>Story overlay <span class="tag">admin test · transparent PNG</span></h2>
-      <p class="muted">Text-only overlay for Instagram stories: lay it over your own photo or chart. No entry, SL or TP. Only admins see this for now.</p>
+      <p class="muted">Quote, the real candles of this trade with entry/exit arrows, and the result, on a transparent background for Instagram stories. No prices, SL or TP. Only admins see this for now.</p>
       <div class="row">
         <select id="ov-style">${Object.entries({ scalper: 'Scalper', trend: 'Trend following', counter: 'Counter trend', swing: 'Swing' }).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
         <select id="ov-show"><option value="pct">Show %</option><option value="r">Show R</option><option value="pips">Show pips</option></select>
         <label class="check"><input type="checkbox" id="ov-ad" checked> 5ABI.FX line</label>
+        <button type="button" class="small secondary" id="ov-next">Next quote</button>
+        <label class="check"><input type="checkbox" id="ov-candles" checked> Candles</label>
         <label class="check"><input type="checkbox" id="ov-scrim"> Dark fade</label>
+      </div>
+      <div class="row">
+        <label>Preview photo <input type="file" id="ov-photo" accept="image/*"></label>
+        <label class="check"><input type="checkbox" id="ov-bake"> Include photo in PNG</label>
       </div>
       <div class="cards">
         <figure><canvas id="ov" class="overlay"></canvas><button class="small" data-save-ov>Save overlay PNG</button></figure>
