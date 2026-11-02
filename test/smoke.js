@@ -111,8 +111,30 @@ function client(base) {
     await admin.post(`/admin/users/${tiaId}`, { name: 'Tia', status: 'active', max_accounts: '1', expires_at: '2020-01-01', ea: '1' });
     assert.match((await tia.get('/dashboard')).text, /free trial has ended/);
     assert.strictEqual((await check('GOLD_SCALPER', '7777')).valid, false);
-    r = await admin.post(`/admin/users/${tiaId}/paid`);
+    // pricing: trial-ended banner links to plans; picking a plan is saved for the admin
+    assert.match((await tia.get('/dashboard')).text, /href="\/pricing">See plans/);
+    r = await client(base).get('/pricing');
+    assert.match(r.text, /Most popular/);
+    assert.match(r.text, /data-billing="annual" hidden><b>\$15<\/b>/);
+    assert.match((await client(base).get('/subscribe?plan=pro')).text, /free trial|Create your account/);   // signed out: sign up first
+    r = await tia.get('/subscribe?plan=journal&billing=annual');
+    assert.match(r.text, /Journal · Annual/);
+    assert.match(r.text, /\$108 USD/);
+    r = await tia.post('/subscribe', { plan: 'journal', billing: 'annual' });
+    assert.match((await admin.get('/admin')).text, /wants a plan/);
+    assert.match((await admin.get(`/admin/users/${tiaId}`)).text, /Requested on the site: <strong>Journal<\/strong>, annual/);
+    // Journal plan: 1 account, only the JOURNAL EA, a year added
+    r = await admin.post(`/admin/users/${tiaId}/paid`, { plan: 'journal', billing: 'annual' });
+    assert.match(r.text, /marked as paid on Journal \(annual\)/);
+    let tu = db.prepare('SELECT * FROM users WHERE id = ?').get(tiaId);
+    assert.strictEqual(tu.max_accounts, 1);
+    assert.strictEqual(tu.plan_request, '');
+    assert.ok(Date.parse(tu.expires_at + 'Z') - Date.now() > 360 * 864e5);
+    assert.strictEqual((await check('GOLD_SCALPER', '7777')).valid, false);       // not in the Journal plan
+    // KATANA plan: every EA, 3 accounts
+    r = await admin.post(`/admin/users/${tiaId}/paid`, { plan: 'katana', billing: 'monthly' });
     assert.match(r.text, /marked as paid/);
+    assert.strictEqual(db.prepare('SELECT max_accounts FROM users WHERE id = ?').get(tiaId).max_accounts, 3);
     assert.strictEqual((await check('GOLD_SCALPER', '7777')).valid, true);
     assert.doesNotMatch((await tia.get('/dashboard')).text, /Free trial/);
     process.env.TRIAL_DAYS = '0';

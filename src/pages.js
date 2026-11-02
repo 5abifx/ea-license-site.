@@ -16,7 +16,7 @@ module.exports = function pages(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, T
     const qa = [
       ...(trial ? [
         ['How does the free trial work?', `Create an account and you get ${trial} days of full access to every ${name} EA straight away. No payment details are needed to start.`],
-        ['What happens when the trial ends?', `The EA stops opening trades on your account. To keep using it, subscribe for ${esc(PRICE_TEXT)} and we reactivate your license.`],
+        ['What happens when the trial ends?', `The EA stops opening trades on your account. To keep using it, pick a plan on the <a href="/pricing">pricing page</a> (from ${esc(PRICE_TEXT)}) and we reactivate your license.`],
         ['Can I get a second free trial?', 'No. Each MT5 account number can only be used for one free trial, even with a different email.'],
       ] : []),
       ['How do I pay?', `Use the Subscribe button in your dashboard, or ${contact('contact us')}. Once your payment is confirmed we extend your license by ${PAID_DAYS} days.`],
@@ -47,7 +47,7 @@ module.exports = function pages(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, T
       <h2>2. Free trial</h2>
       <p>New accounts may receive a free trial for a limited number of days. One trial is allowed per person and per MT5 account number. We may end a trial early if we see abuse, such as multiple accounts.</p>
       <h2>3. Price and payment</h2>
-      <p>After any trial, access costs ${esc(PRICE_TEXT)}, paid in advance. Each payment extends your license by ${PAID_DAYS} days. Prices may change; a change applies from your next payment.</p>
+      <p>After any trial, access costs the price of your plan shown on the <a href="/pricing">pricing page</a> (from ${esc(PRICE_TEXT)}), paid in advance. Each payment extends your license by ${PAID_DAYS} days, or 365 days on annual billing. Prices may change; a change applies from your next payment.</p>
       <h2>4. Cancellation and refunds</h2>
       <p>You can stop paying at any time and your license ends when the paid period runs out. Because you can test the EA during the free trial, payments are not refundable unless the law requires otherwise.</p>
       <h2>5. Trading risk</h2>

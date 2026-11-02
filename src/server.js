@@ -10,6 +10,8 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const { db, FILES_DIR } = require('./db');
 const { esc, fmtDate, layout, authShell, SITE_NAME, PRICE_TEXT, trialDays } = require('./views');
+const { PLANS, BILLING, getPlan, cleanBilling } = require('./plans');
+const { planCards } = require('./pricing');
 
 // ---------- config ----------
 const PORT = Number(process.env.PORT || 3000);
@@ -119,7 +121,7 @@ app.get('/', (req, res) => {
   <section class="lp-hero">
     <div class="wrap lp-hero-in">
       <div class="lp-copy">
-        <span class="lp-eyebrow"><i></i>${trial ? `${trial}-day free trial · then ${esc(PRICE_TEXT)}` : 'MT5 risk manager &amp; trade journal'}</span>
+        <span class="lp-eyebrow"><i></i>${trial ? `${trial}-day free trial · plans from ${esc(PRICE_TEXT)}` : 'MT5 risk manager &amp; trade journal'}</span>
         <h1>Your rules.<br><em>Enforced</em> on every trade.</h1>
         <p class="lp-lead">KATANA sizes every position, sets your stop and stops you trading when the day's loss limit is hit. Every closed trade lands in your journal, ready to review or share.</p>
         <div class="lp-cta">
@@ -291,36 +293,17 @@ app.get('/', (req, res) => {
   </section>
 
   <section id="pricing" class="lp-band">
-    <div class="wrap pricing">
-      <div class="math">
-        <span class="lp-kicker">The simple math</span>
-        <h2 class="section">Costs less than one stop loss.</h2>
-        <p class="lead left">A single 0.10 lot EUR/USD trade stopped out 20 pips away loses about $20. That is the price of a whole month of ${esc(SITE_NAME)}.</p>
-        <div class="sl-vs">
-          <div><span class="muted">One small stop loss</span><strong>≈ $20</strong><span class="muted">0.10 lot × 20 pips, gone in minutes</span></div>
-          <div class="hi"><span>A month of ${esc(SITE_NAME)}</span><strong>${esc(PRICE_TEXT)}</strong><span>Every EA, every trading day</span></div>
-        </div>
-        <p class="muted small">If it stops one revenge trade a month, it has paid for itself.</p>
-      </div>
-      <div class="plan">
-        <div class="plan-name">${esc(SITE_NAME)} Monthly</div>
-        <div class="plan-price">${esc(PRICE_TEXT)}</div>
-        ${trial ? `<div class="plan-note">First ${trial} days free. No payment to start.</div>` : ''}
-        <ul class="ticks">
-          <li>KATANA risk manager</li>
-          <li>Trade Journal EA and calendar</li>
-          <li>Share cards from your real trades</li>
-          <li>All updates and new versions included</li>
-          <li>Cancel anytime, no contract</li>
-        </ul>
-        ${signup ? `<a class="btn big full" href="/signup">${join}</a>` : ''}
-      </div>
+    <div class="wrap">
+      <div class="lp-head"><span class="lp-kicker">Pricing</span><h2>Costs less than one stop loss.</h2>
+        <p>A 0.10 lot EUR/USD trade stopped out 20 pips away loses about $20. ${trial ? `Every plan starts with a ${trial}-day free trial.` : 'Pick the plan that fits how you trade.'}</p></div>
+      ${planCards({ cta: (p) => `<a class="btn ${p.popular ? '' : 'secondary '}full" href="/pricing?plan=${p.id}">${trial ? 'Start free trial' : `Choose ${esc(p.name)}`}</a>` })}
+      <p class="center lp-more"><a href="/pricing">Compare plans and annual prices →</a></p>
     </div>
   </section>
 
   <section class="wrap lp-final">
     <h2>Trade with <em>discipline.</em></h2>
-    <p>${trial ? `Every tool, free for ${trial} days. Then ${esc(PRICE_TEXT)}.` : 'Already bought an EA? Create your account to get started.'}</p>
+    <p>${trial ? `Every tool, free for ${trial} days. Then plans from ${esc(PRICE_TEXT)}.` : 'Already bought an EA? Create your account to get started.'}</p>
     <div class="lp-cta center">
       ${signup ? `<a class="btn big" href="/signup">${join}</a>` : ''}
       <a class="btn big ghost" href="/login">Sign in</a>
@@ -367,7 +350,7 @@ app.get('/signup', (req, res) => {
   page(req, res, 'Create account', authShell(
     trial ? `${trial}-day free trial` : 'New account',
     trial ? `Start your ${trial}-day free trial` : 'Create your account',
-    trial ? `Full access to every EA, no payment needed. After the trial it is ${PRICE_TEXT}.` : 'Use the same email you paid with so we can match your purchase.', `
+    trial ? `Full access to every EA, no payment needed. After the trial, plans start at ${PRICE_TEXT}.` : 'Use the same email you paid with so we can match your purchase.', `
     ${googleOn() ? `${googleButton(trial ? 'Start free trial with Google' : 'Sign up with Google')}
     <p class="muted">We use your Google account to keep one free trial per person. We only receive your name and email.</p>` : `
     <form method="post" action="/signup">
@@ -527,10 +510,10 @@ app.get('/dashboard', requireUser, (req, res) => {
   page(req, res, 'My EAs', `
   <h1>Welcome${u.name ? ', ' + esc(u.name) : ''}</h1>
   ${expired ? `<div class="notice error"><div><strong>${u.trial ? 'Your free trial has ended.' : 'Your license has expired.'}</strong>
-    Your EAs will stop working until you subscribe. It is ${esc(PRICE_TEXT)}.${PAYMENT_URL ? '' : ' Contact us to renew.'}</div>${payButton('Subscribe')}</div>` : ''}
+    Your EAs will stop working until you pick a plan. Plans start at $${PLANS[0].monthly}/month.</div><a class="btn" href="/pricing">See plans</a></div>` : ''}
   ${u.trial && !expired ? `<div class="notice"><div><strong>Free trial: ${daysLeft(u)} day${daysLeft(u) === 1 ? '' : 's'} left</strong>
-    (until ${fmtDate(u.expires_at)} UTC). Keep trading after that for ${esc(PRICE_TEXT)}.</div>${payButton('Subscribe now')}</div>` : ''}
-  ${u.expires_at && !expired && !u.trial ? `<p class="muted">License valid until ${fmtDate(u.expires_at)} (UTC)</p>` : ''}
+    (until ${fmtDate(u.expires_at)} UTC). Pick a plan to keep trading after that.</div><a class="btn" href="/pricing">See plans</a></div>` : ''}
+  ${u.expires_at && !expired && !u.trial ? `<p class="muted">${getPlan(u.plan) ? `${esc(getPlan(u.plan).name)} plan (${esc(BILLING[cleanBilling(u.billing)].label.toLowerCase())}) · ` : ''}License valid until ${fmtDate(u.expires_at)} (UTC) · <a href="/pricing">Plans</a></p>` : ''}
 
   <section class="card">
     <h2>1. Download your EA</h2>
@@ -664,7 +647,7 @@ app.get('/admin', requireAdmin, (req, res) => {
     <table><thead><tr><th>User</th><th>Status</th><th>EAs</th><th>Accounts</th><th>Expires</th><th></th></tr></thead><tbody>
     ${users.map((u) => `<tr>
       <td><a href="/admin/users/${u.id}"><strong>${esc(u.name || '-')}</strong></a><br><span class="muted">${esc(u.email)}</span>${u.is_admin ? ' <span class="tag">admin</span>' : ''}</td>
-      <td><span class="status ${esc(u.status)}">${esc(u.status)}</span>${u.trial ? ' <span class="tag warn">trial</span>' : ''}</td>
+      <td><span class="status ${esc(u.status)}">${esc(u.status)}</span>${u.trial ? ' <span class="tag warn">trial</span>' : ''}${u.plan && !u.trial ? ` <span class="tag">${esc((getPlan(u.plan) || {}).name || u.plan)}</span>` : ''}${u.plan_request ? ' <span class="tag warn">wants a plan</span>' : ''}</td>
       <td>${esc(u.ea_codes || '-')}</td>
       <td>${u.n_acc} / ${u.max_accounts}</td>
       <td>${u.expires_at ? fmtDate(u.expires_at) : 'never'}${isExpired(u) ? ' <span class="tag warn">expired</span>' : ''}</td>
@@ -740,7 +723,15 @@ app.get('/admin/users/:id', requireAdmin, (req, res) => {
   <section class="card">
     <div class="row between">
       <h2>License ${u.trial ? '<span class="tag warn">free trial</span>' : ''}</h2>
-      <form method="post" action="/admin/users/${u.id}/paid" class="inline"><button class="small">Mark as paid (+${PAID_DAYS} days)</button></form>
+      <form method="post" action="/admin/users/${u.id}/paid" class="row paid-form">
+        ${(() => { const [rp, rb] = (u.plan_request || '').split(':'); const cp = rp || u.plan || 'katana', cb = rb || u.billing || 'monthly';
+          return `<select name="plan" aria-label="Plan">${PLANS.map((p) => `<option value="${p.id}" ${p.id === cp ? 'selected' : ''}>${esc(p.name)} (${p.accounts} acct)</option>`).join('')}</select>
+          <select name="billing" aria-label="Billing">${Object.entries(BILLING).map(([k, b]) => `<option value="${k}" ${k === cb ? 'selected' : ''}>${b.label} (+${k === 'annual' ? b.days : PAID_DAYS} days)</option>`).join('')}</select>`; })()}
+        <button class="small">Mark as paid</button></form>
+    </div>
+    ${u.plan_request ? `<p class="notice"><span>Requested on the site: <strong>${esc((getPlan(u.plan_request.split(':')[0]) || {}).name || u.plan_request)}</strong>, ${esc(u.plan_request.split(':')[1] || '')}. Check the payment, then press Mark as paid.</span></p>` : ''}
+    ${u.plan ? `<p class="muted">Current plan: <strong>${esc((getPlan(u.plan) || {}).name || u.plan)}</strong> · ${esc(u.billing)}</p>` : ''}
+    <div>
     </div>
     <form method="post" action="/admin/users/${u.id}" class="grid">
       <label>Name<input name="name" value="${esc(u.name)}"></label>
@@ -786,12 +777,25 @@ app.get('/admin/users/:id', requireAdmin, (req, res) => {
 app.post('/admin/users/:id/paid', requireAdmin, (req, res) => {
   const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
   if (!u) return res.redirect('/admin');
+  const plan = getPlan(req.body && req.body.plan);
+  const billing = cleanBilling(req.body && req.body.billing);
+  const days = plan && billing === 'annual' ? BILLING.annual.days : PAID_DAYS;
   const from = u.expires_at && !isExpired(u) ? u.expires_at : new Date().toISOString().slice(0, 19).replace('T', ' ');
-  db.prepare(`UPDATE users SET trial = 0, status = 'active', expires_at = datetime(?, ?),
-              max_accounts = MAX(max_accounts, ?) WHERE id = ?`).run(from, `+${PAID_DAYS} days`, MAX_ACCOUNTS_DEFAULT, u.id);
-  if (!db.prepare('SELECT 1 FROM user_eas WHERE user_id = ?').get(u.id)) grantAllActiveEas(u.id);
+  db.transaction(() => {
+    db.prepare(`UPDATE users SET trial = 0, status = 'active', expires_at = datetime(?, ?), plan_request = '' WHERE id = ?`).run(from, `+${days} days`, u.id);
+    if (plan) {
+      // the plan decides the account limit and which EAs the customer gets
+      db.prepare('UPDATE users SET plan = ?, billing = ?, max_accounts = ? WHERE id = ?').run(plan.id, billing, plan.accounts, u.id);
+      db.prepare('DELETE FROM user_eas WHERE user_id = ?').run(u.id);
+      if (plan.eas === 'all') grantAllActiveEas(u.id);
+      else db.prepare(`INSERT OR IGNORE INTO user_eas (user_id, ea_id) SELECT ?, id FROM eas WHERE active = 1 AND code IN (${plan.eas.map(() => '?').join(', ')})`).run(u.id, ...plan.eas);
+    } else {
+      db.prepare('UPDATE users SET max_accounts = MAX(max_accounts, ?) WHERE id = ?').run(MAX_ACCOUNTS_DEFAULT, u.id);
+      if (!db.prepare('SELECT 1 FROM user_eas WHERE user_id = ?').get(u.id)) grantAllActiveEas(u.id);
+    }
+  })();
   const after = db.prepare('SELECT expires_at FROM users WHERE id = ?').get(u.id).expires_at;
-  flash(req, 'ok', `${u.email} marked as paid. License now valid until ${after.slice(0, 16)} UTC.`);
+  flash(req, 'ok', `${u.email} marked as paid${plan ? ` on ${plan.name} (${billing})` : ''}. License now valid until ${after.slice(0, 16)} UTC.`);
   res.redirect(`/admin/users/${u.id}`);
 });
 
@@ -932,6 +936,7 @@ app.post('/admin/eas/:id/delete', requireAdmin, (req, res) => {
 });
 
 require('./help')(app, { db, page });
+require('./pricing')(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL: process.env.CONTACT_URL || '' });
 require('./pages')(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, TRIAL_ACCOUNTS, MAX_ACCOUNTS_DEFAULT });
 
 app.use((err, req, res, next) => {
