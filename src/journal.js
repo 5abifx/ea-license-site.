@@ -86,44 +86,127 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   app.get('/journal', requireUser, requireJournal, (req, res) => {
     const u = req.user;
     const key = ensureKey(u);
-    const acc = cleanAccount(req.query.account);
-    const where = acc ? 'user_id = ? AND account_number = ?' : 'user_id = ?';
-    const args = acc ? [u.id, acc] : [u.id];
-    const st = db.prepare(`SELECT COUNT(*) AS n, SUM(net > 0) AS wins, SUM(net) AS net,
-        SUM(CASE WHEN net > 0 THEN net ELSE 0 END) AS gross_win, SUM(CASE WHEN net < 0 THEN -net ELSE 0 END) AS gross_loss,
-        AVG(r) AS avg_r, MAX(currency) AS cur FROM journal_trades WHERE ${where}`).get(...args);
-    const trades = db.prepare(`SELECT id, account_number, symbol, side, lots, net, r, pips, open_time, close_time, setup, rating, currency
-        FROM journal_trades WHERE ${where} ORDER BY close_time DESC LIMIT 300`).all(...args);
-    const accounts = db.prepare('SELECT DISTINCT account_number FROM journal_trades WHERE user_id = ? ORDER BY 1').all(u.id);
-    const winRate = st.n ? Math.round((st.wins / st.n) * 100) : 0;
-    const pf = st.gross_loss ? (st.gross_win / st.gross_loss).toFixed(2) : st.gross_win ? '∞' : '-';
+
+    // accounts: live ones are still on My EAs; removed ones keep their trades in their own tab
+    const live = new Set(db.prepare('SELECT account_number FROM accounts WHERE user_id = ?').all(u.id).map((a) => a.account_number));
+    const accts = db.prepare(`SELECT account_number, COUNT(*) AS n, SUM(net) AS net, MAX(broker) AS broker, MAX(currency) AS cur
+        FROM journal_trades WHERE user_id = ? GROUP BY account_number ORDER BY MAX(close_time) DESC`).all(u.id);
+    accts.forEach((a) => { a.removed = !live.has(a.account_number); });
+    const liveAccts = accts.filter((a) => !a.removed), removedAccts = accts.filter((a) => a.removed);
+    const q = cleanAccount(req.query.account);
+    const sel = accts.find((a) => a.account_number === q) || null;
+    const liveNums = liveAccts.map((a) => a.account_number);
+    const where = sel ? 'user_id = ? AND account_number = ?'
+      : `user_id = ? AND account_number IN (${liveNums.map(() => '?').join(', ') || "''"})`;
+    const args = sel ? [u.id, sel.account_number] : [u.id, ...liveNums];
+
+    // month shown: ?month=YYYY-MM, else the month of the latest trade
+    const latest = db.prepare(`SELECT MAX(close_time) AS t FROM journal_trades WHERE ${where}`).get(...args).t;
+    const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(req.query.month || '') ? req.query.month
+      : (latest || new Date().toISOString()).slice(0, 7);
+    const trades = db.prepare(`SELECT id, account_number, symbol, side, lots, net, r, close_time, setup, currency, broker
+        FROM journal_trades WHERE ${where} AND substr(close_time, 1, 7) = ? ORDER BY close_time`).all(...args, month);
+    const cur = (sel ? sel.cur : liveAccts[0]?.cur) || '';
+    const days = {};
+    trades.forEach((t) => { (days[t.close_time.slice(0, 10)] ||= []).push(t); });
+    const sum = (l) => l.reduce((s, t) => s + (t.net || 0), 0);
+    const dayKeys = Object.keys(days).sort();
+    const net = sum(trades), wins = trades.filter((t) => t.net > 0).length;
+    const greenDays = dayKeys.filter((d) => sum(days[d]) > 0).length;
+    const bestDay = dayKeys.length ? Math.max(...dayKeys.map((d) => sum(days[d]))) : null;
+
+    // calendar geometry (Monday first)
+    const [yy, mm] = month.split('-').map(Number);
+    const nDays = new Date(Date.UTC(yy, mm, 0)).getUTCDate();
+    const lead = (new Date(Date.UTC(yy, mm - 1, 1)).getUTCDay() + 6) % 7;
+    const iso = (d) => `${month}-${String(d).padStart(2, '0')}`;
+    const shift = (n) => { const dt = new Date(Date.UTC(yy, mm - 1 + n, 1)); return dt.toISOString().slice(0, 7); };
+    const monthName = new Date(Date.UTC(yy, mm - 1, 1)).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const short = (v) => `${v < 0 ? '−' : '+'}${Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFixed(1) + 'k' : Math.round(Math.abs(v))}`;
+    const qs = (o) => '?' + new URLSearchParams(Object.entries({ account: sel ? sel.account_number : '', month, ...o }).filter(([, v]) => v)).toString();
+    const pickDay = dayKeys[dayKeys.length - 1] || '';
+
+    let grid = DOW.map((d) => `<div class="dow">${d}</div>`).join('') + '<div class="dow">Week</div>';
+    let cell = 0, week = [];
+    const weekCell = () => { const l = week.flat(); grid += `<div class="wk"><span>Week</span><b class="${cls(sum(l))}">${l.length ? short(sum(l)) : '-'}</b></div>`; week = []; };
+    for (let i = 0; i < lead; i++, cell++) grid += '<div class="day out"></div>';
+    for (let d = 1; d <= nDays; d++, cell++) {
+      const l = days[iso(d)] || [], s = sum(l), weekend = cell % 7 >= 5;
+      grid += l.length
+        ? `<button type="button" class="day ${s >= 0 ? 'win' : 'loss'}" data-day="${iso(d)}" aria-pressed="${iso(d) === pickDay}"><span class="d">${d}</span><span class="v ${cls(s)}">${short(s)}</span><span class="n">${l.length} trade${l.length > 1 ? 's' : ''}</span></button>`
+        : `<div class="day${weekend ? ' off' : ''}"><span class="d">${d}</span></div>`;
+      week.push(l);
+      if ((cell + 1) % 7 === 0) weekCell();
+    }
+    if (cell % 7) { for (; cell % 7; cell++) grid += '<div class="day out"></div>'; weekCell(); }
+
+    // phone: days with trades, newest first, grouped by week
+    const weeks = {};
+    [...dayKeys].reverse().forEach((d) => { const w = Math.floor((Number(d.slice(8)) + lead - 1) / 7); (weeks[w] ||= []).push(d); });
+    const list = Object.keys(weeks).map(Number).sort((a, b) => b - a).map((w) => {
+      const ws = sum(weeks[w].flatMap((d) => days[d]));
+      return `<div class="wkhead"><span>Week ${w + 1}</span><span class="${cls(ws)}">${money(ws, cur)}</span></div>` + weeks[w].map((d) => {
+        const l = days[d], s = sum(l), mx = Math.max(...l.map((t) => Math.abs(t.net || 0)), 1);
+        const wd = DOW[(new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7];
+        return `<button type="button" class="arow" data-day="${d}" aria-pressed="${d === pickDay}"><span class="dt">${wd} ${Number(d.slice(8))}<small>${l.length} trade${l.length > 1 ? 's' : ''}</small></span>
+          <span class="bars">${l.map((t) => `<i class="${(t.net || 0) >= 0 ? 'up' : 'down'}" style="height:${Math.max(4, Math.round(Math.abs(t.net || 0) / mx * 22))}px"></i>`).join('')}</span>
+          <span class="v ${cls(s)}">${money(s, cur)}</span></button>`;
+      }).join('');
+    }).join('');
+
+    // one hidden panel per trading day; the calendar shows the picked one
+    const panels = dayKeys.map((d) => {
+      const l = days[d], s = sum(l), wd = DOW[(new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7];
+      return `<div class="dayp" data-day="${d}"${d === pickDay ? '' : ' hidden'}>
+        <h3>${wd} ${Number(d.slice(8))} ${esc(monthName.split(' ')[0])}</h3>
+        <p class="muted">${l.length} trade${l.length > 1 ? 's' : ''} · <strong class="${cls(s)}">${money(s, cur)}</strong></p>
+        <table><tbody>${l.map((t) => `<tr>
+          <td class="muted">${esc(t.close_time.slice(11, 16))}</td>
+          <td><strong>${esc(t.symbol)}</strong> ${esc(t.side)} ${t.lots ?? ''}${!sel && liveAccts.length > 1 ? `<br><span class="muted small">${esc(t.broker || 'Account')} · ${esc(t.account_number)}</span>` : ''}${t.setup ? `<br><span class="muted small">${esc(t.setup)}</span>` : ''}</td>
+          <td class="right"><span class="${cls(t.net)}">${money(t.net)}</span><br><a class="small" href="/journal/${t.id}">Open ›</a></td></tr>`).join('')}
+        </tbody></table></div>`;
+    }).join('');
+
+    const chip = (a, label, sub, href, on) => `<a class="acct${a && a.removed ? ' removed' : ''}${on ? ' on' : ''}" href="${href}">
+      <small>${label}</small><b class="${cls(a ? a.net : 0)}">${a ? money(a.net, a.cur) : ''}</b><small>${sub}</small></a>`;
+    const allNet = liveAccts.reduce((s, a) => s + (a.net || 0), 0), allN = liveAccts.reduce((s, a) => s + a.n, 0);
     const site = req.protocol + '://' + req.get('host');
 
     page(req, res, 'Trade Journal', `
     <h1>Trade Journal</h1>
-    ${accounts.length > 1 ? `<form method="get" action="/journal" class="row"><select name="account" onchange="this.form.submit()">
-      <option value="">All accounts</option>${accounts.map((a) => `<option ${a.account_number === acc ? 'selected' : ''}>${esc(a.account_number)}</option>`).join('')}
-    </select></form>` : ''}
+    ${accts.length ? `<div class="accts" role="navigation" aria-label="Accounts">
+      ${liveAccts.length > 1 || removedAccts.length ? `<a class="acct${sel ? '' : ' on'}" href="/journal${qs({ account: '' })}"><small>All accounts</small><b class="${cls(allNet)}">${money(allNet, cur)}</b><small>${allN} trades</small></a>` : ''}
+      ${liveAccts.map((a) => chip(a, `${esc(a.broker || 'Account')} · ${esc(a.account_number)}`, `${a.n} trades`, `/journal${qs({ account: a.account_number })}`, sel === a || (!sel && liveAccts.length === 1 && !removedAccts.length))).join('')}
+      ${removedAccts.map((a) => chip(a, `${esc(a.broker || 'Account')} · ${esc(a.account_number)}`, '<span class="tag">Removed</span>', `/journal${qs({ account: a.account_number })}`, sel === a)).join('')}
+    </div>` : ''}
+
+    ${sel && sel.removed ? `<section class="card notice">
+      <p><strong>Account ${esc(sel.account_number)} is no longer on <a href="/dashboard">My EAs</a>.</strong> Its ${sel.n} trades are kept here and left out of "All accounts". Add the account again on My EAs to bring it back, or delete these trades for good.</p>
+      <form method="post" action="/journal/accounts/${esc(sel.account_number)}/delete" onsubmit="return confirm('Delete all ${sel.n} trades of account ${esc(sel.account_number)}? This cannot be undone.')">
+        <button class="small danger">Delete these trades</button></form>
+    </section>` : ''}
+
     <div class="stats">
-      <div><span>Trades</span><strong>${st.n}</strong></div>
-      <div><span>Win rate</span><strong>${st.n ? winRate + '%' : '-'}</strong></div>
-      <div><span>Net P&amp;L</span><strong class="${cls(st.net)}">${st.n ? money(st.net, st.cur) : '-'}</strong></div>
-      <div><span>Profit factor</span><strong>${pf}</strong></div>
-      <div><span>Average R</span><strong>${st.avg_r === null ? '-' : (st.avg_r >= 0 ? '+' : '−') + Math.abs(st.avg_r).toFixed(2) + 'R'}</strong></div>
+      <div><span>${esc(monthName)}</span><strong class="${cls(net)}">${trades.length ? money(net, cur) : '-'}</strong></div>
+      <div><span>Trades</span><strong>${trades.length}</strong></div>
+      <div><span>Win rate</span><strong>${trades.length ? Math.round((wins / trades.length) * 100) + '%' : '-'}</strong></div>
+      <div><span>Green days</span><strong>${dayKeys.length ? `${greenDays} / ${dayKeys.length}` : '-'}</strong></div>
+      <div><span>Best day</span><strong class="${cls(bestDay)}">${bestDay === null ? '-' : money(bestDay, cur)}</strong></div>
     </div>
 
-    <section class="card">
-      <h2>Trades</h2>
-      ${trades.length ? `<table><thead><tr><th>Closed</th><th>Symbol</th><th>Side</th><th>Lots</th><th>Net</th><th>R</th><th>Setup</th><th></th></tr></thead><tbody>
-      ${trades.map((t) => `<tr>
-        <td>${fmtDate(t.close_time)}${accounts.length > 1 ? `<br><span class="muted">${esc(t.account_number)}</span>` : ''}</td>
-        <td><strong>${esc(t.symbol)}</strong></td><td>${esc(t.side)}</td><td>${t.lots ?? '-'}</td>
-        <td class="${cls(t.net)}">${money(t.net)}</td>
-        <td>${t.r === null ? '-' : (t.r >= 0 ? '+' : '−') + Math.abs(t.r).toFixed(2)}</td>
-        <td>${esc(t.setup) || '<span class="muted">add notes</span>'}</td>
-        <td><a class="btn small secondary" href="/journal/${t.id}">Open</a></td></tr>`).join('')}
-      </tbody></table>` : '<p class="muted">No trades yet. Connect the Trade Journal EA below; every trade you close will appear here.</p>'}
-    </section>
+    <div class="cal-split">
+      <section class="card">
+        <div class="row between cal-head"><h2>${esc(monthName)}</h2>
+          <span><a class="btn small secondary" href="/journal${qs({ month: shift(-1) })}" aria-label="Previous month">‹</a>
+          <a class="btn small secondary" href="/journal${qs({ month: shift(1) })}" aria-label="Next month">›</a></span></div>
+        ${accts.length ? `<div class="cal-grid">${grid}</div>
+        <div class="cal-list">${list || '<p class="muted">No trades this month.</p>'}</div>`
+        : '<p class="muted">No trades yet. Connect the Trade Journal EA below; every trade you close will appear here.</p>'}
+      </section>
+      <aside class="card day-panel" aria-live="polite">${panels || `<p class="muted">${accts.length ? 'No trades this month. Use ‹ › to change month.' : 'Tap a day to see its trades.'}</p>`}</aside>
+    </div>
+    <script src="/calendar.js"></script>
 
     <section class="card">
       <h2>Connect the Trade Journal EA</h2>
@@ -136,6 +219,18 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       <form method="post" action="/journal/key" onsubmit="return confirm('Make a new key? The old key stops working and you must paste the new one into the EA.')">
         <button class="small secondary">Make a new key</button></form>
     </section>`);
+  });
+
+  // delete the trades of an account that was removed from My EAs (live accounts are refused)
+  app.post('/journal/accounts/:num/delete', requireUser, requireJournal, (req, res) => {
+    const num = cleanAccount(req.params.num);
+    if (!num || db.prepare('SELECT 1 FROM accounts WHERE user_id = ? AND account_number = ?').get(req.user.id, num)) {
+      flash(req, 'error', 'Only trades of removed accounts can be deleted.');
+      return res.redirect('/journal');
+    }
+    const r = db.prepare('DELETE FROM journal_trades WHERE user_id = ? AND account_number = ?').run(req.user.id, num);
+    flash(req, 'ok', `Deleted ${r.changes} trade${r.changes === 1 ? '' : 's'} of account ${num}.`);
+    res.redirect('/journal');
   });
 
   app.post('/journal/key', requireUser, requireJournal, (req, res) => {
@@ -184,6 +279,26 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       </form>
     </section>
 
+    ${req.user.is_admin ? `<section class="card">
+      <h2>Story overlay <span class="tag">admin test · transparent PNG</span></h2>
+      <p class="muted">Quote, the real candles of this trade with entry/exit arrows, and the result, on a transparent background for Instagram stories. No prices, SL or TP. Only admins see this for now.</p>
+      <div class="row">
+        <select id="ov-style">${Object.entries({ scalper: 'Scalper', trend: 'Trend following', counter: 'Counter trend', swing: 'Swing' }).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
+        <select id="ov-show"><option value="pct">Show %</option><option value="r">Show R</option><option value="pips">Show pips</option></select>
+        <label class="check"><input type="checkbox" id="ov-ad" checked> 5ABI.FX line</label>
+        <button type="button" class="small secondary" id="ov-next">Next quote</button>
+        <label class="check"><input type="checkbox" id="ov-candles" checked> Candles</label>
+        <label class="check"><input type="checkbox" id="ov-scrim"> Dark fade</label>
+      </div>
+      <div class="row">
+        <label>Preview photo <input type="file" id="ov-photo" accept="image/*"></label>
+        <label class="check"><input type="checkbox" id="ov-bake"> Include photo in PNG</label>
+      </div>
+      <div class="cards">
+        <figure><canvas id="ov" class="overlay"></canvas><button class="small" data-save-ov>Save overlay PNG</button></figure>
+      </div>
+    </section>` : ''}
+
     <section class="card">
       <h2>Trade</h2>
       <table><tbody>
@@ -208,9 +323,10 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       </form>
     </section>
 
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800;900&family=Hanken+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800;900&family=Hanken+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@500;600${req.user.is_admin ? '&family=DM+Serif+Display:ital@0;1&family=Montserrat:wght@500;600' : ''}&display=swap">
     <script id="trade-data" type="application/json">${json}</script>
     <script src="/cards.js"></script>
+    ${req.user.is_admin ? '<script src="/overlay.js"></script>' : ''}
     <script src="/journal.js"></script>`);
   });
 

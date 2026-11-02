@@ -9,7 +9,7 @@ const cookieSession = require('cookie-session');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const { db, FILES_DIR } = require('./db');
-const { esc, fmtDate, layout, SITE_NAME, PRICE_TEXT, trialDays } = require('./views');
+const { esc, fmtDate, layout, authShell, SITE_NAME, PRICE_TEXT, trialDays } = require('./views');
 
 // ---------- config ----------
 const PORT = Number(process.env.PORT || 3000);
@@ -227,23 +227,14 @@ app.get('/', (req, res) => {
 
 app.get('/login', (req, res) => {
   if (req.user) return res.redirect('/dashboard');
-  page(req, res, 'Sign in', `
-  <div class="auth">
-    <div class="auth-intro">
-      <h1>Welcome back</h1>
-      <p class="muted">Sign in to download your EAs, manage your MT5 accounts and check your license.</p>
-    </div>
-    <div class="card">
-      <h2>Sign in</h2>
-      ${googleOn() ? `${googleButton('Sign in with Google')}<p class="or">or with email and password</p>` : ''}
-      <form method="post" action="/login">
-        <label>Email<input name="email" required autofocus autocomplete="username"></label>
-        <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
-        <button class="full">Sign in</button>
-      </form>
-      ${SIGNUP_MODE !== 'closed' ? '<p class="muted">No account yet? <a href="/signup">Create one</a></p>' : ''}
-    </div>
-  </div>`);
+  page(req, res, 'Sign in', authShell('Secure sign-in', 'Welcome back', 'Sign in to download your EAs, manage your MT5 accounts and open your journal.', `
+    ${googleOn() ? `${googleButton('Sign in with Google')}<p class="or">or with email and password</p>` : ''}
+    <form method="post" action="/login">
+      <label>Email<input name="email" required autofocus autocomplete="username"></label>
+      <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
+      <button>Continue</button>
+    </form>
+    ${SIGNUP_MODE !== 'closed' ? '<p class="muted">No account yet? <a href="/signup">Create one</a></p>' : ''}`));
 });
 
 app.post('/login', (req, res) => {
@@ -269,26 +260,20 @@ app.post('/logout', (req, res) => { req.session = null; res.redirect('/login'); 
 app.get('/signup', (req, res) => {
   if (SIGNUP_MODE === 'closed') return res.redirect('/login');
   const trial = trialDays();
-  page(req, res, 'Create account', `
-  <div class="auth">
-    <div class="auth-intro">
-      <h1>${trial ? `Start your ${trial}-day free trial` : 'Create your account'}</h1>
-      <p class="muted">${trial ? `Full access to every EA, no payment needed. After the trial it is ${esc(PRICE_TEXT)}.` : 'Use the same email you paid with so we can match your purchase.'}</p>
-    </div>
-    <div class="card">
-      <h2>Create account</h2>
-      ${googleOn() ? `${googleButton(trial ? 'Start free trial with Google' : 'Sign up with Google')}
-      <p class="muted">We use your Google account to keep one free trial per person. We only receive your name and email.</p>` : `
-      <form method="post" action="/signup">
-        <label>Name<input name="name" required maxlength="80" autocomplete="name"></label>
-        <label>Email<input type="email" name="email" required maxlength="120" autocomplete="email"></label>
-        <label>Password<input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters"></label>
-        <button class="full">${trial ? 'Start free trial' : 'Create account'}</button>
-      </form>`}
-      ${!trial && SIGNUP_MODE === 'approval' ? '<p class="muted">Your account will be activated after we confirm your purchase.</p>' : ''}
-      <p class="muted">Already have an account? <a href="/login">Sign in</a></p>
-    </div>
-  </div>`);
+  page(req, res, 'Create account', authShell(
+    trial ? `${trial}-day free trial` : 'New account',
+    trial ? `Start your ${trial}-day free trial` : 'Create your account',
+    trial ? `Full access to every EA, no payment needed. After the trial it is ${PRICE_TEXT}.` : 'Use the same email you paid with so we can match your purchase.', `
+    ${googleOn() ? `${googleButton(trial ? 'Start free trial with Google' : 'Sign up with Google')}
+    <p class="muted">We use your Google account to keep one free trial per person. We only receive your name and email.</p>` : `
+    <form method="post" action="/signup">
+      <label>Name<input name="name" required maxlength="80" autocomplete="name"></label>
+      <label>Email<input type="email" name="email" required maxlength="120" autocomplete="email"></label>
+      <label>Password<input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters"></label>
+      <button>${trial ? 'Start free trial' : 'Create account'}</button>
+    </form>`}
+    ${!trial && SIGNUP_MODE === 'approval' ? '<p class="muted">Your account will be activated after we confirm your purchase.</p>' : ''}
+    <p class="muted">Already have an account? <a href="/login">Sign in</a></p>`));
 });
 
 // Creates a customer account: a free trial when TRIAL_DAYS is set, otherwise SIGNUP_MODE decides. Returns the new user id.
