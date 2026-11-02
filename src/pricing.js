@@ -33,7 +33,7 @@ function billingToggle(billing) {
   </div>`;
 }
 
-module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL }) {
+module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL, refs }) {
   app.get('/pricing', (req, res) => {
     const billing = cleanBilling(req.query.billing);
     const selected = getPlan(req.query.plan) ? req.query.plan : 'katana';
@@ -45,6 +45,7 @@ module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYME
         <p class="pl-quote">“${esc(QUOTES[new Date().getUTCDate() % QUOTES.length])}”</p>
         ${billingToggle(billing)}
       </div>
+      ${refs.discountFor(req.user) ? `<p class="pl-ref"><span class="pl-ref-tick">✓</span> Your ${refs.discountFor(req.user)}% referral discount is applied to your first payment.</p>` : req.session.ref ? `<p class="pl-ref"><span class="pl-ref-tick">✓</span> Referral code ${esc(req.session.ref)}: create your account to get your discount on the first payment.</p>` : ''}
       <input type="hidden" name="billing" value="${billing}">
       ${planCards({ billing, selected })}
       <button class="pl-go">${req.user ? 'Continue' : trial ? `Start ${trial}-day free trial` : 'Continue'}</button>
@@ -58,6 +59,8 @@ module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYME
     const plan = getPlan(req.query.plan) || getPlan('katana');
     const billing = cleanBilling(req.query.billing);
     if (!req.user) return res.redirect('/signup');
+    const off = refs.discountFor(req.user);
+    const total = dueNow(plan, billing), cut = Math.round(total * off) / 100;
     page(req, res, 'Subscribe', `
     <div class="sub">
       <p><a href="/pricing?plan=${plan.id}&amp;billing=${billing}">← Change plan</a></p>
@@ -68,7 +71,9 @@ module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYME
           <ul class="ticks">${plan.features.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
           <div class="sub-row"><span>${esc(plan.name)} plan, billed ${billing === 'annual' ? 'yearly' : 'monthly'}</span><b>$${dueNow(plan, billing)}</b></div>
           ${billing === 'annual' ? `<div class="sub-row muted"><span>Same as $${perMonth(plan, billing)}/month</span><span>you save $${(plan.monthly - plan.annual) * 12}</span></div>` : ''}
-          <div class="sub-row total"><span>Total due</span><b>$${dueNow(plan, billing)} USD</b></div>
+          ${off ? `<div class="sub-row"><span class="sub-badge">${off}% off first payment</span><b class="pos">−$${cut.toFixed(2)}</b></div>` : ''}
+          <div class="sub-row total"><span>Total due</span><b>$${(total - cut).toFixed(off ? 2 : 0)} USD</b></div>
+          ${off ? `<p class="muted small">Then $${total} per ${billing === 'annual' ? 'year' : 'month'}.</p>` : ''}
         </section>
         <section class="card sub-pay">
           <h2>Pay</h2>

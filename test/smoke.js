@@ -137,6 +137,27 @@ function client(base) {
     assert.strictEqual(db.prepare('SELECT max_accounts FROM users WHERE id = ?').get(tiaId).max_accounts, 3);
     assert.strictEqual((await check('GOLD_SCALPER', '7777')).valid, true);
     assert.doesNotMatch((await tia.get('/dashboard')).text, /Free trial/);
+
+    // referrals: friend signs up through Tia's link, gets 20% off the first payment, Tia gets 30 days when it is paid
+    const refLink = (await tia.get('/dashboard')).text.match(/id="ref-link">https?:\/\/[^/]+(\/r\/[A-Z0-9]+)</)[1];
+    const ria = client(base);
+    await ria.get(refLink);
+    assert.match((await ria.get('/pricing')).text, /Referral code [A-Z0-9]+/);
+    await ria.post('/signup', { name: 'Ria', email: 'ria@test.com', password: 'secret123' });
+    r = await ria.get('/subscribe?plan=katana&billing=monthly');
+    assert.match(r.text, /20% off first payment/);
+    assert.match(r.text, /\$16\.00 USD/);
+    const riaId = db.prepare("SELECT id FROM users WHERE email = 'ria@test.com'").get().id;
+    assert.match((await admin.get(`/admin/users/${riaId}`)).text, /Referred by .*tia/);
+    const tiaExp = db.prepare('SELECT expires_at FROM users WHERE id = ?').get(tiaId).expires_at;
+    r = await admin.post(`/admin/users/${riaId}/paid`, { plan: 'katana', billing: 'monthly' });
+    assert.match(r.text, /got 30 free days/);
+    const tiaExp2 = db.prepare('SELECT expires_at FROM users WHERE id = ?').get(tiaId).expires_at;
+    assert.strictEqual(Math.round((Date.parse(tiaExp2 + 'Z') - Date.parse(tiaExp + 'Z')) / 864e5), 30);
+    r = await admin.post(`/admin/users/${riaId}/paid`, { plan: 'katana', billing: 'monthly' });   // second payment: no new reward
+    assert.doesNotMatch(r.text, /free days/);
+    assert.doesNotMatch((await ria.get('/subscribe?plan=katana')).text, /off first payment/);
+    assert.match((await tia.get('/dashboard')).text, /1 joined · 1 paid/);
     process.env.TRIAL_DAYS = '0';
 
     // public info pages, 404 and link preview tags

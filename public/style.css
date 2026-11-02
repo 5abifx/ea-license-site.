@@ -577,3 +577,8 @@ main.wide { padding-bottom: 48px; }
 .paid-form select { width: auto; margin: 0; padding: 6px 8px; font-size: 13px; }
 @media (max-width: 900px) { .pl-grid, .sub-grid { grid-template-columns: 1fr; } .pl-grid { gap: 22px; } .pl-toggle { margin-left: 0; flex-wrap: wrap; } }
 .sub-sum .ticks { margin-bottom: 16px; }
+.pl-ref { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; font-weight: 600; font-size: 14px; display: flex; gap: 10px; align-items: center; }
+.pl-ref-tick { width: 18px; height: 18px; border-radius: 4px; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 11px; }
+.sub-badge { background: var(--card-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px; font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .04em; }
+.ref p b { color: var(--accent); }
+.ref-link { flex-wrap: nowrap; } .ref-link code { flex: 1; min-width: 0; margin: 0; overflow-x: auto; white-space: nowrap; }
