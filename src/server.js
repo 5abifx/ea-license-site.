@@ -12,6 +12,7 @@ const { db, FILES_DIR } = require('./db');
 const { esc, fmtDate, layout, authShell, SITE_NAME, PRICE_TEXT, trialDays } = require('./views');
 const { PLANS, BILLING, getPlan, cleanBilling } = require('./plans');
 const { planCards } = require('./pricing');
+const referrals = require('./referrals');
 
 // ---------- config ----------
 const PORT = Number(process.env.PORT || 3000);
@@ -78,6 +79,7 @@ app.use((req, res, next) => {
 
 const flash = (req, type, msg) => { req.session.flash = { type, msg }; };
 const page = (req, res, title, body, opts) => res.send(layout(req, title, body, opts));
+const refs = referrals.setup(app, { db, page });
 const requireUser = (req, res, next) => (req.user ? next() : res.redirect('/login'));
 const requireAdmin = (req, res, next) =>
   req.user && req.user.is_admin ? next() : res.status(404).send('Not found');
@@ -380,6 +382,7 @@ function createCustomer(req, { name, email, passwordHash, googleSub = null }) {
       .run(email, name, passwordHash, status, MAX_ACCOUNTS_DEFAULT, googleSub);
     if (status === 'active') grantAllActiveEas(info.lastInsertRowid);
   }
+  refs.attach(req, Number(info.lastInsertRowid));
   return Number(info.lastInsertRowid);
 }
 
@@ -552,7 +555,8 @@ app.get('/dashboard', requireUser, (req, res) => {
   ${req.hasJournal ? `<section class="card">
     <h2>4. Trade Journal</h2>
     <p>Every trade you close is logged automatically and turned into share cards. <a href="/journal">Open your journal</a> to get your journal key and set up the Trade Journal EA.</p>
-  </section>` : ''}`);
+  </section>` : ''}
+  ${u.is_admin ? '' : refs.card(req, u)}`);
 });
 
 app.post('/accounts', requireUser, (req, res) => {
@@ -730,6 +734,7 @@ app.get('/admin/users/:id', requireAdmin, (req, res) => {
         <button class="small">Mark as paid</button></form>
     </div>
     ${u.plan_request ? `<p class="notice"><span>Requested on the site: <strong>${esc((getPlan(u.plan_request.split(':')[0]) || {}).name || u.plan_request)}</strong>, ${esc(u.plan_request.split(':')[1] || '')}. Check the payment, then press Mark as paid.</span></p>` : ''}
+    ${refs.adminNote(u)}
     ${u.plan ? `<p class="muted">Current plan: <strong>${esc((getPlan(u.plan) || {}).name || u.plan)}</strong> · ${esc(u.billing)}</p>` : ''}
     <div>
     </div>
@@ -781,7 +786,9 @@ app.post('/admin/users/:id/paid', requireAdmin, (req, res) => {
   const billing = cleanBilling(req.body && req.body.billing);
   const days = plan && billing === 'annual' ? BILLING.annual.days : PAID_DAYS;
   const from = u.expires_at && !isExpired(u) ? u.expires_at : new Date().toISOString().slice(0, 19).replace('T', ' ');
+  let refNote = '';
   db.transaction(() => {
+    refNote = refs.rewardOnPaid(u);
     db.prepare(`UPDATE users SET trial = 0, status = 'active', expires_at = datetime(?, ?), plan_request = '' WHERE id = ?`).run(from, `+${days} days`, u.id);
     if (plan) {
       // the plan decides the account limit and which EAs the customer gets
@@ -795,7 +802,7 @@ app.post('/admin/users/:id/paid', requireAdmin, (req, res) => {
     }
   })();
   const after = db.prepare('SELECT expires_at FROM users WHERE id = ?').get(u.id).expires_at;
-  flash(req, 'ok', `${u.email} marked as paid${plan ? ` on ${plan.name} (${billing})` : ''}. License now valid until ${after.slice(0, 16)} UTC.`);
+  flash(req, 'ok', `${u.email} marked as paid${plan ? ` on ${plan.name} (${billing})` : ''}. License now valid until ${after.slice(0, 16)} UTC.${refNote}`);
   res.redirect(`/admin/users/${u.id}`);
 });
 
@@ -936,7 +943,7 @@ app.post('/admin/eas/:id/delete', requireAdmin, (req, res) => {
 });
 
 require('./help')(app, { db, page });
-require('./pricing')(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL: process.env.CONTACT_URL || '' });
+require('./pricing')(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL: process.env.CONTACT_URL || '', refs });
 require('./pages')(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, TRIAL_ACCOUNTS, MAX_ACCOUNTS_DEFAULT });
 
 app.use((err, req, res, next) => {
