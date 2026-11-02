@@ -87,6 +87,9 @@ if (!userCols.includes('google_sub')) {   // Google account id for "Sign in with
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google ON users(google_sub)');
 }
 if (!userCols.includes('trial')) db.exec('ALTER TABLE users ADD COLUMN trial INTEGER NOT NULL DEFAULT 0');   // 1 = on the free trial, not paid yet
+if (!userCols.includes('plan')) db.exec("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT ''");              // paid plan id (src/plans.js)
+if (!userCols.includes('billing')) db.exec("ALTER TABLE users ADD COLUMN billing TEXT NOT NULL DEFAULT ''");        // monthly | annual
+if (!userCols.includes('plan_request')) db.exec("ALTER TABLE users ADD COLUMN plan_request TEXT NOT NULL DEFAULT ''"); // "katana:annual" picked on /subscribe, waiting for payment
 
 // Every MT5 account number ever used on a free trial, so one account cannot get a second trial with a new email
 db.exec(`CREATE TABLE IF NOT EXISTS trial_accounts (

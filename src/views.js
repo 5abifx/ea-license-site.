@@ -1,6 +1,7 @@
 const SITE_NAME = process.env.SITE_NAME || '5ABI.FX';
 const BRAND = process.env.BRAND || '5ABI.FX';
-const PRICE_TEXT = process.env.PRICE_TEXT || '$20/month';
+// lowest plan price, e.g. "$12/month" (plans live in src/plans.js)
+const PRICE_TEXT = `$${Math.min(...require('./plans').PLANS.map((p) => p.monthly))}/month`;
 // Free trial for new sign ups (read on each request so it can be changed without code edits). 0 = no trial.
 const trialDays = () => Math.max(0, Number(process.env.TRIAL_DAYS ?? 15) || 0);
 
@@ -34,10 +35,10 @@ function layout(req, title, body, opts = {}) {
        ${u.is_admin ? link('/admin', 'Admin') : ''}
        ${u.google_sub ? '' : link('/password', 'Password')}
        <form method="post" action="/logout" class="inline"><button class="link">Sign out</button></form>`
-    : `<a href="/#how">How it works</a><a href="/#pricing">Pricing</a>${link('/faq', 'FAQ')}${link('/login', 'Sign in')}${signup ? '<a class="btn small" href="/signup">Create account</a>' : ''}`;
+    : `<a href="/#how">How it works</a>${link('/pricing', 'Pricing')}${link('/faq', 'FAQ')}${link('/login', 'Sign in')}${signup ? '<a class="btn small" href="/signup">Create account</a>' : ''}`;
   const origin = `${req.protocol}://${req.get('host')}`;
   const trial = trialDays();
-  const desc = `Automated MT5 Expert Advisors that trade your rules 24/5.${trial ? ` ${trial}-day free trial, then ${PRICE_TEXT}.` : ` ${PRICE_TEXT}.`}`;
+  const desc = `Automated MT5 Expert Advisors that trade your rules 24/5.${trial ? ` ${trial}-day free trial, then plans from ${PRICE_TEXT}.` : ` Plans from ${PRICE_TEXT}.`}`;
   const flashHtml = flash ? `<div class="flash ${esc(flash.type)}">${esc(flash.msg)}</div>` : '';
   // the pill only shows when the site name differs from the brand (e.g. "EA Licensing")
   const pill = SITE_NAME !== BRAND ? `<span class="pill">${esc(SITE_NAME)}</span>` : '';
