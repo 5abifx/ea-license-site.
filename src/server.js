@@ -8,7 +8,7 @@ const cookieSession = require('cookie-session');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const { db, FILES_DIR } = require('./db');
-const { esc, fmtDate, layout } = require('./views');
+const { esc, fmtDate, layout, authShell } = require('./views');
 
 // ---------- config ----------
 const PORT = Number(process.env.PORT || 3000);
@@ -104,16 +104,13 @@ app.get('/', (req, res) => res.redirect(req.user ? '/dashboard' : '/login'));
 
 app.get('/login', (req, res) => {
   if (req.user) return res.redirect('/dashboard');
-  page(req, res, 'Sign in', `
-  <div class="card narrow">
-    <h1>Sign in</h1>
+  page(req, res, 'Sign in', authShell('Secure sign-in', 'Welcome back', 'Sign in to your EAs and journal.', `
     <form method="post" action="/login">
       <label>Email<input name="email" required autofocus autocomplete="username"></label>
-      <label>Password<input type="password" name="password" required></label>
-      <button>Sign in</button>
+      <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
+      <button>Continue</button>
     </form>
-    ${SIGNUP_MODE !== 'closed' ? '<p class="muted">No account yet? <a href="/signup">Create one</a></p>' : ''}
-  </div>`);
+    ${SIGNUP_MODE !== 'closed' ? '<p class="muted">No account yet? <a href="/signup">Create one</a></p>' : ''}`));
 });
 
 app.post('/login', (req, res) => {
@@ -138,17 +135,15 @@ app.post('/logout', (req, res) => { req.session = null; res.redirect('/login'); 
 
 app.get('/signup', (req, res) => {
   if (SIGNUP_MODE === 'closed') return res.redirect('/login');
-  page(req, res, 'Create account', `
-  <div class="card narrow">
-    <h1>Create account</h1>
+  page(req, res, 'Create account', authShell('New account', 'Create your account', 'Get access to your EAs and the journal.', `
     <form method="post" action="/signup">
-      <label>Name<input name="name" required maxlength="80"></label>
-      <label>Email<input type="email" name="email" required maxlength="120"></label>
-      <label>Password<input type="password" name="password" required minlength="8"></label>
+      <label>Name<input name="name" required maxlength="80" autocomplete="name"></label>
+      <label>Email<input type="email" name="email" required maxlength="120" autocomplete="email"></label>
+      <label>Password<input type="password" name="password" required minlength="8" autocomplete="new-password"></label>
       <button>Create account</button>
     </form>
     ${SIGNUP_MODE === 'approval' ? '<p class="muted">Your account will be activated after we confirm your purchase.</p>' : ''}
-  </div>`);
+    <p class="muted">Already have an account? <a href="/login">Sign in</a></p>`));
 });
 
 app.post('/signup', (req, res) => {
