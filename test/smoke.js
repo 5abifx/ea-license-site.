@@ -9,7 +9,9 @@ process.env.SESSION_SECRET = 'test-secret-1234567890';
 process.env.ADMIN_EMAIL = 'admin@test.com';
 process.env.ADMIN_PASSWORD = 'adminpass123';
 process.env.SIGNUP_MODE = 'approval';
+process.env.TRIAL_DAYS = '0';          // trial is switched on further down
 const app = require('../src/server');
+const { db } = require('../src/db');
 
 function client(base) {
   let cookies = {};
@@ -27,7 +29,7 @@ function client(base) {
       const loc = r.headers.get('location');
       if (loc.startsWith('/')) return go('GET', loc);
     }
-    return { status: r.status, text };
+    return { status: r.status, text, location: r.headers.get('location') };
   };
   return { get: (u) => go('GET', u), post: (u, b) => go('POST', u, b || {}) };
 }
@@ -89,6 +91,81 @@ function client(base) {
     await admin.post(`/admin/users/${eveId}`, { name: 'Eve', status: 'disabled', max_accounts: '10', expires_at: '', ea: '1' });
     assert.strictEqual((await check('GOLD_SCALPER', '5555')).valid, false);
     assert.match((await eve.get('/dashboard')).text, /Sign in/);
+
+    // free trial: instant access, one account, one trial per MT5 account, admin marks paid
+    process.env.TRIAL_DAYS = '15';
+    assert.match((await client(base).get('/')).text, /15-day free trial/);
+    const tia = client(base);
+    r = await tia.post('/signup', { name: 'Tia', email: 'tia@test.com', password: 'tiapass123' });
+    assert.match(r.text, /Free trial: 15 days left/);
+    await tia.post('/accounts', { account_number: '7777' });
+    assert.strictEqual((await check('GOLD_SCALPER', '7777')).valid, true);
+    r = await tia.post('/accounts', { account_number: '7778' });
+    assert.match(r.text, /at most 1 accounts/);
+    const tom = client(base);
+    await tom.post('/signup', { name: 'Tom', email: 'tom@test.com', password: 'tompass123' });
+    r = await tom.post('/accounts', { account_number: '7777' });
+    assert.match(r.text, /already used a free trial/);
+    r = await admin.get('/admin');
+    const tiaId = r.text.match(/href="\/admin\/users\/(\d+)"><strong>Tia/)[1];
+    await admin.post(`/admin/users/${tiaId}`, { name: 'Tia', status: 'active', max_accounts: '1', expires_at: '2020-01-01', ea: '1' });
+    assert.match((await tia.get('/dashboard')).text, /free trial has ended/);
+    assert.strictEqual((await check('GOLD_SCALPER', '7777')).valid, false);
+    r = await admin.post(`/admin/users/${tiaId}/paid`);
+    assert.match(r.text, /marked as paid/);
+    assert.strictEqual((await check('GOLD_SCALPER', '7777')).valid, true);
+    assert.doesNotMatch((await tia.get('/dashboard')).text, /Free trial/);
+    process.env.TRIAL_DAYS = '0';
+
+    // public info pages, 404 and link preview tags
+    const anon = client(base);
+    for (const u of ['/faq', '/terms', '/privacy']) assert.strictEqual((await anon.get(u)).status, 200, u);
+    r = await anon.get('/no-such-page');
+    assert.strictEqual(r.status, 404);
+    assert.match(r.text, /doesn&#39;t exist|doesn't exist/);
+    assert.match((await anon.get('/')).text, /property="og:image" content="http:\/\/127\.0\.0\.1:\d+\/og\.png"/);
+    assert.match((await fetch(base + '/robots.txt').then((x) => x.text())), /Disallow: \//);
+
+    // Sign in with Google: fake token endpoint returns an ID token for a verified Gmail address
+    const http = require('http');
+    let claims = {};
+    const tokenSrv = http.createServer((q, s2) => {
+      const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+      s2.setHeader('content-type', 'application/json');
+      s2.end(JSON.stringify({ id_token: `${b64({ alg: 'RS256' })}.${b64(claims)}.sig` }));
+    }).listen(0);
+    Object.assign(process.env, { GOOGLE_CLIENT_ID: 'cid.apps.googleusercontent.com', GOOGLE_CLIENT_SECRET: 'secret',
+      GOOGLE_TOKEN_URL: `http://127.0.0.1:${tokenSrv.address().port}/token`, TRIAL_DAYS: '15' });
+    const gUser = client(base);
+    assert.match((await gUser.get('/signup')).text, /Start free trial with Google/);
+    r = await gUser.post('/signup', { name: 'Fake', email: 'fake@test.com', password: 'fakepass123' });
+    assert.match(r.text, /sign up with your Google account/);
+    r = await gUser.get('/auth/google');
+    assert.match(r.location, /^https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth\?.*client_id=cid/);
+    const state = new URL(r.location).searchParams.get('state');
+    r = await gUser.get(`/auth/google/callback?state=wrong&code=abc`);
+    assert.match(r.text, /Google sign in failed/);
+    await gUser.get('/auth/google');
+    claims = { iss: 'https://accounts.google.com', aud: 'cid.apps.googleusercontent.com', sub: 'g-123', email: 'gina@gmail.com', email_verified: true, name: 'Gina', exp: Date.now() / 1000 + 600 };
+    const st2 = new URL((await gUser.get('/auth/google')).location).searchParams.get('state');
+    r = await gUser.get(`/auth/google/callback?state=${st2}&code=abc`);
+    assert.match(r.text, /Free trial: 15 days left/);
+    assert.match(r.text, /Welcome, Gina/);
+    // signing in again with the same Google account reuses the account, no new trial
+    const gAgain = client(base);
+    const st3 = new URL((await gAgain.get('/auth/google')).location).searchParams.get('state');
+    r = await gAgain.get(`/auth/google/callback?state=${st3}&code=abc`);
+    assert.match(r.text, /Welcome, Gina/);
+    assert.strictEqual(db.prepare("SELECT COUNT(*) AS n FROM users WHERE email = 'gina@gmail.com'").get().n, 1);
+    // wrong audience is rejected
+    claims = { ...claims, aud: 'someone-else', sub: 'g-999', email: 'x@gmail.com' };
+    const gBad = client(base);
+    const st4 = new URL((await gBad.get('/auth/google')).location).searchParams.get('state');
+    assert.match((await gBad.get(`/auth/google/callback?state=${st4}&code=abc`)).text, /Google sign in failed/);
+    assert.ok(state);
+    tokenSrv.close();
+    for (const k of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_TOKEN_URL']) delete process.env[k];
+    process.env.TRIAL_DAYS = '0';
 
     // cross-site post blocked
     const xr = await fetch(base + '/accounts', { method: 'POST', headers: { origin: 'https://evil.com' } });
