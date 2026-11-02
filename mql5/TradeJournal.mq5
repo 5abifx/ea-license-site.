@@ -8,7 +8,7 @@
 //| symbols and all EAs on that account.                             |
 //+------------------------------------------------------------------+
 #property copyright "5ABI.FX"
-#property version   "1.00"
+#property version   "1.10"
 #property description "Trade Journal: logs closed trades, partials and candles to your journal."
 
 #define EA_CODE        "JOURNAL"                  // must match the license code in Admin > EAs
@@ -39,7 +39,8 @@ int       g_sentCount = 0;
 
 //--- small helpers ------------------------------------------------------
 string Login() { return IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)); }
-string SentFile() { return JOURNAL_DIR + "sent_" + Login() + ".txt"; }
+// "sent2_": v1.10 re-sends recent trades once, so trades logged without their SL get it
+string SentFile() { return JOURNAL_DIR + "sent2_" + Login() + ".txt"; }
 string LogFile() { return JOURNAL_DIR + "trades_" + Login() + ".csv"; }
 
 string IsoTime(const datetime t)
@@ -135,6 +136,29 @@ bool IsPositionOpen(const ulong id)
    return false;
   }
 
+//--- remember the first SL/TP of each open position --------------------------
+// KATANA and many EAs open at market and add the SL/TP a moment later, so the
+// entry deal has none. Saved in terminal global variables (kept for 4 weeks).
+string LevelKey(const ulong id, const string what) { return "TJ_" + what + "_" + Login() + "_" + IntegerToString((long)id); }
+
+void RememberLevels()
+  {
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+     {
+      if(PositionGetTicket(i) == 0) continue;
+      ulong  id = (ulong)PositionGetInteger(POSITION_IDENTIFIER);
+      double sl = PositionGetDouble(POSITION_SL), tp = PositionGetDouble(POSITION_TP);
+      if(sl > 0 && !GlobalVariableCheck(LevelKey(id, "SL"))) GlobalVariableSet(LevelKey(id, "SL"), sl);
+      if(tp > 0 && !GlobalVariableCheck(LevelKey(id, "TP"))) GlobalVariableSet(LevelKey(id, "TP"), tp);
+     }
+  }
+
+double SavedLevel(const ulong id, const string what)
+  {
+   string k = LevelKey(id, what);
+   return GlobalVariableCheck(k) ? GlobalVariableGet(k) : 0;
+  }
+
 //--- build the trade from the account history -----------------------------
 // Returns false while the position is still open or has no closing deal.
 bool BuildTrade(const ulong id, string &json, datetime &closeTime)
@@ -149,6 +173,7 @@ bool BuildTrade(const ulong id, string &json, datetime &closeTime)
    closeTime = 0;
    string partials = "";
    int    nOut = 0;
+   double outSl = 0, outTp = 0;              // SL/TP recorded on the first closing deal
 
    int total = HistoryDealsTotal();
    for(int i = 0; i < total; i++)
@@ -186,6 +211,8 @@ bool BuildTrade(const ulong id, string &json, datetime &closeTime)
          if(nOut > 0) partials += ",";
          partials += "{" + J("time", IsoTime(t)) + "," + JN("price", price, 8) + "," + JN("lots", vol, 2) + ","
                      + JN("profit", HistoryDealGetDouble(d, DEAL_PROFIT), 2) + "}";
+         if(outSl == 0) outSl = HistoryDealGetDouble(d, DEAL_SL);
+         if(outTp == 0) outTp = HistoryDealGetDouble(d, DEAL_TP);
          nOut++;
          outVol += vol;
          exitPrice = price;
@@ -194,13 +221,19 @@ bool BuildTrade(const ulong id, string &json, datetime &closeTime)
      }
    if(symbol == "" || nOut == 0 || inVol <= 0) return false;
 
-   // the initial stop and target: from the first entry deal, or the opening order
-   if((sl == 0 || tp == 0) && HistoryOrdersTotal() > 0)
+   // the initial stop and target: from the entry deal, else the first SL/TP seen
+   // on the open position, else the orders of this position, else the closing deal
+   if(sl == 0) sl = SavedLevel(id, "SL");
+   if(tp == 0) tp = SavedLevel(id, "TP");
+   for(int i = 0; i < HistoryOrdersTotal() && (sl == 0 || tp == 0); i++)
      {
-      ulong o = HistoryOrderGetTicket(0);
+      ulong o = HistoryOrderGetTicket(i);
+      if(o == 0) continue;
       if(sl == 0) sl = HistoryOrderGetDouble(o, ORDER_SL);
       if(tp == 0) tp = HistoryOrderGetDouble(o, ORDER_TP);
      }
+   if(sl == 0) sl = outSl;
+   if(tp == 0) tp = outTp;
 
    int    digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
    double entry  = inValue / inVol;
@@ -405,6 +438,7 @@ int OnInit()
    if(JournalKey == "")
       Alert("Trade Journal: paste your Journal key (from your dashboard on ", LICENSE_SERVER, ") into the EA inputs.");
    EventSetTimer(10);
+   RememberLevels();
    CatchUp();
    ProcessQueue();
    UpdatePanel();
@@ -419,6 +453,7 @@ void OnDeinit(const int reason)
 void OnTimer()
   {
    LicenseOnTimer();
+   RememberLevels();
    ProcessQueue();
    UpdatePanel();
   }
@@ -427,6 +462,7 @@ void OnTick() { }   // nothing to do on ticks: the journal never trades
 
 void OnTradeTransaction(const MqlTradeTransaction &trans, const MqlTradeRequest &request, const MqlTradeResult &result)
   {
+   if(trans.type == TRADE_TRANSACTION_POSITION || trans.type == TRADE_TRANSACTION_DEAL_ADD) RememberLevels();
    if(trans.type != TRADE_TRANSACTION_DEAL_ADD) return;
    if(!HistoryDealSelect(trans.deal)) return;
    long entry = HistoryDealGetInteger(trans.deal, DEAL_ENTRY);
