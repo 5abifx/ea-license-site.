@@ -12,7 +12,7 @@
 #property description "Trade Journal: logs closed trades, partials and candles to your journal."
 
 #define EA_CODE        "JOURNAL"                  // must match the license code in Admin > EAs
-#define LICENSE_SERVER "https://your-domain.com"  // your website address, no trailing slash
+#define LICENSE_SERVER "https://5abifx.com"  // your website address, no trailing slash
 #define LICENSE_SALT   4471902
 #include "LicenseCheck.mqh"
 
