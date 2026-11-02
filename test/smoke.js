@@ -132,6 +132,22 @@ function client(base) {
     assert.match(r.text, /"partials":\[\{"time":"2026-10-28T15:12:00"/);          // final close is not a partial
     assert.strictEqual((await eve.get(`/journal/${tid}`)).status !== 200 || !(await eve.get(`/journal/${tid}`)).text.includes('XAUUSD'), true);
 
+    // calendar: the trade's day is on the October 2026 calendar
+    r = await bob.get('/journal');
+    assert.match(r.text, /October 2026/);
+    assert.match(r.text, /data-day="2026-10-28"/);
+    // removing the account keeps its trades in a separate Removed tab, out of "All accounts"
+    const accId = (await bob.get('/dashboard')).text.match(/action="\/accounts\/(\d+)\/delete"/)[1];
+    await bob.post(`/accounts/${accId}/delete`, {});
+    r = await bob.get('/journal');
+    assert.match(r.text, /Removed/);
+    assert.doesNotMatch(r.text, /href="\/journal\/\d+"/);                         // not shown under All accounts
+    r = await bob.get('/journal?account=1001');
+    assert.match(r.text, /no longer on/);
+    assert.match(r.text, /href="\/journal\/\d+"/);
+    r = await bob.post('/journal/accounts/1001/delete', {});
+    assert.match(r.text, /Deleted 1 trade of/);
+
     console.log('All smoke tests passed');
   } finally {
     server.close();
