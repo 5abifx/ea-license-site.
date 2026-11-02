@@ -115,98 +115,143 @@ app.get('/', (req, res) => {
   const signup = SIGNUP_MODE !== 'closed';
   const trial = signup ? trialDays() : 0;
   const join = trial ? 'Start free trial' : 'Create account';
-  page(req, res, 'Licensed Expert Advisors', `
-  <section class="hero wrap">
-    <span class="pill">${trial ? `${trial}-day free trial · then ${esc(PRICE_TEXT)}` : `${esc(SITE_NAME)} Licensing`}</span>
-    <h1>Activate. Bind. Trade.</h1>
-    <p class="lead">Every ${esc(SITE_NAME)} Expert Advisor, every license and every MT5 account, managed in one clean dashboard.</p>
-    <div class="cta">
-      ${signup ? `<a class="btn big" href="/signup">${join}</a>` : ''}
-      <a class="btn big secondary" href="/login">Sign in</a>
-    </div>
-  </section>
-
-  <section class="wrap">
-    <div class="preview" aria-label="Example of the license dashboard">
-      <div class="preview-head"><strong>My licenses</strong><span class="tag">Example</span></div>
-      <div class="scroll"><table>
-        <thead><tr><th>Expert Advisor</th><th>MT5 account</th><th>Status</th><th>Last EA check</th></tr></thead>
-        <tbody>
-          <tr><td><strong>Your EA</strong></td><td>51234567</td><td><span class="badge ok">Active</span></td><td class="muted">Checked every hour</td></tr>
-          <tr><td><strong>Your EA</strong></td><td>51234568</td><td><span class="badge warn">Awaiting activation</span></td><td class="muted">-</td></tr>
-        </tbody>
-      </table></div>
-    </div>
-  </section>
-
-  <section class="wrap why">
-    <h2 class="section">Most traders don't lose on their strategy. They lose on execution.</h2>
-    <p class="lead left">You know the setup. Then you hesitate on the entry, move your stop "just this once", close a winner too early, or wake up to a move you slept through. An Expert Advisor trades your rules the same way every time, with no fear, no revenge trades and no missed sessions.</p>
-    <div class="compare">
-      <div class="col bad">
-        <h3>Trading by hand</h3>
-        <ul>
-          <li>Emotions decide when you get in and out</li>
-          <li>Stops get moved, then hit bigger</li>
-          <li>Setups during Asia or London open are missed while you sleep or work</li>
-          <li>Hours a day watching charts</li>
+  page(req, res, 'Risk manager & trade journal for MT5', `
+  <section class="lp-hero">
+    <div class="wrap lp-hero-in">
+      <div class="lp-copy">
+        <span class="lp-eyebrow"><i></i>${trial ? `${trial}-day free trial · then ${esc(PRICE_TEXT)}` : 'MT5 risk manager &amp; trade journal'}</span>
+        <h1>Your rules.<br><em>Enforced</em> on every trade.</h1>
+        <p class="lp-lead">KATANA sizes every position, sets your stop and stops you trading when the day's loss limit is hit. Every closed trade lands in your journal, ready to review or share.</p>
+        <div class="lp-cta">
+          ${signup ? `<a class="btn big" href="/signup">${join}</a>` : ''}
+          <a class="btn big ghost" href="#how">See how it works</a>
+        </div>
+        <ul class="lp-trust">
+          <li><b>MT5</b> native EAs</li>
+          <li><b>Per-account</b> licence</li>
+          <li><b>Prop-firm</b> friendly</li>
         </ul>
       </div>
-      <div class="col good">
-        <h3>With a ${esc(SITE_NAME)} EA</h3>
-        <ul>
-          <li>Entries and exits follow fixed rules</li>
-          <li>The same risk rules applied on every trade</li>
-          <li>Watches the market 24/5 on your MT5 account</li>
-          <li>Set it up once, then check in when you want</li>
-        </ul>
+
+      <div class="kp" aria-label="Example of the KATANA risk panel">
+        <div class="kp-head"><span class="kp-name">KATANA <small>Risk manager</small></span><span class="kp-live"><i></i>Armed</span></div>
+        <div class="kp-acct"><span>Funded 100K · Phase 1</span><b>$100,000.00</b></div>
+        <div class="kp-meter"><div class="kp-row"><span>Daily loss used</span><b>$1,240 <s>/ $5,000</s></b></div><div class="kp-bar"><i style="--w:24.8%"></i></div></div>
+        <div class="kp-meter"><div class="kp-row"><span>Max drawdown used</span><b>$3,100 <s>/ $10,000</s></b></div><div class="kp-bar"><i style="--w:31%"></i></div></div>
+        <div class="kp-calc">
+          <div><span>Risk / trade</span><b>0.5%</b><small>$500</small></div>
+          <div><span>Stop loss</span><b>18.0</b><small>pips</small></div>
+          <div class="hi"><span>Lot size</span><b>2.77</b><small>auto</small></div>
+        </div>
+        <div class="kp-order">
+          <div class="kp-sym"><b>EURUSD</b><span class="buy">BUY 2.77</span></div>
+          <dl><div><dt>Entry</dt><dd>1.08420</dd></div><div><dt>SL</dt><dd class="dn">1.08240</dd></div><div><dt>TP</dt><dd class="up">1.08852</dd></div><div><dt>R:R</dt><dd>1 : 2.4</dd></div></dl>
+          <span class="kp-ok">✓ Protected</span>
+        </div>
+        <p class="kp-note">New trades are blocked for the rest of the day once −$5,000 is reached.</p>
       </div>
+    </div>
+    <div class="wrap"><div class="lp-spec">
+      <span>Daily loss limit</span><span>Max drawdown guard</span><span>Auto lot sizing</span><span>Journal by day &amp; account</span><span>9:16 share cards</span>
+    </div></div>
+  </section>
+
+  <section class="wrap lp-sec">
+    <div class="lp-head">
+      <span class="lp-kicker">Why traders blow accounts</span>
+      <h2>Most accounts don't die on strategy. They die on one bad day.</h2>
+      <p>You know the setup. Then a loss turns into a revenge trade, the stop gets moved "just this once", and a 2% day becomes a 9% day. KATANA takes those decisions out of the moment.</p>
+    </div>
+    <div class="lp-vs">
+      <div class="col bad"><h3>Without limits</h3><ul>
+        <li>Lot size guessed in the moment</li><li>Stops moved, then hit bigger</li><li>Revenge trades after a loss</li><li>One day breaks the prop-firm rule</li></ul></div>
+      <div class="col good"><h3>With KATANA</h3><ul>
+        <li>Lot size worked out from your risk %</li><li>Stop loss set on every trade</li><li>Trading locks at your daily limit</li><li>Drawdown watched against your firm's rules</li></ul></div>
     </div>
   </section>
 
-  <section id="how" class="band">
+  <section id="how" class="lp-band">
     <div class="wrap">
-      <h2 class="section">How it works</h2>
-      <div class="steps">
-        ${trial ? `
-        <div><span class="num">1</span><h3>Create your account</h3><p class="muted">Sign up in seconds. Your ${trial}-day free trial starts right away, no payment needed.</p></div>
-        <div><span class="num">2</span><h3>Bind and download</h3><p class="muted">Add your MT5 account number, download the EA and start trading.</p></div>
-        <div><span class="num">3</span><h3>Keep trading</h3><p class="muted">Liked it? Stay on for ${esc(PRICE_TEXT)} when your trial ends.</p></div>` : `
-        <div><span class="num">1</span><h3>Buy your EA</h3><p class="muted">Purchase the ${esc(SITE_NAME)} Expert Advisor that fits how you trade.</p></div>
-        <div><span class="num">2</span><h3>Create your account</h3><p class="muted">Sign up with the email you paid with.${SIGNUP_MODE === 'approval' ? ' We activate it as soon as your purchase is confirmed.' : ''}</p></div>
-        <div><span class="num">3</span><h3>Bind and download</h3><p class="muted">Add up to ${MAX_ACCOUNTS_DEFAULT} MT5 account numbers, download the EA and start trading.</p></div>`}
+      <div class="lp-head"><span class="lp-kicker">How a trade flows</span><h2>From setup to journal, without the spreadsheet.</h2></div>
+      <ol class="lp-flow">
+        <li><b>01</b><h3>Set your rules</h3><p>Risk per trade, daily loss and max drawdown. Once.</p></li>
+        <li><b>02</b><h3>Take the trade</h3><p>KATANA sizes the lot and places your stop.</p></li>
+        <li><b>03</b><h3>Stay protected</h3><p>Hit the daily limit and new trades are blocked.</p></li>
+        <li><b>04</b><h3>Auto-journal</h3><p>Every closed trade is logged by day and account.</p></li>
+        <li><b>05</b><h3>Share it</h3><p>Turn a real trade into a 9:16 story card.</p></li>
+      </ol>
+      ${trial ? `<p class="lp-flow-note">Start in minutes: create an account, add your MT5 account number, download the EAs. Your ${trial}-day free trial starts right away.</p>` : ''}
+    </div>
+  </section>
+
+  <section class="wrap lp-sec lp-split">
+    <div class="lp-head left">
+      <span class="lp-kicker">Trade Journal</span>
+      <h2>See your month at a glance.</h2>
+      <p>The Trade Journal EA sends every closed trade to your calendar: green and red days, weekly totals and win rate, split by account. Tap a day to see its trades, with the entry, stop and target taken from the real chart.</p>
+      <ul class="lp-ticks"><li>One tab per MT5 account</li><li>Entry, SL and TP from the chart</li><li>Removed accounts kept apart</li></ul>
+    </div>
+    <div class="jc" aria-label="Example journal month">
+      <div class="jc-top"><b>October 2026</b><span class="up">+$3,196.00</span></div>
+      <div class="jc-stats"><div><span>Trades</span><b>41</b></div><div><span>Win rate</span><b>61%</b></div><div><span>Green days</span><b>12/18</b></div></div>
+      <div class="jc-grid">
+        ${['Mo','Tu','We','Th','Fr'].map((d) => `<i>${d}</i>`).join('')}
+        ${[312,-140,488,0,226,-95,640,175,-210,390,128,0,-60,515,244,402,-180,96,310,-45].map((v) => `<span class="${v > 0 ? 'w' : v < 0 ? 'l' : ''}">${v ? (v > 0 ? '+' : '−') + Math.abs(v) : '·'}</span>`).join('')}
       </div>
     </div>
   </section>
 
-  <section class="wrap features">
-    <div><h3>Locked to your accounts</h3><p class="muted">The EA only runs on the MT5 account numbers you register, so your license stays yours.</p></div>
-    <div><h3>Always the latest build</h3><p class="muted">Download the newest version of every EA you own straight from your dashboard.</p></div>
-    <div><h3>Change accounts anytime</h3><p class="muted">Switched broker? Remove an old account and add the new one in seconds.</p></div>
+  <section class="wrap lp-sec lp-split rev">
+    <div class="lp-head left">
+      <span class="lp-kicker">Share cards</span>
+      <h2>Post the trade, not a screenshot of MT5.</h2>
+      <p>Every journaled trade becomes a clean 9:16 card with the real candles, your entry and exit, and the result in R, pips or percent. Made for stories and Discord.</p>
+    </div>
+    <div class="sc-wrap">
+      <div class="sc" aria-label="Example share card">
+        <div class="sc-top"><span>XAUUSD · BUY</span><span class="mark"></span></div>
+        <svg viewBox="0 0 120 70" preserveAspectRatio="none" aria-hidden="true">
+          ${[[8,40,52,44,48],[16,46,50,38,42],[24,44,48,34,36],[32,38,42,30,40],[40,40,44,30,32],[48,34,38,26,28],[56,30,34,20,22],[64,24,30,18,26],[72,26,28,14,16],[80,18,22,10,12],[88,14,18,8,10],[96,12,16,6,8]].map(([x,o,h,l,c]) => `<line x1="${x}" x2="${x}" y1="${h}" y2="${l}" stroke="${c < o ? '#26c6a0' : '#f0464b'}" stroke-width=".8"/><rect x="${x - 2.4}" y="${Math.min(o, c)}" width="4.8" height="${Math.max(1, Math.abs(o - c))}" fill="${c < o ? '#26c6a0' : '#f0464b'}"/>`).join('')}
+          <line x1="0" x2="120" y1="44" y2="44" stroke="#3d7bff" stroke-dasharray="2 2" stroke-width=".6"/>
+        </svg>
+        <div class="sc-res"><b>+2.4R</b><span>Closed at target</span></div>
+      </div>
+    </div>
   </section>
 
+  <section class="wrap lp-sec">
+    <div class="lp-head"><span class="lp-kicker">Everything included</span><h2>One licence. The whole toolkit.</h2></div>
+    <div class="lp-grid">
+      <div><h3>Risk limits</h3><p>Daily loss and max drawdown caps that lock trading when they're reached.</p></div>
+      <div><h3>Position sizing</h3><p>Lot size worked out from your risk % and stop distance on every order.</p></div>
+      <div><h3>Trade Journal</h3><p>Calendar, account tabs and per-day trade lists, filled in automatically.</p></div>
+      <div><h3>Share cards</h3><p>Story-ready cards drawn from the real chart of each trade.</p></div>
+      <div><h3>Your accounts only</h3><p>Each EA runs only on the MT5 account numbers you register.</p></div>
+      <div><h3>Prop-firm ready</h3><p>Firm blocks EAs? Get a <a href="/help/ea-blocked">ready-to-send support email</a> in one click.</p></div>
+    </div>
+  </section>
 
-  <section id="pricing" class="band">
+  <section id="pricing" class="lp-band">
     <div class="wrap pricing">
       <div class="math">
-        <span class="pill">The simple math</span>
+        <span class="lp-kicker">The simple math</span>
         <h2 class="section">Costs less than one stop loss.</h2>
         <p class="lead left">A single 0.10 lot EUR/USD trade stopped out 20 pips away loses about $20. That is the price of a whole month of ${esc(SITE_NAME)}.</p>
         <div class="sl-vs">
           <div><span class="muted">One small stop loss</span><strong>≈ $20</strong><span class="muted">0.10 lot × 20 pips, gone in minutes</span></div>
           <div class="hi"><span>A month of ${esc(SITE_NAME)}</span><strong>${esc(PRICE_TEXT)}</strong><span>Every EA, every trading day</span></div>
         </div>
-        <p class="muted small">If disciplined execution saves you from just one avoidable loss a month, it has paid for itself.</p>
+        <p class="muted small">If it stops one revenge trade a month, it has paid for itself.</p>
       </div>
       <div class="plan">
         <div class="plan-name">${esc(SITE_NAME)} Monthly</div>
         <div class="plan-price">${esc(PRICE_TEXT)}</div>
         ${trial ? `<div class="plan-note">First ${trial} days free. No payment to start.</div>` : ''}
         <ul class="ticks">
-          <li>Every ${esc(SITE_NAME)} Expert Advisor</li>
+          <li>KATANA risk manager</li>
+          <li>Trade Journal EA and calendar</li>
+          <li>Share cards from your real trades</li>
           <li>All updates and new versions included</li>
-          <li>License locked to your MT5 account</li>
-          <li>Switch broker or account anytime</li>
           <li>Cancel anytime, no contract</li>
         </ul>
         ${signup ? `<a class="btn big full" href="/signup">${join}</a>` : ''}
@@ -214,15 +259,15 @@ app.get('/', (req, res) => {
     </div>
   </section>
 
-  <section class="wrap">
-    <div class="cta-card">
-      <div><h2>Ready to trade with ${esc(SITE_NAME)}?</h2><p>${trial ? `Try every EA free for ${trial} days. After that it is ${esc(PRICE_TEXT)}.` : 'Already bought an EA? Create your account to get started.'}</p></div>
-      <div class="cta">
-        ${signup ? `<a class="btn big" href="/signup">${join}</a>` : ''}
-        <a class="btn big ghost" href="/login">Sign in</a>
-      </div>
+  <section class="wrap lp-final">
+    <h2>Trade with <em>discipline.</em></h2>
+    <p>${trial ? `Every tool, free for ${trial} days. Then ${esc(PRICE_TEXT)}.` : 'Already bought an EA? Create your account to get started.'}</p>
+    <div class="lp-cta center">
+      ${signup ? `<a class="btn big" href="/signup">${join}</a>` : ''}
+      <a class="btn big ghost" href="/login">Sign in</a>
     </div>
-  </section>`, { wide: true });
+  </section>
+`, { wide: true });
 });
 
 app.get('/login', (req, res) => {
