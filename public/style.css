@@ -73,3 +73,5 @@ textarea { display: block; width: 100%; margin-top: 4px; padding: 9px 11px; font
 ol.steps li { margin-bottom: 10px; }
 .row select { width: auto; margin: 0; }
 .row label.check { margin: 0; }
+/* transparent overlay preview: checkerboard shows what is see-through */
+.cards canvas.overlay { background: #2a2d33 repeating-conic-gradient(#3a3d44 0 25%, transparent 0 50%) 0 0 / 24px 24px; }
