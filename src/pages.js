@@ -8,7 +8,7 @@ module.exports = function pages(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, T
   const name = esc(SITE_NAME);
 
   app.get('/robots.txt', (req, res) => {
-    res.type('text/plain').send('User-agent: *\nAllow: /$\nAllow: /faq\nAllow: /terms\nAllow: /privacy\nDisallow: /\n');
+    res.type('text/plain').send('User-agent: *\nAllow: /$\nAllow: /faq\nAllow: /terms\nAllow: /privacy\nAllow: /help/\nDisallow: /\n');
   });
 
   app.get('/faq', (req, res) => {
@@ -24,6 +24,7 @@ module.exports = function pages(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, T
       ['Can I change broker or account?', 'Yes. Remove the old account number in your dashboard and add the new one. The EA works on the new account within the hour.'],
       ['Which platform does it run on?', 'MetaTrader 5 (MT5). The EA needs MT5 to stay open, so most traders run it on a VPS.'],
       ['How do I install the EA?', 'Download it from your dashboard, copy it into MT5 (File → Open Data Folder → MQL5 → Experts), allow WebRequest for this website under Tools → Options → Expert Advisors, then attach it to a chart. The dashboard shows the exact URL to allow.'],
+      ['My prop firm blocks the EA ("AutoTrading disabled by server").', 'Many prop firms switch EA trading off until you ask. Use our <a href="/help/ea-blocked">ready-to-send support email</a>: fill in your account and copy it to their support.'],
       ['Do I get updates?', 'Yes. New versions appear in your dashboard as soon as they are released, at no extra cost.'],
       ['Can I cancel?', 'Yes, anytime. There is no contract. If you do not renew, your license simply ends at the end of the period you paid for.'],
       ['Is profit guaranteed?', 'No. Trading forex and CFDs is risky and you can lose money. An EA follows fixed rules, but no strategy wins every trade. Only trade money you can afford to lose.'],
