@@ -116,6 +116,16 @@ Auction Compass comes with every paid plan, but not with the free trial. MT5 ind
 
 `RELAY_SALT` must be the same in `LicenseRelay.mqh` and in each indicator.
 
+## Compass EA (trade execution)
+
+`mql5/5ABI_Compass_EA.mq5` trades the Auction Compass plan: it classifies the open (V1 to V4), waits for the 30-minute acceptance rule, arms setups at pVAL / pVAH / pPOC (or a pullback for V3 trend days) and fires on a trigger, with stop and target fixed before entry. It uses the same numbers as the indicator through `Compass_Engine.mqh`.
+
+- Keep these together in `MQL5\Experts`: `5ABI_Compass_EA.mq5`, `Compass_Engine.mqh`, `Compass_Risk.mqh`, `Compass_Exec.mqh`, `Compass_Signals.mqh`, `Compass_Triggers.mqh`, `LicenseCheck.mqh`.
+- Licence code **`BOT`** (add it in Admin > EAs). The Strategy Tester is always allowed.
+- Hard guards before every order: risk % of equity (lot rounded down, never up), daily loss and max drawdown at 80% of the prop limits counting open P/L, max trades per day, max open positions, max attempts per level, trading hours, Friday cut-off, high-impact news window, spread.
+- Every decision (ARM, SKIP with its reason, ENTRY, PARTIAL, EXIT, CLOSE with P/L and R) is written to `MQL5\Files\5ABI_CompassEA\<symbol>_log.csv`.
+- Mode *Signal only* sends alerts without placing orders.
+
 ## Daily use
 
 - **New EA**: Admin → EAs → *Add a new EA* (name, license code, version, file). Tick *Give to all active users* or choose per customer.
