@@ -163,6 +163,9 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       }).join('');
     }).join('');
 
+    // private text (account numbers, broker servers): hidden when "Hide private info" is on
+    const priv = (real, mask) => `<span class="priv"><span class="priv-real">${real}</span><span class="priv-mask">${mask}</span></span>`;
+    const acctLabel = (a) => priv(`${esc(a.broker || 'Account')} · ${esc(a.account_number)}`, `Account ••${esc(String(a.account_number).slice(-2))}`);
     // one hidden panel per trading day; the calendar shows the picked one
     const panels = dayKeys.map((d) => {
       const l = days[d], s = sum(l), wd = DOW[(new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7];
@@ -171,7 +174,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         <p class="muted">${l.length} trade${l.length > 1 ? 's' : ''} · <strong class="${cls(s)}">${money(s, cur)}</strong></p>
         <table><tbody>${l.map((t) => `<tr>
           <td class="muted">${esc(t.close_time.slice(11, 16))}</td>
-          <td><strong>${esc(t.symbol)}</strong> ${esc(t.side)} ${t.lots ?? ''}${!sel && liveAccts.length > 1 ? `<br><span class="muted small">${esc(t.broker || 'Account')} · ${esc(t.account_number)}</span>` : ''}${t.setup ? `<br><span class="muted small">${esc(t.setup)}</span>` : ''}</td>
+          <td><strong>${esc(t.symbol)}</strong> ${esc(t.side)} ${t.lots ?? ''}${!sel && liveAccts.length > 1 ? `<br><span class="muted small">${priv(`${esc(t.broker || 'Account')} · ${esc(t.account_number)}`, `Account ••${esc(String(t.account_number).slice(-2))}`)}</span>` : ''}${t.setup ? `<br><span class="muted small">${esc(t.setup)}</span>` : ''}</td>
           <td class="right"><span class="${cls(t.net)}">${money(t.net)}</span><br><a class="small" href="/journal/${t.id}">Open ›</a></td></tr>`).join('')}
         </tbody></table></div>`;
     }).join('');
@@ -193,11 +196,12 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const site = req.protocol + '://' + req.get('host');
 
     page(req, res, 'Trade Journal', `
-    <h1>Trade Journal</h1>
+    <div class="row between page-head"><h1>Trade Journal</h1>
+      <button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers, your name and the journal key, so you can screenshot this page">Hide private info</button></div>
     ${accts.length ? `<div class="accts" role="navigation" aria-label="Accounts">
       ${liveAccts.length > 1 || removedAccts.length ? `<a class="acct${sel ? '' : ' on'}" href="/journal${qs({ account: '' })}"><small>All accounts</small><b class="${cls(allNet)}">${money(allNet, cur)}</b><small>${allN} trades</small></a>` : ''}
-      ${liveAccts.map((a) => chip(a, `${esc(a.broker || 'Account')} · ${esc(a.account_number)}`, `${a.n} trades`, `/journal${qs({ account: a.account_number })}`, sel === a || (!sel && liveAccts.length === 1 && !removedAccts.length))).join('')}
-      ${removedAccts.map((a) => chip(a, `${esc(a.broker || 'Account')} · ${esc(a.account_number)}`, '<span class="tag">Removed</span>', `/journal${qs({ account: a.account_number })}`, sel === a)).join('')}
+      ${liveAccts.map((a) => chip(a, acctLabel(a), `${a.n} trades`, `/journal${qs({ account: a.account_number })}`, sel === a || (!sel && liveAccts.length === 1 && !removedAccts.length))).join('')}
+      ${removedAccts.map((a) => chip(a, acctLabel(a), '<span class="tag">Removed</span>', `/journal${qs({ account: a.account_number })}`, sel === a)).join('')}
     </div>` : ''}
 
     ${sel && sel.removed ? `<section class="card notice">
@@ -229,17 +233,18 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
     ${insightsHtml}
 
-    <section class="card">
-      <h2>Connect the Trade Journal EA</h2>
+    <details class="card connect priv-hide"${accts.length ? '' : ' open'}>
+      <summary><h2>Connect the Trade Journal EA</h2><span class="muted small">Journal key and setup steps</span></summary>
       <ol class="steps">
         <li>Download <strong>Trade Journal</strong> from <a href="/dashboard">My EAs</a> and attach it to <strong>one extra chart</strong> on each MT5 account (MT5 allows one EA per chart, so open a new chart for it; any symbol works). It reads the whole account, so it logs every symbol and every EA, and it never trades, so it runs safely next to KATANA.</li>
         <li>Paste this key into the EA's <strong>Journal key</strong> input:
-          <code class="block">${esc(key)}</code></li>
+          <span class="keybox"><code class="block" data-key="${esc(key)}">••••••••••••••••••••••••••••••••</code>
+          <button type="button" class="small secondary key-show">Show</button><button type="button" class="small secondary key-copy">Copy</button></span></li>
         <li>Make sure the account number is on <a href="/dashboard">My EAs</a>, and that MT5 allows <code>${esc(site)}</code> under Tools → Options → Expert Advisors → Allow WebRequest.</li>
       </ol>
       <form method="post" action="/journal/key" onsubmit="return confirm('Make a new key? The old key stops working and you must paste the new one into the EA.')">
         <button class="small secondary">Make a new key</button></form>
-    </section>`);
+    </details>`);
   });
 
   // delete the trades of an account that was removed from My EAs (live accounts are refused)
@@ -280,7 +285,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     page(req, res, `${t.symbol} ${t.side}`, `
     <p><a href="/journal">← All trades</a></p>
     <h1>${esc(t.symbol)} ${esc(t.side)} <span class="${cls(t.net)}">${money(t.net, t.currency)}</span></h1>
-    <p class="muted">Account ${esc(t.account_number)} · position ${esc(t.position_id)} · ${fmtDate(t.open_time)} → ${fmtDate(t.close_time)} (broker time)</p>
+    <p class="muted"><span class="priv"><span class="priv-real">Account ${esc(t.account_number)} · position ${esc(t.position_id)}</span><span class="priv-mask">Account ••${esc(String(t.account_number).slice(-2))}</span></span> · ${fmtDate(t.open_time)} → ${fmtDate(t.close_time)} (broker time)</p>
 
     <section class="card">
       <h2>Share cards <span class="tag">5ABI.FX story · 9:16</span></h2>

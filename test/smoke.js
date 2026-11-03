@@ -233,7 +233,7 @@ function client(base) {
     await admin.post(`/admin/users/${bobId}`, [['name', 'Bob'], ['status', 'active'], ['max_accounts', '10'], ['expires_at', ''], ['ea', '1'], ['ea', '2']]);
     r = await bob.get('/journal');
     assert.match(r.text, /No trades yet/);
-    const key = r.text.match(/<code class="block">([0-9a-f]{32})<\/code>/)[1];
+    const key = r.text.match(/<code class="block" data-key="([0-9a-f]{32})">/)[1];
 
     const send = (body) => fetch(`${base}/api/journal/trades`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     const trade = { position_id: '777', symbol: 'XAUUSD', side: 'BUY', lots: 0.5, entry: 2641.2, exit: 2668.9, sl: 2631.2, tp: 2668.9, digits: 2,
