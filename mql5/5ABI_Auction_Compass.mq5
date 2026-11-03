@@ -23,12 +23,13 @@ enum EStripPos
 
 enum EProfType
   {
-   PROF_VOLUME = 0, // Volume profile
-   PROF_TPO    = 1, // Market Profile (TPO)
-   PROF_SPLIT  = 2  // Split: volume left, TPO right
+   PT_VOLUME = 0, // Volume
+   PT_TPO    = 1, // TPO (Market Profile)
+   PT_SPLIT  = 2  // Split: TPO | Volume
   };
 
 input group "Profiles"
+input EProfType InpProfType        = PT_SPLIT;   // Profile type
 input ENUM_TIMEFRAMES InpDataTF    = PERIOD_M5;  // Profile data resolution (same on every chart TF)
 input int     InpSessions          = 8;          // Sessions to show
 input int     InpRows              = 70;         // Profile rows
@@ -39,18 +40,16 @@ input bool    InpShowVA            = true;       // Show VAH / VAL lines
 input bool    InpShowNaked         = true;       // Show naked POCs
 input int     InpNakedMax          = 6;          // Max naked POCs
 input bool    InpShowShape         = true;       // Show profile shape letter
+input bool    InpShowTpoPoc        = true;       // TPO POC tick (only when it differs from volume POC)
+input bool    InpShowSingles       = true;       // Unfilled single prints
+input bool    InpShowIB            = true;       // Today's Initial Balance
+input int     InpIBMins            = 60;         // Initial Balance length (minutes)
+input string  InpIBStart           = "";         // IB start, broker time HH:MM (blank = broker day open)
 input bool    InpShowPoor          = true;       // Show poor highs / lows
 input bool    InpShowZones         = true;       // Show business zones
 input double  InpZoneTol           = 12.0;       // Zone tolerance (% of prev VA width)
 input int     InpTPOMins           = 30;         // TPO period (minutes)
 input int     InpAcceptMins        = 30;         // Acceptance time (minutes)
-
-input group "Market Profile (TPO)"
-input EProfType InpProfType        = PROF_VOLUME; // Profile type
-input bool    InpLetters           = true;       // Today's TPO letters (A, B, C...) beside price
-input int     InpIBPeriods         = 2;          // Initial balance (TPO periods, 2 = first hour)
-input int     InpLettersPx         = 220;        // Letters column max width (pixels)
-input string  InpLetterFont        = "Consolas"; // Letters font (monospace)
 
 input group "Weekly profile (docked right)"
 input bool    InpShowWeek          = true;       // Show weekly profile
@@ -193,15 +192,14 @@ public:
    double            lo, hi, step, open0, close0, mx;
    double            vol[];
    int               tpo[];
-   double            tv[];             // TPO counts as doubles
-   int               n, pocI, upI, dnI;
+   int               n, pocI, upI, dnI, tpoPocI, mxT, fb, ft;
    double            poc, vah, val;
-   int               tPocI, tUp, tDn;  // Market Profile (TPO) levels
-   double            tMx, tPoc, tVah, tVal;
    string            shape;
    bool              poorHi, poorLo, ok;
                      CProf(void) { ok = false; n = 0; shape = ""; }
   };
+
+void DrawSingles(CProf &p, int idx, double hs, double ls);
 
 CProf    g_h[];          // finished sessions, [0] = yesterday
 int      g_hn = 0;
@@ -357,37 +355,6 @@ int RowOf(CProf &p, double px)
    return IMax(0, IMin(p.n - 1, k));
   }
 
-// POC (ties go to the row nearest the middle) and value area (grow toward the larger neighbour)
-void PocVA(const double &v[], int n, int &pocI, double &mx, int &up, int &dn)
-  {
-   pocI = 0;
-   mx = 0;
-   double total = 0, mid = (n - 1) / 2.0;
-   for(int k = 0; k < n; k++)
-     {
-      total += v[k];
-      if(v[k] > mx || (v[k] == mx && MathAbs(k - mid) < MathAbs(pocI - mid)))
-        {
-         mx = v[k];
-         pocI = k;
-        }
-     }
-   if(mx <= 0)
-      mx = 1;
-   double target = total * InpVAPct / 100.0, acc = v[pocI];
-   up = pocI;
-   dn = pocI;
-   while(acc < target && (up < n - 1 || dn > 0))
-     {
-      double vu = up < n - 1 ? v[up + 1] : -1.0;
-      double vd = dn > 0 ? v[dn - 1] : -1.0;
-      if(vu >= vd)
-         acc += v[++up];
-      else
-         acc += v[--dn];
-     }
-  }
-
 bool BuildFrom(CProf &p, const MqlRates &r[], int c, datetime t0)
   {
    p.ok = false;
@@ -436,24 +403,41 @@ bool BuildFrom(CProf &p, const MqlRates &r[], int c, datetime t0)
    p.close0 = r[c - 1].close;
    p.tEnd   = (datetime)(r[c - 1].time + PeriodSeconds(InpDataTF));
 
-   // Levels from volume and from time (TPO). Every module (bias, naked POCs, zones, tags)
-   // follows the chosen profile type: TPO levels in Market Profile mode, volume otherwise.
-   ArrayResize(p.tv, p.n);
+   // POC (ties go to the row nearest the middle)
+   p.pocI = 0;
+   p.mx = 0;
+   double total = 0;
+   double mid = (p.n - 1) / 2.0;
    for(int k = 0; k < p.n; k++)
-      p.tv[k] = p.tpo[k];
-   int up, dn;
-   PocVA(p.vol, p.n, p.pocI, p.mx, up, dn);
-   PocVA(p.tv, p.n, p.tPocI, p.tMx, p.tUp, p.tDn);
-   if(InpProfType == PROF_TPO)
      {
-      p.pocI = p.tPocI;
-      p.mx   = p.tMx;
-      up     = p.tUp;
-      dn     = p.tDn;
+      total += p.vol[k];
+      if(p.vol[k] > p.mx || (p.vol[k] == p.mx && MathAbs(k - mid) < MathAbs(p.pocI - mid)))
+        {
+         p.mx = p.vol[k];
+         p.pocI = k;
+        }
      }
-   p.tPoc = p.lo + (p.tPocI + 0.5) * p.step;
-   p.tVah = p.lo + (p.tUp + 1) * p.step;
-   p.tVal = p.lo + p.tDn * p.step;
+   if(p.mx <= 0)
+      p.mx = 1;
+
+   // Value area: expand from the POC toward the larger neighbour
+   double target = total * InpVAPct / 100.0, acc = p.vol[p.pocI];
+   int up = p.pocI, dn = p.pocI;
+   while(acc < target && (up < p.n - 1 || dn > 0))
+     {
+      double vu = up < p.n - 1 ? p.vol[up + 1] : -1.0;
+      double vd = dn > 0 ? p.vol[dn - 1] : -1.0;
+      if(vu >= vd)
+        {
+         up++;
+         acc += p.vol[up];
+        }
+      else
+        {
+         dn--;
+         acc += p.vol[dn];
+        }
+     }
    p.upI = up;
    p.dnI = dn;
    p.poc = p.lo + (p.pocI + 0.5) * p.step;
@@ -476,6 +460,19 @@ bool BuildFrom(CProf &p, const MqlRates &r[], int c, datetime t0)
          if(p.tpo[k] <= 1)
             sing++;
         }
+   p.fb = fb;
+   p.ft = ft;
+   // TPO POC (ties go to the row nearest the middle)
+   p.tpoPocI = 0;
+   p.mxT = 0;
+   for(int k = 0; k < p.n; k++)
+      if(p.tpo[k] > p.mxT || (p.tpo[k] == p.mxT && MathAbs(k - mid) < MathAbs(p.tpoPocI - mid)))
+        {
+         p.mxT = p.tpo[k];
+         p.tpoPocI = k;
+        }
+   if(p.mxT <= 0)
+      p.mxT = 1;
    double pos = (p.pocI + 0.5) / p.n;
    p.shape  = (span > 0 && (double)sing / span >= 0.20) ? "T" : pos >= 0.62 ? "P" : pos <= 0.38 ? "b" : "D";
    p.poorHi = p.tpo[p.n - 1] >= 2;
@@ -519,35 +516,37 @@ void DrawProfile(CProf &p, string tag, bool dev)
       return;
    double span = (double)(p.tEnd - p.t0);
    span = dev ? fmax(span, 6 * 3600.0) : fmin(span, 86400.0);
-   bool useT  = InpProfType == PROF_TPO;
-   bool split = InpProfType == PROF_SPLIT && !dev;      // today stays one profile
-   double wf  = InpWidthPct / 100.0 * (split ? 0.5 : 1.0);
    color cIn = Mix(InpProf, 0.42), cOut = Mix(InpProf, 0.22);
-   color tIn = Mix(InpProf, 0.30), tOut = Mix(InpProf, 0.14);   // TPO side: a step quieter
-   datetime tE = (datetime)(p.t0 + (long)span);
+   color tIn = Mix(InpAccent, 0.34), tOut = Mix(InpAccent, 0.16);
+   double W = span * InpWidthPct / 100.0;
+   bool showV = InpProfType != PT_TPO, showT = InpProfType != PT_VOLUME;
+   double wT = InpProfType == PT_SPLIT ? W * 0.5 : W;          // TPO half (left)
+   double wV = InpProfType == PT_SPLIT ? W * 0.5 : W;          // volume half (right)
+   long   xV = InpProfType == PT_SPLIT ? (long)(W * 0.5) : 0;
    for(int k = 0; k < p.n; k++)
      {
-      double p1 = p.lo + k * p.step, p2 = p.lo + (k + 1) * p.step;
+      bool inVA = k >= p.dnI && k <= p.upI;
+      double y1 = p.lo + k * p.step, y2 = p.lo + (k + 1) * p.step;
       string nm = PFX + tag + "r" + IntegerToString(k);
-      double vv = useT ? p.tv[k] / p.tMx : p.vol[k] / p.mx;
-      if(vv <= 0)
+      if(!showV || p.vol[k] <= 0)
          ObjectDelete(0, nm);
       else
-         Rect(nm, p.t0, p1, (datetime)(p.t0 + (long)(vv * span * wf)), p2, (k >= p.dnI && k <= p.upI) ? cIn : cOut);
-      // split: TPO grows left from the end of the session
+         Rect(nm, (datetime)(p.t0 + xV), y1, (datetime)(p.t0 + xV + (long)(p.vol[k] / p.mx * wV)), y2, inVA ? cIn : cOut);
       string nt = PFX + tag + "t" + IntegerToString(k);
-      double tt = p.tv[k] / p.tMx;
-      if(!split || tt <= 0)
+      if(!showT || p.tpo[k] <= 0)
          ObjectDelete(0, nt);
       else
-         Rect(nt, (datetime)(tE - (long)(tt * span * wf)), p1, tE, p2, (k >= p.tDn && k <= p.tUp) ? tIn : tOut);
+         Rect(nt, p.t0, y1, (datetime)(p.t0 + (long)((double)p.tpo[k] / p.mxT * wT)), y2, inVA ? tIn : tOut);
      }
-   datetime t2 = (datetime)(p.t0 + (long)(span * wf));
-   Seg(PFX + tag + "poc", p.t0, t2, p.poc, InpPoc, STYLE_SOLID, dev ? 2 : 1, false);
-   if(split)
-      Seg(PFX + tag + "tpoc", (datetime)(tE - (long)(span * wf)), tE, p.tPoc, Mix(InpPoc, 0.75), STYLE_DOT, 1, false);
+   datetime t2 = (datetime)(p.t0 + (long)W);
+   // TPO POC tick: only when time and volume disagree on fair price
+   string ntp = PFX + tag + "tpoc";
+   if(InpShowTpoPoc && InpProfType != PT_TPO && MathAbs(p.tpoPocI - p.pocI) > 1)
+      Seg(ntp, p.t0, (datetime)(p.t0 + (long)(W * 0.18)), p.lo + (p.tpoPocI + 0.5) * p.step, InpPoc, STYLE_SOLID, 3, false);
    else
-      ObjectDelete(0, PFX + tag + "tpoc");
+      ObjectDelete(0, ntp);
+   double pocLine = InpProfType == PT_TPO ? p.lo + (p.tpoPocI + 0.5) * p.step : p.poc;   // TPO-only: show the TPO POC
+   Seg(PFX + tag + "poc", p.t0, t2, pocLine, InpPoc, STYLE_SOLID, dev ? 2 : 1, false);
    if(InpShowVA)
      {
       color cv = Mix(TC(), 0.45);
@@ -653,6 +652,34 @@ void DrawNaked()
             Txt(PFX + "nplt" + IntegerToString(i), g_h[i].tEnd, g_h[i].lo, "poor low", cp, ANCHOR_LEFT_UPPER);
            }
         }
+      if(InpShowSingles)
+         DrawSingles(g_h[i], i, hs, ls);
+     }
+  }
+
+// Unfilled single prints: a thin accent strip on the profile's left edge
+void DrawSingles(CProf &p, int idx, double hs, double ls)
+  {
+   if(p.fb < 0)
+      return;
+   color cs = Mix(InpAccent, 0.75);
+   long ws = (long)fmax(PeriodSeconds(_Period), (p.tEnd - p.t0) * 0.03);
+   int k = p.fb, run = 0;
+   while(k <= p.ft)
+     {
+      if(p.tpo[k] > 1)
+        { k++; continue; }
+      int a = k;
+      while(k <= p.ft && p.tpo[k] <= 1)
+         k++;
+      int b = k - 1;
+      if(b - a + 1 < 2)
+         continue;                       // ignore one-row noise
+      double lo = p.lo + a * p.step, hi = p.lo + (b + 1) * p.step;
+      if(hs >= hi && ls <= lo)
+         continue;                       // price traded back through: filled
+      Rect(PFX + "ns" + IntegerToString(idx) + "_" + IntegerToString(run), (datetime)(p.t0 - ws), hi, p.t0, lo, cs);
+      run++;
      }
   }
 
@@ -871,6 +898,50 @@ void LiveUpdate()
    double elapsed = (double)(now - g_tr[0].time) / 60.0;
    bool gapHeld = variant == 3 && elapsed >= InpAcceptMins;
 
+   // Initial Balance (today)
+   string ibTx = "";
+   if(InpShowIB)
+     {
+      // IB starts at the broker's day open, or at InpIBStart (e.g. "16:30" for the New York open on a GMT+3 broker)
+      datetime ibStart = g_tr[0].time;
+      if(StringLen(InpIBStart) >= 4)
+        {
+         datetime t = StringToTime(TimeToString(d0, TIME_DATE) + " " + InpIBStart);
+         if(t > 0)
+            ibStart = t;
+        }
+      datetime ibEnd = (datetime)(ibStart + (long)InpIBMins * 60);
+      double ibHi = -DBL_MAX, ibLo = DBL_MAX, dHi = -DBL_MAX, dLo = DBL_MAX;
+      for(int i = 0; i < g_tn; i++)
+        {
+         if(g_tr[i].time < ibStart)
+            continue;
+         if(g_tr[i].time < ibEnd)
+           {
+            ibHi = fmax(ibHi, g_tr[i].high);
+            ibLo = fmin(ibLo, g_tr[i].low);
+           }
+         dHi = fmax(dHi, g_tr[i].high);
+         dLo = fmin(dLo, g_tr[i].low);
+        }
+      color ci = Mix(InpAccent, 0.8);
+      if(ibHi > ibLo)
+        {
+         Seg(PFX + "d_ibh", ibStart, ibEnd, ibHi, ci, STYLE_SOLID, 2, false);
+         Seg(PFX + "d_ibl", ibStart, ibEnd, ibLo, ci, STYLE_SOLID, 2, false);
+        }
+      if(now < ibStart)
+         ibTx = "IB at " + TimeToString(ibStart, TIME_MINUTES);
+      else if(now >= ibEnd && ibHi > ibLo)
+        {
+         double ext = (dHi - dLo) / (ibHi - ibLo);
+         string dir = dHi > ibHi && dLo < ibLo ? "↕" : dHi > ibHi ? "▲" : dLo < ibLo ? "▼" : "";
+         ibTx = "IB " + dir + "×" + DoubleToString(ext, 1);
+        }
+      else
+         ibTx = "IB forming";
+     }
+
    // Bias (live) + alert (on closed data bars)
    string why;
    int bDir = Bias(g_tn - 1, now, px, why);
@@ -917,7 +988,7 @@ void LiveUpdate()
      }
    string wk = (!g_pwk.ok || !InpShowWeek) ? "" : px > g_pwk.vah ? "WEEK ▲" : px < g_pwk.val ? "WEEK ▼" : "WEEK ↔";
    g_s1 = "◆ " + InpBrand;
-   g_s3 = "V" + IntegerToString(variant) + " · " + accTx + (mig == "" ? "" : " · " + mig) + (wk == "" ? "" : " · " + wk);
+   g_s3 = "V" + IntegerToString(variant) + " · " + accTx + (mig == "" ? "" : " · " + mig) + (wk == "" ? "" : " · " + wk) + (ibTx == "" ? "" : " · " + ibTx);
    g_tip3 = VPlan(variant, accepted, gapHeld, outDir);
 
    // Tags + plan
@@ -975,85 +1046,6 @@ int YOf(double price)
    return y;
   }
 
-//--- classic Market Profile letters for today: A = first TPO period, B = second ...
-string TpoLetter(int i)
-  {
-   ushort c = (ushort)(i < 26 ? 'A' + i : i < 52 ? 'a' + (i - 26) : '+');
-   return ShortToString(c);
-  }
-
-void DrawLetters(int xRight, int H)
-  {
-   ObjectsDeleteAll(0, PFX + "pxL");
-   if(!InpLetters || g_tn <= 0 || !g_dev.ok)
-      return;
-   int x0 = 0, yy = 0;
-   ChartTimePriceToXY(0, 0, iTime(_Symbol, _Period, 0), g_dev.poc, x0, yy);
-   int xLeft = IMax(xRight - InpLettersPx, x0 + 16);         // never on top of the candles
-   int cw = IMax(5, (int)MathRound(InpFontSize * 0.74));      // monospace character width
-   int maxCh = (xRight - xLeft) / cw;
-   if(maxCh < 4)
-      return;
-   int yHi = YOf(g_dev.hi), yLo = YOf(g_dev.lo);
-   int rowPx = InpFontSize + 5;
-   int nr = IMax(1, IMin(200, (yLo - yHi) / rowPx));
-   double step = (g_dev.hi - g_dev.lo) / nr;
-   if(step <= 0)
-      return;
-   string row[];
-   ArrayResize(row, nr);
-   for(int k = 0; k < nr; k++)
-      row[k] = "";
-   int lastP[];
-   ArrayResize(lastP, nr);
-   ArrayInitialize(lastP, -1);
-   datetime d0 = g_dev.t0;
-   long per = (long)IMax(1, InpTPOMins) * 60;
-   double ibHi = -DBL_MAX, ibLo = DBL_MAX;
-   for(int i = 0; i < g_tn; i++)
-     {
-      int pi = (int)(((long)g_tr[i].time - (long)d0) / per);
-      if(pi < IMax(1, InpIBPeriods))
-        {
-         ibHi = fmax(ibHi, g_tr[i].high);
-         ibLo = fmin(ibLo, g_tr[i].low);
-        }
-      int a = IMax(0, IMin(nr - 1, (int)MathFloor((g_tr[i].low - g_dev.lo) / step)));
-      int b = IMax(0, IMin(nr - 1, (int)MathFloor((g_tr[i].high - g_dev.lo) / step)));
-      for(int k = a; k <= b; k++)
-         if(lastP[k] != pi)
-           {
-            row[k] += TpoLetter(pi);
-            lastP[k] = pi;
-           }
-     }
-   color cVA = Mix(TC(), 0.85), cOut = Mix(TC(), 0.5), cSingle = Mix(InpAccent, 0.85);
-   for(int k = 0; k < nr; k++)
-     {
-      if(row[k] == "")
-         continue;
-      double pLo = g_dev.lo + k * step, pHi = pLo + step, pm = pLo + step / 2;
-      int y = YOf(pm);
-      if(y < 0 || y > H)
-         continue;
-      string s = row[k];
-      if(StringLen(s) > maxCh)
-         s = StringSubstr(s, 0, maxCh - 1) + "…";
-      color c = (g_dev.tPoc >= pLo && g_dev.tPoc < pHi) ? InpPoc
-                : (StringLen(row[k]) == 1 && k > 0 && k < nr - 1) ? cSingle
-                : (pm >= g_dev.tVal && pm <= g_dev.tVah) ? cVA : cOut;
-      PxText(PFX + "pxL" + IntegerToString(k), xLeft, y, s, c, ANCHOR_LEFT, InpLetterFont,
-             "Market Profile: each letter is one " + IntegerToString(InpTPOMins) + "-min period that traded here");
-     }
-   // initial balance bar on the left of the letters
-   if(ibHi > ibLo)
-     {
-      int y1 = YOf(ibHi), y2 = YOf(ibLo);
-      PxRect(PFX + "pxLib", xLeft - 6, y1, 2, IMax(1, y2 - y1), InpAccent);
-      ObjectSetString(0, PFX + "pxLib", OBJPROP_TOOLTIP, "Initial balance (first " + IntegerToString(InpIBPeriods * InpTPOMins) + " min)");
-     }
-  }
-
 void DrawPixels()
   {
    int W = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
@@ -1071,13 +1063,12 @@ void DrawPixels()
         {
          string nm = PFX + "pxW" + IntegerToString(k);
          int y1 = YOf(g_wk.lo + (k + 1) * g_wk.step), y2 = YOf(g_wk.lo + k * g_wk.step);
-         double vv = InpProfType == PROF_TPO ? g_wk.tv[k] / g_wk.tMx : g_wk.vol[k] / g_wk.mx;
-         if(vv <= 0 || y2 < 0 || y1 > H)
+         if(g_wk.vol[k] <= 0 || y2 < 0 || y1 > H)
            {
             ObjectDelete(0, nm);
             continue;
            }
-         int w = IMax(1, (int)MathRound(vv * InpWeekWidthPx));
+         int w = IMax(1, (int)MathRound(g_wk.vol[k] / g_wk.mx * InpWeekWidthPx));
          PxRect(nm, xR - w, y1, w, IMax(1, y2 - y1), (k >= g_wk.dnI && k <= g_wk.upI) ? cIn : cOut);
         }
       PxRect(PFX + "pxWpoc", xL, YOf(g_wk.poc), InpWeekWidthPx, 1, InpPoc);
@@ -1130,9 +1121,6 @@ void DrawPixels()
          PxText(PFX + "pxT" + IntegerToString(i), xT, y, g_tgTx[k], g_tgC[k], ANCHOR_LEFT, InpFont, "");
         }
      }
-
-   // Today's Market Profile letters, in the free space between the last candle and the tags
-   DrawLetters(xL - 12 - InpTagsPx - 14, H);
 
    // Status strip, three stacked lines, no background
    if(InpShowStrip)
