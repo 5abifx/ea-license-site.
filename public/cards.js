@@ -387,7 +387,8 @@ function drawChart(ctx, W, H, t) {
   }
   if (state.candles.example) text(ctx, "EXAMPLE CANDLES · NOT REAL PRICE DATA", x0, y0 - 14, { w: 600, size: 20, fam: M, color: P.dim, ls: 2 });
   // footer stats
-  const rr = e !== null && sl !== null && tp !== null && Math.abs(e - sl) > 0 ? (Math.abs(tp - e) / Math.abs(e - sl)).toFixed(2) : "—";
+  const slRisk = e !== null && sl !== null && (buy ? sl < e : sl > e);   // a break-even / profit stop is not a risk
+  const rr = slRisk && tp !== null ? (Math.abs(tp - e) / Math.abs(e - sl)).toFixed(2) : "—";
   const stats = [["PLANNED R:R", `1 : ${rr}`], ["PARTIALS", String(parsePartials(t).length)], ["HELD", duration(t)]];
   ctx.fillStyle = P.grid; ctx.fillRect(pad, H - pad - 120, W - 2 * pad, 2);
   stats.forEach(([k, v], i) => {

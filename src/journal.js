@@ -7,6 +7,8 @@ const { esc, fmtDate } = require('./views');
 const JOURNAL_CODE = process.env.JOURNAL_EA_CODE || 'JOURNAL';
 const EMOTIONS = ['', 'Calm', 'Confident', 'Patient', 'Anxious', 'Greedy', 'Fearful', 'Revenge', 'Bored', 'FOMO'];
 
+const KEEP_IF_EDITED = ['sl', 'r', 'risk_money', 'risk_pct'];   // columns the trader can correct
+
 module.exports = function registerJournal(app, { db, page, flash, requireUser, isExpired, cleanAccount }) {
   const hasJournal = (u) => !!u && (u.is_admin || (u.status === 'active' && !isExpired(u) && !!db.prepare(`
     SELECT 1 FROM user_eas ue JOIN eas e ON e.id = ue.ea_id
@@ -70,10 +72,15 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       currency: s(b.currency, 8), broker: s(b.broker, 80), tf: s(t.tf, 8),
       partials: JSON.stringify(partials), candles: JSON.stringify(candles),
     };
+    // break-even / trailed stop is not the risk: no R or risk % from it
+    if (row.sl !== null && row.entry !== null && (side === 'BUY' ? row.sl >= row.entry : row.sl <= row.entry)) {
+      row.r = null; row.risk_money = null; row.risk_pct = null;
+    }
     const cols = Object.keys(row);
     db.prepare(`INSERT INTO journal_trades (${cols.join(', ')}) VALUES (${cols.map((c) => '@' + c).join(', ')})
       ON CONFLICT (user_id, account_number, position_id) DO UPDATE SET
-      ${cols.filter((c) => !['user_id', 'account_number', 'position_id'].includes(c)).map((c) => `${c} = excluded.${c}`).join(', ')},
+      ${cols.filter((c) => !['user_id', 'account_number', 'position_id'].includes(c))
+        .map((c) => (KEEP_IF_EDITED.includes(c) ? `${c} = CASE WHEN sl_edited = 1 THEN ${c} ELSE excluded.${c} END` : `${c} = excluded.${c}`)).join(', ')},
       updated_at = datetime('now')`).run(row);
     db.prepare(`UPDATE accounts SET last_check_at = datetime('now'), last_check_ea = ? WHERE user_id = ? AND account_number = ?`)
       .run(JOURNAL_CODE, u.id, account);
@@ -317,12 +324,19 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       <h2>Trade</h2>
       <table><tbody>
         <tr><th>Entry</th><td>${fx(t.entry)}</td><th>Exit</th><td>${fx(t.exit)}</td></tr>
-        <tr><th>Stop loss</th><td>${fx(t.sl) || '-'}</td><th>Take profit</th><td>${fx(t.tp) || '-'}</td></tr>
+        <tr><th>Stop loss</th><td>${fx(t.sl) || '-'}${t.sl_edited ? ' <span class="muted">(edited)</span>' : ''}</td><th>Take profit</th><td>${fx(t.tp) || '-'}</td></tr>
         <tr><th>Lots</th><td>${t.lots ?? '-'}</td><th>Pips</th><td>${t.pips ?? '-'}</td></tr>
         <tr><th>R multiple</th><td>${t.r === null ? '-' : t.r.toFixed(2)}</td><th>Risk</th><td>${t.risk_pct === null ? '-' : t.risk_pct.toFixed(2) + '%'}</td></tr>
         <tr><th>Gross / costs</th><td>${money(t.profit)} / ${money((t.commission || 0) + (t.swap || 0))}</td><th>Best / worst move</th><td>${fx(t.mfe) || '-'} / ${fx(t.mae) || '-'}</td></tr>
         <tr><th>Magic / comment</th><td>${t.magic ?? '-'} ${esc(t.comment)}</td><th>Partial closes</th><td>${partials.length ? partials.map((p) => `${p.lots} @ ${fx(p.price)}`).join('<br>') : 'none'}</td></tr>
       </tbody></table>
+      ${t.r === null && t.entry !== null ? `<p class="muted">${t.sl !== null && (t.side === 'BUY' ? t.sl >= t.entry : t.sl <= t.entry)
+        ? 'The stop shown is at break-even or in profit, so it was moved before the journal saw your first stop. Type your original stop-loss to get R and risk %.'
+        : 'No stop-loss was recorded. Type the stop-loss you used to get R and risk %.'}</p>` : ''}
+      <form method="post" action="/journal/${t.id}/sl" class="inline-form">
+        <label>Original stop-loss <input name="sl" inputmode="decimal" placeholder="${t.side === 'BUY' ? 'below' : 'above'} entry ${fx(t.entry)}" value="${t.sl_edited ? fx(t.sl) : ''}" required></label>
+        <button class="secondary small">Save stop</button>
+      </form>
     </section>
 
     <section class="card">
@@ -347,6 +361,35 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   app.post('/journal/handle', requireUser, requireJournal, (req, res) => {
     db.prepare('UPDATE users SET card_handle = ? WHERE id = ?').run(String(req.body.card_handle || '').trim().slice(0, 40), req.user.id);
     res.redirect(`/journal/${Number(req.body.back) || ''}`);
+  });
+
+  // The trader corrects the stop-loss (e.g. moved to break-even before the EA saw it).
+  // R comes from prices: average exit vs entry, over the entry-to-stop distance.
+  app.post('/journal/:id/sl', requireUser, requireJournal, (req, res) => {
+    const t = getTrade(req);
+    if (!t) return res.status(404).send('Not found');
+    const sl = Number(String(req.body.sl || '').replace(',', '.').trim());
+    const buy = t.side === 'BUY';
+    if (!Number.isFinite(sl) || sl <= 0 || t.entry === null || (buy ? sl >= t.entry : sl <= t.entry)) {
+      flash(req, 'error', `The original stop must be ${buy ? 'below' : 'above'} the entry price ${t.entry}.`);
+      return res.redirect(`/journal/${t.id}`);
+    }
+    const parts = JSON.parse(t.partials || '[]').filter((p) => Number.isFinite(p.price) && Number.isFinite(p.lots));
+    const lots = Number(t.lots) || 0;
+    const partLots = parts.reduce((a, p) => a + p.lots, 0);
+    const restLots = Math.max(0, lots - partLots);
+    const avgExit = lots > 0 && t.exit !== null
+      ? (parts.reduce((a, p) => a + p.price * p.lots, 0) + t.exit * restLots) / (partLots + restLots || 1)
+      : t.exit;
+    const move = (buy ? 1 : -1) * (avgExit - t.entry);
+    const r = avgExit === null ? null : move / Math.abs(t.entry - sl);
+    const riskMoney = r && t.net !== null ? Math.abs(t.net / r) : null;
+    const startBal = t.balance_after !== null && t.net !== null ? t.balance_after - t.net : null;
+    const riskPct = riskMoney && startBal > 0 ? (riskMoney / startBal) * 100 : null;
+    db.prepare(`UPDATE journal_trades SET sl = ?, r = ?, risk_money = ?, risk_pct = ?, sl_edited = 1, updated_at = datetime('now')
+      WHERE id = ? AND user_id = ?`).run(sl, r, riskMoney, riskPct, t.id, req.user.id);
+    flash(req, 'ok', r === null ? 'Stop-loss saved.' : `Stop-loss saved. This trade is ${r >= 0 ? '+' : '−'}${Math.abs(r).toFixed(2)}R.`);
+    res.redirect(`/journal/${t.id}`);
   });
 
   app.post('/journal/:id', requireUser, requireJournal, (req, res) => {

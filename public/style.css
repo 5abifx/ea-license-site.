@@ -582,3 +582,7 @@ main.wide { padding-bottom: 48px; }
 .sub-badge { background: var(--card-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px; font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .04em; }
 .ref p b { color: var(--accent); }
 .ref-link { flex-wrap: nowrap; } .ref-link code { flex: 1; min-width: 0; margin: 0; overflow-x: auto; white-space: nowrap; }
+
+/* journal: correct the stop-loss */
+.inline-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-top: 12px; }
+.inline-form label { flex: 1 1 220px; max-width: 320px; margin: 0; }
