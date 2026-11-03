@@ -18,6 +18,11 @@ module.exports = function help(app, { db, page }) {
       <p class="lead left">If MT5 shows <strong>"AutoTrading disabled by server"</strong>, your prop firm or broker has switched off EA trading on that account. Only their support team can switch it on. Most firms do it within a day when you ask.</p>
 
       <div class="card eb-check">
+        <h2>On FundedNext? EAs are a paid add-on</h2>
+        <p>FundedNext only allows EAs on accounts that have the <strong>EA add-on</strong> (about <strong>$5</strong>). Their support confirmed this, so an email alone won't switch it on. Add the EA add-on to your account first (ask FundedNext support if you can't find it), then restart MT5 and attach the EA again. Other firms may have a similar add-on, so check before you email.</p>
+      </div>
+
+      <div class="card eb-check">
         <h2>First, rule out the quick fix</h2>
         <p>If the message says <strong>"disabled by client"</strong> instead, it is your own MT5: press the <strong>Algo Trading</strong> button in the top toolbar so it turns green, and make sure <em>Allow Algo Trading</em> is ticked in the EA's settings. No email needed.</p>
       </div>
