@@ -269,6 +269,26 @@ function client(base) {
     assert.match(r.text, /<b>6 revenge trades<\/b>/);
     assert.match(r.text, /Last 90 days · 13 trades/);
     for (let i = 0; i < 6; i++) for (const p of ['L', 'R']) assert.ok(db.prepare("DELETE FROM journal_trades WHERE position_id = ?").run(p + i).changes);
+    // stop moved to break-even before the EA saw it: no fake R, and the trader can type the real stop
+    const be = { position_id: 'BE1', symbol: 'XAUUSD', side: 'BUY', lots: 0.1, entry: 3944.16, exit: 3948.03, sl: 3944.37, tp: 3964.62, digits: 2,
+      open_time: '2026-11-03T04:17:00', close_time: '2026-11-03T04:56:00', net: 48.37, r: 23.03, risk_money: 2.1, risk_pct: 0.03, balance_after: 10048.37 };
+    await send({ key, account: '1001', currency: 'USD', trade: be });
+    let beRow = db.prepare("SELECT * FROM journal_trades WHERE position_id = 'BE1'").get();
+    assert.strictEqual(beRow.r, null);
+    assert.strictEqual(beRow.risk_pct, null);
+    r = await bob.get(`/journal/${beRow.id}`);
+    assert.match(r.text, /break-even or in profit/);
+    r = await bob.post(`/journal/${beRow.id}/sl`, { sl: '3950' });
+    assert.match(r.text, /must be below the entry/);
+    r = await bob.post(`/journal/${beRow.id}/sl`, { sl: '3940.00' });
+    assert.match(r.text, /This trade is \+0\.93R/);
+    await send({ key, account: '1001', currency: 'USD', trade: be });          // EA re-send keeps the typed stop
+    beRow = db.prepare("SELECT * FROM journal_trades WHERE position_id = 'BE1'").get();
+    assert.strictEqual(beRow.sl, 3940);
+    assert.ok(Math.abs(beRow.r - 0.93) < 0.01);
+    assert.ok(Math.abs(beRow.risk_money - 52) < 0.5 && beRow.risk_pct > 0.5 && beRow.risk_pct < 0.53);
+    assert.match((await bob.get(`/journal/${beRow.id}`)).text, /\(edited\)/);
+    assert.strictEqual(db.prepare("DELETE FROM journal_trades WHERE position_id = 'BE1'").run().changes, 1);
 
     // calendar: the trade's day is on the October 2026 calendar
     r = await bob.get('/journal');

@@ -94,6 +94,15 @@ if (!userCols.includes('ref_code')) { db.exec('ALTER TABLE users ADD COLUMN ref_
 if (!userCols.includes('referred_by')) db.exec('ALTER TABLE users ADD COLUMN referred_by INTEGER');                 // user id of the referrer
 if (!userCols.includes('ref_rewarded')) db.exec('ALTER TABLE users ADD COLUMN ref_rewarded INTEGER NOT NULL DEFAULT 0'); // 1 = first payment done, referrer rewarded
 
+// Journal: 1 = the trader typed the original stop-loss on the trade page, so EA re-sends keep it
+const jCols = db.prepare('PRAGMA table_info(journal_trades)').all().map((c) => c.name);
+if (!jCols.includes('sl_edited')) db.exec('ALTER TABLE journal_trades ADD COLUMN sl_edited INTEGER NOT NULL DEFAULT 0');
+// A stop at entry or in profit (break-even / trailed before the journal saw the first stop)
+// is not a risk, so R and risk % cannot be worked out from it.
+db.exec(`UPDATE journal_trades SET r = NULL, risk_money = NULL, risk_pct = NULL
+  WHERE sl_edited = 0 AND sl IS NOT NULL AND entry IS NOT NULL AND r IS NOT NULL
+    AND ((side = 'BUY' AND sl >= entry) OR (side = 'SELL' AND sl <= entry))`);
+
 // Every MT5 account number ever used on a free trial, so one account cannot get a second trial with a new email
 db.exec(`CREATE TABLE IF NOT EXISTS trial_accounts (
   account_number TEXT PRIMARY KEY,
