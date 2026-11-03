@@ -106,6 +106,16 @@ A separate, read-only EA (`mql5/TradeJournal.mq5`) logs every closed trade to th
 
 The journal API (`POST /api/journal/trades`) only accepts trades with the customer's journal key, from an account registered on their dashboard, while their `JOURNAL` license is active and not expired.
 
+## Indicators (Auction Compass)
+
+Auction Compass comes with every paid plan, but not with the free trial. MT5 indicators are not allowed to call `WebRequest`, so they cannot ask the site themselves.
+
+1. In **Admin > EAs**, add the indicator with the licence code **`COMPASS`** and upload its compiled `.ex5`. Members put it in `MQL5\Indicators`.
+2. `/api/check?ea=COMPASS` is valid for any paid, active member who has the Trade Journal (or COMPASS) and has registered the account. Trial members get "Included with every paid plan". Change the list with `PAID_ONLY_EAS` (default `COMPASS`).
+3. The Trade Journal EA (`LicenseRelay.mqh`) checks every code in `RELAY_CODES` each hour and leaves a signed note in the terminal's global variables. The indicator reads that note and stays unlocked for 48 hours after the last successful check. Owner accounts in `LIC_OWNER` and the Strategy Tester are always unlocked.
+
+`RELAY_SALT` must be the same in `LicenseRelay.mqh` and in each indicator.
+
 ## Daily use
 
 - **New EA**: Admin → EAs → *Add a new EA* (name, license code, version, file). Tick *Give to all active users* or choose per customer.
