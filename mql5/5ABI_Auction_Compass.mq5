@@ -7,7 +7,7 @@
 //|  MT5 (indicators cannot reach the website themselves).          |
 //+------------------------------------------------------------------+
 #property copyright   "5ABI FX"
-#property version     "1.10"
+#property version     "1.11"
 #property description "5ABI FX · Auction Compass"
 #property indicator_chart_window
 #property indicator_buffers 0
@@ -115,6 +115,20 @@ void LicLockScreen()
    t[0] = "◆ " + InpBrand + " · Auction Compass is locked";
    t[1] = "Included with every paid plan on " + LIC_SERVER + ". Add account " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + " on your dashboard";
    t[2] = "and keep the Trade Journal EA running on any chart in this MT5";
+   // a card behind the text, so it reads on dark and light charts and over candles
+   int fs = InpFontSize + 1, lh = fs * 3, cw = IMin(W - 20, fs * 62), ch = lh * 3 + fs * 2;
+   string bg = PFX + "lockbg";
+   ObjectCreate(0, bg, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, bg, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, bg, OBJPROP_XDISTANCE, W / 2 - cw / 2);
+   ObjectSetInteger(0, bg, OBJPROP_YDISTANCE, H / 2 - ch / 2);
+   ObjectSetInteger(0, bg, OBJPROP_XSIZE, cw);
+   ObjectSetInteger(0, bg, OBJPROP_YSIZE, ch);
+   ObjectSetInteger(0, bg, OBJPROP_BGCOLOR, Mix(InpAccent, 0.10));
+   ObjectSetInteger(0, bg, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+   ObjectSetInteger(0, bg, OBJPROP_COLOR, InpAccent);
+   ObjectSetInteger(0, bg, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, bg, OBJPROP_HIDDEN, true);
    for(int i = 0; i < 3; i++)
      {
       string nm = PFX + "lock" + IntegerToString(i);
@@ -122,13 +136,14 @@ void LicLockScreen()
       ObjectSetInteger(0, nm, OBJPROP_CORNER, CORNER_LEFT_UPPER);
       ObjectSetInteger(0, nm, OBJPROP_ANCHOR, ANCHOR_CENTER);
       ObjectSetInteger(0, nm, OBJPROP_XDISTANCE, W / 2);
-      ObjectSetInteger(0, nm, OBJPROP_YDISTANCE, H / 2 + (i - 1) * (InpFontSize * 3));
+      ObjectSetInteger(0, nm, OBJPROP_YDISTANCE, H / 2 + (i - 1) * lh);
       ObjectSetString(0, nm, OBJPROP_TEXT, t[i]);
       ObjectSetString(0, nm, OBJPROP_FONT, i == 0 ? InpFont + " Semibold" : InpFont);
-      ObjectSetInteger(0, nm, OBJPROP_FONTSIZE, i == 0 ? InpFontSize + 3 : InpFontSize + 1);
-      ObjectSetInteger(0, nm, OBJPROP_COLOR, i == 0 ? InpAccent : InpText);
+      ObjectSetInteger(0, nm, OBJPROP_FONTSIZE, i == 0 ? fs + 2 : fs);
+      ObjectSetInteger(0, nm, OBJPROP_COLOR, i == 0 ? InpAccent : TC());   // TC(): dark text on light charts
       ObjectSetInteger(0, nm, OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, nm, OBJPROP_HIDDEN, true);
+      ObjectSetInteger(0, nm, OBJPROP_ZORDER, 101);
      }
    ChartRedraw();
   }
