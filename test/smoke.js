@@ -269,6 +269,24 @@ function client(base) {
     r = await bob.get('/journal');
     assert.match(r.text, /<b>6 revenge trades<\/b>/);
     assert.match(r.text, /Last 90 days · 13 trades/);
+    assert.match(r.text, /Edge score/);
+    assert.match(r.text, /href="\/journal\/insights"/);
+    // full Insights page: score, focus, leaks with a Fix line, charts, prop firm guard per account
+    r = await bob.get('/journal/insights');
+    assert.match(r.text, /<b>6 revenge trades<\/b>/);
+    assert.match(r.text, /This week's focus/);
+    assert.match(r.text, /class="fix"/);
+    assert.match(r.text, /Equity and drawdown/);
+    assert.match(r.text, /Pick one account above/);
+    r = await bob.get('/journal/insights?account=1001&days=all');
+    assert.match(r.text, /All time/);
+    assert.match(r.text, /Prop firm guard/);
+    r = await bob.post('/journal/insights/limits', { account: '1001', daily: '5', max: '10', target: '8', start: '10000' });
+    assert.match(r.text, /Prop firm limits saved/);
+    assert.match(r.text, /Worst day <b>−[\d.]+%<\/b>/);
+    assert.match(r.text, /Set KATANA&#39;s daily loss limit to 3%/);
+    r = await eve.post('/journal/insights/limits', { account: '1001', daily: '1' });
+    assert.doesNotMatch(r.text, /Prop firm limits saved/);
     for (let i = 0; i < 6; i++) for (const p of ['L', 'R']) assert.ok(db.prepare("DELETE FROM journal_trades WHERE position_id = ?").run(p + i).changes);
     // stop moved to break-even before the EA saw it: no fake R, and the trader can type the real stop
     const be = { position_id: 'BE1', symbol: 'XAUUSD', side: 'BUY', lots: 0.1, entry: 3944.16, exit: 3948.03, sl: 3944.37, tp: 3964.62, digits: 2,

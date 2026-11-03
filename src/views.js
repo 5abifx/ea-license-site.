@@ -113,7 +113,7 @@ function appShell(req, u, flashHtml, body, title) {
   </div>
   <nav class="side-nav" aria-label="Members menu">
     ${group('Main menu', `${item('/dashboard', 'eas', 'My EAs')}
-      ${req.hasJournal ? item('/journal', 'journal', 'Journal') : ''}`)}
+      ${req.hasJournal ? item('/journal', 'journal', 'Journal', on('/journal') && !on('/journal/insights')) + item('/journal/insights', 'insights', 'Insights') : ''}`)}
     ${group('Account', `${item('/pricing', 'plans', 'Plans')}
       ${u.google_sub ? '' : item('/password', 'lock', 'Password')}`)}
     ${u.is_admin ? group('Owner', `${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas'))}${item('/admin/eas', 'upload', 'EAs')}`) : ''}

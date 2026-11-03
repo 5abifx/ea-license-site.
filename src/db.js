@@ -94,6 +94,10 @@ if (!userCols.includes('ref_code')) { db.exec('ALTER TABLE users ADD COLUMN ref_
 if (!userCols.includes('referred_by')) db.exec('ALTER TABLE users ADD COLUMN referred_by INTEGER');                 // user id of the referrer
 if (!userCols.includes('ref_rewarded')) db.exec('ALTER TABLE users ADD COLUMN ref_rewarded INTEGER NOT NULL DEFAULT 0'); // 1 = first payment done, referrer rewarded
 
+// Prop firm rules per account for the Insights page (percent of the start balance; start balance optional)
+const accCols = db.prepare('PRAGMA table_info(accounts)').all().map((c) => c.name);
+for (const c of ['prop_daily', 'prop_max', 'prop_target', 'prop_start']) if (!accCols.includes(c)) db.exec(`ALTER TABLE accounts ADD COLUMN ${c} REAL`);
+
 // Journal: 1 = the trader typed the original stop-loss on the trade page, so EA re-sends keep it
 const jCols = db.prepare('PRAGMA table_info(journal_trades)').all().map((c) => c.name);
 if (!jCols.includes('sl_edited')) db.exec('ALTER TABLE journal_trades ADD COLUMN sl_edited INTEGER NOT NULL DEFAULT 0');
