@@ -12,7 +12,7 @@
 //|  Private build: distribute the compiled .ex5 only.               |
 //+------------------------------------------------------------------+
 #property copyright   "5ABI FX"
-#property version     "1.00"
+#property version     "1.01"
 #property description "5ABI FX · Compass EA: trades the auction plan"
 
 #define EA_CODE        "BOT"                 // must match the licence code in Admin > EAs
@@ -77,7 +77,7 @@ input double   InpDailyLossBuffer = 80.0;            // Stop at this % of each l
 input bool     InpCloseAtLimit    = true;            // Close open trades when a limit is reached
 
 input group "Time and news"
-input int      InpStartHour       = 1;               // No entries before (server hour)
+input int      InpStartHour       = 9;               // No entries before (server hour, 9 = London open on GMT+2/3 servers)
 input int      InpEndHour         = 21;              // No entries from (server hour)
 input int      InpFridayEndHour   = 18;              // Friday: no entries from (0 = off)
 input bool     InpNewsFilter      = true;            // Pause for high-impact news (MT5 calendar)

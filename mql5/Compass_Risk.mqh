@@ -42,14 +42,24 @@ double LotsFor(double entry, double stop, double &riskMoney)
   {
    double eq = AccountInfoDouble(ACCOUNT_EQUITY);
    riskMoney = eq * InpRiskPct / 100.0;
-   double ts = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
-   double tv = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE_LOSS);
-   if(tv <= 0)
-      tv = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
-   if(ts <= 0 || tv <= 0)
-      return 0;
-   double dist = MathAbs(entry - stop) + (double)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD) * _Point;
-   double perLot = dist / ts * tv + InpCommissionPerLot;
+   // Ask the terminal what 1.00 lot loses from entry to stop (plus the spread).
+   // Tick value alone is wrong on some brokers' gold (it gave lots 10x too big).
+   double spread = (double)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD) * _Point;
+   bool isLong = stop < entry;
+   double exitPx = isLong ? stop - spread : stop + spread;
+   double pl = 0;
+   double perLot = 0;
+   if(OrderCalcProfit(isLong ? ORDER_TYPE_BUY : ORDER_TYPE_SELL, _Symbol, 1.0, entry, exitPx, pl) && pl < 0)
+      perLot = -pl;
+   else
+     {
+      double ts = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+      double tv = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+      if(ts <= 0 || tv <= 0)
+         return 0;
+      perLot = (MathAbs(entry - stop) + spread) / ts * tv;
+     }
+   perLot += InpCommissionPerLot;
    if(perLot <= 0)
       return 0;
    double lots = riskMoney / perLot;
