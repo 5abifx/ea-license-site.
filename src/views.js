@@ -124,11 +124,12 @@ function appShell(req, u, flashHtml, body, title) {
   </nav>
 </aside>
 <div class="app-main">
-  <div class="app-top"><span class="crumb"><a href="/dashboard">Home</a><i>›</i><b>${esc(title)}</b></span>${u.name ? `<span class="who">${esc(u.name)}</span>` : ''}</div>
+  <div class="app-top"><span class="crumb"><a href="/dashboard">Home</a><i>›</i><b>${esc(title)}</b></span>${u.name ? `<span class="who priv-hide">${esc(u.name)}</span>` : ''}</div>
   <main class="app-body">${flashHtml}${body}</main>
   <footer class="app-foot"><span class="foot-links"><a href="/faq">FAQ</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></span><span class="muted">${RISK}</span></footer>
 </div>
-</div>`;
+</div>
+<script src="/privacy.js"></script>`;
 }
 
 // split sign-in / sign-up screen: brand pitch on the left, the form on the right

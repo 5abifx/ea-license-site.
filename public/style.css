@@ -658,3 +658,19 @@ main.wide { padding-bottom: 48px; }
   .dash-eas .ea-list .ea { flex-direction: row; align-items: center; padding: 12px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; }
   .dash-eas .ea-list .ea:last-child { border-bottom: 0; }
 }
+
+/* "Hide private info" (journal screenshots) */
+.page-head { margin-bottom: 4px; } .page-head h1 { margin: 8px 0; }
+.priv-mask { display: none; }
+body.private .priv-real { display: none; }
+body.private .priv-mask { display: inline; }
+body.private .priv-hide, body.private .plan-box { display: none !important; }
+.priv-toggle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+details.connect > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+details.connect > summary::-webkit-details-marker { display: none; }
+details.connect > summary h2 { margin: 0; }
+details.connect > summary h2::before { content: '▸'; display: inline-block; width: 16px; color: var(--muted); transition: transform .15s; }
+details.connect[open] > summary h2::before { transform: rotate(90deg); }
+details.connect[open] > summary { margin-bottom: 14px; }
+.keybox { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.keybox code.block { flex: 1 1 260px; margin: 0; }
