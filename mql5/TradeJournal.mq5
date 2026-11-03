@@ -8,7 +8,7 @@
 //| symbols and all EAs on that account.                             |
 //+------------------------------------------------------------------+
 #property copyright "5ABI.FX"
-#property version   "1.20"
+#property version   "1.21"
 #property description "Trade Journal: logs closed trades, partials and candles to your journal."
 
 #define EA_CODE        "JOURNAL"                  // must match the license code in Admin > EAs
@@ -427,7 +427,8 @@ void UpdatePanel()
            "License: ", LicenseIsValid() ? "OK" : "not active", "\n",
            "Today: ", trades, " closes, ", DoubleToString(pnl, 2), " ", AccountInfoString(ACCOUNT_CURRENCY), "\n",
            "Waiting to send: ", ArraySize(g_queue), "\n",
-           "Last sync: ", g_lastSync);
+           "Last sync: ", g_lastSync, "\n",
+           "Indicators: ", g_relayStatus);
   }
 
 //--- events ----------------------------------------------------------------

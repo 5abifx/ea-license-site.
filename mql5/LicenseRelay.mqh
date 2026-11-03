@@ -19,7 +19,8 @@
 #define RELAY_SALT "5abi.fx-relay-6271"
 string   RELAY_CODES[] = { "COMPASS" };   // licence codes of the indicators (Admin > EAs)
 datetime g_relayNext   = 0;
-string   g_relayStatus = "";
+string   g_relayStatus = "checking...";
+bool     g_relayAllOk  = false;
 
 //--- the same signature the indicators compute
 double RelaySign(const string code, const long login, const double at)
@@ -57,7 +58,8 @@ bool RelayCheckAll()
    long login = AccountInfoInteger(ACCOUNT_LOGIN);
    if(login <= 0 || MQLInfoInteger(MQL_TESTER)) return false;
    bool reached = true;
-   g_relayStatus = "";
+   g_relayAllOk = true;
+   string st = "";
    for(int i = 0; i < ArraySize(RELAY_CODES); i++)
      {
       string code = RELAY_CODES[i];
@@ -75,17 +77,20 @@ bool RelayCheckAll()
         }
       else
          reached = false;            // keep the last note: the indicator allows a grace period
-      g_relayStatus += (g_relayStatus == "" ? "" : ", ") + code + (r == 1 ? " OK" : r == 0 ? " not active" : " not checked");
+      if(r != 1) g_relayAllOk = false;
+      st += (st == "" ? "" : ", ") + code + (r == 1 ? " unlocked" : r == 0 ? " not active for this account" : " site not reachable");
      }
+   g_relayStatus = st;
    return reached;
   }
 
-//--- call from OnTimer: checks every hour, every minute while the site is unreachable
+//--- call from OnTimer: every hour once unlocked, every 2 minutes while not (so a newly
+//--- added account or product unlocks quickly), every minute while the site is unreachable
 void RelayOnTimer()
   {
    if(TimeLocal() < g_relayNext) return;
    bool ok = RelayCheckAll();
-   g_relayNext = TimeLocal() + (ok ? 3600 : 60);
+   g_relayNext = TimeLocal() + (!ok ? 60 : g_relayAllOk ? 3600 : 120);
   }
 
 #endif
