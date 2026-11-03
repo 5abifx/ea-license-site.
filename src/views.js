@@ -19,7 +19,31 @@ function fmtDate(s) {
 function brandMark() {
   const dot = BRAND.lastIndexOf('.');
   const word = dot > 0 ? `${esc(BRAND.slice(0, dot))}<b>${esc(BRAND.slice(dot))}</b>` : esc(BRAND);
-  return `<span class="mark" aria-hidden="true"></span><span>${word}</span>`;
+  return `<img class="mark" src="/logo.png" alt="" width="34" height="21"><span>${word}</span>`;
+}
+
+// small stroke icons for the members menu
+const ICONS = {
+  eas: '<path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/>',
+  journal: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  insights: '<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
+  plans: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
+  gift: '<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7C10 3 7 3 7 5s5 2 5 2 5 0 5-2-3-2-5 2"/>',
+  lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
+  shield: '<path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/>',
+  upload: '<path d="M12 21V9m0 0l-5 5m5-5l5 5M4 3h16"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 2-2.5 2-2.5 4M12 17h.01"/>',
+  out: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>',
+};
+const icon = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
+
+// plan box at the top of the members menu
+function planBox(u) {
+  const expired = u.expires_at && new Date(u.expires_at + 'Z') < new Date();
+  const plan = require('./plans').getPlan(u.plan);
+  const name = u.is_admin && !u.plan ? 'Owner' : u.trial ? 'Free trial' : plan ? `${plan.name} · ${u.billing === 'annual' ? 'annual' : 'monthly'}` : 'Member';
+  const state = u.status === 'pending' ? ['warn', 'Waiting'] : expired ? ['bad', 'Expired'] : ['ok', 'Active'];
+  return `<a class="plan-box" href="/pricing"><span>Plan</span><b>${esc(name)}</b><i class="${state[0]}">${state[1]}</i></a>`;
 }
 
 // opts.wide: full-width main for the landing page (sections bring their own .wrap)
@@ -56,21 +80,55 @@ function layout(req, title, body, opts = {}) {
 <meta property="og:image" content="${esc(origin)}/og.png">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
 <link rel="stylesheet" href="/style.css">
 </head><body>
-<header><div class="wrap bar"><a class="brand" href="/">${brandMark()}${pill}</a><nav>${nav}</nav></div></header>
+${u && !opts.wide ? appShell(req, u, flashHtml, body, title) : `<header><div class="wrap bar"><a class="brand" href="/">${brandMark()}${pill}</a><nav>${nav}</nav></div></header>
 ${opts.wide
     ? `<main class="wide">${flashHtml ? `<div class="wrap">${flashHtml}</div>` : ''}${body}</main>`
     : `<main class="wrap">${flashHtml}${body}</main>`}
 <footer><div class="wrap foot">
 <span class="brand">${brandMark()}</span>
 <span class="foot-links"><a href="/faq">FAQ</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></span>
-<span class="muted">Trading forex and CFDs carries a high level of risk and may not be suitable for every investor. Past performance does not guarantee future results.</span>
-</div></footer>
+<span class="muted">${RISK}</span>
+</div></footer>`}
 </body></html>`;
+}
+
+const RISK = 'Trading forex and CFDs carries a high level of risk and may not be suitable for every investor. Past performance does not guarantee future results.';
+
+// signed-in pages: side menu on the left (a top bar on phones), the page fills the rest of the screen
+function appShell(req, u, flashHtml, body, title) {
+  const on = (href) => req.path === href || req.path.startsWith(href + '/');
+  const item = (href, ic, text, active = on(href)) => `<a href="${href}"${active ? ' class="on" aria-current="page"' : ''}>${icon(ic)}<span>${text}</span></a>`;
+  const group = (label, items) => (items.trim() ? `<div class="side-group"><div class="side-label">${label}</div>${items}</div>` : '');
+  const adminPage = req.path.startsWith('/admin');
+  return `<div class="app">
+<aside class="side">
+  <div class="side-top">
+    <a class="brand" href="/dashboard">${brandMark()}</a>
+    ${planBox(u)}
+  </div>
+  <nav class="side-nav" aria-label="Members menu">
+    ${group('Main menu', `${item('/dashboard', 'eas', 'My EAs')}
+      ${req.hasJournal ? item('/journal', 'journal', 'Journal') : ''}`)}
+    ${group('Account', `${item('/pricing', 'plans', 'Plans')}
+      ${u.google_sub ? '' : item('/password', 'lock', 'Password')}`)}
+    ${u.is_admin ? group('Owner', `${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas'))}${item('/admin/eas', 'upload', 'EAs')}`) : ''}
+    <div class="side-group side-end">
+      ${item('/faq', 'help', 'Help &amp; FAQ')}
+      <form method="post" action="/logout"><button class="link">${icon('out')}<span>Sign out</span></button></form>
+    </div>
+  </nav>
+</aside>
+<div class="app-main">
+  <div class="app-top"><span class="crumb"><a href="/dashboard">Home</a><i>›</i><b>${esc(title)}</b></span>${u.name ? `<span class="who">${esc(u.name)}</span>` : ''}</div>
+  <main class="app-body">${flashHtml}${body}</main>
+  <footer class="app-foot"><span class="foot-links"><a href="/faq">FAQ</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></span><span class="muted">${RISK}</span></footer>
+</div>
+</div>`;
 }
 
 // split sign-in / sign-up screen: brand pitch on the left, the form on the right
