@@ -7,7 +7,7 @@
 //|  MT5 (indicators cannot reach the website themselves).          |
 //+------------------------------------------------------------------+
 #property copyright   "5ABI FX"
-#property version     "1.12"
+#property version     "1.21"
 #property description "5ABI FX · Auction Compass"
 #property indicator_chart_window
 #property indicator_buffers 0
@@ -19,6 +19,12 @@ enum EStripPos
    STRIP_TOP_LEFT      = 1, // Top left
    STRIP_BOTTOM_LEFT   = 2, // Bottom left
    STRIP_BOTTOM_CENTER = 3  // Bottom center
+  };
+
+enum EExtend
+  {
+   EXT_WEEK = 0, // This week only
+   EXT_ALL  = 1  // All shown sessions
   };
 
 input group "Profiles"
@@ -33,10 +39,18 @@ input bool    InpShowNaked         = true;       // Show naked POCs
 input int     InpNakedMax          = 6;          // Max naked POCs
 input bool    InpShowShape         = true;       // Show profile shape letter
 input bool    InpShowPoor          = true;       // Show poor highs / lows
+input EExtend InpExtend            = EXT_WEEK;   // Extend naked POC / VAH / VAL / poor high-low until grabbed
 input bool    InpShowZones         = true;       // Show business zones
 input double  InpZoneTol           = 12.0;       // Zone tolerance (% of prev VA width)
 input int     InpTPOMins           = 30;         // TPO period (minutes)
 input int     InpAcceptMins        = 30;         // Acceptance time (minutes)
+
+input group "Market profile marks (symbols only, hover for details)"
+input bool    InpShowSingles       = true;       // Single prints (orange bar)
+input bool    InpShowTails         = true;       // Strong tails (fading teal / red bar)
+input bool    InpShowTpoPoc        = true;       // TPO POC (gold diamond, only when it differs from the volume POC)
+input int     InpMinRun            = 2;          // Rows needed for a single-print run / tail
+input bool    InpShowLegend        = true;       // Small (i) legend in the bottom-right corner
 
 input group "Weekly profile (docked right)"
 input bool    InpShowWeek          = true;       // Show weekly profile
@@ -181,6 +195,7 @@ public:
    int               tpo[];
    int               n, pocI, upI, dnI;
    double            poc, vah, val;
+   int               tPocI, tailHi, tailLo;   // TPO POC row; tail length (rows) at the top / bottom
    string            shape;
    bool              poorHi, poorLo, ok;
                      CProf(void) { ok = false; n = 0; shape = ""; }
@@ -293,6 +308,33 @@ void Txt(string nm, datetime t, double p, string s, color c, ENUM_ANCHOR_POINT a
    ObjectSetInteger(0, nm, OBJPROP_FONTSIZE, InpFontSize);
    ObjectSetInteger(0, nm, OBJPROP_COLOR, c);
    ObjectSetInteger(0, nm, OBJPROP_ANCHOR, a);
+  }
+
+// Thin vertical bar at a fixed pixel width (marks beside a profile)
+void VBar(string nm, datetime t, double p1, double p2, color c, int w, string tip)
+  {
+   if(ObjectFind(0, nm) < 0)
+     {
+      ObjectCreate(0, nm, OBJ_TREND, 0, t, p1, t, p2);
+      Common(nm, false);
+      ObjectSetInteger(0, nm, OBJPROP_RAY_LEFT, false);
+      ObjectSetInteger(0, nm, OBJPROP_RAY_RIGHT, false);
+     }
+   else
+     {
+      ObjectMove(0, nm, 0, t, p1);
+      ObjectMove(0, nm, 1, t, p2);
+     }
+   ObjectSetInteger(0, nm, OBJPROP_COLOR, c);
+   ObjectSetInteger(0, nm, OBJPROP_WIDTH, w);
+   ObjectSetInteger(0, nm, OBJPROP_STYLE, STYLE_SOLID);
+   ObjectSetString(0, nm, OBJPROP_TOOLTIP, tip);
+  }
+
+void Tip(string nm, string tip)
+  {
+   if(ObjectFind(0, nm) >= 0)
+      ObjectSetString(0, nm, OBJPROP_TOOLTIP, tip);
   }
 
 void PxRect(string nm, int x, int y, int w, int h, color c)
@@ -449,6 +491,25 @@ bool BuildFrom(CProf &p, const MqlRates &r[], int c, datetime t0)
    p.shape  = (span > 0 && (double)sing / span >= 0.20) ? "T" : pos >= 0.62 ? "P" : pos <= 0.38 ? "b" : "D";
    p.poorHi = p.tpo[p.n - 1] >= 2;
    p.poorLo = p.tpo[0] >= 2;
+
+   // TPO POC: most TPO periods (ties go to the row nearest the middle)
+   p.tPocI = p.pocI;
+   int tmx = -1;
+   for(int k = 0; k < p.n; k++)
+      if(p.tpo[k] > tmx || (p.tpo[k] == tmx && MathAbs(k - mid) < MathAbs(p.tPocI - mid)))
+        {
+         tmx = p.tpo[k];
+         p.tPocI = k;
+        }
+   // Tails: single-print rows running out to the extreme
+   p.tailHi = 0;
+   for(int k = p.n - 1; k >= 0 && p.tpo[k] == 1; k--)
+      p.tailHi++;
+   p.tailLo = 0;
+   for(int k = 0; k < p.n && p.tpo[k] == 1; k++)
+      p.tailLo++;
+   if(p.tailHi >= p.n || p.tailLo >= p.n)
+      p.tailHi = p.tailLo = 0;           // one-period session: no tails
    p.ok = true;
    return true;
   }
@@ -502,6 +563,8 @@ void DrawProfile(CProf &p, string tag, bool dev)
       Rect(nm, p.t0, p.lo + k * p.step, (datetime)(p.t0 + w), p.lo + (k + 1) * p.step, inVA ? cIn : cOut);
      }
    datetime t2 = (datetime)(p.t0 + (long)(span * InpWidthPct / 100.0));
+   if(dev)   // today's POC / VAH / VAL follow the live candle instead of stopping mid-day
+      t2 = (datetime)MathMax((double)t2, (double)(TimeCurrent() + 3 * PeriodSeconds(_Period)));
    Seg(PFX + tag + "poc", p.t0, t2, p.poc, InpPoc, STYLE_SOLID, dev ? 2 : 1, false);
    if(InpShowVA)
      {
@@ -511,6 +574,67 @@ void DrawProfile(CProf &p, string tag, bool dev)
      }
    if(InpShowShape)
       Txt(PFX + tag + "shp", p.t0, p.hi, p.shape, Mix(InpAccent, 0.85), ANCHOR_LEFT_LOWER);
+  }
+
+// Market profile marks beside a profile: single prints, tails, TPO POC.
+// hs / ls = highest / lowest traded since the session ended (filled marks are hidden).
+void DrawMarks(CProf &p, string tag, double hs, double ls)
+  {
+   ObjectsDeleteAll(0, PFX + tag + "m");
+   if(!p.ok)
+      return;
+   long bs = PeriodSeconds(_Period);
+   datetime tEdge = (datetime)(p.t0 - bs);       // tails + TPO POC, right at the profile edge
+   datetime tOut  = (datetime)(p.t0 - 2 * bs);   // single prints, set out from the profile
+   int run = IMax(1, InpMinRun);
+
+   if(InpShowSingles)
+     {
+      // single-print runs inside the profile (between the first / last rows with 2+ TPOs)
+      int fb = p.tailLo, ft = p.n - 1 - p.tailHi, j = 0;
+      int k = fb;
+      while(k <= ft)
+        {
+         if(p.tpo[k] != 1)
+           { k++; continue; }
+         int a = k;
+         while(k <= ft && p.tpo[k] == 1)
+            k++;
+         int b = k - 1;
+         double pLo = p.lo + a * p.step, pHi = p.lo + (b + 1) * p.step;
+         bool filled = hs >= pHi && ls <= pLo;     // traded through the whole run since
+         if(b - a + 1 >= run && !filled)
+            VBar(PFX + tag + "ms" + IntegerToString(j++), tOut, pLo, pHi, InpAccent, 3,
+                 "Single prints " + Px(pLo) + " - " + Px(pHi));
+        }
+     }
+   if(InpShowTails)
+     {
+      // fading bar: strong at the profile, faint toward the extreme
+      if(p.tailHi >= run && hs <= p.hi)
+        {
+         double a = p.hi - p.tailHi * p.step, d = (p.hi - a) / 3.0;
+         string tip = "Selling tail " + Px(a) + " - " + Px(p.hi);
+         VBar(PFX + tag + "mth0", tEdge, a, a + d, InpBear, 3, tip);
+         VBar(PFX + tag + "mth1", tEdge, a + d, a + 2 * d, Mix(InpBear, 0.6), 3, tip);
+         VBar(PFX + tag + "mth2", tEdge, a + 2 * d, p.hi, Mix(InpBear, 0.3), 3, tip);
+        }
+      if(p.tailLo >= run && ls >= p.lo)
+        {
+         double a = p.lo + p.tailLo * p.step, d = (a - p.lo) / 3.0;
+         string tip = "Buying tail " + Px(p.lo) + " - " + Px(a);
+         VBar(PFX + tag + "mtl0", tEdge, a - d, a, InpBull, 3, tip);
+         VBar(PFX + tag + "mtl1", tEdge, a - 2 * d, a - d, Mix(InpBull, 0.6), 3, tip);
+         VBar(PFX + tag + "mtl2", tEdge, p.lo, a - 2 * d, Mix(InpBull, 0.3), 3, tip);
+        }
+     }
+   if(InpShowTpoPoc && MathAbs(p.tPocI - p.pocI) > 1)
+     {
+      double tp = p.lo + (p.tPocI + 0.5) * p.step;
+      string nm = PFX + tag + "mtp";
+      Txt(nm, tEdge, tp, ShortToString(0x25C6), InpPoc, ANCHOR_CENTER);
+      Tip(nm, "TPO POC " + Px(tp) + " (volume POC " + Px(p.poc) + ")");
+     }
   }
 
 struct SLev
@@ -576,38 +700,60 @@ void DrawZones()
      }
   }
 
+// Is this finished session inside the window whose untouched levels we extend?
+bool InScope(CProf &p)
+  {
+   if(InpExtend == EXT_ALL)
+      return true;
+   datetime w0 = iTime(_Symbol, PERIOD_W1, 0);
+   return w0 > 0 && p.t0 >= w0;
+  }
+
+// Untouched level: line from the end of its session to the live candle (gone once price grabs it)
+void OpenLvl(string nm, datetime t1, datetime tLive, double px, color c, ENUM_LINE_STYLE st, string tip)
+  {
+   Seg(nm, t1, tLive, px, c, st, 1, false);
+   Tip(nm, tip);
+  }
+
 void DrawNaked()
   {
    ObjectsDeleteAll(0, PFX + "n");
    ArrayResize(g_nk, 0);
-   color cn = Mix(InpPoc, 0.65), cp = Mix(InpBear, 0.6);
+   color cn = Mix(InpPoc, 0.65), cp = Mix(InpBear, 0.32), cv = Mix(TC(), 0.35);
+   datetime tLive = (datetime)(TimeCurrent() + 3 * PeriodSeconds(_Period));
    for(int i = 0; i < g_hn; i++)
      {
       if(!g_h[i].ok)
          continue;
       double hs, ls;
       RangeSince(g_h[i].tEnd, hs, ls);
+      bool scope = InScope(g_h[i]);
+      string id = IntegerToString(i);
       if(ArraySize(g_nk) < InpNakedMax && !(ls <= g_h[i].poc && hs >= g_h[i].poc))
         {
          int sz = ArraySize(g_nk);
          ArrayResize(g_nk, sz + 1);
          g_nk[sz] = g_h[i].poc;
-         if(InpShowNaked)
-            Seg(PFX + "n" + IntegerToString(i), g_h[i].tEnd, (datetime)(g_h[i].tEnd + 3600), g_h[i].poc, cn, STYLE_DASH, 1, true);
+         if(InpShowNaked && scope)
+            OpenLvl(PFX + "n" + id, g_h[i].tEnd, tLive, g_h[i].poc, cn, STYLE_DASH, "Naked POC " + Px(g_h[i].poc));
         }
-      if(InpShowPoor && i < 3)
+      if(InpShowVA && scope)
         {
-         if(g_h[i].poorHi && hs < g_h[i].hi)
-           {
-            Seg(PFX + "nph" + IntegerToString(i), g_h[i].tEnd, (datetime)(g_h[i].tEnd + 3600), g_h[i].hi, cp, STYLE_DOT, 1, true);
-            Txt(PFX + "npht" + IntegerToString(i), g_h[i].tEnd, g_h[i].hi, "poor high", cp, ANCHOR_LEFT_LOWER);
-           }
-         if(g_h[i].poorLo && ls > g_h[i].lo)
-           {
-            Seg(PFX + "npl" + IntegerToString(i), g_h[i].tEnd, (datetime)(g_h[i].tEnd + 3600), g_h[i].lo, cp, STYLE_DOT, 1, true);
-            Txt(PFX + "nplt" + IntegerToString(i), g_h[i].tEnd, g_h[i].lo, "poor low", cp, ANCHOR_LEFT_UPPER);
-           }
+         if(!(ls <= g_h[i].vah && hs >= g_h[i].vah))
+            OpenLvl(PFX + "nva" + id, g_h[i].tEnd, tLive, g_h[i].vah, cv, STYLE_DOT, "Untouched VAH " + Px(g_h[i].vah));
+         if(!(ls <= g_h[i].val && hs >= g_h[i].val))
+            OpenLvl(PFX + "nvl" + id, g_h[i].tEnd, tLive, g_h[i].val, cv, STYLE_DOT, "Untouched VAL " + Px(g_h[i].val));
         }
+      if(InpShowPoor && scope)
+        {
+         // faint ray from the profile to the live candle (gone once price grabs it)
+         if(g_h[i].poorHi && hs < g_h[i].hi)
+            OpenLvl(PFX + "nph" + id, g_h[i].t0, tLive, g_h[i].hi, cp, STYLE_SOLID, "Poor high " + Px(g_h[i].hi) + " (not yet repaired)");
+         if(g_h[i].poorLo && ls > g_h[i].lo)
+            OpenLvl(PFX + "npl" + id, g_h[i].t0, tLive, g_h[i].lo, cp, STYLE_SOLID, "Poor low " + Px(g_h[i].lo) + " (not yet repaired)");
+        }
+      DrawMarks(g_h[i], "h" + id + "_", hs, ls);
      }
   }
 
@@ -752,7 +898,10 @@ void LiveUpdate()
    if(g_tn <= 0)
       return;
    if(BuildFrom(g_dev, g_tr, g_tn, d0) && InpShowDev)
+     {
       DrawProfile(g_dev, "d_", true);
+      DrawMarks(g_dev, "d_", -DBL_MAX, DBL_MAX);
+     }
 
    // this week's profile + trail of this week's daily shapes
    datetime w0 = iTime(_Symbol, PERIOD_W1, 0);
@@ -935,6 +1084,20 @@ void DrawPixels()
    int W = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
    int H = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
    int lh = IMax(12, InpFontSize * 2);
+   // (i) legend: hover to see what each mark means
+   if(InpShowLegend)
+      PxText(PFX + "pxLg", W - 8, H - 6, ShortToString(0x24D8), Mix(TC(), 0.55), ANCHOR_RIGHT_LOWER, "Segoe UI Symbol",
+             "Market profile marks\n"
+             "Orange bar  = single prints (unfilled)\n"
+             "Teal fading bar = buying tail\n"
+             "Red fading bar  = selling tail\n"
+             "Gold diamond = TPO POC (differs from volume POC)\n"
+             "Faint red line = poor high / low (until grabbed)\n"
+             "Dashed gold line = naked POC (until grabbed)\n"
+             "Dotted line = untouched VAH / VAL (until grabbed)\n"
+             "Hover any mark for its prices");
+   else
+      ObjectDelete(0, PFX + "pxLg");
    int xR = W - InpWeekMarginPx;
    int xL = xR;
 
