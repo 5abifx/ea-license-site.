@@ -7,7 +7,7 @@
 //|  MT5 (indicators cannot reach the website themselves).          |
 //+------------------------------------------------------------------+
 #property copyright   "5ABI FX"
-#property version     "1.11"
+#property version     "1.12"
 #property description "5ABI FX · Auction Compass"
 #property indicator_chart_window
 #property indicator_buffers 0
@@ -111,12 +111,14 @@ void LicLockScreen()
    ObjectsDeleteAll(0, PFX);
    int W = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
    int H = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
-   string t[3];
+   // MT5 cuts a label after 63 characters, so every line stays short
+   string t[4];
    t[0] = "◆ " + InpBrand + " · Auction Compass is locked";
-   t[1] = "Included with every paid plan on " + LIC_SERVER + ". Add account " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + " on your dashboard";
-   t[2] = "and keep the Trade Journal EA running on any chart in this MT5";
+   t[1] = "Account " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + " is not unlocked yet";
+   t[2] = "Add it on your dashboard at " + LIC_SERVER + " (paid plan)";
+   t[3] = "and keep the Trade Journal EA running in this MT5";
    // a card behind the text, so it reads on dark and light charts and over candles
-   int fs = InpFontSize + 1, lh = fs * 3, cw = IMin(W - 20, fs * 62), ch = lh * 3 + fs * 2;
+   int fs = InpFontSize + 1, lh = fs * 3, cw = IMin(W - 20, fs * 62), ch = lh * 4 + fs * 2;
    string bg = PFX + "lockbg";
    ObjectCreate(0, bg, OBJ_RECTANGLE_LABEL, 0, 0, 0);
    ObjectSetInteger(0, bg, OBJPROP_CORNER, CORNER_LEFT_UPPER);
@@ -129,14 +131,14 @@ void LicLockScreen()
    ObjectSetInteger(0, bg, OBJPROP_COLOR, InpAccent);
    ObjectSetInteger(0, bg, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, bg, OBJPROP_HIDDEN, true);
-   for(int i = 0; i < 3; i++)
+   for(int i = 0; i < 4; i++)
      {
       string nm = PFX + "lock" + IntegerToString(i);
       ObjectCreate(0, nm, OBJ_LABEL, 0, 0, 0);
       ObjectSetInteger(0, nm, OBJPROP_CORNER, CORNER_LEFT_UPPER);
       ObjectSetInteger(0, nm, OBJPROP_ANCHOR, ANCHOR_CENTER);
       ObjectSetInteger(0, nm, OBJPROP_XDISTANCE, W / 2);
-      ObjectSetInteger(0, nm, OBJPROP_YDISTANCE, H / 2 + (i - 1) * lh);
+      ObjectSetInteger(0, nm, OBJPROP_YDISTANCE, H / 2 + (i * 2 - 3) * lh / 2);
       ObjectSetString(0, nm, OBJPROP_TEXT, t[i]);
       ObjectSetString(0, nm, OBJPROP_FONT, i == 0 ? InpFont + " Semibold" : InpFont);
       ObjectSetInteger(0, nm, OBJPROP_FONTSIZE, i == 0 ? fs + 2 : fs);
