@@ -1,6 +1,7 @@
 // Trade Journal: receives trades from the Trade Journal EA and shows them to the customer.
 const crypto = require('crypto');
-const { insights } = require('./insights');
+const { analyze, propGuard } = require('./insights');
+const insightsView = require('./insights-view');
 const express = require('express');
 const { esc, fmtDate } = require('./views');
 
@@ -91,11 +92,14 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   const money = (v, cur = '') => (v === null || v === undefined ? '-' : `${v < 0 ? '−' : '+'}${Math.abs(v).toFixed(2)}${cur ? ' ' + esc(cur) : ''}`);
   const cls = (v) => (v > 0 ? 'pos' : v < 0 ? 'neg' : '');
 
-  app.get('/journal', requireUser, requireJournal, (req, res) => {
-    const u = req.user;
-    const key = ensureKey(u);
+  // private text (account numbers, broker servers): hidden when "Hide private info" is on
+  const priv = (real, mask) => `<span class="priv"><span class="priv-real">${real}</span><span class="priv-mask">${mask}</span></span>`;
+  const acctLabel = (a) => priv(`${esc(a.broker || 'Account')} · ${esc(a.account_number)}`, `Account ••${esc(String(a.account_number).slice(-2))}`);
 
-    // accounts: live ones are still on My EAs; removed ones keep their trades in their own tab
+  // accounts: live ones are still on My EAs; removed ones keep their trades in their own tab.
+  // ?account= picks one; without it, all live accounts.
+  const scope = (req) => {
+    const u = req.user;
     const live = new Set(db.prepare('SELECT account_number FROM accounts WHERE user_id = ?').all(u.id).map((a) => a.account_number));
     const accts = db.prepare(`SELECT account_number, COUNT(*) AS n, SUM(net) AS net, MAX(broker) AS broker, MAX(currency) AS cur
         FROM journal_trades WHERE user_id = ? GROUP BY account_number ORDER BY MAX(close_time) DESC`).all(u.id);
@@ -107,6 +111,17 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const where = sel ? 'user_id = ? AND account_number = ?'
       : `user_id = ? AND account_number IN (${liveNums.map(() => '?').join(', ') || "''"})`;
     const args = sel ? [u.id, sel.account_number] : [u.id, ...liveNums];
+    return { accts, liveAccts, removedAccts, sel, where, args };
+  };
+  // columns the insights read
+  const INS_COLS = `account_number, symbol, side, lots, entry, exit, sl, tp, open_time, close_time, net, r, risk_pct,
+    balance_after, mfe, mae, candles, setup, emotion, mistakes`;
+
+  app.get('/journal', requireUser, requireJournal, (req, res) => {
+    const u = req.user;
+    const key = ensureKey(u);
+
+    const { accts, liveAccts, removedAccts, sel, where, args } = scope(req);
 
     // month shown: ?month=YYYY-MM, else the month of the latest trade
     const latest = db.prepare(`SELECT MAX(close_time) AS t FROM journal_trades WHERE ${where}`).get(...args).t;
@@ -163,9 +178,6 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       }).join('');
     }).join('');
 
-    // private text (account numbers, broker servers): hidden when "Hide private info" is on
-    const priv = (real, mask) => `<span class="priv"><span class="priv-real">${real}</span><span class="priv-mask">${mask}</span></span>`;
-    const acctLabel = (a) => priv(`${esc(a.broker || 'Account')} · ${esc(a.account_number)}`, `Account ••${esc(String(a.account_number).slice(-2))}`);
     // one hidden panel per trading day; the calendar shows the picked one
     const panels = dayKeys.map((d) => {
       const l = days[d], s = sum(l), wd = DOW[(new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7];
@@ -179,15 +191,14 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         </tbody></table></div>`;
     }).join('');
 
-    // insights over the last 90 days of the shown accounts
+    // insights strip: last 90 days of the shown accounts; the full page is /journal/insights
     const since = latest ? new Date(Date.parse(latest.slice(0, 10) + 'T00:00:00Z') - 89 * 864e5).toISOString().slice(0, 10) : '';
-    const ins = latest ? insights(db.prepare(`SELECT account_number, symbol, side, net, r, open_time, close_time
-        FROM journal_trades WHERE ${where} AND close_time >= ? ORDER BY close_time`).all(...args, since), { money: (v) => money(v, cur), esc }) : null;
+    const ins = latest ? analyze(db.prepare(`SELECT ${INS_COLS} FROM journal_trades WHERE ${where} AND close_time >= ? ORDER BY close_time`)
+      .all(...args, since), { money: (v) => money(v, cur), esc }) : null;
+    const insHref = `/journal/insights${sel ? '?account=' + encodeURIComponent(sel.account_number) : ''}`;
     const insightsHtml = !ins ? '' : `<section class="card insights">
       <div class="row between"><h2>Insights</h2><span class="muted small">${ins.locked ? '' : `Last 90 days · ${ins.count} trades${sel ? '' : liveAccts.length > 1 ? ' · all accounts' : ''}`}</span></div>
-      ${ins.locked ? `<p class="muted">Insights unlock after ${ins.need} closed trades. ${ins.have} so far.</p>`
-        : ins.items.length ? `<div class="ins-grid">${ins.items.map((i) => `<div class="ins ${i.tone}"><span class="ins-tag"><i></i>${esc(i.tag)}</span><p>${i.html}</p></div>`).join('')}</div>`
-        : '<p class="muted">No clear patterns yet. Keep journaling and check back.</p>'}
+      ${insightsView.stripHtml(ins, { money: (v) => money(v, cur), href: insHref })}
     </section>`;
 
     const chip = (a, label, sub, href, on) => `<a class="acct${a && a.removed ? ' removed' : ''}${on ? ' on' : ''}" href="${href}">
@@ -263,6 +274,63 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     db.prepare('UPDATE users SET journal_key = ? WHERE id = ?').run(crypto.randomBytes(16).toString('hex'), req.user.id);
     flash(req, 'ok', 'New journal key created. Paste it into the EA inputs.');
     res.redirect('/journal');
+  });
+
+  // ---------- full Insights page ----------
+  const PERIODS = { 30: 'Last 30 days', 90: 'Last 90 days', 365: 'Last 12 months', all: 'All time' };
+  app.get('/journal/insights', requireUser, requireJournal, (req, res) => {
+    const u = req.user;
+    const { accts, liveAccts, removedAccts, sel, where, args } = scope(req);
+    const cur = (sel ? sel.cur : liveAccts[0]?.cur) || '';
+    const m = (v) => money(v, cur);
+    const period = Object.keys(PERIODS).includes(String(req.query.days)) ? String(req.query.days) : '90';
+    const latest = db.prepare(`SELECT MAX(close_time) AS t FROM journal_trades WHERE ${where}`).get(...args).t;
+    const since = latest && period !== 'all'
+      ? new Date(Date.parse(latest.slice(0, 10) + 'T00:00:00Z') - (Number(period) - 1) * 864e5).toISOString().slice(0, 10) : '';
+    const rows = latest ? db.prepare(`SELECT ${INS_COLS} FROM journal_trades WHERE ${where}${since ? ' AND close_time >= ?' : ''} ORDER BY close_time`)
+      .all(...args, ...(since ? [since] : [])) : [];
+    const a = analyze(rows, { money: m, esc });
+
+    // prop firm guard: one live account, all its trades
+    let prop = '';
+    if (sel && !sel.removed) {
+      const acc = db.prepare('SELECT prop_daily, prop_max, prop_target, prop_start FROM accounts WHERE user_id = ? AND account_number = ?').get(u.id, sel.account_number);
+      const limits = { daily: acc.prop_daily, max: acc.prop_max, target: acc.prop_target, start: acc.prop_start };
+      const P = propGuard(db.prepare(`SELECT ${INS_COLS} FROM journal_trades WHERE user_id = ? AND account_number = ? ORDER BY close_time`)
+        .all(u.id, sel.account_number), limits, { money: m });
+      prop = insightsView.propHtml(P, sel.account_number, limits);
+    } else if (liveAccts.length) {
+      prop = `<section class="card prop"><h2>Prop firm guard</h2><p class="muted small">Pick one account above to type its prop firm rules (daily loss, max loss, profit target) and see how close you are to each.</p></section>`;
+    }
+
+    const qs = (o) => '?' + new URLSearchParams(Object.entries({ account: sel ? sel.account_number : '', days: period, ...o }).filter(([, v]) => v)).toString();
+    const chip = (a2, label, sub, href, on) => `<a class="acct${a2 && a2.removed ? ' removed' : ''}${on ? ' on' : ''}" href="${href}">
+      <small>${label}</small><b class="${cls(a2 ? a2.net : 0)}">${a2 ? money(a2.net, a2.cur) : ''}</b><small>${sub}</small></a>`;
+    const allNet = liveAccts.reduce((s, x) => s + (x.net || 0), 0), allN = liveAccts.reduce((s, x) => s + x.n, 0);
+
+    page(req, res, 'Insights', `
+    <div class="row between page-head"><h1>Insights</h1>
+      <button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers and your name, so you can screenshot this page">Hide private info</button></div>
+    ${accts.length ? `<div class="accts" role="navigation" aria-label="Accounts">
+      ${liveAccts.length > 1 || removedAccts.length ? `<a class="acct${sel ? '' : ' on'}" href="/journal/insights${qs({ account: '' })}"><small>All accounts</small><b class="${cls(allNet)}">${money(allNet, cur)}</b><small>${allN} trades</small></a>` : ''}
+      ${liveAccts.map((x) => chip(x, acctLabel(x), `${x.n} trades`, `/journal/insights${qs({ account: x.account_number })}`, sel === x || (!sel && liveAccts.length === 1 && !removedAccts.length))).join('')}
+      ${removedAccts.map((x) => chip(x, acctLabel(x), '<span class="tag">Removed</span>', `/journal/insights${qs({ account: x.account_number })}`, sel === x)).join('')}
+    </div>` : ''}
+    <div class="periods" role="navigation" aria-label="Period">${Object.entries(PERIODS).map(([k, l]) => `<a href="/journal/insights${qs({ days: k })}"${k === period ? ' class="on" aria-current="true"' : ''}>${l}</a>`).join('')}
+      ${a.locked ? '' : `<span class="muted small">${a.count} trades${sel ? '' : liveAccts.length > 1 ? ' · all accounts' : ''}</span>`}</div>
+    ${latest ? insightsView.fullHtml(a, { money: m, cur, prop }) : `<section class="card"><p class="muted">No trades yet. Connect the Trade Journal EA on the <a href="/journal">Journal</a> page; insights start after ${a.need} closed trades.</p></section>`}`);
+  });
+
+  // prop firm rules of one account (percent of the start balance)
+  app.post('/journal/insights/limits', requireUser, requireJournal, (req, res) => {
+    const num = cleanAccount(req.body.account);
+    const acc = num && db.prepare('SELECT id FROM accounts WHERE user_id = ? AND account_number = ?').get(req.user.id, num);
+    if (!acc) { flash(req, 'error', 'Pick one of your accounts first.'); return res.redirect('/journal/insights'); }
+    const p = (v, max) => { const x = Number(String(v ?? '').replace(',', '.').replace('%', '').trim()); return String(v ?? '').trim() && Number.isFinite(x) && x > 0 && x <= max ? x : null; };
+    db.prepare('UPDATE accounts SET prop_daily = ?, prop_max = ?, prop_target = ?, prop_start = ? WHERE id = ?')
+      .run(p(req.body.daily, 100), p(req.body.max, 100), p(req.body.target, 1000), p(req.body.start, 1e9), acc.id);
+    flash(req, 'ok', 'Prop firm limits saved.');
+    res.redirect(`/journal/insights?account=${encodeURIComponent(num)}`);
   });
 
   const getTrade = (req) => db.prepare('SELECT * FROM journal_trades WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
