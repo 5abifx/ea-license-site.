@@ -539,7 +539,7 @@ app.get('/dashboard', requireUser, (req, res) => {
     (until ${fmtDate(u.expires_at)} UTC). Pick a plan to keep trading after that.</div><a class="btn" href="/pricing">See plans</a></div>` : ''}
   ${u.expires_at && !expired && !u.trial ? `<p class="muted">${getPlan(u.plan) ? `${esc(getPlan(u.plan).name)} plan (${esc(BILLING[cleanBilling(u.billing)].label.toLowerCase())}) · ` : ''}License valid until ${fmtDate(u.expires_at)} (UTC) · <a href="/pricing">Plans</a></p>` : ''}
 
-  <section class="card">
+  <section class="card dash-eas">
     <h2>1. Download your EA</h2>
     ${eas.length ? `<div class="ea-list">${eas.map((e) => `
       <div class="ea">
@@ -551,6 +551,7 @@ app.get('/dashboard', requireUser, (req, res) => {
     : '<p class="muted">No EAs are assigned to your account yet.</p>'}
   </section>
 
+  <div class="dash-split">
   <section class="card">
     <h2>2. Add your MT5 account numbers <span class="tag">${accounts.length} / ${u.max_accounts}</span></h2>
     <p class="muted">The EA only runs on the account numbers listed here. Find the number in MT5 under File → Login to Trade Account, or at the top of the Navigator window.</p>
@@ -575,12 +576,15 @@ app.get('/dashboard', requireUser, (req, res) => {
     <p class="muted">Want the 5ABI.FX look on your charts? Download the chart template <a href="/templates/5ABI.FX.tpl" download>5ABI.FX.tpl</a> (or <a href="/templates/5ABI.FX%20Compass.tpl" download>with Auction Compass</a>), put it in <strong>File → Open Data Folder → MQL5 → Profiles → Templates</strong>, then right-click a chart → <strong>Templates</strong>.</p>
     <p class="muted">Prop firm account says <strong>"AutoTrading disabled by server"</strong>? <a href="/help/ea-blocked">Get a ready-to-send email for their support</a>.</p>
   </section>
+  </div>
+  <div class="dash-split">
   ${req.hasJournal ? `<section class="card">
     <h2>4. Trade Journal</h2>
     <p>Every trade you close is logged automatically and turned into share cards. <a href="/journal">Open your journal</a> to get your journal key and set up the Trade Journal EA.</p>
     ${eas.some((e) => PAID_ONLY.includes(String(e.code).toUpperCase())) && !u.trial ? '<p class="muted">Indicators like Auction Compass unlock by themselves while the Trade Journal EA runs on any chart in the same MT5. Put indicators in <strong>MQL5 → Indicators</strong>.</p>' : ''}
   </section>` : ''}
-  ${u.is_admin ? '' : refs.card(req, u)}`);
+  ${u.is_admin ? '' : refs.card(req, u)}
+  </div>`);
 });
 
 app.post('/accounts', requireUser, (req, res) => {
