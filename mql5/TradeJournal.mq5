@@ -8,13 +8,14 @@
 //| symbols and all EAs on that account.                             |
 //+------------------------------------------------------------------+
 #property copyright "5ABI.FX"
-#property version   "1.10"
+#property version   "1.20"
 #property description "Trade Journal: logs closed trades, partials and candles to your journal."
 
 #define EA_CODE        "JOURNAL"                  // must match the license code in Admin > EAs
 #define LICENSE_SERVER "https://5abifx.com"  // your website address, no trailing slash
 #define LICENSE_SALT   4471902
 #include "LicenseCheck.mqh"
+#include "LicenseRelay.mqh"     // also unlocks 5ABI.FX indicators (they cannot reach the site)
 
 input string          JournalKey     = "";          // Journal key (from your dashboard)
 input ENUM_TIMEFRAMES ChartTimeframe = PERIOD_M5;   // Candles saved with each trade
@@ -453,6 +454,7 @@ void OnDeinit(const int reason)
 void OnTimer()
   {
    LicenseOnTimer();
+   RelayOnTimer();
    RememberLevels();
    ProcessQueue();
    UpdatePanel();
