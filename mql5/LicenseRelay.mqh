@@ -6,8 +6,8 @@
 //| the site for each indicator code below and leaves a signed note  |
 //| (terminal global variables). The indicator only reads the note.  |
 //|                                                                  |
-//| Used by TradeJournal.mq5 and 5ABI_Licence.mq5. RELAY_SALT must   |
-//| be the same number as in the indicators.                         |
+//| Used by TradeJournal.mq5. RELAY_SALT must be the same text as in |
+//| the indicators.                                                  |
 //+------------------------------------------------------------------+
 #ifndef LICENSE_RELAY_MQH
 #define LICENSE_RELAY_MQH

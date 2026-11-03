@@ -107,6 +107,16 @@ function daysLeft(u) {
 function payButton(label) {
   return PAYMENT_URL ? `<a class="btn" href="${esc(PAYMENT_URL)}" target="_blank" rel="noopener">${esc(label)}</a>` : '';
 }
+// Tools that come with every paid plan but not with the free trial (e.g. the Auction Compass indicator)
+const PAID_ONLY = String(process.env.PAID_ONLY_EAS || 'COMPASS').split(',').map((c) => c.trim().toUpperCase()).filter(Boolean);
+const paidOnlyLocked = (u, e) => !!u.trial && PAID_ONLY.includes(String(e.code).toUpperCase());
+// Paid members (any plan, or the Trade Journal) get the paid-only tools without the admin assigning them
+function paidOnlyEas(u) {
+  if (u.trial || !PAID_ONLY.length) return [];
+  const paid = u.plan || db.prepare("SELECT 1 FROM user_eas ue JOIN eas e ON e.id = ue.ea_id WHERE ue.user_id = ? AND e.code = 'JOURNAL'").get(u.id);
+  return paid ? db.prepare(`SELECT * FROM eas WHERE active = 1 AND UPPER(code) IN (${PAID_ONLY.map(() => '?').join(', ')})`).all(...PAID_ONLY) : [];
+}
+
 function grantAllActiveEas(userId) {
   db.prepare(`INSERT OR IGNORE INTO user_eas (user_id, ea_id) SELECT ?, id FROM eas WHERE active = 1`).run(userId);
 }
@@ -516,6 +526,7 @@ app.get('/dashboard', requireUser, (req, res) => {
   }
   const eas = db.prepare(`SELECT e.* FROM eas e JOIN user_eas ue ON ue.ea_id = e.id
                           WHERE ue.user_id = ? AND e.active = 1 ORDER BY e.name`).all(u.id);
+  for (const x of paidOnlyEas(u)) if (!eas.some((e) => e.id === x.id)) eas.push(x);
   const accounts = db.prepare('SELECT * FROM accounts WHERE user_id = ? ORDER BY created_at').all(u.id);
   const full = accounts.length >= u.max_accounts;
   const expired = isExpired(u);
@@ -534,7 +545,8 @@ app.get('/dashboard', requireUser, (req, res) => {
       <div class="ea">
         <div><strong>${esc(e.name)}</strong> <span class="tag">v${esc(e.version)}</span>
         ${e.description ? `<p class="muted">${esc(e.description)}</p>` : ''}</div>
-        ${e.file_path ? `<a class="btn" href="/download/${e.id}">Download</a>` : '<span class="muted">Coming soon</span>'}
+        ${paidOnlyLocked(u, e) ? '<a class="btn secondary" href="/pricing">Included when you subscribe</a>'
+          : e.file_path ? `<a class="btn" href="/download/${e.id}">Download</a>` : '<span class="muted">Coming soon</span>'}
       </div>`).join('')}</div>`
     : '<p class="muted">No EAs are assigned to your account yet.</p>'}
   </section>
@@ -565,6 +577,7 @@ app.get('/dashboard', requireUser, (req, res) => {
   ${req.hasJournal ? `<section class="card">
     <h2>4. Trade Journal</h2>
     <p>Every trade you close is logged automatically and turned into share cards. <a href="/journal">Open your journal</a> to get your journal key and set up the Trade Journal EA.</p>
+    ${eas.some((e) => PAID_ONLY.includes(String(e.code).toUpperCase())) && !u.trial ? '<p class="muted">Indicators like Auction Compass unlock by themselves while the Trade Journal EA runs on any chart in the same MT5. Put indicators in <strong>MQL5 → Indicators</strong>.</p>' : ''}
   </section>` : ''}
   ${u.is_admin ? '' : refs.card(req, u)}`);
 });
@@ -599,8 +612,9 @@ app.post('/accounts/:id/delete', requireUser, (req, res) => {
 app.get('/download/:id', requireUser, (req, res) => {
   const u = req.user;
   const e = db.prepare(`SELECT e.* FROM eas e JOIN user_eas ue ON ue.ea_id = e.id
-                        WHERE e.id = ? AND ue.user_id = ? AND e.active = 1`).get(req.params.id, u.id);
-  if (u.status !== 'active' || !e || !e.file_path) return res.status(404).send('Not found');
+                        WHERE e.id = ? AND ue.user_id = ? AND e.active = 1`).get(req.params.id, u.id)
+    || paidOnlyEas(u).find((x) => String(x.id) === String(req.params.id));
+  if (u.status !== 'active' || !e || !e.file_path || paidOnlyLocked(u, e)) return res.status(404).send('Not found');
   res.download(path.join(FILES_DIR, e.file_path), e.file_name);
 });
 
@@ -616,12 +630,24 @@ app.get('/api/check', (req, res) => {
   const ea = db.prepare('SELECT * FROM eas WHERE code = ?').get(code);
   if (!ea || !ea.active) return reply(false, 'Unknown or inactive EA');
 
-  const rows = db.prepare(`
-    SELECT a.id AS account_id, u.* FROM accounts a
-    JOIN users u ON u.id = a.user_id
-    JOIN user_eas ue ON ue.user_id = u.id AND ue.ea_id = ?
-    WHERE a.account_number = ? AND u.status = 'active'`).all(ea.id, num);
-  const ok = rows.find((u) => !isExpired(u));
+  // A paid-only tool (Auction Compass) comes with every paid plan (they all include the Trade Journal),
+  // so it works as soon as the account is added, without being assigned one by one.
+  const paidOnly = PAID_ONLY.includes(String(ea.code).toUpperCase());
+  const rows = paidOnly
+    ? db.prepare(`
+      SELECT a.id AS account_id, u.* FROM accounts a
+      JOIN users u ON u.id = a.user_id
+      WHERE a.account_number = ? AND u.status = 'active' AND (u.plan != '' OR EXISTS (
+        SELECT 1 FROM user_eas ue JOIN eas e ON e.id = ue.ea_id WHERE ue.user_id = u.id AND (e.id = ? OR e.code = 'JOURNAL')))`).all(num, ea.id)
+    : db.prepare(`
+      SELECT a.id AS account_id, u.* FROM accounts a
+      JOIN users u ON u.id = a.user_id
+      JOIN user_eas ue ON ue.user_id = u.id AND ue.ea_id = ?
+      WHERE a.account_number = ? AND u.status = 'active'`).all(ea.id, num);
+  const ok = rows.find((u) => !isExpired(u) && !(paidOnly && u.trial));
+  if (!ok && paidOnly && rows.some((u) => !isExpired(u))) {
+    return reply(false, 'Included with every paid plan, not with the free trial', { latest_version: ea.version });
+  }
   if (!ok) {
     return reply(false, rows.length ? 'License expired' : 'Account not registered for this EA',
       { latest_version: ea.version });

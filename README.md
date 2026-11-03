@@ -108,13 +108,13 @@ The journal API (`POST /api/journal/trades`) only accepts trades with the custom
 
 ## Indicators (Auction Compass)
 
-MT5 indicators are not allowed to call `WebRequest`, so they cannot ask the site themselves.
+Auction Compass comes with every paid plan, but not with the free trial. MT5 indicators are not allowed to call `WebRequest`, so they cannot ask the site themselves.
 
-1. In **Admin > EAs**, add the indicator with the licence code **`COMPASS`** and upload its compiled `.ex5`. Members copy it into `MQL5\Indicators` instead of `MQL5\Experts`.
-2. An EA that includes `mql5/LicenseRelay.mqh` checks every indicator code in `RELAY_CODES` each hour, then leaves a signed note in the terminal's global variables. The Trade Journal EA does this, and so does the tiny `mql5/5ABI_Licence.mq5` EA for members who don't run the journal.
-3. `mql5/5ABI_Auction_Compass.mq5` reads that note. It stays unlocked for 48 hours after the last successful check. With no valid note, it shows a lock message and draws nothing. Owner accounts in `LIC_OWNER` and the Strategy Tester are always unlocked.
+1. In **Admin > EAs**, add the indicator with the licence code **`COMPASS`** and upload its compiled `.ex5`. Members put it in `MQL5\Indicators`.
+2. `/api/check?ea=COMPASS` is valid for any paid, active member who has the Trade Journal (or COMPASS) and has registered the account. Trial members get "Included with every paid plan". Change the list with `PAID_ONLY_EAS` (default `COMPASS`).
+3. The Trade Journal EA (`LicenseRelay.mqh`) checks every code in `RELAY_CODES` each hour and leaves a signed note in the terminal's global variables. The indicator reads that note and stays unlocked for 48 hours after the last successful check. Owner accounts in `LIC_OWNER` and the Strategy Tester are always unlocked.
 
-`RELAY_SALT` must be the same in `LicenseRelay.mqh` and in each indicator. To add another indicator, give it its own code, add the code to `RELAY_CODES`, and copy the licence block from Auction Compass.
+`RELAY_SALT` must be the same in `LicenseRelay.mqh` and in each indicator.
 
 ## Daily use
 

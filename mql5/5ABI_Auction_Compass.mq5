@@ -3,8 +3,8 @@
 //|  Sierra-style session profiles, naked POCs, poor highs/lows,     |
 //|  business zones, docked weekly profile, auto bias + alerts.      |
 //|  Private build: distribute the compiled .ex5 only.               |
-//|  Licence: needs the Trade Journal EA or the 5ABI_Licence EA      |
-//|  running in the same MT5 (indicators cannot reach the website).  |
+//|  Licence: unlocks while the Trade Journal EA runs in the same    |
+//|  MT5 (indicators cannot reach the website themselves).          |
 //+------------------------------------------------------------------+
 #property copyright   "5ABI FX"
 #property version     "1.10"
@@ -70,8 +70,8 @@ input string  InpFont              = "Segoe UI";       // Font
 #define PFX "5ABI_"
 
 //+------------------------------------------------------------------+
-//| Licence: read the signed note left by the Trade Journal EA or the |
-//| 5ABI_Licence EA (see LicenseRelay.mqh). RELAY_SALT must match.    |
+//| Licence: read the signed note left by the Trade Journal EA       |
+//| (see LicenseRelay.mqh). RELAY_SALT must match.                   |
 //+------------------------------------------------------------------+
 #define LIC_CODE       "COMPASS"
 #define LIC_SERVER     "5abifx.com"
@@ -113,8 +113,8 @@ void LicLockScreen()
    int H = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
    string t[3];
    t[0] = "◆ " + InpBrand + " · Auction Compass is locked";
-   t[1] = "Account " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + ": add it on " + LIC_SERVER + " (Auction Compass)";
-   t[2] = "Then run the Trade Journal EA or the 5ABI_Licence EA on any chart in this MT5";
+   t[1] = "Included with every paid plan on " + LIC_SERVER + ". Add account " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + " on your dashboard";
+   t[2] = "and keep the Trade Journal EA running on any chart in this MT5";
    for(int i = 0; i < 3; i++)
      {
       string nm = PFX + "lock" + IntegerToString(i);

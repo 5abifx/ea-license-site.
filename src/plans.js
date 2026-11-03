@@ -3,8 +3,8 @@
 // `annual` is the per-month price when billed yearly (charged as annual × 12).
 const PLANS = [
   { id: 'journal', name: 'Journal', tagline: 'for traders who want to review',
-    monthly: 12, annual: 9, accounts: 1, eas: ['JOURNAL'],
-    features: ['Trade Journal EA', 'Calendar by day and account', 'Journal Insights', 'Share cards from real trades', '1 MT5 account'] },
+    monthly: 12, annual: 9, accounts: 1, eas: ['JOURNAL', 'COMPASS'],
+    features: ['Trade Journal EA', 'Auction Compass indicator', 'Calendar by day and account', 'Journal Insights', 'Share cards from real trades', '1 MT5 account'] },
   { id: 'katana', name: 'KATANA', tagline: 'for active traders', popular: true,
     monthly: 20, annual: 15, accounts: 3, eas: 'all',
     extrasTitle: 'Everything in Journal, plus',
