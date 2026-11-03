@@ -166,6 +166,7 @@ function client(base) {
     r = await anon.get('/help/ea-blocked');
     assert.strictEqual(r.status, 200);
     assert.match(r.text, /AutoTrading disabled by server/);
+    assert.match(r.text, /EA add-on/);
     r = await tia.get('/help/ea-blocked');
     assert.match(r.text, /<option value="7777" selected/);
     assert.match((await tia.get('/dashboard')).text, /help\/ea-blocked/);
