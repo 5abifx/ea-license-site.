@@ -746,8 +746,10 @@ app.get('/admin', requireAdmin, (req, res) => {
         <option value="student_off">Remove student</option>
         <option value="expiry">Set expiry date to</option>
         <option value="never">Never expire</option>
+        <option value="trial">Start a free trial of</option>
       </select>
       <input type="date" name="expires_at" aria-label="Expiry date">
+      <label class="row-inline"><input type="number" name="trial_days" value="${trialDays() || 15}" min="1" max="365" style="width:5em" aria-label="Trial days"> days (trial)</label>
       <button class="small secondary">Apply</button>
     </form>
     <table><thead><tr><th><input type="checkbox" aria-label="Tick all" onclick="document.querySelectorAll('input[form=bulk][name=ids]').forEach((c) => { c.checked = this.checked; })"></th><th>User</th><th>Status</th><th>EAs</th><th>Accounts</th><th>Expires</th><th></th></tr></thead><tbody>
@@ -804,6 +806,24 @@ app.post('/admin/users', requireAdmin, (req, res) => {
   res.redirect('/admin');
 });
 
+// Put an existing user on a free trial: active, every active EA, expires in `days` days from now.
+// Clears any paid plan. Their MT5 accounts are recorded as trial accounts, like a new sign-up's.
+const cleanTrialDays = (v) => Math.min(365, Math.max(1, Math.round(Number(v)) || trialDays() || 15));
+function startTrial(userId, days) {
+  const r = db.prepare(`UPDATE users SET trial = 1, status = 'active', plan = '', billing = '', plan_request = '',
+    expires_at = datetime('now', ?) WHERE id = ? AND is_admin = 0`).run(`+${days} days`, userId);
+  if (!r.changes) return 0;
+  grantAllActiveEas(userId);
+  db.prepare('INSERT OR IGNORE INTO trial_accounts (account_number, user_id) SELECT account_number, user_id FROM accounts WHERE user_id = ?').run(userId);
+  return 1;
+}
+app.post('/admin/users/:id/trial', requireAdmin, (req, res) => {
+  const days = cleanTrialDays(req.body.trial_days);
+  const ok = startTrial(Number(req.params.id), days);
+  flash(req, ok ? 'ok' : 'error', ok ? `${days}-day free trial started.` : 'Admins cannot be put on a trial.');
+  res.redirect(`/admin/users/${req.params.id}`);
+});
+
 // Early members: active, never expire, not on a trial, no paid plan, not an admin
 function earlyNonStudents() {
   return db.prepare(`SELECT id FROM users WHERE student = 0 AND is_admin = 0 AND trial = 0 AND plan = ''
@@ -828,6 +848,12 @@ app.post('/admin/users/bulk', requireAdmin, (req, res) => {
     arg = parseExpiry(req.body.expires_at);
     if (!arg) { flash(req, 'error', 'Pick an expiry date.'); return res.redirect('/admin'); }
     stmt = 'UPDATE users SET expires_at = ? WHERE id = ? AND is_admin = 0'; done = `set to expire on ${arg.slice(0, 10)} (admins skipped)`;
+  } else if (action === 'trial') {
+    const days = cleanTrialDays(req.body.trial_days);
+    let n = 0;
+    db.transaction(() => ids.forEach((id) => { n += startTrial(id, days); }))();
+    flash(req, 'ok', `${n} user${n === 1 ? '' : 's'} started a ${days}-day free trial (admins skipped).`);
+    return res.redirect('/admin');
   } else { flash(req, 'error', 'Pick an action.'); return res.redirect('/admin'); }
   const upd = db.prepare(stmt);
   let n = 0;
@@ -868,6 +894,10 @@ app.get('/admin/users/:id', requireAdmin, (req, res) => {
           <select name="billing" aria-label="Billing">${Object.entries(BILLING).map(([k, b]) => `<option value="${k}" ${k === cb ? 'selected' : ''}>${b.label} (+${k === 'annual' ? b.days : PAID_DAYS} days)</option>`).join('')}</select>`; })()}
         <button class="small">Mark as paid</button></form>
     </div>
+    ${u.is_admin ? '' : `<form method="post" action="/admin/users/${u.id}/trial" class="row" onsubmit="return confirm('Start a free trial for this user? Their expiry date changes and any paid plan is cleared.')">
+      <span class="muted">Free trial:</span>
+      <input type="number" name="trial_days" value="${trialDays() || 15}" min="1" max="365" style="width:5em" aria-label="Trial days"> <span class="muted">days from today</span>
+      <button class="small secondary">${u.trial ? 'Restart free trial' : 'Start free trial'}</button></form>`}
     ${u.plan_request ? `<p class="notice"><span>Requested on the site: <strong>${esc((getPlan(u.plan_request.split(':')[0]) || {}).name || u.plan_request)}</strong>, ${esc(u.plan_request.split(':')[1] || '')}. Check the payment, then press Mark as paid.</span></p>` : ''}
     ${refs.adminNote(u)}
     ${u.plan ? `<p class="muted">Current plan: <strong>${esc((getPlan(u.plan) || {}).name || u.plan)}</strong> · ${esc(u.billing)}</p>` : ''}
