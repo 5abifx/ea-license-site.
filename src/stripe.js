@@ -59,7 +59,7 @@ function verify(raw, header, secret, toleranceSec = 300) {
 
 const sqlTime = (unix) => new Date(unix * 1000).toISOString().slice(0, 19).replace('T', ' ');
 
-module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid, startTrial }) {
+module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid, startTrial, mentor }) {
   db.exec(`CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   const cols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   if (!cols.includes('stripe_customer')) db.exec('ALTER TABLE users ADD COLUMN stripe_customer TEXT');
@@ -72,7 +72,8 @@ module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid, 
   const siteUrl = (req) => process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
 
   // Called by POST /subscribe when Stripe is on. Returns the Checkout URL to send the customer to.
-  async function checkoutUrl(req, u, plan, billing, discountPct) {
+  // foreverPct: a discount on every payment (mentorship students), used instead of the one-time referral discount
+  async function checkoutUrl(req, u, plan, billing, discountPct, foreverPct = 0) {
     const params = {
       mode: 'subscription',
       client_reference_id: String(u.id),
@@ -100,7 +101,10 @@ module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid, 
       if (discountPct) params.metadata.ref_off = discountPct;   // added to the subscription after checkout, so it hits the first real charge
       discountPct = 0;
     }
-    if (discountPct) {
+    if (foreverPct) {
+      const c = await call('POST', '/v1/coupons', { percent_off: foreverPct, duration: 'forever', name: `Mentorship student ${foreverPct}% off` });
+      params.discounts = { 0: { coupon: c.id } };
+    } else if (discountPct) {
       // referral discount: a one-time coupon for the first payment only
       const c = await call('POST', '/v1/coupons', { percent_off: discountPct, duration: 'once', name: `Referral ${discountPct}% off` });
       params.discounts = { 0: { coupon: c.id } };
@@ -155,7 +159,9 @@ module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid, 
     if (db.prepare('SELECT 1 FROM stripe_events WHERE id = ?').get(ev.id)) return res.json({ received: true, duplicate: true });
     const obj = (ev.data && ev.data.object) || {};
     try {
-      if (ev.type === 'checkout.session.completed') {
+      if (mentor && await mentor.onStripeEvent(ev.type, obj)) {
+        // a mentorship payment (src/mentorship.js), never an EA plan
+      } else if (ev.type === 'checkout.session.completed') {
         const id = Number(obj.client_reference_id || (obj.metadata && obj.metadata.user_id));
         if (id && obj.customer) db.prepare('UPDATE users SET stripe_customer = ?, stripe_sub = COALESCE(?, stripe_sub) WHERE id = ?').run(String(obj.customer), obj.subscription ? String(obj.subscription) : null, id);
         if (id && obj.metadata && obj.metadata.trial === '1') {

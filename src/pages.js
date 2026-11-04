@@ -8,7 +8,7 @@ module.exports = function pages(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, T
   const name = esc(SITE_NAME);
 
   app.get('/robots.txt', (req, res) => {
-    res.type('text/plain').send('User-agent: *\nAllow: /$\nAllow: /faq\nAllow: /terms\nAllow: /privacy\nAllow: /help/\nDisallow: /\n');
+    res.type('text/plain').send('User-agent: *\nAllow: /$\nAllow: /mentorship\nAllow: /faq\nAllow: /terms\nAllow: /privacy\nAllow: /help/\nDisallow: /\n');
   });
 
   app.get('/faq', (req, res) => {

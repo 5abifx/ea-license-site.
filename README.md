@@ -39,6 +39,7 @@ Everything (database + uploaded EA files) lives in the `data/` folder. **Back th
 | `CONTACT_URL` | Optional "Contact us" link on the FAQ, Terms and Privacy pages. Defaults to `PAYMENT_URL`. |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Turn on **card payments with Stripe** (subscriptions). See below. |
 | `TRIAL_NEEDS_CARD` | With Stripe on, new sign ups must add a card in Stripe Checkout to start the `TRIAL_DAYS` free trial; the first charge is when the trial ends (default on). Set `false` for the old trial without a card. |
+| `MENTOR_SEATS`, `MENTOR_YOUTUBE`, `MENTOR_DISCORD`, `MENTOR_INSTAGRAM`, `MENTOR_X`, `MENTOR_WHATSAPP` | **Mentorship page** (`/mentorship`): `MENTOR_SEATS=3/10` shows a seats counter; the others are the social links shown under "Your mentor" (full `https://` links, any left empty are hidden). Plans and prices are in `src/mentorship.js`. The mystery discount and the leads lists are in Admin > Mentorship. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Turn on **Sign in with Google**. New accounts can then only be created with Google, which stops fake email sign ups for repeat trials. See below. |
 
 ### Card payments with Stripe

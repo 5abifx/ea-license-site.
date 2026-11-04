@@ -34,6 +34,7 @@ const ICONS = {
   upload: '<path d="M12 21V9m0 0l-5 5m5-5l5 5M4 3h16"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 2-2.5 2-2.5 4M12 17h.01"/>',
   out: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>',
+  cap: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5M22 9v6"/>',
 };
 const icon = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
 
@@ -59,10 +60,11 @@ function layout(req, title, body, opts = {}) {
        ${u.is_admin ? link('/admin', 'Admin') : ''}
        ${u.google_sub ? '' : link('/password', 'Password')}
        <form method="post" action="/logout" class="inline"><button class="link">Sign out</button></form>`
-    : `<a href="/#how">How it works</a>${link('/pricing', 'Pricing')}${link('/faq', 'FAQ')}${link('/login', 'Sign in')}${signup ? '<a class="btn small" href="/signup">Create account</a>' : ''}`;
+    : `<a href="/#how">How it works</a>${link('/mentorship', 'Mentorship')}${link('/pricing', 'Pricing')}${link('/faq', 'FAQ')}${link('/login', 'Sign in')}${signup ? '<a class="btn small" href="/signup">Create account</a>' : ''}`;
   const origin = `${req.protocol}://${req.get('host')}`;
+  const og = opts.og || {}; // link preview (Discord, iMessage, WhatsApp): { title, desc, image }
   const trial = trialDays();
-  const desc = `Automated MT5 Expert Advisors that trade your rules 24/5.${trial ? ` ${trial}-day free trial, then plans from ${PRICE_TEXT}.` : ` Plans from ${PRICE_TEXT}.`}`;
+  const desc = `KATANA risk manager, trade journal and live mentorship for MT5 traders.${trial ? ` ${trial}-day free trial, then plans from ${PRICE_TEXT}.` : ` Plans from ${PRICE_TEXT}.`}`;
   const flashHtml = flash ? `<div class="flash ${esc(flash.type)}">${esc(flash.msg)}</div>` : '';
   // the pill only shows when the site name differs from the brand (e.g. "EA Licensing")
   const pill = SITE_NAME !== BRAND ? `<span class="pill">${esc(SITE_NAME)}</span>` : '';
@@ -70,22 +72,22 @@ function layout(req, title, body, opts = {}) {
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)} · ${esc(SITE_NAME)}</title>
-<meta name="description" content="${esc(desc)}">
+<meta name="description" content="${esc(og.desc || desc)}">
 <meta name="theme-color" content="#0a0a0b">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="${esc(SITE_NAME)}">
-<meta property="og:title" content="${esc(SITE_NAME)} · Activate. Bind. Trade.">
-<meta property="og:description" content="${esc(desc)}">
+<meta property="og:title" content="${esc(og.title || `${SITE_NAME} · Your rules. Enforced on every trade.`)}">
+<meta property="og:description" content="${esc(og.desc || desc)}">
 <meta property="og:url" content="${esc(origin + req.path)}">
-<meta property="og:image" content="${esc(origin)}/og.png">
+<meta property="og:image" content="${esc(origin)}/${og.image || 'og.png'}?v=2">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@200;300;400;600&family=Manrope:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/style.css">
 </head><body>
-${u && !opts.wide ? appShell(req, u, flashHtml, body, title) : `<header><div class="wrap bar"><a class="brand" href="/">${brandMark()}${pill}</a><nav>${nav}</nav></div></header>
+${u && !opts.wide ? appShell(req, u, flashHtml, body, title) : `<header><div class="wrap bar"><a class="brand" href="/">${brandMark()}${pill}</a><button type="button" class="menu-btn" data-menu aria-controls="site-nav" aria-expanded="false" aria-label="Menu"><i></i><i></i><i></i></button><nav id="site-nav">${nav}</nav></div></header>
 ${opts.wide
     ? `<main class="wide">${flashHtml ? `<div class="wrap">${flashHtml}</div>` : ''}${body}</main>`
     : `<main class="wrap">${flashHtml}${body}</main>`}
@@ -94,6 +96,7 @@ ${opts.wide
 <span class="foot-links"><a href="/faq">FAQ</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></span>
 <span class="muted">${RISK}</span>
 </div></footer>`}
+<script src="/menu.js"></script>
 </body></html>`;
 }
 
@@ -110,11 +113,12 @@ function appShell(req, u, flashHtml, body, title) {
   <div class="side-top">
     <a class="brand" href="/dashboard">${brandMark()}</a>
     ${planBox(u)}
+    <button type="button" class="menu-btn" data-menu aria-controls="side-nav" aria-expanded="false" aria-label="Menu"><i></i><i></i><i></i></button>
   </div>
-  <nav class="side-nav" aria-label="Members menu">
+  <nav class="side-nav" id="side-nav" aria-label="Members menu">
     ${group('Main menu', `${item('/dashboard', 'eas', 'My EAs')}
       ${req.hasJournal ? item('/journal', 'journal', 'Journal', on('/journal') && !on('/journal/insights')) + item('/journal/insights', 'insights', 'Insights') : ''}`)}
-    ${group('Account', `${item('/pricing', 'plans', 'Plans')}
+    ${group('Account', `${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}
       ${u.google_sub ? '' : item('/password', 'lock', 'Password')}`)}
     ${u.is_admin ? group('Owner', `${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas'))}${item('/admin/eas', 'upload', 'EAs')}`) : ''}
     <div class="side-group side-end">
