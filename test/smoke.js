@@ -325,29 +325,46 @@ function client(base) {
     r = await bob.post('/journal/accounts/1001/delete', {});
     assert.match(r.text, /Deleted 1 trade of/);
 
-    // Auction Compass: paid plans only, comes with the Journal, works once the account is added
+    // Auction Compass: students only. Paid plans and EA ticks do not unlock it; the admin's Student switch does
     const fdc = new FormData();
     fdc.append('name', 'Auction Compass'); fdc.append('code', 'COMPASS'); fdc.append('version', '1.1'); fdc.append('active', '1');
     fdc.append('file', new Blob(['FAKE-EX5']), '5ABI_Auction_Compass.ex5');
-    assert.match((await admin.post('/admin/eas', fdc)).text, /EA added/);
-    assert.strictEqual((await check('COMPASS', '7777')).valid, true);            // Tia: paid KATANA plan, not assigned by hand
+    assert.match((await admin.post('/admin/eas', fdc)).text, /EA added/);          // adding an EA ticks it for every active user
+    let tc = await check('COMPASS', '7777');                                         // Tia: paid KATANA plan, not a student
+    assert.strictEqual(tc.valid, false);
+    assert.match(tc.message, /Only for 5ABI\.FX students/);
+    r = await tia.get('/dashboard');
+    assert.doesNotMatch(r.text, /Auction Compass/);
+    const compassId = db.prepare("SELECT id FROM eas WHERE code = 'COMPASS'").get().id;
+    assert.strictEqual((await tia.get(`/download/${compassId}`)).status, 404);
+    assert.doesNotMatch((await client(base).get('/pricing')).text, /Compass/);
+    // the admin marks Tia as a student: Compass unlocks on her account and shows on her dashboard
+    const tiaRow = db.prepare('SELECT * FROM users WHERE id = ?').get(tiaId);
+    r = await admin.get(`/admin/users/${tiaId}`);
+    assert.match(r.text, /name="student"/);
+    const tiaForm = { name: tiaRow.name, status: 'active', max_accounts: String(tiaRow.max_accounts), expires_at: tiaRow.expires_at.slice(0, 10), ea: '1' };
+    await admin.post(`/admin/users/${tiaId}`, { ...tiaForm, student: '1' });
+    assert.strictEqual((await check('COMPASS', '7777')).valid, true);
+    assert.match((await admin.get('/admin')).text, /student<\/span>/);
     r = await tia.get('/dashboard');
     assert.match(r.text, /Auction Compass/);
-    const compassId = r.text.match(/Auction Compass[\s\S]*?href="\/download\/(\d+)"/)[1];
+    assert.match(r.text, /5ABI\.FX%20Compass\.tpl/);
     assert.strictEqual((await tia.get(`/download/${compassId}`)).status, 200);
+    // switching it off locks it again
+    await admin.post(`/admin/users/${tiaId}`, tiaForm);
+    assert.strictEqual((await check('COMPASS', '7777')).valid, false);
+    // a trial user who is not a student does not get it; other EAs still work on the trial
     process.env.TRIAL_DAYS = '15';
     const tess = client(base);
     await tess.post('/signup', { name: 'Tess', email: 'tess@test.com', password: 'tesspass123' });
     await tess.post('/accounts', { account_number: '8888' });
     process.env.TRIAL_DAYS = '0';
-    const tc = await check('COMPASS', '8888');
+    tc = await check('COMPASS', '8888');
     assert.strictEqual(tc.valid, false);
-    assert.match(tc.message, /not with the free trial/);
-    assert.strictEqual((await check('GOLD_SCALPER', '8888')).valid, true);        // other EAs still work on the trial
+    assert.strictEqual((await check('GOLD_SCALPER', '8888')).valid, true);
     r = await tess.get('/dashboard');
-    assert.match(r.text, /Included when you subscribe/);
+    assert.doesNotMatch(r.text, /Auction Compass/);
     assert.strictEqual((await tess.get(`/download/${compassId}`)).status, 404);
-    assert.match((await client(base).get('/pricing')).text, /Auction Compass indicator/);
 
     console.log('All smoke tests passed');
   } finally {
