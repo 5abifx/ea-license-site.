@@ -384,6 +384,18 @@ function client(base) {
     r = await admin.post('/admin/users/bulk', `action=never&ids=${earlyId}`);
     assert.strictEqual(db.prepare('SELECT expires_at FROM users WHERE id = ?').get(earlyId).expires_at, null);
 
+    // free trial for an existing user: bulk and from the user page
+    r = await admin.post('/admin/users/bulk', `action=trial&trial_days=7&ids=${earlyId}`);
+    assert.match(r.text, /1 user started a 7-day free trial/);
+    let er = db.prepare('SELECT * FROM users WHERE id = ?').get(earlyId);
+    assert.strictEqual(er.trial, 1);
+    assert.ok(Math.abs(new Date(er.expires_at + 'Z') - Date.now() - 7 * 86400000) < 120000);
+    assert.match((await admin.get(`/admin/users/${earlyId}`)).text, /Restart free trial/);
+    r = await admin.post(`/admin/users/${earlyId}/trial`, { trial_days: '3' });
+    assert.match(r.text, /3-day free trial started/);
+    er = db.prepare('SELECT * FROM users WHERE id = ?').get(earlyId);
+    assert.ok(Math.abs(new Date(er.expires_at + 'Z') - Date.now() - 3 * 86400000) < 120000);
+
     console.log('All smoke tests passed');
   } finally {
     server.close();
