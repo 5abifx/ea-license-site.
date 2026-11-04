@@ -366,6 +366,24 @@ function client(base) {
     assert.doesNotMatch(r.text, /Auction Compass/);
     assert.strictEqual((await tess.get(`/download/${compassId}`)).status, 404);
 
+    // bulk tools: early members (no expiry, no trial, no plan) become students in one click
+    await admin.post('/admin/users', { name: 'Early', email: 'early@test.com', password: 'earlypass1', max_accounts: '10', expires_at: '', ea: '1' });
+    const earlyId = db.prepare("SELECT id FROM users WHERE email = 'early@test.com'").get().id;
+    r = await admin.get('/admin');
+    assert.match(r.text, /not marked as student yet/);
+    r = await admin.post('/admin/users/early-students', {});
+    assert.match(r.text, /marked as student/);
+    assert.strictEqual(db.prepare('SELECT student FROM users WHERE id = ?').get(earlyId).student, 1);
+    assert.strictEqual(db.prepare("SELECT student FROM users WHERE email = 'tess@test.com'").get().student, 0);   // trial user untouched
+    assert.doesNotMatch((await admin.get('/admin')).text, /not marked as student yet/);
+    r = await admin.post('/admin/users/bulk', `action=expiry&expires_at=2030-01-31&ids=${earlyId}&ids=${tiaId}`);
+    assert.match(r.text, /2 users set to expire on 2030-01-31/);
+    assert.strictEqual(db.prepare('SELECT expires_at FROM users WHERE id = ?').get(earlyId).expires_at, '2030-01-31 23:59:59');
+    r = await admin.post('/admin/users/bulk', `action=student_off&ids=${earlyId}`);
+    assert.match(r.text, /1 user no longer students/);
+    r = await admin.post('/admin/users/bulk', `action=never&ids=${earlyId}`);
+    assert.strictEqual(db.prepare('SELECT expires_at FROM users WHERE id = ?').get(earlyId).expires_at, null);
+
     console.log('All smoke tests passed');
   } finally {
     server.close();
