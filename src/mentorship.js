@@ -405,9 +405,8 @@ function body({ seats, socials, price, pricing }) {
   <div class="topics"><span>Read who is in control</span><span>Know where price is fair</span><span>Plan before the open</span><span>Time your entry</span><span>Size risk from your own numbers</span><span>Fix the habits that cost you</span><span>Pass prop-firm rules</span></div>
   <div class="vs">
     <div><h3>Most trading courses</h3><ul><li>Cheap recorded content from people with no real experience</li>
-<li>Hard to follow, with nobody to ask</li><li>Predict moves from old candles</li><li>Weekend classes on a closed market, recapping what already happened</li><li>Tools sold to you on top</li><li>Then you're on your own</li></ul></div>
-    <div class="us"><h3>5ABI.FX mentorship</h3><ul><li>Taught live in the open market only, never on weekends</li>
-<li>Taught live by a trader who trades it every day</li><li>Explained clearly and simply, ask as many times as you need</li>
+<li>Hard to follow, with nobody to ask</li><li>Predict moves from old candles</li><li>Then you're on your own</li></ul></div>
+    <div class="us"><h3>5ABI.FX mentorship</h3><ul><li>Taught live by a trader who trades it every day</li><li>Explained clearly and simply, ask as many times as you need</li>
 <li>Read price and volume, no predictions</li><li>See the reaction in real time</li><li>Trading software included, and we teach you to use it</li><li>Your mentor stays involved in your growth</li></ul></div>
   </div>
 </div></section>
