@@ -590,6 +590,8 @@ app.get('/dashboard', requireUser, (req, res) => {
     (until ${fmtDate(u.expires_at)} UTC). Pick a plan to keep trading after that.</div><a class="btn" href="/pricing">See plans</a></div>` : ''}
   ${u.expires_at && !expired && !u.trial ? `<p class="muted">${getPlan(u.plan) ? `${esc(getPlan(u.plan).name)} plan (${esc(BILLING[cleanBilling(u.billing)].label.toLowerCase())}) · ` : ''}License valid until ${fmtDate(u.expires_at)} (UTC) · <a href="/pricing">Plans</a></p>` : ''}
 
+  ${req.query.paid && u.plan_request ? '<div class="notice"><div><strong>Thanks for your payment!</strong> Your plan switches on in a moment. Refresh this page if it does not show yet.</div></div>' : ''}
+  ${u.stripe_customer ? `<form method="post" action="/billing" class="row"><span class="muted">${u.stripe_sub ? 'Card subscription active.' : 'Card subscription ended.'}</span><button class="small secondary">Manage billing</button></form>` : ''}
   <section class="card dash-eas">
     <h2>1. Download your EA</h2>
     ${eas.length ? `<div class="ea-list">${eas.map((e) => `
@@ -950,12 +952,23 @@ app.post('/admin/users/:id/paid', requireAdmin, (req, res) => {
   if (!u) return res.redirect('/admin');
   const plan = getPlan(req.body && req.body.plan);
   const billing = cleanBilling(req.body && req.body.billing);
+  const refNote = applyPaid(u, plan, billing);
+  const after = db.prepare('SELECT expires_at FROM users WHERE id = ?').get(u.id).expires_at;
+  flash(req, 'ok', `${u.email} marked as paid${plan ? ` on ${plan.name} (${billing})` : ''}. License now valid until ${after.slice(0, 16)} UTC.${refNote}`);
+  res.redirect(`/admin/users/${u.id}`);
+});
+
+// A payment came in (admin "Mark as paid" or Stripe): end the trial, apply the plan, extend the licence
+// from today or from the current expiry, whichever is later. `until` (UTC 'YYYY-MM-DD HH:MM:SS', e.g. the
+// end of the Stripe billing period) is used instead when it is later. Returns the referral note ('' if none).
+function applyPaid(u, plan, billing, until = null) {
   const days = plan && billing === 'annual' ? BILLING.annual.days : PAID_DAYS;
   const from = u.expires_at && !isExpired(u) ? u.expires_at : new Date().toISOString().slice(0, 19).replace('T', ' ');
   let refNote = '';
   db.transaction(() => {
     refNote = refs.rewardOnPaid(u);
     db.prepare(`UPDATE users SET trial = 0, status = 'active', expires_at = datetime(?, ?), plan_request = '' WHERE id = ?`).run(from, `+${days} days`, u.id);
+    if (until) db.prepare('UPDATE users SET expires_at = MAX(expires_at, ?) WHERE id = ?').run(until, u.id);
     if (plan) {
       // the plan decides the account limit and which EAs the customer gets
       db.prepare('UPDATE users SET plan = ?, billing = ?, max_accounts = ? WHERE id = ?').run(plan.id, billing, plan.accounts, u.id);
@@ -967,10 +980,8 @@ app.post('/admin/users/:id/paid', requireAdmin, (req, res) => {
       if (!db.prepare('SELECT 1 FROM user_eas WHERE user_id = ?').get(u.id)) grantAllActiveEas(u.id);
     }
   })();
-  const after = db.prepare('SELECT expires_at FROM users WHERE id = ?').get(u.id).expires_at;
-  flash(req, 'ok', `${u.email} marked as paid${plan ? ` on ${plan.name} (${billing})` : ''}. License now valid until ${after.slice(0, 16)} UTC.${refNote}`);
-  res.redirect(`/admin/users/${u.id}`);
-});
+  return refNote;
+}
 
 app.post('/admin/users/:id', requireAdmin, (req, res) => {
   const id = Number(req.params.id);
@@ -1109,7 +1120,8 @@ app.post('/admin/eas/:id/delete', requireAdmin, (req, res) => {
 });
 
 require('./help')(app, { db, page });
-require('./pricing')(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL: process.env.CONTACT_URL || '', refs });
+const stripe = require('./stripe')(app, { db, flash, requireUser, applyPaid, refs });
+require('./pricing')(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL: process.env.CONTACT_URL || '', refs, stripe });
 require('./pages')(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, TRIAL_ACCOUNTS, MAX_ACCOUNTS_DEFAULT });
 
 app.use((err, req, res, next) => {

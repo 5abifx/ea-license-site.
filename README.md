@@ -37,7 +37,19 @@ Everything (database + uploaded EA files) lives in the `data/` folder. **Back th
 | `PAID_DAYS` | Days added when you click **Mark as paid** on a user in Admin (default 30). |
 | `PAYMENT_URL` | Optional link for the **Subscribe** button (payment page or Discord invite). |
 | `CONTACT_URL` | Optional "Contact us" link on the FAQ, Terms and Privacy pages. Defaults to `PAYMENT_URL`. |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Turn on **card payments with Stripe** (subscriptions). See below. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Turn on **Sign in with Google**. New accounts can then only be created with Google, which stops fake email sign ups for repeat trials. See below. |
+
+### Card payments with Stripe
+
+Prices come from `src/plans.js`, so you do not create products in Stripe.
+
+1. Stripe dashboard → **Developers → API keys**: copy the **Secret key** (`sk_live_...`) into `STRIPE_SECRET_KEY`.
+2. **Developers → Webhooks → Add endpoint**: URL `https://YOUR-SITE/api/stripe/webhook`, events
+   `checkout.session.completed`, `invoice.paid`, `customer.subscription.deleted`. Copy its **Signing secret** (`whsec_...`) into `STRIPE_WEBHOOK_SECRET`.
+3. **Settings → Billing → Customer portal**: turn it on (lets customers update their card or cancel from **Manage billing**).
+
+Each paid invoice (first payment and every renewal) applies the plan and extends the licence to the end of the paid period plus 2 days, the same as **Mark as paid**. A cancelled subscription runs to the end of what was paid. Referral discounts become a one-time Stripe coupon on the first payment. **Mark as paid** keeps working for other payment methods.
 
 ### Sign in with Google
 

@@ -34,3 +34,7 @@ services:
         sync: false          # Sign in with Google (see README)
       - key: GOOGLE_CLIENT_SECRET
         sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false          # card payments (see README)
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false

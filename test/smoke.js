@@ -396,6 +396,75 @@ function client(base) {
     er = db.prepare('SELECT * FROM users WHERE id = ?').get(earlyId);
     assert.ok(Math.abs(new Date(er.expires_at + 'Z') - Date.now() - 3 * 86400000) < 120000);
 
+    // Stripe: checkout for the picked plan, then the signed webhook switches the plan on
+    {
+      const http = require('http');
+      const crypto = require('crypto');
+      const calls = [];
+      const fake = http.createServer((q, s2) => {
+        let body = '';
+        q.on('data', (c) => { body += c; });
+        q.on('end', () => {
+          calls.push({ method: q.method, url: q.url, body: new URLSearchParams(body), auth: q.headers.authorization });
+          s2.setHeader('content-type', 'application/json');
+          if (q.url === '/v1/checkout/sessions') return s2.end(JSON.stringify({ id: 'cs_1', url: 'https://checkout.stripe.com/c/pay/cs_1' }));
+          if (q.url === '/v1/subscriptions/sub_1') return s2.end(JSON.stringify({ id: 'sub_1', metadata: { user_id: String(payId), plan: 'pro', billing: 'annual' } }));
+          if (q.url === '/v1/billing_portal/sessions') return s2.end(JSON.stringify({ url: 'https://billing.stripe.com/p/session/x' }));
+          s2.statusCode = 404; s2.end('{}');
+        });
+      }).listen(0);
+      Object.assign(process.env, { STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_WEBHOOK_SECRET: 'whsec_x', STRIPE_API_BASE: `http://127.0.0.1:${fake.address().port}` });
+      await admin.post('/admin/users', { name: 'Payer', email: 'payer@test.com', password: 'payerpass1', max_accounts: '1', expires_at: '2020-01-01', ea: '1' });
+      const payId = db.prepare("SELECT id FROM users WHERE email = 'payer@test.com'").get().id;
+      const payer = client(base);
+      await payer.post('/login', { email: 'payer@test.com', password: 'payerpass1' });
+      r = await payer.get('/subscribe?plan=pro&billing=annual');
+      assert.match(r.text, /Pay \$348 by card/);
+      r = await payer.post('/subscribe', { plan: 'pro', billing: 'annual' });
+      assert.strictEqual(r.location, 'https://checkout.stripe.com/c/pay/cs_1');
+      const cs = calls.find((c) => c.url === '/v1/checkout/sessions');
+      assert.strictEqual(cs.auth, 'Bearer sk_test_x');
+      assert.strictEqual(cs.body.get('mode'), 'subscription');
+      assert.strictEqual(cs.body.get('line_items[0][price_data][unit_amount]'), '34800');
+      assert.strictEqual(cs.body.get('line_items[0][price_data][recurring][interval]'), 'year');
+      assert.strictEqual(cs.body.get('subscription_data[metadata][user_id]'), String(payId));
+      assert.strictEqual(cs.body.get('customer_email'), 'payer@test.com');
+
+      const hook = async (ev, secret = 'whsec_x') => {
+        const raw = JSON.stringify(ev);
+        const t = Math.floor(Date.now() / 1000);
+        const sig = crypto.createHmac('sha256', secret).update(`${t}.${raw}`).digest('hex');
+        return fetch(`${base}/api/stripe/webhook`, { method: 'POST', headers: { 'content-type': 'application/json', 'stripe-signature': `t=${t},v1=${sig}` }, body: raw });
+      };
+      assert.strictEqual((await hook({ id: 'evt_bad', type: 'invoice.paid', data: { object: {} } }, 'wrong')).status, 400);
+      assert.strictEqual((await hook({ id: 'evt_1', type: 'checkout.session.completed', data: { object: { client_reference_id: String(payId), customer: 'cus_1', subscription: 'sub_1' } } })).status, 200);
+      const periodEnd = Math.floor(Date.now() / 1000) + 365 * 86400;
+      const inv = { id: 'evt_2', type: 'invoice.paid', data: { object: { customer: 'cus_1', amount_paid: 34800,
+        parent: { subscription_details: { subscription: 'sub_1' } }, lines: { data: [{ period: { end: periodEnd } }] } } } };
+      assert.strictEqual((await hook(inv)).status, 200);
+      let pu = db.prepare('SELECT * FROM users WHERE id = ?').get(payId);
+      assert.strictEqual(pu.plan, 'pro');
+      assert.strictEqual(pu.billing, 'annual');
+      assert.strictEqual(pu.max_accounts, 10);
+      assert.strictEqual(pu.stripe_customer, 'cus_1');
+      assert.strictEqual(pu.stripe_sub, 'sub_1');
+      const exp1 = pu.expires_at;
+      assert.ok(new Date(exp1 + 'Z') >= new Date((periodEnd + 86400) * 1000));
+      assert.strictEqual((await hook(inv)).status, 200);                                 // replayed event changes nothing
+      assert.strictEqual(db.prepare('SELECT expires_at FROM users WHERE id = ?').get(payId).expires_at, exp1);
+      r = await payer.get('/dashboard');
+      assert.match(r.text, /Manage billing/);
+      r = await payer.post('/billing', {});
+      assert.strictEqual(r.location, 'https://billing.stripe.com/p/session/x');
+      assert.match((await payer.get('/subscribe?plan=pro&billing=annual')).text, /already have an active subscription/);
+      await hook({ id: 'evt_3', type: 'customer.subscription.deleted', data: { object: { id: 'sub_1' } } });
+      pu = db.prepare('SELECT * FROM users WHERE id = ?').get(payId);
+      assert.strictEqual(pu.stripe_sub, null);
+      assert.strictEqual(pu.expires_at, exp1);                                             // keeps what was paid
+      fake.close();
+      for (const k of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_API_BASE']) delete process.env[k];
+    }
+
     console.log('All smoke tests passed');
   } finally {
     server.close();
