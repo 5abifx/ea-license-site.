@@ -129,17 +129,18 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
   }
   function promoPopup(pr, u) {
     if (!pr || u) return ''; // first-time visitors only: signed-in people just see the bar
-    return `<div class="mystery" id="mystery" hidden role="dialog" aria-modal="true" aria-labelledby="mystery-t">
-      <div class="mystery-card">
+    // a small ticket that slides in at the side: it never blocks the page
+    return `<aside class="mystery" id="mystery" hidden aria-labelledby="mystery-t">
+      <div class="mystery-stub" aria-hidden="true"><b>?%</b><span>OFF</span></div>
+      <div class="mystery-body">
         <button type="button" class="mystery-x" data-close aria-label="Close">×</button>
-        <img src="/logo.png" alt="" width="90">
-        <p class="mystery-k">Limited time · <span data-countdown>ends ${esc(pr.ends.toISOString().slice(0, 10))}</span></p>
-        <h2 id="mystery-t">You've got a<br><em>Mystery Discount</em></h2>
-        <p>Claim it to see how much you save on the mentorship. Free account, no card.</p>
-        <a class="btn pri big" href="/mentorship/claim">Claim now</a>
-        <button type="button" class="link" data-close>No thanks</button>
+        <p class="mystery-k">Limited time</p>
+        <h2 id="mystery-t">Mystery discount</h2>
+        <p class="mystery-t mono" data-countdown>ends ${esc(pr.ends.toISOString().slice(0, 10))}</p>
+        <a class="mystery-go" href="/mentorship/claim">Reveal my discount →</a>
+        <p class="mystery-s">Free account, no card.</p>
       </div>
-    </div>`;
+    </aside>`;
   }
 
   // Claim the mystery discount. Signed out: make a free account first, then it is claimed on the way back.

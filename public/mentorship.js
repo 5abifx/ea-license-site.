@@ -19,7 +19,7 @@
     var open = function () { pop.hidden = false; try { localStorage.setItem('mystery-seen', '1'); } catch (e) { /* ignore */ } };
     var close = function () { pop.hidden = true; };
     if (!seen) setTimeout(open, 1200);
-    pop.addEventListener('click', function (e) { if (e.target === pop || e.target.hasAttribute('data-close')) close(); });
+    pop.addEventListener('click', function (e) { if (e.target.hasAttribute('data-close')) close(); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
   }
 })();

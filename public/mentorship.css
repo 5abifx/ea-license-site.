@@ -214,18 +214,28 @@
 .mp .promo-bar .mono{background:rgba(0,0,0,.12);padding:3px 8px;border-radius:6px;text-transform:none;letter-spacing:0}
 .mp .promo-bar a{color:var(--pc-ink);font-weight:800;text-decoration:underline}
 .mp .promo-bar .ok{color:#0d5a49;margin:0}
-.mp .mystery{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.78);backdrop-filter:blur(6px);display:grid;place-items:center;padding:16px}
+.mp .mystery{position:fixed;right:20px;bottom:20px;z-index:50;width:340px;display:flex;color:var(--fg);filter:drop-shadow(0 14px 34px rgba(0,0,0,.6));animation:slidein .45s cubic-bezier(.2,.9,.3,1.2)}
 .mp .mystery[hidden]{display:none}
-.mp .mystery-card{position:relative;max-width:440px;width:100%;text-align:center;padding:36px 28px 26px;border-radius:18px;background:radial-gradient(500px 260px at 50% 0,var(--pc-glow),transparent 70%),var(--panel);border:1px solid var(--pc-line);display:flex;flex-direction:column;align-items:center;gap:12px;animation:pop .35s ease-out}
-@keyframes pop{from{transform:scale(.92);opacity:0}}
-@media(prefers-reduced-motion:reduce){.mp .mystery-card{animation:none}}
-.mp .mystery-card h2{font-size:34px;line-height:1.05}
-.mp .mystery-card h2 em{font-style:normal;color:var(--pc);font-size:40px}
-.mp .mystery-card p{margin:0;color:var(--muted)}
-.mp .mystery-k{font:700 12px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--pc)!important}
-.mp .mystery-card .btn.pri{background:var(--pc-grad);border-color:var(--pc);color:var(--pc-ink);width:100%;justify-content:center;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
-.mp .mystery-card .link{background:none;border:0;color:var(--fg);cursor:pointer;font:500 14px var(--sans);padding:6px}
-.mp .mystery-x{position:absolute;top:10px;right:14px;background:none;border:0;color:var(--muted);font-size:26px;cursor:pointer;line-height:1}
+@keyframes slidein{from{transform:translateX(120%);opacity:0}}
+@media(prefers-reduced-motion:reduce){.mp .mystery{animation:none}}
+/* ticket: coloured stub + dark body, notches cut where they meet, dashed tear line */
+.mp .mystery-stub{flex:0 0 92px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--pc-grad);color:var(--pc-ink);border-radius:14px 0 0 14px;
+  -webkit-mask:radial-gradient(circle 9px at 100% 0,#0000 98%,#000) top/100% 51% no-repeat,radial-gradient(circle 9px at 100% 100%,#0000 98%,#000) bottom/100% 51% no-repeat;
+  mask:radial-gradient(circle 9px at 100% 0,#0000 98%,#000) top/100% 51% no-repeat,radial-gradient(circle 9px at 100% 100%,#0000 98%,#000) bottom/100% 51% no-repeat}
+.mp .mystery-stub b{font:900 38px/1 var(--big);letter-spacing:-.02em}
+.mp .mystery-stub span{font:800 12px var(--mono);letter-spacing:.2em;margin-top:2px}
+.mp .mystery-body{position:relative;flex:1;padding:14px 16px 12px 18px;background:var(--panel);border:1px solid var(--pc-line);border-left:2px dashed var(--pc-line);border-radius:0 14px 14px 0;
+  -webkit-mask:radial-gradient(circle 9px at 0 0,#0000 98%,#000) top/100% 51% no-repeat,radial-gradient(circle 9px at 0 100%,#0000 98%,#000) bottom/100% 51% no-repeat;
+  mask:radial-gradient(circle 9px at 0 0,#0000 98%,#000) top/100% 51% no-repeat,radial-gradient(circle 9px at 0 100%,#0000 98%,#000) bottom/100% 51% no-repeat}
+.mp .mystery-body p{margin:0}
+.mp .mystery-k{font:700 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--pc)!important}
+.mp .mystery-body h2{font-size:20px;line-height:1.15;margin:2px 0 2px}
+.mp .mystery-t{font-size:12px;color:var(--muted)}
+.mp .mystery-go{display:inline-block;margin-top:9px;font-weight:800;font-size:14px;color:var(--pc);text-decoration:none}
+.mp .mystery-go:hover{text-decoration:underline}
+.mp .mystery-s{font-size:11px;color:var(--muted);margin-top:2px!important}
+.mp .mystery-x{position:absolute;top:6px;right:8px;background:none;border:0;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:4px}
+@media(max-width:560px){.mp .mystery{left:12px;right:12px;bottom:12px;width:auto}.mp .mystery-stub{flex-basis:70px}.mp .mystery-stub b{font-size:28px}.mp .mystery-body{padding:10px 14px 10px 14px}.mp .mystery-body h2{font-size:17px}.mp .mystery-go{margin-top:5px}.mp .mystery-s{display:none}}
 
 .mp h1,.mp h2,.mp h3{color:var(--fg)}
 .mp .mp-hero{text-align:left}
