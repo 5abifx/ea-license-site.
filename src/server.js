@@ -10,8 +10,8 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const { db, FILES_DIR } = require('./db');
 const { esc, fmtDate, layout, authShell, SITE_NAME, PRICE_TEXT, trialDays } = require('./views');
-const { PLANS, BILLING, getPlan, cleanBilling } = require('./plans');
-const { planCards } = require('./pricing');
+const { PLANS, BILLING, getPlan, cleanBilling, maxSave } = require('./plans');
+const { cinePage } = require('./cine');
 const referrals = require('./referrals');
 
 // ---------- config ----------
@@ -150,246 +150,38 @@ function takeNext(req, fallback) {
 require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount });
 
 // ---------- auth ----------
+// Signed-out home: the cinematic page (src/cine-pages/home.html + public/cine/home.*). Signed in: the dashboard.
 app.get('/', (req, res) => {
   if (req.user) return res.redirect('/dashboard');
   const signup = SIGNUP_MODE !== 'closed';
   const trial = signup ? trialDays() : 0;
   const join = trial ? 'Start free trial' : 'Create account';
-  page(req, res, 'Risk manager & trade journal for MT5', `
-  <section class="lp-hero">
-    <div class="wrap lp-hero-in">
-      <div class="lp-copy">
-        <span class="lp-eyebrow"><i></i>${trial ? `${trial}-day free trial · plans from ${esc(PRICE_TEXT)}` : 'MT5 risk manager &amp; trade journal'}</span>
-        <h1>Your rules.<br><em>Enforced</em> on every trade.</h1>
-        <p class="lp-lead">KATANA sizes every position, sets your stop and stops you trading when the day's loss limit is hit. Every closed trade lands in your journal, ready to review or share.</p>
-        <div class="lp-cta">
-          ${signup ? `<a class="btn big" href="/signup">${join}</a>` : ''}
-          <a class="btn big ghost" href="#how">See how it works</a>
-        </div>
-        <ul class="lp-trust">
-          <li><b>MT5</b> native EAs</li>
-          <li><b>Per-account</b> licence</li>
-          <li><b>Prop-firm</b> friendly</li>
-        </ul>
-      </div>
-
-      <div class="kp" aria-label="Example of the KATANA risk panel">
-        <div class="kp-head"><span class="kp-name">KATANA <small>Risk manager</small></span><span class="kp-live"><i></i>Armed</span></div>
-        <div class="kp-acct"><span>Funded 100K · Phase 1</span><b>$100,000.00</b></div>
-        <div class="kp-meter"><div class="kp-row"><span>Daily loss used</span><b>$1,240 <s>/ $5,000</s></b></div><div class="kp-bar"><i style="--w:24.8%"></i></div></div>
-        <div class="kp-meter"><div class="kp-row"><span>Max drawdown used</span><b>$3,100 <s>/ $10,000</s></b></div><div class="kp-bar"><i style="--w:31%"></i></div></div>
-        <div class="kp-calc">
-          <div><span>Risk / trade</span><b>0.5%</b><small>$500</small></div>
-          <div><span>Stop loss</span><b>18.0</b><small>pips</small></div>
-          <div class="hi"><span>Lot size</span><b>2.77</b><small>auto</small></div>
-        </div>
-        <div class="kp-order">
-          <div class="kp-sym"><b>EURUSD</b><span class="buy">BUY 2.77</span></div>
-          <dl><div><dt>Entry</dt><dd>1.08420</dd></div><div><dt>SL</dt><dd class="dn">1.08240</dd></div><div><dt>TP</dt><dd class="up">1.08852</dd></div><div><dt>R:R</dt><dd>1 : 2.4</dd></div></dl>
-          <span class="kp-ok">✓ Protected</span>
-        </div>
-        <p class="kp-note">New trades are blocked for the rest of the day once −$5,000 is reached.</p>
-      </div>
+  const tiers = PLANS.map((p) => {
+    const items = [
+      ...(p.extrasTitle ? [['', esc(p.extrasTitle.replace(/, plus$/, ''))]] : []),
+      ...p.features.map((f) => [p.extrasTitle ? 'hl' : '', esc(f)]),
+    ];
+    return `<article class="tier${p.popular ? ' top' : ''}">${p.popular ? '<span class="badge">Most popular</span>' : ''}<h3>${esc(p.name)}</h3><p class="for">${esc(p.tagline.charAt(0).toUpperCase() + p.tagline.slice(1))}</p>
+<div class="amt"><span class="mem"><b data-m="$${p.monthly}" data-y="$${p.annual}">$${p.monthly}</b><i>/ month</i></span></div>
+<ul>${items.map(([c, t]) => `<li${c ? ` class="${c}"` : ''}>${t}</li>`).join('')}</ul>
+<div class="act"><a class="pb${p.popular ? ' pri' : ''}" href="/pricing?plan=${p.id}">${trial ? 'Start free trial' : `Choose ${esc(p.name)}`}</a></div></article>`;
+  }).join('');
+  const price = `<section class="band g" id="price">
+  <div class="in">
+    <div class="phead">
+      <div><p class="k rv">Plans · USD${trial ? ` · ${trial}-day free trial` : ''}</p><h2 class="rv">One licence.<br><span class="m">The whole toolkit.</span></h2></div>
+      <div class="view" role="group" aria-label="Billing"><button type="button" data-b="m" aria-pressed="true">Monthly</button><button type="button" data-b="y" aria-pressed="false">Annual · save ${maxSave()}%</button></div>
     </div>
-    <div class="wrap"><div class="lp-spec">
-      <span>Daily loss limit</span><span>Max drawdown guard</span><span>Auto lot sizing</span><span>Journal by day &amp; account</span><span>Edge score &amp; insights</span><span>Prop firm guard</span><span>9:16 share cards</span>
-    </div></div>
-  </section>
-
-  <section class="wrap lp-sec">
-    <div class="lp-head">
-      <span class="lp-kicker">Why traders blow accounts</span>
-      <h2>Most accounts don't die on strategy. They die on one bad day.</h2>
-      <p>You know the setup. Then a loss turns into a revenge trade, the stop gets moved "just this once", and a 2% day becomes a 9% day. KATANA takes those decisions out of the moment.</p>
-    </div>
-    <div class="lp-vs">
-      <div class="col bad"><h3>Without limits</h3><ul>
-        <li>Lot size guessed in the moment</li><li>Stops moved, then hit bigger</li><li>Revenge trades after a loss</li><li>One day breaks the prop-firm rule</li></ul></div>
-      <div class="col good"><h3>With KATANA</h3><ul>
-        <li>Lot size worked out from your risk %</li><li>Stop loss set on every trade</li><li>Trading locks at your daily limit</li><li>Drawdown watched against your firm's rules</li></ul></div>
-    </div>
-  </section>
-
-  <section id="how" class="lp-band">
-    <div class="wrap">
-      <div class="lp-head"><span class="lp-kicker">How a trade flows</span><h2>From setup to journal, without the spreadsheet.</h2></div>
-      <ol class="lp-flow">
-        <li><b>01</b><h3>Set your rules</h3><p>Risk per trade, daily loss and max drawdown. Once.</p></li>
-        <li><b>02</b><h3>Take the trade</h3><p>KATANA sizes the lot and places your stop.</p></li>
-        <li><b>03</b><h3>Stay protected</h3><p>Hit the daily limit and new trades are blocked.</p></li>
-        <li><b>04</b><h3>Auto-journal</h3><p>Every closed trade is logged by day and account.</p></li>
-        <li><b>05</b><h3>Share it</h3><p>Turn a real trade into a 9:16 story card.</p></li>
-      </ol>
-      ${trial ? `<p class="lp-flow-note">Start in minutes: create an account, add your MT5 account number, download the EAs. Your ${trial}-day free trial starts right away.</p>` : ''}
-    </div>
-  </section>
-
-  <section class="wrap lp-sec">
-    <div class="lp-head"><span class="lp-kicker">Always on</span><h2>Three guards between you and your next bad decision.</h2>
-      <p>They watch the parts of trading you can't watch in the moment: risk, habits and your prop firm's rules.</p></div>
-    <div class="gd-grid">
-      <article class="gd">
-        <div class="gd-top"><span class="gd-ico a">⛨</span><span class="gd-pill">Guardrails</span></div>
-        <span class="gd-kind">KATANA risk manager</span>
-        <h3>Sits between you and the oversized trade.</h3>
-        <p>Sizes every lot from your risk %, places the stop and locks trading at your daily loss limit.</p>
-        <div class="gd-chat"><div>You're at <b>−2.1%</b> today. Next full loss hits your 3% cap.</div><div>Lot size set to <b>1.20</b> for 0.5% risk.</div><div class="me">New trades locked until tomorrow.</div></div>
-        <span class="gd-foot"><i></i>Guard active</span>
-      </article>
-      <article class="gd">
-        <div class="gd-top"><span class="gd-ico b">◎</span><span class="gd-pill">Discipline</span></div>
-        <span class="gd-kind">Journal insights</span>
-        <h3>Finds the habit that's costing you.</h3>
-        <p>Reads every closed trade and points at the leaks: revenge trades, bad hours, overtrading.</p>
-        <div class="gd-chat"><div><b>3 revenge trades</b> this week, all within 15 min of a stop-out.</div><div>Late-session trades lose <b>68%</b> of the time.</div><div class="me">Strongest setup: XAUUSD buys, <b>+11.2R</b>.</div></div>
-        <span class="gd-foot"><i></i>Guard active</span>
-      </article>
-      <article class="gd">
-        <div class="gd-top"><span class="gd-ico c">◆</span><span class="gd-pill">Prop rules</span></div>
-        <span class="gd-kind">Funded accounts</span>
-        <h3>Keeps the challenge alive.</h3>
-        <p>Your firm's limits tracked trade by trade, with a KATANA limit that stops you first. Firm blocks EAs? The <a href="/help/ea-blocked">support email</a> is one click away.</p>
-        <div class="gd-chat"><div>Daily limit <b>5%</b> · Max drawdown <b>10%</b>.</div><div>Drawdown used: <b>$3,100</b> of $10,000.</div><div class="me">Tip: set KATANA's limit to <b>3%</b>, below the firm's 5%.</div></div>
-        <span class="gd-foot"><i></i>Guard active</span>
-      </article>
-    </div>
-  </section>
-
-  <section class="wrap lp-sec lp-split">
-    <div class="lp-head left">
-      <span class="lp-kicker">Trade Journal</span>
-      <h2>See your month at a glance.</h2>
-      <p>The Trade Journal EA sends every closed trade to your calendar: green and red days, weekly totals and win rate, split by account. Tap a day to see its trades, with the entry, stop and target taken from the real chart.</p>
-      <ul class="lp-ticks"><li>One tab per MT5 account</li><li>Entry, SL and TP from the chart</li><li>Removed accounts kept apart</li></ul>
-    </div>
-    <div class="jc" aria-label="Example journal month">
-      <div class="jc-top"><b>October 2026</b><span class="up">+$3,196.00</span></div>
-      <div class="jc-stats"><div><span>Trades</span><b>41</b></div><div><span>Win rate</span><b>61%</b></div><div><span>Green days</span><b>12/18</b></div></div>
-      <div class="jc-grid">
-        ${['Mo','Tu','We','Th','Fr'].map((d) => `<i>${d}</i>`).join('')}
-        ${[312,-140,488,0,226,-95,640,175,-210,390,128,0,-60,515,244,402,-180,96,310,-45].map((v) => `<span class="${v > 0 ? 'w' : v < 0 ? 'l' : ''}">${v ? (v > 0 ? '+' : '−') + Math.abs(v) : '·'}</span>`).join('')}
-      </div>
-    </div>
-  </section>
-
-  <section class="lp-coach">
-    <div class="wrap">
-      <div class="lp-head"><span class="lp-kicker">Journal insights</span><h2>Your journal, <em>reading you back.</em></h2>
-        <p>Open Insights and your trades are already scored, sorted and explained. One habit to fix this week, the leaks costing you money, and what to keep doing.</p></div>
-      <div class="dk" aria-label="Example of the Insights page in the members area">
-        <aside class="dk-side">
-          <div class="dk-logo"><img src="/logo.png" alt="" width="26" height="16"><span>5ABI<b>.FX</b></span></div>
-          <span class="dk-sec">Main menu</span>
-          <span class="dk-nav">My EAs</span><span class="dk-nav">Journal</span><span class="dk-nav on">Insights</span>
-          <span class="dk-sec">Account</span>
-          <span class="dk-nav">Plans</span><span class="dk-nav">Help &amp; FAQ</span>
-        </aside>
-        <div class="dk-main">
-          <div class="dk-bar"><b>Insights</b><span class="dk-pills"><i>30 days</i><i class="on">90 days</i><i>All time</i></span><span class="dk-priv">Hide private info</span></div>
-          <div class="dk-top">
-            <div class="dk-score">
-              <span class="dk-lbl">Edge score</span>
-              <div class="dk-num"><b>72</b><small>/ 100 · solid</small></div>
-              ${[['Profit factor', 78], ['Win / loss size', 64], ['Win rate', 58], ['Drawdown', 81], ['Recovery', 70], ['Consistency', 49]].map(([n, v]) => `<div class="dk-row"><span>${n}</span><i style="--w:${v}%" class="${v < 55 ? 'lo' : ''}"></i><em>${v}</em></div>`).join('')}
-            </div>
-            <div class="dk-focus">
-              <span class="dk-lbl acc">This week's focus</span>
-              <h3>“Moved stop” is your most expensive habit.</h3>
-              <p>Trades where the stop was moved cost <b>−$852</b> over 15 trades.</p>
-              <div class="dk-rule"><b>Rule to try:</b> leave the stop where you put it. Without this leak you'd be up <b>+$2,048</b> instead of +$1,196.</div>
-              <p class="dk-next">Next: “entered early” <b>−$293</b> · trades marked FOMO win <b>18%</b></p>
-            </div>
-          </div>
-          <div class="dk-nums">
-            ${[['Profit factor', '1.64', 'up'], ['Expectancy', '+0.31R', 'up'], ['Avg win / loss', '1.8 : 1', ''], ['Max drawdown', '−3.2%', 'dn'], ['Win rate', '52%', '']].map(([n, v, c]) => `<div><span>${n}</span><b class="${c}">${v}</b></div>`).join('')}
-          </div>
-          <div class="dk-leaks">
-            <div><span class="dk-lbl"><i class="r"></i>Time of day</span><p>You lose <b>70%</b> of trades opened after 17:00.</p><em><b>Fix</b> Stop trading the late session for 2 weeks.</em></div>
-            <div><span class="dk-lbl"><i class="r"></i>Overtrading</span><p>After your 2nd trade of the day, win rate drops to <b>36%</b>.</p><em><b>Fix</b> Max 2 trades a day. Close the platform after a green one.</em></div>
-            <div><span class="dk-lbl"><i class="g"></i>What works</span><p>Strongest setup: <b>London breakout</b>, +11.2R over 22 trades.</p><em><b>Keep</b> Trade it at full size, trade less of everything else.</em></div>
-          </div>
-        </div>
-      </div>
-      <ul class="dk-also">
-        <li><b>Edge score</b> Six parts of your trading in one number out of 100.</li>
-        <li><b>Leaks with a fix</b> Each problem comes with one plain rule to try.</li>
-        <li><b>Charts</b> Equity and drawdown, profit by session and day, where trades end in R.</li>
-      </ul>
-    </div>
-  </section>
-
-  <section class="wrap lp-sec lp-split">
-    <div class="lp-head left">
-      <span class="lp-kicker">Prop firm guard</span>
-      <h2>Know how close you are to the firm's line.</h2>
-      <p>Enter your firm's daily loss, max loss and profit target once per account. The journal tracks every trade against them and tells you what KATANA's daily limit should be, so it stops you well before the firm does.</p>
-      <ul class="lp-ticks"><li>Daily loss, max loss and target per account</li><li>Worst day and lowest balance shown</li><li>Suggested KATANA limit below the firm's</li></ul>
-    </div>
-    <div class="pg" aria-label="Example prop firm guard">
-      <div class="pg-top"><b>Funded 100K · Phase 1</b><span>All trades of this account</span></div>
-      <div class="pg-m"><div class="pg-r"><span>Daily loss</span><em>42% used</em></div><div class="pg-bar"><i style="--w:42%"></i></div><p>Worst day <b>−2.1%</b> against your <b>5%</b> limit.</p></div>
-      <div class="pg-m"><div class="pg-r"><span>Max loss</span><em>31% used</em></div><div class="pg-bar warn"><i style="--w:31%"></i></div><p>Lowest balance <b>3.1%</b> below the start. Limit <b>10%</b>.</p></div>
-      <div class="pg-m"><div class="pg-r"><span>Profit target</span><em>68% done</em></div><div class="pg-bar ok"><i style="--w:68%"></i></div><p><b>+5.4%</b> of the <b>8%</b> target.</p></div>
-      <div class="pg-fix"><b>Fix</b> Set KATANA's daily loss limit to 3%, so it stops you before the firm's 5%.</div>
-    </div>
-  </section>
-
-  <section class="wrap lp-sec lp-split rev">
-    <div class="lp-head left">
-      <span class="lp-kicker">Share cards</span>
-      <h2>Post the trade, not a screenshot of MT5.</h2>
-      <p>Every journaled trade becomes a clean 9:16 card with the real candles, your entry and exit, and the result in R, pips or percent. Made for stories and Discord.</p>
-      <p class="pv-note">Posting a screenshot of your journal? One switch hides your account numbers, broker and name.</p>
-      <div class="pv" aria-label="Example of hide private info">
-        <span class="pv-sw"><i></i>Hide private info</span>
-        <span class="pv-acc"><s>FundedNext · 14337344</s><b>Account ••44</b></span>
-      </div>
-    </div>
-    <div class="sc-wrap">
-      <div class="sc" aria-label="Example share card">
-        <div class="sc-top"><span>XAUUSD · BUY</span><span class="mark"></span></div>
-        <svg viewBox="0 0 120 70" preserveAspectRatio="none" aria-hidden="true">
-          ${[[8,40,52,44,48],[16,46,50,38,42],[24,44,48,34,36],[32,38,42,30,40],[40,40,44,30,32],[48,34,38,26,28],[56,30,34,20,22],[64,24,30,18,26],[72,26,28,14,16],[80,18,22,10,12],[88,14,18,8,10],[96,12,16,6,8]].map(([x,o,h,l,c]) => `<line x1="${x}" x2="${x}" y1="${h}" y2="${l}" stroke="${c < o ? '#26c6a0' : '#f0464b'}" stroke-width=".8"/><rect x="${x - 2.4}" y="${Math.min(o, c)}" width="4.8" height="${Math.max(1, Math.abs(o - c))}" fill="${c < o ? '#26c6a0' : '#f0464b'}"/>`).join('')}
-          <line x1="0" x2="120" y1="44" y2="44" stroke="#3d7bff" stroke-dasharray="2 2" stroke-width=".6"/>
-        </svg>
-        <div class="sc-res"><b>+2.4R</b><span>Closed at target</span></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="wrap lp-sec">
-    <div class="lp-head"><span class="lp-kicker">Everything included</span><h2>One licence. The whole toolkit.</h2></div>
-    <div class="lp-grid">
-      <div><h3>Risk limits</h3><p>Daily loss and max drawdown caps that lock trading when they're reached.</p></div>
-      <div><h3>Position sizing</h3><p>Lot size worked out from your risk % and stop distance on every order.</p></div>
-      <div><h3>Trade Journal</h3><p>Calendar, account tabs and per-day trade lists, filled in automatically.</p></div>
-      <div><h3>Journal Insights</h3><p>Edge score, weekly focus, leaks with a fix for each, and charts of your own trades.</p></div>
-      <div><h3>Prop firm guard</h3><p>Daily loss, max loss and target tracked per account against your firm's rules.</p></div>
-      <div><h3>Private mode</h3><p>Hide account numbers, broker and name before you share a screenshot.</p></div>
-      <div><h3>Share cards</h3><p>Story-ready cards drawn from the real chart of each trade.</p></div>
-      <div><h3>Your accounts only</h3><p>Each EA runs only on the MT5 account numbers you register.</p></div>
-      <div><h3>Prop-firm ready</h3><p>Firm blocks EAs? Get a <a href="/help/ea-blocked">ready-to-send support email</a> in one click.</p></div>
-    </div>
-  </section>
-
-  <section id="pricing" class="lp-band">
-    <div class="wrap">
-      <div class="lp-head"><span class="lp-kicker">Pricing</span><h2>Costs less than one stop loss.</h2>
-        <p>A 0.10 lot EUR/USD trade stopped out 20 pips away loses about $20. ${trial ? `Every plan starts with a ${trial}-day free trial.` : 'Pick the plan that fits how you trade.'}</p></div>
-      ${planCards({ cta: (p) => `<a class="btn ${p.popular ? '' : 'secondary '}full" href="/pricing?plan=${p.id}">${trial ? 'Start free trial' : `Choose ${esc(p.name)}`}</a>` })}
-      <p class="center lp-more"><a href="/pricing">Compare plans and annual prices →</a></p>
-    </div>
-  </section>
-
-  <section class="wrap lp-final">
-    <h2>Trade with <em>discipline.</em></h2>
-    <p>${trial ? `Every tool, free for ${trial} days. Then plans from ${esc(PRICE_TEXT)}.` : 'Already bought an EA? Create your account to get started.'}</p>
-    <div class="lp-cta center">
-      ${signup ? `<a class="btn big" href="/signup">${join}</a>` : ''}
-      <a class="btn big ghost" href="/login">Sign in</a>
-    </div>
-  </section>
-`, { wide: true });
+    <div class="tiers rv" id="tiers">${tiers}</div>
+    <p class="pfine">${trial ? `Every plan starts with a ${trial}-day free trial of all EAs. Cancel anytime.` : 'Cancel anytime.'}</p>
+  </div>
+</section>`;
+  res.send(cinePage(req, 'home', {
+    KICKER: `MT5 risk manager · trade journal${trial ? ` · ${trial}-day free trial` : ''}`,
+    JOINBTN: signup ? `<a class="go pri" href="/signup">${join}</a>` : '',
+    PRICE: price,
+    CTA: signup ? `<a class="cta" href="/signup">${join}</a>` : '<a class="cta" href="/login">Sign in</a>',
+  }, { title: `${SITE_NAME} · Risk manager & trade journal for MT5` }));
 });
 
 app.get('/login', (req, res) => {

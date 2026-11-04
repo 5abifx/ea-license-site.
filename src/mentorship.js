@@ -15,6 +15,7 @@
 // Plans and prices are edited in MENTOR_PLANS below. Optional env: MENTOR_SEATS ("3/10" shows a seats
 // counter), MENTOR_YOUTUBE, MENTOR_DISCORD, MENTOR_INSTAGRAM, MENTOR_X, MENTOR_WHATSAPP (links on the page).
 const { esc, fmtDate } = require('./views');
+const { cinePage } = require('./cine');
 
 const MENTOR_PLANS = [
   { id: 'selfstudy', name: 'Self-Study', price: 997, soon: true },
@@ -62,85 +63,75 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
   const stripeOn = () => Boolean(process.env.STRIPE_SECRET_KEY);
   const siteUrl = (req) => process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
 
-  // ---------- the page ----------
+  // ---------- the page (cinematic layout: src/cine-pages/mentorship.html + public/cine/mentorship.*) ----------
   function socials() {
     const links = [
-      ['YouTube', process.env.MENTOR_YOUTUBE, 'Watch on YouTube'],
-      ['Discord', process.env.MENTOR_DISCORD, '5ABI Community'],
-      ['Instagram', process.env.MENTOR_INSTAGRAM || 'https://www.instagram.com/5abi.fx/', '@5abi.fx'],
-      ['X', process.env.MENTOR_X, 'Follow on X'],
-      ['WhatsApp', process.env.MENTOR_WHATSAPP, 'Ask a question'],
+      ['YouTube', process.env.MENTOR_YOUTUBE],
+      ['Discord', process.env.MENTOR_DISCORD],
+      ['Instagram', process.env.MENTOR_INSTAGRAM || 'https://www.instagram.com/5abi.fx/'],
+      ['X', process.env.MENTOR_X],
+      ['WhatsApp', process.env.MENTOR_WHATSAPP],
     ].filter(([, url]) => url && /^https?:\/\//.test(url));
-    return `<div class="socials">${links.map(([n, url, sub]) => `<a class="soc" href="${esc(url)}" target="_blank" rel="noopener"><b>${n}</b><span>${esc(sub)}</span></a>`).join('')}</div>`;
+    return links.length ? `<div class="socs">${links.map(([n, url]) => `<a href="${esc(url)}" target="_blank" rel="noopener">${n}</a>`).join('')}</div>` : '';
   }
 
-  function seats() {
+  // third gauge on the "One market. One open." slide: seats left (MENTOR_SEATS = "taken/total"), or "small batches"
+  function seatsGauge() {
     const m = /^(\d+)\s*\/\s*(\d+)$/.exec(String(process.env.MENTOR_SEATS || '').trim());
-    if (!m) return '';
-    const taken = Math.min(Number(m[1]), Number(m[2])), total = Math.min(Number(m[2]), 40);
-    return `<div class="seats"><span class="dots">${Array.from({ length: total }, (_, i) => `<i${i < taken ? '' : ' class="o"'}></i>`).join('')}</span><span class="mono">${taken} of ${total} seats taken this intake</span></div>`;
+    const ring = (to) => `<svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="1" stroke-dasharray="1 5"/><circle class="arc" cx="100" cy="100" r="92" fill="none" stroke="var(--glow)" stroke-width="1.4" stroke-dasharray="578" stroke-dashoffset="578" transform="rotate(-90 100 100)" data-to="${to}"/></svg>`;
+    if (!m || !Number(m[2])) return `<div class="gauge">${ring(1)}<b>Small</b><p>batches only</p></div>`;
+    const total = Number(m[2]), left = Math.max(0, total - Math.min(Number(m[1]), total));
+    return `<div class="gauge">${ring((left / total).toFixed(2))}<b data-count="${left}">${left}</b><p>${left === 1 ? 'seat' : 'seats'} left</p></div>`;
   }
 
   const signupLink = '/signup?next=mentorship';
-  const lockLink = (text = 'Sign up free to see prices') => `<a class="lockp" href="${signupLink}">🔒 ${esc(text)}</a>`;
+  const LISTS = {
+    selfstudy: [['', 'Recorded lessons from real sessions'], ['', 'Learn at your own pace'], ['', 'Private Discord'], ['', 'Trade Journal, 3 months'], ['no', 'Live classes'], ['no', 'Private calls'], ['no', 'Trader Awareness Test'], ['no', 'Trading software']],
+    mentorship: [['', '8 weeks of live classes at the midnight open'], ['', 'Group trade reviews + private Discord'], ['', '1 private call'], ['', 'Trader Awareness Test report'], ['', 'KATANA + Journal, 3 months'], ['', 'Student indicator at graduation'], ['', `${EA_DISCOUNT}% off all 5ABI.FX EAs`], ['no', 'Trading software']],
+    full: [['', 'Everything in Mentorship'], ['hl', 'Trading software: heatmap + one platform you pick'], ['hl', '4 private calls, not 1'], ['hl', 'KATANA + Journal for 6 months, not 3'], ['hl', `${EA_DISCOUNT}% off all EAs while you are a member`], ['', 'Priority answers in Discord']],
+  };
+  const HEAD = {
+    selfstudy: ['Recorded lessons, at your own pace', '<span class="badge soon">Coming soon</span>'],
+    mentorship: ['Live classes plus your own plan', ''],
+    full: ['Everything, software included', '<span class="badge">Most students pick this</span>'],
+  };
 
   function tier(p, u, waiting, pr) {
-    const li = (items) => items.map(([cls, t]) => `<li${cls ? ` class="${cls}"` : ''}>${t}</li>`).join('');
-    const list = {
-      selfstudy: [['', 'Recorded lessons'], ['', 'Learn at your own pace'], ['', 'Private Discord'], ['', 'Trade Journal, 3 months'], ['no', 'Live classes'], ['no', '1-to-1 calls'], ['no', 'Trader Awareness Test report'], ['no', 'Trading software included'], ['no', `${EA_DISCOUNT}% off EAs`]],
-      mentorship: [['', '8 weekly live classes at the midnight open'], ['', 'Group trade reviews + private Discord'], ['', '1 × 1-to-1 call'], ['', 'Trader Awareness Test report'], ['', 'KATANA + Journal, 3 months'], ['', 'Student indicator at graduation'], ['', `${EA_DISCOUNT}% off all 5ABI.FX EAs`], ['no', 'Trading software included']],
-      full: [['', 'Everything in Mentorship'], ['hl', 'Trading software included: heatmap + one platform you pick'], ['hl', '4 × 1-to-1 calls (not 1)'], ['hl', 'KATANA + Journal for 6 months (not 3)'], ['hl', `${EA_DISCOUNT}% off all EAs while you're a member`], ['', 'Priority answers in Discord']],
-    }[p.id];
-    const head = {
-      selfstudy: ['Recorded lessons, at your own pace', '<span class="mbadge soonb">Coming soon</span>'],
-      mentorship: ['Live sessions plus your own plan', ''],
-      full: ['Everything, software included', '<span class="mbadge">Most students pick this</span>'],
-    }[p.id];
     const off = p.soon ? null : pr;
-    const amount = u ? `<div class="amt">${off ? `<s>${money(p.price)}</s>` : ''}<b>${money(cut(p.price, off))}</b><span>one-time</span></div>${off ? `<div class="pplan promo-tag">Mystery discount: ${off.pct}% off</div>` : ''}${p.part ? `<div class="pplan">or ${PARTS} × ${money(cut(p.part, off))}</div>` : ''}`
-      : `<div class="amt locked-amt">${lockLink()}</div>`;
+    const pri = p.id === 'full' ? ' pri' : '';
+    const amount = u
+      ? `<span class="mem">${off ? `<s>${money(p.price)}</s>` : ''}<b>${money(cut(p.price, off))}</b><i>one-time</i>${p.part ? `<em>or ${PARTS} × ${money(cut(p.part, off))}</em>` : ''}</span>${off ? `<span class="promo-tag">Mystery discount · ${off.pct}% off</span>` : ''}`
+      : `<a class="vis lock" href="${signupLink}">🔒 Sign up free to see the price</a>`;
     let action;
-    if (!u) action = `<a class="btn${p.id === 'full' ? ' pri' : ''}" href="${signupLink}">Sign up to see the price</a>`;
+    if (!u) action = `<a class="pb${pri}" href="${signupLink}">Sign up to see the price</a>`;
     else if (p.soon) action = waiting ? '<p class="ok">✓ You\'re on the list. We\'ll email you when Self-Study opens.</p>'
-      : `<form method="post" action="/mentorship/waitlist"><button class="btn" type="submit">Notify me when it opens</button></form>`;
+      : '<form method="post" action="/mentorship/waitlist"><button class="pb" type="submit">Notify me when it opens</button></form>';
     else if (u.mentor_plan === p.id) action = '<p class="ok">✓ You\'re in. Check your email and Discord for your first class.</p>';
-    else action = `<form method="post" action="/mentorship/checkout" class="pay">
-        <input type="hidden" name="plan" value="${p.id}">
-        <button class="btn${p.id === 'full' ? ' pri' : ''}" name="pay" value="once">Pay ${money(cut(p.price, off))}</button>
-        ${p.part ? `<button class="btn ghost" name="pay" value="parts">Pay in ${PARTS} parts</button>` : ''}
-      </form>`;
-    return `<div class="tier${p.id === 'full' ? ' top' : ''}${p.soon ? ' soon' : ''}">
-      ${head[1]}
-      <div class="nm">${esc(p.name)}</div><div class="for">${head[0]}</div>
-      ${amount}
-      <ul>${li(list)}</ul>
-      ${p.id === 'mentorship' ? `<div class="nudge">Get the trading software (worth $3,500+) and 4 private calls for just <b>${u ? `${money(cut(getMentorPlan('full').price, pr) - cut(p.price, pr))} more` : 'a little more'}</b> →</div>` : ''}
-      ${action}
-    </div>`;
+    else action = `<form method="post" action="/mentorship/checkout"><input type="hidden" name="plan" value="${p.id}">
+        <button class="pb${pri}" name="pay" value="once">Pay ${money(cut(p.price, off))}</button>
+        ${p.part ? `<button class="pb ghost" name="pay" value="parts">Pay in ${PARTS} parts</button>` : ''}</form>`;
+    const nudge = p.id === 'mentorship'
+      ? `<p class="nudge">Get the trading software (worth $3,500+) and 4 private calls for just <b>${u ? `${money(cut(getMentorPlan('full').price, pr) - cut(p.price, pr))} more` : 'a little more'}</b> →</p>` : '';
+    return `<article class="tier${p.id === 'full' ? ' top' : ''}${p.soon ? ' soon' : ''}">${HEAD[p.id][1]}<h3>${esc(p.name)}</h3><p class="for">${HEAD[p.id][0]}</p>
+<div class="amt">${amount}</div>
+<ul>${LISTS[p.id].map(([c, t]) => `<li${c ? ` class="${c}"` : ''}>${t}</li>`).join('')}</ul>${nudge}<div class="act">${action}</div></article>`;
   }
 
   function pricing(u, waiting, pr) {
-    return `<section class="band alt" id="price"><div class="in">
-  <div class="sec-head"><div class="eyebrow">Pricing · USD · one-time · 8 weeks</div><h2>Pick how far you want to go.</h2>
-  ${u ? '' : '<p class="lede">Prices are shown to members. Sign up free in one tap, no card needed.</p>'}</div>
-  ${u ? '' : `<div class="gate"><a class="btn pri" href="${signupLink}">Sign up free to see prices</a><a class="btn" href="/login?next=mentorship">I have an account</a></div>`}
-  <div class="ladder">${MENTOR_PLANS.map((p) => tier(p, u, waiting, pr)).join('')}</div>
-  ${u ? '<p class="fine center">Card payment by Stripe. Paying in 3 parts charges the same card once a month for 3 months.</p>' : ''}
-</div></section>`;
-  }
-
-  function promoBar(pr, u) {
-    if (!pr) return '';
-    return `<div class="promo-bar" data-ends="${pr.ends.toISOString()}"><span>Limited time</span><b>${claimed(u) ? `${pr.pct}% off the mentorship` : 'Mystery discount for new students'}</b>
-      <span class="mono" data-countdown>ends ${esc(pr.ends.toISOString().slice(0, 10))}</span>${claimed(u) ? '<span class="ok">✓ Claimed</span>' : '<a href="/mentorship/claim" data-claim>Claim</a>'}</div>`;
-  }
-  function promoPopup(pr, u) {
-    if (!pr || u) return ''; // first-time visitors only: signed-in people just see the bar
-    // a small note that slides in at the corner: it never blocks the page
-    return `<aside class="mystery" id="mystery" hidden aria-labelledby="mystery-t">
-      <div class="mystery-top"><b id="mystery-t">Mystery discount</b><button type="button" class="mystery-x" data-close aria-label="Close">×</button></div>
-      <p><span class="mono" data-countdown>ends ${esc(pr.ends.toISOString().slice(0, 10))}</span> · <a class="mystery-go" href="/mentorship/claim">Reveal →</a></p>
-    </aside>`;
+    const live = promo();
+    const note = live && !u
+      ? `<aside class="mys" id="mys" hidden><button type="button" aria-label="Close" data-x>×</button><b>A mystery discount is waiting</b><p>For new students, for a short time. Ends in <span class="mono" data-ends="${live.ends.toISOString()}">soon</span></p><a href="/mentorship/claim">Reveal →</a></aside>` : '';
+    const claimLine = live && u && !pr
+      ? `<p class="pfine">A mystery discount is running for new students. Ends in <span class="mono" data-ends="${live.ends.toISOString()}">soon</span>. <a href="/mentorship/claim">Claim it →</a></p>` : '';
+    return `<section class="band g" id="price" data-view="${u ? 'member' : 'visitor'}">
+  <div class="in">
+    <div class="phead"><div><p class="k rv">Plans · USD · one-time · 8 weeks</p><h2 class="rv">Pick how far<br><span class="m">you want to go.</span></h2></div></div>
+    ${u ? claimLine : `<div class="gate rv"><p>Prices are shown to members. Sign up free in one tap, no card needed.</p><a class="pb pri" href="${signupLink}">Sign up free to see prices</a><a class="pb ghost" href="/login?next=mentorship">I have an account</a></div>`}
+    <div class="tiers rv">${MENTOR_PLANS.map((p) => tier(p, u, waiting, pr)).join('')}</div>
+    ${u ? '<p class="pfine">Card payment by Stripe. Paying in 3 parts charges the same card once a month for 3 months.</p>' : ''}
+  </div>
+  ${note}
+</section>`;
   }
 
   // Claim the mystery discount. Signed out: make a free account first, then it is claimed on the way back.
@@ -160,8 +151,11 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
     if (u && !u.is_admin) track(u.id, 'prices');
     const pr = promoFor(u);
     const waiting = u && db.prepare("SELECT 1 FROM mentor_events WHERE user_id = ? AND event = 'waitlist' AND plan = 'selfstudy'").get(u.id);
-    const price = (id) => (u ? money(cut(MENTOR_PLANS.find((p) => p.id === id).price, pr)) : lockLink('Sign up to see'));
-    page(req, res, 'Mentorship', `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800;900&display=swap"><link rel="stylesheet" href="/mentorship.css"><div class="mp">${promoBar(promo(), u)}${body({ u, seats: seats(), socials: socials(), price, pricing: pricing(u, waiting, pr) })}${promoPopup(promo(), u)}</div><script src="/mentorship.js"></script>`, { wide: true, og: OG });
+    const navr = u
+      ? '<a class="go hide-s" href="/dashboard">My EAs</a><a class="go" href="#price">See the plans</a>'
+      : '<a class="go hide-s" href="/">Home</a><a class="go hide-s" href="/login?next=mentorship">Sign in</a><a class="go" href="#price">See the plans</a>';
+    res.send(cinePage(req, 'mentorship', { NAVR: navr, SEATS: seatsGauge(), PRICE: pricing(u, waiting, pr), SOCIALS: socials() },
+      { title: `Mentorship · ${OG.title.split(' · ')[0]}`, og: OG }));
   });
 
   // ---------- waitlist and checkout ----------
@@ -370,163 +364,3 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
 
 module.exports.MENTOR_PLANS = MENTOR_PLANS;
 module.exports.eaDiscountFor = eaDiscountFor;
-
-// the page sections (prices are filled in by pricing() and price())
-function body({ seats, socials, price, pricing }) {
-  return `
-<section class="band mp-hero"><div class="in">
-  <div>
-    <div class="eyebrow">5ABI.FX Mentorship · 8 live classes</div>
-    <h1>Stop predicting candles. Read what's behind them.</h1>
-    <p class="lede">An 8-week live mentorship with Gursewak: the tools and the knowledge to use them in day trading. One 90-minute live class a week at the <b>midnight open</b>, where we all trade together, plus a live trading lab to finish. A method you won't find on YouTube. Included: one pro platform (your choice of NinjaTrader, ATAS or DeepCharts) and a heatmap.</p>
-    <div class="ctas"><a class="btn pri" href="#price">See the plans</a><a class="btn" href="#reviews">Read student reviews</a></div>
-    ${seats}
-  </div>
-  <div class="desk" aria-label="Illustration of a trading desk">
-    <div class="bar"><span>Live class</span><span>Market open</span></div>
-    <div class="dom">
-      <span style="height:22%"></span><span style="height:35%"></span><span class="s" style="height:48%"></span><span style="height:62%"></span><span style="height:78%"></span><span class="p" style="height:100%"></span><span style="height:84%"></span><span class="s" style="height:66%"></span><span style="height:52%"></span><span class="s" style="height:40%"></span><span style="height:28%"></span><span style="height:18%"></span>
-    </div>
-    <div class="row"><span class="chip on">Buyers in control</span><span class="chip">POC</span><span class="chip">VAH</span><span class="chip">VAL</span><span class="chip on">KATANA risk set</span></div>
-  </div>
-</div></section>
-
-<section class="band" style="padding-block:28px 56px"><div class="in">
-  <div class="proof">
-    <div><b class="mono">8</b><span>live classes, 90 minutes each</span></div>
-    <div><b class="mono">00:00</b><span>live at the midnight open</span></div>
-    <div><b class="mono">1:1</b><span>personal calls with your mentor</span></div>
-    <div><b class="mono">30%</b><span>off every 5ABI.FX EA for students</span></div>
-  </div>
-</div></section>
-
-<section class="band alt"><div class="in">
-  <div class="sec-head"><div class="eyebrow">What you learn</div><h2>How price actually moves, and who is moving it.</h2><p class="lede">No setups to memorise and no recycled internet content. You learn to read the market while it's open, from someone who trades it.</p></div>
-  <div class="topics"><span>Read who is in control</span><span>Know where price is fair</span><span>Plan before the open</span><span>Time your entry</span><span>Size risk from your own numbers</span><span>Fix the habits that cost you</span><span>Pass prop-firm rules</span></div>
-  <div class="vs">
-    <div><h3>Most trading courses</h3><ul><li>Cheap recorded content from people with no real experience</li>
-<li>Hard to follow, with nobody to ask</li><li>Predict moves from old candles</li><li>Then you're on your own</li></ul></div>
-    <div class="us"><h3>5ABI.FX mentorship</h3><ul><li>Taught live by a trader who trades it every day</li><li>Explained clearly and simply, ask as many times as you need</li>
-<li>Read price and volume, no predictions</li><li>See the reaction in real time</li><li>Trading software included, and we teach you to use it</li><li>Your mentor stays involved in your growth</li></ul></div>
-  </div>
-</div></section>
-
-<section class="band" id="inside"><div class="in">
-  <div class="sec-head"><div class="eyebrow">What you get</div><h2>Everything serious traders pay for separately.</h2></div>
-  <div class="stack">
-    <div class="item"><div class="ico">01</div><div><h3>8 live classes</h3><p>One 90-minute live class a week with Gursewak. The method is taught in class only, never posted online.</p></div><div class="val">included</div></div>
-    <div class="item"><div class="ico">02</div><div><h3>Personal 1-to-1 calls</h3><p>Ask anything as many times as you need. We go through your trades and the habits holding you back.</p></div><div class="val">included</div></div>
-    <div class="item"><div class="ico">03</div><div><h3>Trading software included</h3><p>The software you need for day trading, set up for you, and taught step by step. You don't buy it yourself.</p></div><div class="val">included</div></div>
-    <div class="item"><div class="ico">04</div><div><h3>KATANA risk manager + Trade Journal</h3><p>Exact lot size, a real stop on every trade, daily loss guard, and a journal that finds your leaks.</p></div><div class="val">included</div></div>
-    <div class="item"><div class="ico">05</div><div><h3>Private student indicator</h3><p>Handed out at graduation in week 8, once you can read the levels by hand. Not sold anywhere else.</p></div><div class="val">students only</div></div>
-    <div class="item"><div class="ico">06</div><div><h3>Trader Awareness Test + report</h3><p>Your personal report on strengths and resistances, with advice on what to change in your trading style.</p></div><div class="val">included</div></div>
-    <div class="item"><div class="ico">07</div><div><h3>30% off every 5ABI.FX EA</h3><p>For as long as you're a mentorship member.</p></div><div class="val">ongoing</div></div>
-    <div class="item"><div class="ico">08</div><div><h3>Private Discord</h3><p>Inner-circle channels, journals, achievements, and Q&amp;A with other students.</p></div><div class="val">included</div></div>
-    <div class="total"><span>Everything above, in one place</span><span>Full mentorship <strong>${price('full')}</strong></span></div>
-  </div>
-</div></section>
-
-<section class="band" id="test"><div class="in tt">
-  <div>
-    <div class="eyebrow">Trader Awareness Test</div>
-    <h2 style="margin-top:8px">Know what holds you back before the market shows you.</h2>
-    <p class="lede" style="margin-top:14px">On Mentorship and Full Mentorship, you take our Trader Awareness Test. You get a personal report on where you express yourself and where you resist, and I tell you exactly what to change in the way you trade.</p>
-    <ul class="ttl"><li>Personal colour score report, private to you</li><li>Your strengths and resistances as a trader</li><li>Advice on what to change in your trading style</li><li>Reviewed with you on a 1-to-1 call</li></ul>
-  </div>
-  <div class="rep" aria-label="Sample Trader Awareness Test report">
-    <div class="rh"><b>5ABI.FX · Trader Awareness Test</b><span>SAMPLE · CONFIDENTIAL</span></div>
-    <div class="leg"><span>Resistance (−)</span><span>Expression (+)</span></div>
-    <div class="tr"><span class="cn">Yellow</span><div class="neg"><i style="width:13%;background:#e9c84a"></i></div><div class="pos"><i style="width:63%;background:#e9c84a"></i></div><span class="nv">+63 / -13</span></div><div class="tr"><span class="cn">Blue</span><div class="neg"><i style="width:25%;background:#4a8fe9"></i></div><div class="pos"><i style="width:38%;background:#4a8fe9"></i></div><span class="nv">+38 / -25</span></div><div class="tr"><span class="cn">Orange</span><div class="neg"><i style="width:0%;background:#ff8a3d"></i></div><div class="pos"><i style="width:50%;background:#ff8a3d"></i></div><span class="nv">+50 / 0</span></div><div class="tr"><span class="cn">Turquoise</span><div class="neg"><i style="width:38%;background:#2fd3b0"></i></div><div class="pos"><i style="width:25%;background:#2fd3b0"></i></div><span class="nv">+25 / -38</span></div><div class="tr"><span class="cn">Green</span><div class="neg"><i style="width:50%;background:#4cc76a"></i></div><div class="pos"><i style="width:13%;background:#4cc76a"></i></div><span class="nv">+13 / -50</span></div><div class="tr"><span class="cn">Beige</span><div class="neg"><i style="width:13%;background:#cdb79a"></i></div><div class="pos"><i style="width:0%;background:#cdb79a"></i></div><span class="nv">0 / -13</span></div><div class="tr"><span class="cn">Purple</span><div class="neg"><i style="width:25%;background:#9a6be9"></i></div><div class="pos"><i style="width:13%;background:#9a6be9"></i></div><span class="nv">+13 / -25</span></div><div class="tr"><span class="cn">Red</span><div class="neg"><i style="width:13%;background:#e5484d"></i></div><div class="pos"><i style="width:38%;background:#e5484d"></i></div><span class="nv">+38 / -13</span></div>
-    <div class="adv"><b>Advice</b><p>Strong drive to act, low patience. Trade fewer setups, wait for your level, and set your daily limit in KATANA before the open.</p></div>
-  </div>
-</div></section>
-<section class="band alt" id="reviews"><div class="in">
-  <div class="sec-head"><div class="eyebrow">Student reviews</div><h2>In their own words</h2><p class="lede">Written by our mentorship students.</p></div>
-  <div class="reviews">
-    <div class="rev feat"><q>I traded support and resistance, order blocks and ICT concepts, learning from multiple mentors, YouTube channels, Telegram channels, paid courses and free courses. But in the end, I was not profitable at all. Then I started this mentorship. He explained everything in the live market with live trades and real-time examples. No backtesting, only live market execution in every session. Instead of guessing where the price might go, I now understand where it is actually heading, where I need to wait, and where I should execute. Zero guessing, just pure knowledge-based execution.</q><p class="rev-more">"Another crucial area that most mentors skip is psychology. He identified exactly where psychological barriers were holding me back, diagnosed my specific blind spots and provided tailored solutions."</p><p class="rev-more">"If you are looking for cheap get-rich-quick trading strategies, you are in the wrong place. Here, you must give 100% effort to learn and practice."</p><div class="who"><span class="av">R</span><div><b>Rajinder</b><span>Punjab, India · finishing the mentorship</span></div></div><span class="src">Student review · Nov 2026</span></div>
-    <div class="rev"><q>I've been trading for 5 years and bought many courses: SMC, ICT and more. They all still felt like prediction. This mentorship completely changed the way I see the markets.</q><p style="margin:0;color:var(--muted);font-size:14px">"Free access to professional software, which makes learning much easier, and personal 1-on-1 meetings where you can ask questions."</p><div class="who"><span class="av">R</span><div><b>Ranjeet S.</b><span>5 years trading</span></div></div><span class="src">Discord · Aug 2026</span></div>
-    <div class="rev"><q>Most people think trading education is just charts and reading past candles. Here the game is completely different. This mentorship teaches you about yourself: your trading style, the problems you face, and how to fix them.</q><p style="margin:0;color:var(--muted);font-size:14px">"Everyone needs a mentor who doesn't just help with learning, but also with personal development."</p><div class="who"><span class="av">K</span><div><b>Karam</b><span>4 months in</span></div></div><span class="src">Discord · Oct 2026</span></div>
-    <div class="rev"><q>He doesn't just teach setups. He focuses on helping you understand why the market is moving and what is happening behind the candles.</q><p style="margin:0;color:var(--muted);font-size:14px">"His patience, clear explanations, and the way he breaks complicated concepts into simple steps."</p><div class="who"><span class="av">D</span><div><b>Daytona_FX</b><span>1 month in</span></div></div><span class="src">Discord · Oct 2026</span></div>
-  </div>
-</div></section>
-
-<section class="band" id="tools"><div class="in">
-  <div class="sec-head"><div class="eyebrow">The real cost of learning alone</div><h2>Learning to day trade by yourself costs thousands before your first trade.</h2><p class="lede">To day trade this way you need trading software and live market data. Here's what that costs if you buy it yourself, at official prices.</p></div>
-  <div class="cost">
-    <div class="bill">
-      <div class="bh">If you start alone · software</div>
-      <div class="bl"><div><b>Heatmap software</b><span>Global+ lifetime</span></div><em>$1,990</em></div>
-      <div class="bl"><div><b>ATAS</b><span>Ultra lifetime</span></div><em>€1,999</em></div>
-      <div class="bl"><div><b>NinjaTrader</b><span>Lifetime licence</span></div><em>$1,499</em></div>
-      <div class="bl tot"><div><b>Software</b></div><em>~$5,800</em></div>
-      <div class="bh" style="margin-top:14px">Then the data feed · every month</div>
-      <div class="bl"><div><b>Level 1</b><span>Top of book</span></div><em>$39/mo</em></div>
-      <div class="bl"><div><b>Level 2</b><span>Full market depth</span></div><em>$97/mo</em></div>
-      <div class="bl tot"><div><b>Depth data</b></div><em>~$1,160/yr</em></div>
-      <p class="fine">Official list prices (dxFeed, CME Group data). Prices can change.</p>
-    </div>
-    <div class="with">
-      <div class="bh">With Full Mentorship</div>
-      <div class="big">${price('full')}</div>
-      <p>Software included: the heatmap plus one platform you pick (NinjaTrader, ATAS or DeepCharts), set up for you.</p>
-      <p>And someone shows you how to use it, live, for 8 weeks.</p>
-      <div class="save">You skip $3,500+ of software (heatmap + one platform) and months of guessing.</div>
-      <p class="fine">Live market data is billed by the data provider.</p>
-      <a class="btn pri" href="#price">See the plans</a>
-    </div>
-  </div>
-  <div class="tools" style="margin-top:20px">
-    <div class="tool ours"><span class="k">Built by 5ABI.FX</span><h3>KATANA + Trade Journal</h3><p>Our own tools: risk rules you can't break, and a journal that finds your mistakes.</p></div>
-  </div>
-</div></section>
-
-<section class="band alt" id="curriculum"><div class="in">
-  <div class="sec-head"><div class="eyebrow">The 8-week journey</div><h2>Eight live classes. The method stays inside the room.</h2><p class="lede">We don't publish the method. What you learn is taught live, by a trader who uses it every day, and shown only to students.</p></div>
-  <div class="fmt">
-    <div><span class="k">Before week 1</span><b>Foundations</b><p>The basics done quickly, so live time goes to charts.</p></div>
-    <div><span class="k">Every week · midnight open</span><b>90-minute live class</b><p>We unite live at the midnight open (00:00 New York time) and learn on the real market. Weekdays only, weekends off.</p></div>
-    <div><span class="k">Between classes</span><b>Practice + review</b><p>Drills on real charts and feedback on your trades.</p></div>
-    <div><span class="k">Week 8</span><b>Graduation</b><p>Trade the full routine live and leave with your own plan.</p></div>
-  </div>
-  <ol class="weeks">
-    <li><span class="n">1</span><div><b>How markets really move</b><p>See the market the way the big players do.</p></div></li>
-    <li><span class="n">2</span><div><b>Finding value</b><p>Know where price is fair, and where it isn't.</p></div></li>
-    <li><span class="n">3</span><div><b>The big picture</b><p>Build the map before you look for trades.</p></div></li>
-    <li><span class="n">4</span><div><b>The game plan</b><p>Walk into every session with a written plan.</p></div></li>
-    <li><span class="n">5</span><div><b>Reading the session</b><p>Know what kind of day it is, early.</p></div></li>
-    <li><span class="n">6</span><div><b>Timing the entry</b><p>Enter only when the market confirms it.</p></div></li>
-    <li><span class="n">7</span><div><b>Risk by the numbers</b><p>Size and protect your account, prop firms included.</p></div></li>
-    <li><span class="n">8</span><div><b>Live trading lab</b><p>Put it all together live, then graduate.</p></div></li>
-  </ol>
-  <div class="locked"><span class="lk" aria-hidden="true">🔒</span><div><b>The full syllabus is shared with students only.</b><p>The exact rules, levels and setups are taught live in class and never posted online.</p></div></div>
-</div></section>
-
-
-
-<section class="band" id="mentor"><div class="in mentor">
-  <div class="photo"><img src="/logo.png" alt="5ABI.FX" width="160"></div>
-  <div>
-    <div class="eyebrow">Your mentor</div>
-    <h2 style="margin-top:8px">Gursewak · 5ABI.FX</h2>
-    <p class="lede" style="margin-top:14px">I teach the way I trade: live at the midnight open, reading price and volume instead of guessing. I built KATANA and the Trade Journal because I needed them myself. I stay with every student until it clicks.</p>
-    ${socials}
-  </div>
-</div></section>
-
-${pricing}
-
-<section class="band" id="faq"><div class="in" style="max-width:820px">
-  <div class="sec-head"><div class="eyebrow">FAQ</div><h2>Questions before you join</h2></div>
-  <details><summary>I've only traded candles, SMC or ICT. Is this for me?</summary><p>Yes. Most students come from candle-based strategies. Weeks 1 and 2 set up your platforms and cover the basics first.</p></details>
-  <details><summary>When are the live classes?</summary><p>At the midnight open, 00:00 New York time. That's when we all meet and trade the market live together. Classes run only while the market is open. Weekends are off for everyone.</p></details>
-  <details><summary>Isn't this all free on YouTube?</summary><p>The names of the tools are online. The way we put them together, the exact rules, and a trader checking your trades live are not. That part is only taught inside the mentorship.</p></details>
-  <details><summary>Is it live or recorded?</summary><p>Live. You get 8 live 90-minute classes, one a week, with practice and trade reviews between classes. A short Foundations step covers the basics before week 1. The method itself is never recorded or posted online.</p></details>
-  <details><summary>Do I need to buy any software?</summary><p>Not on Full Mentorship. You get a heatmap and one trading platform you pick (NinjaTrader, ATAS or DeepCharts). Live market data is billed by the data provider and is not included.</p></details>
-  <details><summary>Do students get a discount on the EAs?</summary><p>Yes. Mentorship and Full Mentorship students get 30% off every 5ABI.FX EA plan.</p></details>
-  <details><summary>Does this work with prop firms?</summary><p>Yes. KATANA keeps you inside daily loss and drawdown rules, and the Journal tracks each account.</p></details>
-  <details><summary>Can I pay in parts?</summary><p>Yes. Mentorship and Full Mentorship can be paid in 3 monthly parts by card.</p></details>
-  <details><summary>What happens after 8 weeks?</summary><p>You can stay in Discord and keep your tools and EA discount on the Alumni plan.</p></details>
-</div></section>
-
-`;
-}
