@@ -725,6 +725,7 @@ app.get('/admin', requireAdmin, (req, res) => {
     .all(q, `%${q}%`, `%${q}%`, `%${q}%`);
   const eas = db.prepare('SELECT * FROM eas ORDER BY name').all();
   const pending = users.filter((u) => u.status === 'pending').length;
+  const early = earlyNonStudents().length;
 
   page(req, res, 'Admin', `
   <h1>Admin</h1>
@@ -735,16 +736,31 @@ app.get('/admin', requireAdmin, (req, res) => {
       <h2>Users ${pending ? `<span class="tag warn">${pending} waiting for approval</span>` : ''}</h2>
       <form method="get" action="/admin" class="row"><input name="q" value="${esc(q)}" placeholder="Search email, name or account number"><button class="secondary">Search</button></form>
     </div>
-    <table><thead><tr><th>User</th><th>Status</th><th>EAs</th><th>Accounts</th><th>Expires</th><th></th></tr></thead><tbody>
+    ${early ? `<form method="post" action="/admin/users/early-students" class="notice" onsubmit="return confirm('Mark ${early} user${early === 1 ? '' : 's'} with no expiry date as students?')">
+      <span><strong>${early} user${early === 1 ? '' : 's'} with no expiry date ${early === 1 ? 'is' : 'are'} not marked as student yet</strong> (early members, not on a trial or a paid plan).</span>
+      <button class="small">Mark them all as students</button></form>` : ''}
+    <form method="post" action="/admin/users/bulk" id="bulk" class="row bulk-bar">
+      <span class="muted">With the ticked users:</span>
+      <select name="action" aria-label="Bulk action">
+        <option value="student_on">Make student</option>
+        <option value="student_off">Remove student</option>
+        <option value="expiry">Set expiry date to</option>
+        <option value="never">Never expire</option>
+      </select>
+      <input type="date" name="expires_at" aria-label="Expiry date">
+      <button class="small secondary">Apply</button>
+    </form>
+    <table><thead><tr><th><input type="checkbox" aria-label="Tick all" onclick="document.querySelectorAll('input[form=bulk][name=ids]').forEach((c) => { c.checked = this.checked; })"></th><th>User</th><th>Status</th><th>EAs</th><th>Accounts</th><th>Expires</th><th></th></tr></thead><tbody>
     ${users.map((u) => `<tr>
+      <td><input type="checkbox" form="bulk" name="ids" value="${u.id}" aria-label="Tick ${esc(u.email)}"></td>
       <td><a href="/admin/users/${u.id}"><strong>${esc(u.name || '-')}</strong></a><br><span class="muted">${esc(u.email)}</span>${u.is_admin ? ' <span class="tag">admin</span>' : ''}${u.student ? ' <span class="tag">student</span>' : ''}</td>
       <td><span class="status ${esc(u.status)}">${esc(u.status)}</span>${u.trial ? ' <span class="tag warn">trial</span>' : ''}${u.plan && !u.trial ? ` <span class="tag">${esc((getPlan(u.plan) || {}).name || u.plan)}</span>` : ''}${u.plan_request ? ' <span class="tag warn">wants a plan</span>' : ''}</td>
-      <td>${esc(u.ea_codes || '-')}</td>
+      <td>${esc((u.ea_codes || '').split(', ').filter((c) => c && !isStudentOnly(c)).join(', ') || '-')}</td>
       <td>${u.n_acc} / ${u.max_accounts}</td>
       <td>${u.expires_at ? fmtDate(u.expires_at) : 'never'}${isExpired(u) ? ' <span class="tag warn">expired</span>' : ''}</td>
       <td class="nowrap">${u.status === 'pending' ? `<form method="post" action="/admin/users/${u.id}/approve" class="inline"><button class="small">Approve</button></form>` : ''}
         <a class="btn small secondary" href="/admin/users/${u.id}">Manage</a></td>
-    </tr>`).join('') || '<tr><td colspan="6" class="muted">No users found.</td></tr>'}
+    </tr>`).join('') || '<tr><td colspan="7" class="muted">No users found.</td></tr>'}
     </tbody></table>
   </section>
 
@@ -785,6 +801,38 @@ app.post('/admin/users', requireAdmin, (req, res) => {
       Math.max(0, Number(req.body.max_accounts) || 0), parseExpiry(req.body.expires_at));
   setUserEas(info.lastInsertRowid, req.body.ea);
   flash(req, 'ok', `User ${email} created. Send them the website link, their email and password.`);
+  res.redirect('/admin');
+});
+
+// Early members: active, never expire, not on a trial, no paid plan, not an admin
+function earlyNonStudents() {
+  return db.prepare(`SELECT id FROM users WHERE student = 0 AND is_admin = 0 AND trial = 0 AND plan = ''
+    AND expires_at IS NULL AND status = 'active'`).all();
+}
+app.post('/admin/users/early-students', requireAdmin, (req, res) => {
+  const ids = earlyNonStudents().map((u) => u.id);
+  const upd = db.prepare('UPDATE users SET student = 1 WHERE id = ?');
+  db.transaction(() => ids.forEach((id) => upd.run(id)))();
+  flash(req, 'ok', `${ids.length} user${ids.length === 1 ? '' : 's'} marked as student${ids.length === 1 ? '' : 's'}.`);
+  res.redirect('/admin');
+});
+app.post('/admin/users/bulk', requireAdmin, (req, res) => {
+  const ids = [].concat(req.body.ids || []).map(Number).filter(Boolean);
+  const action = String(req.body.action || '');
+  if (!ids.length) { flash(req, 'error', 'Tick at least one user first.'); return res.redirect('/admin'); }
+  let stmt, arg, done;
+  if (action === 'student_on') { stmt = 'UPDATE users SET student = 1 WHERE id = ?'; done = 'marked as student'; }
+  else if (action === 'student_off') { stmt = 'UPDATE users SET student = 0 WHERE id = ?'; done = 'no longer students'; }
+  else if (action === 'never') { stmt = 'UPDATE users SET expires_at = NULL WHERE id = ?'; done = 'set to never expire'; }
+  else if (action === 'expiry') {
+    arg = parseExpiry(req.body.expires_at);
+    if (!arg) { flash(req, 'error', 'Pick an expiry date.'); return res.redirect('/admin'); }
+    stmt = 'UPDATE users SET expires_at = ? WHERE id = ? AND is_admin = 0'; done = `set to expire on ${arg.slice(0, 10)} (admins skipped)`;
+  } else { flash(req, 'error', 'Pick an action.'); return res.redirect('/admin'); }
+  const upd = db.prepare(stmt);
+  let n = 0;
+  db.transaction(() => ids.forEach((id) => { n += (arg ? upd.run(arg, id) : upd.run(id)).changes; }))();
+  flash(req, 'ok', `${n} user${n === 1 ? '' : 's'} ${done}.`);
   res.redirect('/admin');
 });
 
