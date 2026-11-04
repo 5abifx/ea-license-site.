@@ -62,8 +62,9 @@ function layout(req, title, body, opts = {}) {
        <form method="post" action="/logout" class="inline"><button class="link">Sign out</button></form>`
     : `<a href="/#how">How it works</a>${link('/mentorship', 'Mentorship')}${link('/pricing', 'Pricing')}${link('/faq', 'FAQ')}${link('/login', 'Sign in')}${signup ? '<a class="btn small" href="/signup">Create account</a>' : ''}`;
   const origin = `${req.protocol}://${req.get('host')}`;
+  const og = opts.og || {}; // link preview (Discord, iMessage, WhatsApp): { title, desc, image }
   const trial = trialDays();
-  const desc = `Automated MT5 Expert Advisors that trade your rules 24/5.${trial ? ` ${trial}-day free trial, then plans from ${PRICE_TEXT}.` : ` Plans from ${PRICE_TEXT}.`}`;
+  const desc = `KATANA risk manager, trade journal and live mentorship for MT5 traders.${trial ? ` ${trial}-day free trial, then plans from ${PRICE_TEXT}.` : ` Plans from ${PRICE_TEXT}.`}`;
   const flashHtml = flash ? `<div class="flash ${esc(flash.type)}">${esc(flash.msg)}</div>` : '';
   // the pill only shows when the site name differs from the brand (e.g. "EA Licensing")
   const pill = SITE_NAME !== BRAND ? `<span class="pill">${esc(SITE_NAME)}</span>` : '';
@@ -71,14 +72,14 @@ function layout(req, title, body, opts = {}) {
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)} · ${esc(SITE_NAME)}</title>
-<meta name="description" content="${esc(desc)}">
+<meta name="description" content="${esc(og.desc || desc)}">
 <meta name="theme-color" content="#0a0a0b">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="${esc(SITE_NAME)}">
-<meta property="og:title" content="${esc(SITE_NAME)} · Activate. Bind. Trade.">
-<meta property="og:description" content="${esc(desc)}">
+<meta property="og:title" content="${esc(og.title || `${SITE_NAME} · Your rules. Enforced on every trade.`)}">
+<meta property="og:description" content="${esc(og.desc || desc)}">
 <meta property="og:url" content="${esc(origin + req.path)}">
-<meta property="og:image" content="${esc(origin)}/og.png">
+<meta property="og:image" content="${esc(origin)}/${og.image || 'og.png'}?v=2">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -86,7 +87,7 @@ function layout(req, title, body, opts = {}) {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
 <link rel="stylesheet" href="/style.css">
 </head><body>
-${u && !opts.wide ? appShell(req, u, flashHtml, body, title) : `<header><div class="wrap bar"><a class="brand" href="/">${brandMark()}${pill}</a><nav>${nav}</nav></div></header>
+${u && !opts.wide ? appShell(req, u, flashHtml, body, title) : `<header><div class="wrap bar"><a class="brand" href="/">${brandMark()}${pill}</a><button type="button" class="menu-btn" data-menu aria-controls="site-nav" aria-expanded="false" aria-label="Menu"><i></i><i></i><i></i></button><nav id="site-nav">${nav}</nav></div></header>
 ${opts.wide
     ? `<main class="wide">${flashHtml ? `<div class="wrap">${flashHtml}</div>` : ''}${body}</main>`
     : `<main class="wrap">${flashHtml}${body}</main>`}
@@ -95,6 +96,7 @@ ${opts.wide
 <span class="foot-links"><a href="/faq">FAQ</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></span>
 <span class="muted">${RISK}</span>
 </div></footer>`}
+<script src="/menu.js"></script>
 </body></html>`;
 }
 
@@ -111,8 +113,9 @@ function appShell(req, u, flashHtml, body, title) {
   <div class="side-top">
     <a class="brand" href="/dashboard">${brandMark()}</a>
     ${planBox(u)}
+    <button type="button" class="menu-btn" data-menu aria-controls="side-nav" aria-expanded="false" aria-label="Menu"><i></i><i></i><i></i></button>
   </div>
-  <nav class="side-nav" aria-label="Members menu">
+  <nav class="side-nav" id="side-nav" aria-label="Members menu">
     ${group('Main menu', `${item('/dashboard', 'eas', 'My EAs')}
       ${req.hasJournal ? item('/journal', 'journal', 'Journal', on('/journal') && !on('/journal/insights')) + item('/journal/insights', 'insights', 'Insights') : ''}`)}
     ${group('Account', `${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}

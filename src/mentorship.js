@@ -27,6 +27,13 @@ const getMentorPlan = (id) => MENTOR_PLANS.find((p) => p.id === id && !p.soon) |
 const money = (n) => `$${Number(n).toLocaleString('en-US')}`;
 const eaDiscountFor = (u) => (u && getMentorPlan(u.mentor_plan) ? EA_DISCOUNT : 0);
 
+// link preview when the mentorship page is shared (Discord, iMessage, WhatsApp)
+const OG = {
+  title: '5ABI.FX Mentorship · Learn to day trade live',
+  desc: 'An 8-week live day trading mentorship with Gursewak. Live classes at the midnight open, a pro platform and a heatmap included.',
+  image: 'og-mentorship.png',
+};
+
 module.exports = function mentorship(app, { db, page, flash, requireUser, requireAdmin, grantAllActiveEas, PAYMENT_URL }) {
   const cols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   if (!cols.includes('mentor_plan')) db.exec("ALTER TABLE users ADD COLUMN mentor_plan TEXT NOT NULL DEFAULT ''");   // mentorship | full (paid)
@@ -154,7 +161,7 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
     const pr = promoFor(u);
     const waiting = u && db.prepare("SELECT 1 FROM mentor_events WHERE user_id = ? AND event = 'waitlist' AND plan = 'selfstudy'").get(u.id);
     const price = (id) => (u ? money(cut(MENTOR_PLANS.find((p) => p.id === id).price, pr)) : lockLink('Sign up to see'));
-    page(req, res, 'Mentorship', `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800;900&display=swap"><link rel="stylesheet" href="/mentorship.css"><div class="mp">${promoBar(promo(), u)}${body({ u, seats: seats(), socials: socials(), price, pricing: pricing(u, waiting, pr) })}${promoPopup(promo(), u)}</div><script src="/mentorship.js"></script>`, { wide: true });
+    page(req, res, 'Mentorship', `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800;900&display=swap"><link rel="stylesheet" href="/mentorship.css"><div class="mp">${promoBar(promo(), u)}${body({ u, seats: seats(), socials: socials(), price, pricing: pricing(u, waiting, pr) })}${promoPopup(promo(), u)}</div><script src="/mentorship.js"></script>`, { wide: true, og: OG });
   });
 
   // ---------- waitlist and checkout ----------

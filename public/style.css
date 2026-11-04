@@ -677,20 +677,18 @@ main.wide { padding-bottom: 48px; }
 
 @media (max-width: 1100px) { .dash-split { grid-template-columns: minmax(0, 1fr); } }
 
-/* phones and small tablets: the side menu becomes a top bar, like before */
+/* phones and small tablets: a slim top bar with the logo and a ☰ button; the side menu opens as a panel under it */
 @media (max-width: 900px) {
   .app { display: block; }
-  .side { position: static; height: auto; overflow: visible; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between;
-    gap: 6px 12px; padding: 10px 16px; border-right: 0; border-bottom: 1px solid var(--line); }
-  .side-top { flex-direction: row; align-items: center; gap: 10px; }
+  .side { position: sticky; top: 0; z-index: 20; height: auto; overflow: visible; display: block; padding: 0; border-right: 0; border-bottom: 1px solid var(--line); background: #0d0d0f; }
+  .side-top { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; height: 58px; padding: 0 16px; }
   .side .brand { padding: 0; }
   .plan-box { display: none; }
-  .side-nav { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 2px; flex: 0 1 auto; }
-  .side-group { flex-direction: row; flex-wrap: wrap; gap: 2px; }
-  .side-label, .side-nav svg, .side-nav a[href="/faq"] { display: none; }
-  .side-end { margin: 0; border: 0; padding: 0; }
-  .side-nav a, .side-nav button.link { width: auto; padding: 6px 9px; font-size: 14px; color: var(--muted); }
-  .side-nav a.on { background: none; color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); border-radius: 0; }
+  .side-nav { display: none; position: absolute; left: 0; right: 0; top: 100%; max-height: calc(100vh - 58px); overflow-y: auto; padding: 12px 12px 18px;
+    background: #0d0d0f; border-bottom: 1px solid var(--line); box-shadow: 0 18px 40px rgba(0,0,0,.6); gap: 12px; }
+  body.menu-open .side-nav { display: flex; }
+  .side-nav a, .side-nav button.link { padding: 12px; font-size: 15px; }
+  .side-end { margin-top: 0; }
   .app-top { display: none; }
   .app-body { padding: 20px 16px 48px; }
   .dash-eas .ea-list { display: block; }
@@ -782,3 +780,24 @@ details.connect[open] > summary { margin-bottom: 14px; }
 .strip-focus p { margin: 4px 0 0; font-size: 14px; }
 .ins-more { margin: 14px 0 0; }
 @media (max-width: 520px) { .ins-strip { grid-template-columns: minmax(0, 1fr); } .strip-score { border-right: 0; padding-right: 0; } }
+
+/* ☰ menu button: phones only */
+.menu-btn { display: none; flex: none; width: 42px; height: 42px; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--card-2, #17171a);
+  flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer; }
+.menu-btn i { display: block; width: 18px; height: 2px; border-radius: 2px; background: var(--text); transition: transform .2s, opacity .2s; }
+body.menu-open .menu-btn i:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+body.menu-open .menu-btn i:nth-child(2) { opacity: 0; }
+body.menu-open .menu-btn i:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+@media (max-width: 900px) { .side .menu-btn { display: flex; } }
+@media (max-width: 760px) {
+  header { position: sticky; top: 0; z-index: 20; }
+  header .bar { position: relative; flex-wrap: nowrap; height: 58px; min-height: 0; padding-block: 0; }
+  header .menu-btn { display: flex; }
+  #site-nav { display: none; position: absolute; left: 0; right: 0; top: 100%; flex-direction: column; align-items: stretch; gap: 0; padding: 8px 16px 18px;
+    background: #0d0d0f; border-bottom: 1px solid var(--line); box-shadow: 0 18px 40px rgba(0,0,0,.6); font-size: 16px; }
+  body.menu-open #site-nav { display: flex; }
+  #site-nav a, #site-nav button.link { padding: 14px 4px; border-bottom: 1px solid var(--line); font-size: 16px; text-align: left; }
+  #site-nav a.on { color: var(--text); border-bottom-color: var(--line); box-shadow: inset 3px 0 0 var(--accent); padding-left: 12px; }
+  #site-nav form { margin: 0; }
+  #site-nav a.btn { margin-top: 14px; border-bottom: 0; text-align: center; justify-content: center; padding: 13px; color: #120700; }
+}
