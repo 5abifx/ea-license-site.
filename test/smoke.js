@@ -520,6 +520,9 @@ function client(base) {
       r = await admin.post('/admin/mentorship/promo', { pct: '10', ends: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 16) });
       assert.match(r.text, /Mystery discount on: 10% off/);
       assert.match((await anon.get('/mentorship')).text, /Mystery Discount/);
+      r = await ct.get('/mentorship');
+      assert.doesNotMatch(r.text, /id="mystery"/);                                       // pop-up is for signed-out visitors only
+      assert.match(r.text, /href="\/mentorship\/claim"/);                               // the bar still offers the claim
       r = await ct.get('/mentorship/claim');
       assert.match(r.text, /Mystery discount unlocked/);
       assert.match(r.text, /\$2,880/);                                                    // 3,200 less 10%

@@ -1,4 +1,4 @@
-// Mentorship page: mystery discount pop-up (once per visit) and the live countdown to the real end date
+// Mentorship page: mystery discount pop-up (once per browser, signed-out visitors only) and the live countdown to the real end date
 (function () {
   var bar = document.querySelector('.promo-bar');
   var pop = document.getElementById('mystery');
@@ -15,8 +15,8 @@
   }
   if (pop) {
     var seen = false;
-    try { seen = sessionStorage.getItem('mystery-seen') === '1'; } catch (e) { /* storage blocked */ }
-    var open = function () { pop.hidden = false; try { sessionStorage.setItem('mystery-seen', '1'); } catch (e) { /* ignore */ } };
+    try { seen = localStorage.getItem('mystery-seen') === '1'; } catch (e) { /* storage blocked */ }
+    var open = function () { pop.hidden = false; try { localStorage.setItem('mystery-seen', '1'); } catch (e) { /* ignore */ } };
     var close = function () { pop.hidden = true; };
     if (!seen) setTimeout(open, 1200);
     pop.addEventListener('click', function (e) { if (e.target === pop || e.target.hasAttribute('data-close')) close(); });

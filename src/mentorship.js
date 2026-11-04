@@ -128,14 +128,14 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
       <span class="mono" data-countdown>ends ${esc(pr.ends.toISOString().slice(0, 10))}</span>${claimed(u) ? '<span class="ok">✓ Claimed</span>' : '<a href="/mentorship/claim" data-claim>Claim</a>'}</div>`;
   }
   function promoPopup(pr, u) {
-    if (!pr || claimed(u)) return '';
+    if (!pr || u) return ''; // first-time visitors only: signed-in people just see the bar
     return `<div class="mystery" id="mystery" hidden role="dialog" aria-modal="true" aria-labelledby="mystery-t">
       <div class="mystery-card">
         <button type="button" class="mystery-x" data-close aria-label="Close">×</button>
         <img src="/logo.png" alt="" width="90">
         <p class="mystery-k">Limited time · <span data-countdown>ends ${esc(pr.ends.toISOString().slice(0, 10))}</span></p>
         <h2 id="mystery-t">You've got a<br><em>Mystery Discount</em></h2>
-        <p>Claim it to see how much you save on the mentorship.${u ? '' : ' Free account, no card.'}</p>
+        <p>Claim it to see how much you save on the mentorship. Free account, no card.</p>
         <a class="btn pri big" href="/mentorship/claim">Claim now</a>
         <button type="button" class="link" data-close>No thanks</button>
       </div>
