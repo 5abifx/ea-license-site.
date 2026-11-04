@@ -33,7 +33,7 @@ function billingToggle(billing) {
   </div>`;
 }
 
-module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL, refs }) {
+module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL, refs, stripe }) {
   app.get('/pricing', (req, res) => {
     const billing = cleanBilling(req.query.billing);
     const selected = getPlan(req.query.plan) ? req.query.plan : 'katana';
@@ -77,22 +77,41 @@ module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYME
         </section>
         <section class="card sub-pay">
           <h2>Pay</h2>
+          ${stripe && stripe.on() ? (req.user.stripe_sub ? `
+          <p>You already have an active subscription. Change plan, update your card or cancel in billing.</p>
+          <form method="post" action="/billing"><button class="full">Manage billing</button></form>` : `
+          <p>Pay securely by card with Stripe. Your plan switches on as soon as the payment goes through, and renews ${billing === 'annual' ? 'every year' : 'every month'} until you cancel.</p>
+          <form method="post" action="/subscribe">
+            <input type="hidden" name="plan" value="${plan.id}"><input type="hidden" name="billing" value="${billing}">
+            <button class="full">Pay $${(total - cut).toFixed(off ? 2 : 0)} by card</button>
+          </form>
+          <p class="muted small">Cancel anytime from your dashboard. You keep access until the end of the paid period.</p>`) : `
           <p>Card payments in the site are coming soon. For now, pay with the button below and we switch your plan on${req.user.email ? ` for <b>${esc(req.user.email)}</b>` : ''}, usually within a few hours.</p>
           <form method="post" action="/subscribe">
             <input type="hidden" name="plan" value="${plan.id}"><input type="hidden" name="billing" value="${billing}">
             <button class="full">${PAYMENT_URL ? 'Continue to payment' : 'Request this plan'}</button>
           </form>
-          <p class="muted small">Mention your account email when you pay so we can match it.</p>
+          <p class="muted small">Mention your account email when you pay so we can match it.</p>`}
         </section>
       </div>
     </div>`);
   });
 
-  app.post('/subscribe', requireUser, (req, res) => {
+  app.post('/subscribe', requireUser, async (req, res) => {
     const plan = getPlan(req.body.plan);
     if (!plan) return res.redirect('/pricing');
     const billing = cleanBilling(req.body.billing);
+    if (stripe && stripe.on() && req.user.stripe_sub) return res.redirect(307, '/billing');
     db.prepare('UPDATE users SET plan_request = ? WHERE id = ?').run(`${plan.id}:${billing}`, req.user.id);
+    if (stripe && stripe.on()) {
+      try {
+        return res.redirect(303, await stripe.checkoutUrl(req, req.user, plan, billing, refs.discountFor(req.user)));
+      } catch (e) {
+        console.error('Stripe checkout:', e.message);
+        req.session.flash = { type: 'error', msg: 'Card payment could not start. Please try again in a minute or contact us.' };
+        return res.redirect(`/subscribe?plan=${plan.id}&billing=${billing}`);
+      }
+    }
     if (PAYMENT_URL) return res.redirect(303, PAYMENT_URL);
     req.session.flash = { type: 'ok', msg: `Thanks! We got your request for ${plan.name} (${BILLING[billing].label.toLowerCase()}). ${CONTACT_URL ? 'Contact us to pay and we switch it on.' : 'We will contact you to finish payment.'}` };
     res.redirect('/dashboard');
