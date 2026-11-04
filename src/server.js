@@ -176,7 +176,7 @@ app.get('/', (req, res) => {
       </div>
     </div>
     <div class="wrap"><div class="lp-spec">
-      <span>Daily loss limit</span><span>Max drawdown guard</span><span>Auto lot sizing</span><span>Journal by day &amp; account</span><span>9:16 share cards</span>
+      <span>Daily loss limit</span><span>Max drawdown guard</span><span>Auto lot sizing</span><span>Journal by day &amp; account</span><span>Edge score &amp; insights</span><span>Prop firm guard</span><span>9:16 share cards</span>
     </div></div>
   </section>
 
@@ -232,8 +232,8 @@ app.get('/', (req, res) => {
         <div class="gd-top"><span class="gd-ico c">◆</span><span class="gd-pill">Prop rules</span></div>
         <span class="gd-kind">Funded accounts</span>
         <h3>Keeps the challenge alive.</h3>
-        <p>Set daily loss and max drawdown to your firm's numbers. If the firm blocks EAs, the support email is one click away.</p>
-        <div class="gd-chat"><div>Daily limit <b>5%</b> · Max drawdown <b>10%</b>.</div><div>Drawdown used: <b>$3,100</b> of $10,000.</div><div class="me">EA blocked by server? <a href="/help/ea-blocked">Copy the email</a></div></div>
+        <p>Your firm's limits tracked trade by trade, with a KATANA limit that stops you first. Firm blocks EAs? The <a href="/help/ea-blocked">support email</a> is one click away.</p>
+        <div class="gd-chat"><div>Daily limit <b>5%</b> · Max drawdown <b>10%</b>.</div><div>Drawdown used: <b>$3,100</b> of $10,000.</div><div class="me">Tip: set KATANA's limit to <b>3%</b>, below the firm's 5%.</div></div>
         <span class="gd-foot"><i></i>Guard active</span>
       </article>
     </div>
@@ -259,28 +259,62 @@ app.get('/', (req, res) => {
   <section class="lp-coach">
     <div class="wrap">
       <div class="lp-head"><span class="lp-kicker">Journal insights</span><h2>Your journal, <em>reading you back.</em></h2>
-        <p>Every closed trade is checked for patterns. No spreadsheets, no guessing: just what your own numbers say.</p></div>
-      <div class="co-grid">
-        <div class="co-card">
-          <span class="co-label">Pattern detection</span>
-          <h3>See patterns you can't see.</h3>
-          <p>The leaks hiding in your last 90 days of trades.</p>
-          <div class="co-list">
-            <div><i class="r"></i><span>Time of day</span>You lose <b>64%</b> of trades opened after 17:00.</div>
-            <div><i class="r"></i><span>Behavior</span><b>7 revenge trades</b> cost <b>−$1,240</b> this month.</div>
-            <div><i class="g"></i><span>Edge</span>Strongest setup: <b>XAUUSD buys</b>, +18.4R.</div>
-            <div><i class="y"></i><span>Streak</span><b>6 winners in a row</b> on Tuesday mornings.</div>
+        <p>Open Insights and your trades are already scored, sorted and explained. One habit to fix this week, the leaks costing you money, and what to keep doing.</p></div>
+      <div class="dk" aria-label="Example of the Insights page in the members area">
+        <aside class="dk-side">
+          <div class="dk-logo"><img src="/logo.png" alt="" width="26" height="16"><span>5ABI<b>.FX</b></span></div>
+          <span class="dk-sec">Main menu</span>
+          <span class="dk-nav">My EAs</span><span class="dk-nav">Journal</span><span class="dk-nav on">Insights</span>
+          <span class="dk-sec">Account</span>
+          <span class="dk-nav">Plans</span><span class="dk-nav">Help &amp; FAQ</span>
+        </aside>
+        <div class="dk-main">
+          <div class="dk-bar"><b>Insights</b><span class="dk-pills"><i>30 days</i><i class="on">90 days</i><i>All time</i></span><span class="dk-priv">Hide private info</span></div>
+          <div class="dk-top">
+            <div class="dk-score">
+              <span class="dk-lbl">Edge score</span>
+              <div class="dk-num"><b>72</b><small>/ 100 · solid</small></div>
+              ${[['Profit factor', 78], ['Win / loss size', 64], ['Win rate', 58], ['Drawdown', 81], ['Recovery', 70], ['Consistency', 49]].map(([n, v]) => `<div class="dk-row"><span>${n}</span><i style="--w:${v}%" class="${v < 55 ? 'lo' : ''}"></i><em>${v}</em></div>`).join('')}
+            </div>
+            <div class="dk-focus">
+              <span class="dk-lbl acc">This week's focus</span>
+              <h3>“Moved stop” is your most expensive habit.</h3>
+              <p>Trades where the stop was moved cost <b>−$852</b> over 15 trades.</p>
+              <div class="dk-rule"><b>Rule to try:</b> leave the stop where you put it. Without this leak you'd be up <b>+$2,048</b> instead of +$1,196.</div>
+              <p class="dk-next">Next: “entered early” <b>−$293</b> · trades marked FOMO win <b>18%</b></p>
+            </div>
           </div>
-        </div>
-        <div class="co-card">
-          <span class="co-label">Sessions</span>
-          <h3>Know when you trade best.</h3>
-          <p>Net result by session, so you know when to sit on your hands.</p>
-          <div class="co-bars" aria-label="Example net result by session">
-            ${[['Asia', 180], ['London', 2310], ['New York', 940], ['Late', -1120]].map(([n, v]) => `<div><span>${n}</span><i class="${v < 0 ? 'neg' : ''}" style="--w:${Math.round(Math.abs(v) / 2310 * 100)}%"></i><b class="${v < 0 ? 'neg' : 'pos'}">${v < 0 ? '−' : '+'}$${Math.abs(v).toLocaleString('en-US')}</b></div>`).join('')}
+          <div class="dk-nums">
+            ${[['Profit factor', '1.64', 'up'], ['Expectancy', '+0.31R', 'up'], ['Avg win / loss', '1.8 : 1', ''], ['Max drawdown', '−3.2%', 'dn'], ['Win rate', '52%', '']].map(([n, v, c]) => `<div><span>${n}</span><b class="${c}">${v}</b></div>`).join('')}
+          </div>
+          <div class="dk-leaks">
+            <div><span class="dk-lbl"><i class="r"></i>Time of day</span><p>You lose <b>70%</b> of trades opened after 17:00.</p><em><b>Fix</b> Stop trading the late session for 2 weeks.</em></div>
+            <div><span class="dk-lbl"><i class="r"></i>Overtrading</span><p>After your 2nd trade of the day, win rate drops to <b>36%</b>.</p><em><b>Fix</b> Max 2 trades a day. Close the platform after a green one.</em></div>
+            <div><span class="dk-lbl"><i class="g"></i>What works</span><p>Strongest setup: <b>London breakout</b>, +11.2R over 22 trades.</p><em><b>Keep</b> Trade it at full size, trade less of everything else.</em></div>
           </div>
         </div>
       </div>
+      <ul class="dk-also">
+        <li><b>Edge score</b> Six parts of your trading in one number out of 100.</li>
+        <li><b>Leaks with a fix</b> Each problem comes with one plain rule to try.</li>
+        <li><b>Charts</b> Equity and drawdown, profit by session and day, where trades end in R.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="wrap lp-sec lp-split">
+    <div class="lp-head left">
+      <span class="lp-kicker">Prop firm guard</span>
+      <h2>Know how close you are to the firm's line.</h2>
+      <p>Enter your firm's daily loss, max loss and profit target once per account. The journal tracks every trade against them and tells you what KATANA's daily limit should be, so it stops you well before the firm does.</p>
+      <ul class="lp-ticks"><li>Daily loss, max loss and target per account</li><li>Worst day and lowest balance shown</li><li>Suggested KATANA limit below the firm's</li></ul>
+    </div>
+    <div class="pg" aria-label="Example prop firm guard">
+      <div class="pg-top"><b>Funded 100K · Phase 1</b><span>All trades of this account</span></div>
+      <div class="pg-m"><div class="pg-r"><span>Daily loss</span><em>42% used</em></div><div class="pg-bar"><i style="--w:42%"></i></div><p>Worst day <b>−2.1%</b> against your <b>5%</b> limit.</p></div>
+      <div class="pg-m"><div class="pg-r"><span>Max loss</span><em>31% used</em></div><div class="pg-bar warn"><i style="--w:31%"></i></div><p>Lowest balance <b>3.1%</b> below the start. Limit <b>10%</b>.</p></div>
+      <div class="pg-m"><div class="pg-r"><span>Profit target</span><em>68% done</em></div><div class="pg-bar ok"><i style="--w:68%"></i></div><p><b>+5.4%</b> of the <b>8%</b> target.</p></div>
+      <div class="pg-fix"><b>Fix</b> Set KATANA's daily loss limit to 3%, so it stops you before the firm's 5%.</div>
     </div>
   </section>
 
@@ -289,6 +323,11 @@ app.get('/', (req, res) => {
       <span class="lp-kicker">Share cards</span>
       <h2>Post the trade, not a screenshot of MT5.</h2>
       <p>Every journaled trade becomes a clean 9:16 card with the real candles, your entry and exit, and the result in R, pips or percent. Made for stories and Discord.</p>
+      <p class="pv-note">Posting a screenshot of your journal? One switch hides your account numbers, broker and name.</p>
+      <div class="pv" aria-label="Example of hide private info">
+        <span class="pv-sw"><i></i>Hide private info</span>
+        <span class="pv-acc"><s>FundedNext · 14337344</s><b>Account ••44</b></span>
+      </div>
     </div>
     <div class="sc-wrap">
       <div class="sc" aria-label="Example share card">
@@ -308,6 +347,9 @@ app.get('/', (req, res) => {
       <div><h3>Risk limits</h3><p>Daily loss and max drawdown caps that lock trading when they're reached.</p></div>
       <div><h3>Position sizing</h3><p>Lot size worked out from your risk % and stop distance on every order.</p></div>
       <div><h3>Trade Journal</h3><p>Calendar, account tabs and per-day trade lists, filled in automatically.</p></div>
+      <div><h3>Journal Insights</h3><p>Edge score, weekly focus, leaks with a fix for each, and charts of your own trades.</p></div>
+      <div><h3>Prop firm guard</h3><p>Daily loss, max loss and target tracked per account against your firm's rules.</p></div>
+      <div><h3>Private mode</h3><p>Hide account numbers, broker and name before you share a screenshot.</p></div>
       <div><h3>Share cards</h3><p>Story-ready cards drawn from the real chart of each trade.</p></div>
       <div><h3>Your accounts only</h3><p>Each EA runs only on the MT5 account numbers you register.</p></div>
       <div><h3>Prop-firm ready</h3><p>Firm blocks EAs? Get a <a href="/help/ea-blocked">ready-to-send support email</a> in one click.</p></div>
