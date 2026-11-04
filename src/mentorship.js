@@ -129,17 +129,10 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
   }
   function promoPopup(pr, u) {
     if (!pr || u) return ''; // first-time visitors only: signed-in people just see the bar
-    // a small ticket that slides in at the side: it never blocks the page
+    // a small note that slides in at the corner: it never blocks the page
     return `<aside class="mystery" id="mystery" hidden aria-labelledby="mystery-t">
-      <div class="mystery-stub" aria-hidden="true"><b>?%</b><span>OFF</span></div>
-      <div class="mystery-body">
-        <button type="button" class="mystery-x" data-close aria-label="Close">×</button>
-        <p class="mystery-k">Limited time</p>
-        <h2 id="mystery-t">Mystery discount</h2>
-        <p class="mystery-t mono" data-countdown>ends ${esc(pr.ends.toISOString().slice(0, 10))}</p>
-        <a class="mystery-go" href="/mentorship/claim">Reveal my discount →</a>
-        <p class="mystery-s">Free account, no card.</p>
-      </div>
+      <div class="mystery-top"><b id="mystery-t">Mystery discount</b><button type="button" class="mystery-x" data-close aria-label="Close">×</button></div>
+      <p><span class="mono" data-countdown>ends ${esc(pr.ends.toISOString().slice(0, 10))}</span> · <a class="mystery-go" href="/mentorship/claim">Reveal →</a></p>
     </aside>`;
   }
 
