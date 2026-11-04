@@ -7,7 +7,8 @@
 //|                                                                  |
 //|  Needs these inputs declared before it is included:              |
 //|  InpDataTF, InpSessions, InpRows, InpVAPct, InpTPOMins,          |
-//|  InpAcceptMins, InpIBMins, InpNakedMax, InpZoneTol               |
+//|  InpAcceptMins, InpIBMins, InpNakedMax, InpZoneTol,              |
+//|  InpAnchor, InpCashOpen, InpProfileRTH, InpRTHMins               |
 //+------------------------------------------------------------------+
 #ifndef COMPASS_ENGINE_MQH
 #define COMPASS_ENGINE_MQH
@@ -70,6 +71,53 @@ int      g_zn = 0;
 int  IMax(int a, int b) { return a > b ? a : b; }
 int  IMin(int a, int b) { return a < b ? a : b; }
 string Px(double p)     { return DoubleToString(p, _Digits); }
+
+//+------------------------------------------------------------------+
+//| Session anchor: broker midnight (as the indicator) or the cash   |
+//| open (COMEX 08:20 New York = 15:20 on GMT+2/+3 servers).          |
+//+------------------------------------------------------------------+
+int CashOffsetSec()
+  {
+   string p[];
+   if(StringSplit(InpCashOpen, ':', p) < 2)
+      return 0;
+   return (int)StringToInteger(p[0]) * 3600 + (int)StringToInteger(p[1]) * 60;
+  }
+
+// Session start times, most recent first: s[0] = the session we are in now
+int SessionStarts(datetime &s[], int n)
+  {
+   ArrayResize(s, 0);
+   datetime now = TimeCurrent();
+   int off = InpAnchor == ANCHOR_CASH ? CashOffsetSec() : 0;
+   for(int i = 0; i < n + 20 && ArraySize(s) < n; i++)
+     {
+      datetime d = iTime(_Symbol, PERIOD_D1, i);
+      if(d == 0)
+         break;
+      datetime a = (datetime)(d + off);
+      if(a > now)
+         continue;
+      int m = ArraySize(s);
+      ArrayResize(s, m + 1);
+      s[m] = a;
+     }
+   return ArraySize(s);
+  }
+
+// End of finished session k (k >= 1)
+datetime SessionEnd(int k, const datetime &s[])
+  {
+   if(InpAnchor == ANCHOR_CASH && InpProfileRTH)
+      return (datetime)MathMin((double)s[k - 1], (double)(s[k] + (long)InpRTHMins * 60));
+   return s[k - 1];
+  }
+
+datetime CurrentSessionStart()
+  {
+   datetime s[];
+   return SessionStarts(s, 1) > 0 ? s[0] : 0;
+  }
 
 //+------------------------------------------------------------------+
 //| Profile build                                                    |
@@ -303,10 +351,11 @@ bool EngineBuildHistory()
    int N = IMax(2, InpSessions);
    ArrayResize(g_h, N);
    g_hn = 0;
-   for(int k = 1; k <= N; k++)
+   datetime ss[];
+   int ns = SessionStarts(ss, N + 1);
+   for(int k = 1; k <= N && k < ns; k++)
      {
-      datetime a = iTime(_Symbol, PERIOD_D1, k), b = iTime(_Symbol, PERIOD_D1, k - 1);
-      if(a == 0 || b == 0 || !Build(g_h[g_hn], a, b))
+      if(!Build(g_h[g_hn], ss[k], SessionEnd(k, ss)))
          break;
       g_hn++;
      }
@@ -435,7 +484,7 @@ int EngineBias(int last, datetime tNow, double px, string &why, int &score, bool
 bool EngineDay(SDay &d)
   {
    d.ready = false;
-   datetime d0 = iTime(_Symbol, PERIOD_D1, 0);
+   datetime d0 = CurrentSessionStart();
    if(d0 == 0 || g_hn < 1)
       return false;
    if(d.d0 != d0)

@@ -125,6 +125,7 @@ Auction Compass comes with every paid plan, but not with the free trial. MT5 ind
 - Hard guards before every order: risk % of equity (lot rounded down, never up), daily loss and max drawdown at 80% of the prop limits counting open P/L, max trades per day, max open positions, max attempts per level, trading hours, Friday cut-off, high-impact news window, spread.
 - Every decision (ARM, SKIP with its reason, ENTRY, PARTIAL, EXIT, CLOSE with P/L and R) is written to `MQL5\Files\5ABI_CompassEA\<symbol>_log.csv`.
 - Mode *Signal only* sends alerts without placing orders.
+- *Day starts at*: **Cash open** (default, COMEX 08:20 New York, set as server time in *Cash open*; 15:20 on GMT+2/+3 servers) or **Broker midnight** (same as the indicator). With the cash open, yesterday's profile covers cash hours only and entries are allowed for *Trade window* minutes after the open. The prop firm daily loss still resets at broker midnight.
 
 ## Daily use
 

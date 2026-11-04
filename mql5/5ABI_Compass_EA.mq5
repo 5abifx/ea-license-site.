@@ -12,7 +12,7 @@
 //|  Private build: distribute the compiled .ex5 only.               |
 //+------------------------------------------------------------------+
 #property copyright   "5ABI FX"
-#property version     "1.01"
+#property version     "1.10"
 #property description "5ABI FX · Compass EA: trades the auction plan"
 
 #define EA_CODE        "BOT"                 // must match the licence code in Admin > EAs
@@ -28,6 +28,8 @@ enum ETrigger { TRIG_CLOSE_BACK = 0, // Close back inside (data TF)
 enum EStop    { STOP_AUTO = 0,       // Auto: passive, else tight if RRR fails
                 STOP_PASSIVE = 1,    // Passive: beyond pHi / pLo
                 STOP_TIGHT = 2 };    // Tight: beyond the trigger structure
+enum EAnchor  { ANCHOR_BROKER = 0,   // Broker midnight (same as the indicator)
+                ANCHOR_CASH = 1 };   // Cash open (COMEX)
 enum EPartAt  { PART_LEVEL = 0,      // At pPOC / first target (else R multiple)
                 PART_1R = 1 };       // Always at the R multiple
 
@@ -77,13 +79,20 @@ input double   InpDailyLossBuffer = 80.0;            // Stop at this % of each l
 input bool     InpCloseAtLimit    = true;            // Close open trades when a limit is reached
 
 input group "Time and news"
-input int      InpStartHour       = 1;               // No entries before (server hour)
-input int      InpEndHour         = 21;              // No entries from (server hour)
+input int      InpStartHour       = 0;               // No entries before (server hour)
+input int      InpEndHour         = 23;              // No entries from (server hour)
 input int      InpFridayEndHour   = 18;              // Friday: no entries from (0 = off)
 input bool     InpNewsFilter      = true;            // Pause for high-impact news (MT5 calendar)
 input int      InpNewsBefore      = 15;              // Minutes before
 input int      InpNewsAfter       = 15;              // Minutes after
 input bool     InpNewsFlat        = true;            // Close open trades before the news
+
+input group "Session"
+input EAnchor  InpAnchor          = ANCHOR_CASH;     // Day starts at
+input string   InpCashOpen        = "15:20";         // Cash open, server time (NY 08:20 = 15:20 on GMT+2/+3)
+input bool     InpProfileRTH      = true;            // Cash: profiles cover cash hours only
+input int      InpRTHMins         = 310;             // Cash hours length (min, 08:20-13:30 NY = 310)
+input int      InpTradeWindowMins = 300;             // Cash: entries only this long after the open (0 = off)
 
 input group "Engine (same as the Compass indicator)"
 input ENUM_TIMEFRAMES InpDataTF   = PERIOD_M5;       // Profile data resolution
@@ -153,7 +162,7 @@ void Panel()
             arm += (arm == "" ? "" : ", ") + SetupTag(i) + " @" + Px(g_set[i].level);
       s += "Armed: " + (arm == "" ? "none" : arm) + "\n";
       s += "Trades " + DoubleToString(DayGet(g_d.d0, "trades"), 0) + "/" + IntegerToString(InpMaxTradesDay) +
-           " · day loss " + DoubleToString(fmax(0, DayLossPctNow(g_d.d0)), 2) + "% / " + DoubleToString(InpDailyLossPct, 1) + "%\n";
+           " · day loss " + DoubleToString(fmax(0, DayLossPctNow(iTime(_Symbol, PERIOD_D1, 0))), 2) + "% / " + DoubleToString(InpDailyLossPct, 1) + "%\n";
      }
    if(g_halt)
       s += "STOPPED: " + g_haltWhy + "\n";
@@ -171,7 +180,7 @@ void NewDay(datetime d0)
    g_buf = (g_h[0].vah - g_h[0].val) * InpStopBufferPct / 100.0;
    g_dayDone = DayGet(d0, "done") > 0;
    g_doneWhy = g_dayDone ? "restored from earlier today" : "";
-   DayStartBalance(d0);
+   DayStartBalance(iTime(_Symbol, PERIOD_D1, 0));
    PrintFormat("5ABI Compass EA %s: pVAH %s pPOC %s pVAL %s pHi %s pLo %s shape %s · week POC %s · %d naked POCs · %d zones",
                _Symbol, Px(g_h[0].vah), Px(g_h[0].poc), Px(g_h[0].val), Px(g_h[0].hi), Px(g_h[0].lo), g_h[0].shape,
                g_pwk.ok ? Px(g_pwk.poc) : "-", ArraySize(g_nk), g_zn);
@@ -222,8 +231,9 @@ void OnTimer()
 
 void OnTick()
   {
-   datetime d0 = iTime(_Symbol, PERIOD_D1, 0);
-   if(d0 == 0)
+   datetime bd = iTime(_Symbol, PERIOD_D1, 0);    // broker day (prop firm daily loss resets here)
+   datetime d0 = CurrentSessionStart();           // trading session (broker midnight or cash open)
+   if(bd == 0 || d0 == 0)
       return;
 
    // PREP: once per day, retried until the history is synced
@@ -252,7 +262,7 @@ void OnTick()
          Disarm(i, why);
       Alert("5ABI Compass EA stopped: " + why);
      }
-   if(!g_dayDone && DailyLossHit(d0, why))
+   if(!g_dayDone && DailyLossHit(bd, why))
      {
       if(InpCloseAtLimit)
          CloseAll("daily loss guard");

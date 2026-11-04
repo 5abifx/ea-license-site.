@@ -31,6 +31,8 @@ string EntryBlock(int i)
       return "max open positions";
    if(!InHours(TimeCurrent(), why))
       return why;
+   if(InpAnchor == ANCHOR_CASH && InpTradeWindowMins > 0 && TimeCurrent() >= g_d.d0 + (long)InpTradeWindowMins * 60)
+      return "after the cash-session trade window";
    if(InpNewsFilter && NewsState(TimeCurrent()) != 0)
       return "news window";
    if(!SpreadOk(why))
