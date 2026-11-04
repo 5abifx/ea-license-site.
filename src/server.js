@@ -138,6 +138,15 @@ function rateLimit(key, max, windowMs) {
   return h.n > max;
 }
 
+// Where to go after sign in / sign up: /signup?next=mentorship brings people back to the mentorship prices
+const NEXT_PAGES = { mentorship: '/mentorship#price' };
+function rememberNext(req) { if (NEXT_PAGES[req.query.next]) req.session.next = req.query.next; }
+function takeNext(req, fallback) {
+  const n = req.session && NEXT_PAGES[req.session.next];
+  if (req.session) req.session.next = null;
+  return n || fallback;
+}
+
 require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount });
 
 // ---------- auth ----------
@@ -384,7 +393,8 @@ app.get('/', (req, res) => {
 });
 
 app.get('/login', (req, res) => {
-  if (req.user) return res.redirect('/dashboard');
+  rememberNext(req);
+  if (req.user) return res.redirect(takeNext(req, '/dashboard'));
   page(req, res, 'Sign in', authShell('Secure sign-in', 'Welcome back', 'Sign in to download your EAs, manage your MT5 accounts and open your journal.', `
     ${googleOn() ? `${googleButton('Sign in with Google')}<p class="or">or with email and password</p>` : ''}
     <form method="post" action="/login">
@@ -410,14 +420,28 @@ app.post('/login', (req, res) => {
     return res.redirect('/login');
   }
   req.session.uid = u.id;
-  res.redirect(u.is_admin ? '/admin' : '/dashboard');
+  res.redirect(takeNext(req, u.is_admin ? '/admin' : '/dashboard'));
 });
 
 app.post('/logout', (req, res) => { req.session = null; res.redirect('/login'); });
 
 app.get('/signup', (req, res) => {
   if (SIGNUP_MODE === 'closed') return res.redirect('/login');
+  rememberNext(req);
+  if (req.user) return res.redirect(takeNext(req, '/dashboard'));
   const trial = trialDays();
+  if (req.session.next === 'mentorship') {
+    // from the mentorship page: a free account to see the prices, no card needed
+    return page(req, res, 'Create account', authShell('5ABI.FX Mentorship', 'See the mentorship prices', 'Create a free account. No card needed. You go straight back to the plans.', `
+    ${googleOn() ? googleButton('Continue with Google') : `
+    <form method="post" action="/signup">
+      <label>Name<input name="name" required maxlength="80" autocomplete="name"></label>
+      <label>Email<input type="email" name="email" required maxlength="120" autocomplete="email"></label>
+      <label>Password<input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters"></label>
+      <button>See the prices</button>
+    </form>`}
+    <p class="muted">Already have an account? <a href="/login?next=mentorship">Sign in</a></p>`));
+  }
   page(req, res, 'Create account', authShell(
     trial ? `${trial}-day free trial` : 'New account',
     trial ? `Start your ${trial}-day free trial` : 'Create your account',
@@ -445,7 +469,8 @@ function createCustomer(req, { name, email, passwordHash, googleSub = null }) {
                        VALUES (?, ?, ?, 'active', ?, datetime('now'), 0, ?)`)
       .run(email, name, passwordHash, TRIAL_ACCOUNTS, googleSub);
     grantAllActiveEas(info.lastInsertRowid);
-    flash(req, 'ok', `Account created. Pick a plan and add a card to start your ${trial}-day free trial. You are not charged until the trial ends.`);
+    flash(req, 'ok', req.session.next === 'mentorship' ? 'Account created. Here are the mentorship prices.'
+      : `Account created. Pick a plan and add a card to start your ${trial}-day free trial. You are not charged until the trial ends.`);
   } else if (trial) {
     // Free trial: active right away, all EAs, expires after TRIAL_DAYS
     info = db.prepare(`INSERT INTO users (email, name, password_hash, status, max_accounts, expires_at, trial, google_sub)
@@ -485,7 +510,7 @@ app.post('/signup', (req, res) => {
     return res.redirect('/login');
   }
   req.session.uid = createCustomer(req, { name, email, passwordHash: bcrypt.hashSync(password, 10) });
-  res.redirect('/dashboard');
+  res.redirect(takeNext(req, '/dashboard'));
 });
 
 // ---------- Sign in with Google (OpenID Connect, authorization code flow) ----------
@@ -549,7 +574,7 @@ app.get('/auth/google/callback', async (req, res) => {
   }
   if (u.status === 'disabled') return fail('This account is disabled. Please contact support.');
   req.session.uid = u.id;
-  res.redirect(u.is_admin ? '/admin' : '/dashboard');
+  res.redirect(takeNext(req, u.is_admin ? '/admin' : '/dashboard'));
 });
 
 app.get('/password', requireUser, (req, res) => page(req, res, 'Change password', `
@@ -742,7 +767,7 @@ app.get('/admin', requireAdmin, (req, res) => {
 
   page(req, res, 'Admin', `
   <h1>Admin</h1>
-  <div class="tabs"><a class="on" href="/admin">Users</a><a href="/admin/eas">EAs (${eas.length})</a></div>
+  <div class="tabs"><a class="on" href="/admin">Users</a><a href="/admin/eas">EAs (${eas.length})</a><a href="/admin/mentorship">Mentorship</a></div>
 
   <section class="card">
     <div class="row between">
@@ -1058,7 +1083,7 @@ app.get('/admin/eas', requireAdmin, (req, res) => {
 
   page(req, res, 'EAs', `
   <h1>Admin</h1>
-  <div class="tabs"><a href="/admin">Users</a><a class="on" href="/admin/eas">EAs (${eas.length})</a></div>
+  <div class="tabs"><a href="/admin">Users</a><a class="on" href="/admin/eas">EAs (${eas.length})</a><a href="/admin/mentorship">Mentorship</a></div>
   ${eas.map((e) => `<section class="card">
     <div class="row between"><h2>${esc(e.name)} <span class="tag">v${esc(e.version)}</span> ${e.active ? '' : '<span class="tag warn">inactive</span>'}</h2>
     <span class="muted">${e.n_users} users · code <code>${esc(e.code)}</code></span></div>
@@ -1131,7 +1156,8 @@ app.post('/admin/eas/:id/delete', requireAdmin, (req, res) => {
 });
 
 require('./help')(app, { db, page });
-const stripe = require('./stripe')(app, { db, flash, requireUser, applyPaid, startTrial, refs });
+const mentor = require('./mentorship')(app, { db, page, flash, requireUser, requireAdmin, grantAllActiveEas, PAYMENT_URL });
+const stripe = require('./stripe')(app, { db, flash, requireUser, applyPaid, startTrial, refs, mentor });
 require('./pricing')(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL: process.env.CONTACT_URL || '', refs, stripe });
 require('./pages')(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, TRIAL_ACCOUNTS, MAX_ACCOUNTS_DEFAULT });
 

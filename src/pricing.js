@@ -2,6 +2,7 @@
 // and the admin applies the plan with "Mark as paid"; the picked plan is saved on the user as plan_request.
 const { esc } = require('./views');
 const { PLANS, BILLING, getPlan, cleanBilling, perMonth, dueNow, maxSave } = require('./plans');
+const { eaDiscountFor } = require('./mentorship');
 
 const QUOTES = ['Every trade you don\'t journal is a lesson lost.', 'Protect the account first. Profits follow.', 'One bad day shouldn\'t cost you the challenge.'];
 
@@ -45,7 +46,7 @@ module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYME
         <p class="pl-quote">“${esc(QUOTES[new Date().getUTCDate() % QUOTES.length])}”</p>
         ${billingToggle(billing)}
       </div>
-      ${refs.discountFor(req.user) ? `<p class="pl-ref"><span class="pl-ref-tick">✓</span> Your ${refs.discountFor(req.user)}% referral discount is applied to your first payment.</p>` : req.session.ref ? `<p class="pl-ref"><span class="pl-ref-tick">✓</span> Referral code ${esc(req.session.ref)}: create your account to get your discount on the first payment.</p>` : ''}
+      ${eaDiscountFor(req.user) ? `<p class="pl-ref"><span class="pl-ref-tick">✓</span> Mentorship student: ${eaDiscountFor(req.user)}% off every payment on any plan.</p>` : refs.discountFor(req.user) ? `<p class="pl-ref"><span class="pl-ref-tick">✓</span> Your ${refs.discountFor(req.user)}% referral discount is applied to your first payment.</p>` : req.session.ref ? `<p class="pl-ref"><span class="pl-ref-tick">✓</span> Referral code ${esc(req.session.ref)}: create your account to get your discount on the first payment.</p>` : ''}
       <input type="hidden" name="billing" value="${billing}">
       ${planCards({ billing, selected })}
       <button class="pl-go">${req.user && !(stripe && stripe.needsCardTrial(req.user)) ? 'Continue' : trial ? `Start ${trial}-day free trial` : 'Continue'}</button>
@@ -59,7 +60,8 @@ module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYME
     const plan = getPlan(req.query.plan) || getPlan('katana');
     const billing = cleanBilling(req.query.billing);
     if (!req.user) return res.redirect('/signup');
-    const off = refs.discountFor(req.user);
+    const moff = eaDiscountFor(req.user);
+    const off = moff || refs.discountFor(req.user);
     const total = dueNow(plan, billing), cut = Math.round(total * off) / 100;
     const cardTrial = stripe && stripe.on() && stripe.needsCardTrial(req.user) ? trialDays() : 0;
     const firstCharge = new Date(Date.now() + cardTrial * 86400000).toISOString().slice(0, 10);
@@ -73,12 +75,12 @@ module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYME
           <ul class="ticks">${plan.features.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
           <div class="sub-row"><span>${esc(plan.name)} plan, billed ${billing === 'annual' ? 'yearly' : 'monthly'}</span><b>$${dueNow(plan, billing)}</b></div>
           ${billing === 'annual' ? `<div class="sub-row muted"><span>Same as $${perMonth(plan, billing)}/month</span><span>you save $${(plan.monthly - plan.annual) * 12}</span></div>` : ''}
-          ${off ? `<div class="sub-row"><span class="sub-badge">${off}% off first payment</span><b class="pos">−$${cut.toFixed(2)}</b></div>` : ''}
+          ${off ? `<div class="sub-row"><span class="sub-badge">${off}% off ${moff ? 'every payment (mentorship student)' : 'first payment'}</span><b class="pos">−$${cut.toFixed(2)}</b></div>` : ''}
           ${cardTrial ? `<div class="sub-row"><span>${cardTrial}-day free trial</span><b class="pos">until ${firstCharge}</b></div>
           <div class="sub-row total"><span>Due today</span><b>$0 USD</b></div>
           <p class="muted small">First charge $${(total - cut).toFixed(off ? 2 : 0)} on ${firstCharge}${off ? `, then $${total}` : ''} per ${billing === 'annual' ? 'year' : 'month'}. Cancel before ${firstCharge} and you pay nothing.</p>` : `
           <div class="sub-row total"><span>Total due</span><b>$${(total - cut).toFixed(off ? 2 : 0)} USD</b></div>
-          ${off ? `<p class="muted small">Then $${total} per ${billing === 'annual' ? 'year' : 'month'}.</p>` : ''}`}
+          ${off && !moff ? `<p class="muted small">Then $${total} per ${billing === 'annual' ? 'year' : 'month'}.</p>` : ''}`}
         </section>
         <section class="card sub-pay">
           <h2>Pay</h2>
@@ -110,7 +112,7 @@ module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYME
     db.prepare('UPDATE users SET plan_request = ? WHERE id = ?').run(`${plan.id}:${billing}`, req.user.id);
     if (stripe && stripe.on()) {
       try {
-        return res.redirect(303, await stripe.checkoutUrl(req, req.user, plan, billing, refs.discountFor(req.user)));
+        return res.redirect(303, await stripe.checkoutUrl(req, req.user, plan, billing, refs.discountFor(req.user), eaDiscountFor(req.user)));
       } catch (e) {
         console.error('Stripe checkout:', e.message);
         req.session.flash = { type: 'error', msg: 'Card payment could not start. Please try again in a minute or contact us.' };

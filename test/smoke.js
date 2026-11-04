@@ -409,6 +409,8 @@ function client(base) {
           s2.setHeader('content-type', 'application/json');
           if (q.url === '/v1/checkout/sessions') return s2.end(JSON.stringify({ id: 'cs_1', url: 'https://checkout.stripe.com/c/pay/cs_1' }));
           if (q.url === '/v1/subscriptions/sub_1') return s2.end(JSON.stringify({ id: 'sub_1', metadata: { user_id: String(payId), plan: 'pro', billing: 'annual' } }));
+          if (q.url === '/v1/coupons') return s2.end(JSON.stringify({ id: 'co_1' }));
+          if (q.url === '/v1/subscriptions/sub_m') return s2.end(JSON.stringify({ id: 'sub_m', metadata: { kind: 'mentorship', user_id: String(payId), mplan: 'full' } }));
           if (q.url === '/v1/billing_portal/sessions') return s2.end(JSON.stringify({ url: 'https://billing.stripe.com/p/session/x' }));
           s2.statusCode = 404; s2.end('{}');
         });
@@ -504,6 +506,68 @@ function client(base) {
       assert.strictEqual(cu.trial, 0);
       assert.strictEqual(cu.plan, 'journal');
       assert.doesNotMatch((await ct.get('/dashboard')).text, /Start your 15-day free trial/);   // no second card trial
+      // Mentorship: prices only for members, waitlist, mystery discount, one-time and 3-part checkout, EA discount
+      const anon = client(base);
+      r = await anon.get('/mentorship');
+      assert.match(r.text, /Sign up free to see prices/);
+      assert.doesNotMatch(r.text, /\$2,797/);
+      assert.match((await anon.get('/signup?next=mentorship')).text, /See the mentorship prices/);
+      r = await ct.get('/mentorship');
+      assert.match(r.text, /\$2,797/);
+      assert.match(r.text, /Pay in 3 parts/);
+      await ct.post('/mentorship/waitlist', {});
+      assert.match((await ct.get('/mentorship')).text, /on the list/);
+      r = await admin.post('/admin/mentorship/promo', { pct: '10', ends: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 16) });
+      assert.match(r.text, /Mystery discount on: 10% off/);
+      assert.match((await anon.get('/mentorship')).text, /Mystery Discount/);
+      r = await ct.get('/mentorship/claim');
+      assert.match(r.text, /Mystery discount unlocked/);
+      assert.match(r.text, /\$2,880/);                                                    // 3,200 less 10%
+      calls.length = 0;
+      r = await ct.post('/mentorship/checkout', { plan: 'full', pay: 'once' });
+      assert.strictEqual(r.location, 'https://checkout.stripe.com/c/pay/cs_1');
+      const ms = calls.find((c) => c.url === '/v1/checkout/sessions');
+      assert.strictEqual(ms.body.get('mode'), 'payment');
+      assert.strictEqual(ms.body.get('line_items[0][price_data][unit_amount]'), '288000');
+      assert.strictEqual(ms.body.get('metadata[kind]'), 'mentorship');
+      const caraPlan = db.prepare('SELECT plan FROM users WHERE id = ?').get(caraId).plan;
+      await hook({ id: 'evt_m1', type: 'checkout.session.completed', data: { object: { mode: 'payment', payment_status: 'paid', customer: 'cus_2',
+        client_reference_id: String(caraId), metadata: { kind: 'mentorship', user_id: String(caraId), mplan: 'full', parts: '1' } } } });
+      cu = db.prepare('SELECT * FROM users WHERE id = ?').get(caraId);
+      assert.strictEqual(cu.mentor_plan, 'full');
+      assert.strictEqual(cu.plan, caraPlan);                                               // EA plan untouched
+      assert.strictEqual(cu.student, 0);                                                   // indicator waits for graduation
+      assert.ok(new Date(cu.expires_at + 'Z') - Date.now() > 170 * 86400000);              // KATANA + Journal for 6 months
+      assert.match((await ct.get('/mentorship')).text, /You're in/);
+      r = await admin.get('/admin/mentorship');
+      assert.match(r.text, /cara@test\.com/);
+      await admin.post(`/admin/mentorship/${caraId}/graduate`, {});
+      assert.strictEqual(db.prepare('SELECT student FROM users WHERE id = ?').get(caraId).student, 1);
+      // a student who paid directly gets 30% off every EA payment
+      r = await admin.post('/admin/mentorship/add', { email: 'payer@test.com', plan: 'mentorship' });
+      assert.match(r.text, /added as a Mentorship student/);
+      calls.length = 0;
+      await payer.post('/subscribe', { plan: 'journal', billing: 'monthly' });
+      const co = calls.find((c) => c.url === '/v1/coupons');
+      assert.strictEqual(co.body.get('percent_off'), '30');
+      assert.strictEqual(co.body.get('duration'), 'forever');
+      // 3 monthly parts: a subscription that is cancelled after the 3rd payment; paying upgrades to Full
+      calls.length = 0;
+      await payer.post('/mentorship/checkout', { plan: 'full', pay: 'parts' });
+      const mp = calls.find((c) => c.url === '/v1/checkout/sessions');
+      assert.strictEqual(mp.body.get('mode'), 'subscription');
+      assert.strictEqual(mp.body.get('line_items[0][price_data][unit_amount]'), '109900');
+      assert.strictEqual(mp.body.get('subscription_data[metadata][kind]'), 'mentorship');
+      await hook({ id: 'evt_m2', type: 'checkout.session.completed', data: { object: { mode: 'subscription', subscription: 'sub_m', customer: 'cus_1',
+        metadata: { kind: 'mentorship', user_id: String(payId), mplan: 'full', parts: '3' } } } });
+      const cancel = calls.find((c) => c.url === '/v1/subscriptions/sub_m' && c.method === 'POST');
+      assert.ok(Number(cancel.body.get('cancel_at')) > Date.now() / 1000 + 60 * 86400);
+      assert.strictEqual(db.prepare('SELECT stripe_sub FROM users WHERE id = ?').get(payId).stripe_sub, null);   // not an EA subscription
+      await hook({ id: 'evt_m3', type: 'invoice.paid', data: { object: { customer: 'cus_1', amount_paid: 109900, parent: { subscription_details: { subscription: 'sub_m' } } } } });
+      pu = db.prepare('SELECT * FROM users WHERE id = ?').get(payId);
+      assert.strictEqual(pu.mentor_plan, 'full');
+      assert.strictEqual(pu.plan, 'pro');
+
       process.env.TRIAL_DAYS = '0';
       fake.close();
       for (const k of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_API_BASE']) delete process.env[k];

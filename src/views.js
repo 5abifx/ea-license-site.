@@ -34,6 +34,7 @@ const ICONS = {
   upload: '<path d="M12 21V9m0 0l-5 5m5-5l5 5M4 3h16"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 2-2.5 2-2.5 4M12 17h.01"/>',
   out: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>',
+  cap: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5M22 9v6"/>',
 };
 const icon = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
 
@@ -59,7 +60,7 @@ function layout(req, title, body, opts = {}) {
        ${u.is_admin ? link('/admin', 'Admin') : ''}
        ${u.google_sub ? '' : link('/password', 'Password')}
        <form method="post" action="/logout" class="inline"><button class="link">Sign out</button></form>`
-    : `<a href="/#how">How it works</a>${link('/pricing', 'Pricing')}${link('/faq', 'FAQ')}${link('/login', 'Sign in')}${signup ? '<a class="btn small" href="/signup">Create account</a>' : ''}`;
+    : `<a href="/#how">How it works</a>${link('/mentorship', 'Mentorship')}${link('/pricing', 'Pricing')}${link('/faq', 'FAQ')}${link('/login', 'Sign in')}${signup ? '<a class="btn small" href="/signup">Create account</a>' : ''}`;
   const origin = `${req.protocol}://${req.get('host')}`;
   const trial = trialDays();
   const desc = `Automated MT5 Expert Advisors that trade your rules 24/5.${trial ? ` ${trial}-day free trial, then plans from ${PRICE_TEXT}.` : ` Plans from ${PRICE_TEXT}.`}`;
@@ -114,7 +115,7 @@ function appShell(req, u, flashHtml, body, title) {
   <nav class="side-nav" aria-label="Members menu">
     ${group('Main menu', `${item('/dashboard', 'eas', 'My EAs')}
       ${req.hasJournal ? item('/journal', 'journal', 'Journal', on('/journal') && !on('/journal/insights')) + item('/journal/insights', 'insights', 'Insights') : ''}`)}
-    ${group('Account', `${item('/pricing', 'plans', 'Plans')}
+    ${group('Account', `${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}
       ${u.google_sub ? '' : item('/password', 'lock', 'Password')}`)}
     ${u.is_admin ? group('Owner', `${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas'))}${item('/admin/eas', 'upload', 'EAs')}`) : ''}
     <div class="side-group side-end">
