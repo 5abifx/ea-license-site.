@@ -461,6 +461,50 @@ function client(base) {
       pu = db.prepare('SELECT * FROM users WHERE id = ?').get(payId);
       assert.strictEqual(pu.stripe_sub, null);
       assert.strictEqual(pu.expires_at, exp1);                                             // keeps what was paid
+
+      // card trial: sign up gives no access until a card is added; Stripe trial starts the free trial
+      process.env.TRIAL_DAYS = '15';
+      delete process.env.GOOGLE_CLIENT_ID;
+      const ct = client(base);
+      // (another IP: the sign up rate limit is used up by earlier tests)
+      const su = await fetch(`${base}/signup`, { method: 'POST', redirect: 'manual',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-forwarded-for': '10.9.9.9' },
+        body: new URLSearchParams({ name: 'Cara', email: 'cara@test.com', password: 'carapass123' }).toString() });
+      assert.strictEqual(su.status, 302);
+      r = await ct.post('/login', { email: 'cara@test.com', password: 'carapass123' });
+      assert.match(r.text, /Start your 15-day free trial/);
+      const caraId = db.prepare("SELECT id FROM users WHERE email = 'cara@test.com'").get().id;
+      await ct.post('/accounts', { account_number: '4242' });
+      assert.strictEqual((await check('GOLD_SCALPER', '4242')).valid, false);          // no card yet: nothing works
+      r = await ct.get('/subscribe?plan=journal&billing=monthly');
+      assert.match(r.text, /Due today<\/span><b>\$0 USD/);
+      assert.match(r.text, /Add card and start free trial/);
+      calls.length = 0;
+      r = await ct.post('/subscribe', { plan: 'journal', billing: 'monthly' });
+      const cs2 = calls.find((c) => c.url === '/v1/checkout/sessions');
+      assert.strictEqual(cs2.body.get('subscription_data[trial_period_days]'), '15');
+      assert.strictEqual(cs2.body.get('payment_method_collection'), 'always');
+      assert.strictEqual(cs2.body.get('metadata[trial]'), '1');
+      await hook({ id: 'evt_t1', type: 'checkout.session.completed', data: { object: { client_reference_id: String(caraId), customer: 'cus_2', subscription: 'sub_2',
+        metadata: { user_id: String(caraId), plan: 'journal', billing: 'monthly', trial: '1' } } } });
+      let cu = db.prepare('SELECT * FROM users WHERE id = ?').get(caraId);
+      assert.strictEqual(cu.trial, 1);
+      assert.strictEqual(cu.trial_used, 1);
+      assert.ok(Math.abs(new Date(cu.expires_at + 'Z') - Date.now() - 16 * 86400000) < 120000);
+      assert.strictEqual((await check('GOLD_SCALPER', '4242')).valid, true);           // trial running
+      assert.ok(db.prepare("SELECT 1 FROM trial_accounts WHERE account_number = '4242'").get());
+      // the $0 trial invoice does not end the trial
+      await hook({ id: 'evt_t2', type: 'invoice.paid', data: { object: { customer: 'cus_2', amount_paid: 0, billing_reason: 'subscription_create',
+        subscription: { id: 'sub_2', status: 'trialing', trial_end: 1, metadata: { user_id: String(caraId), plan: 'journal', billing: 'monthly' } } } } });
+      assert.strictEqual(db.prepare('SELECT trial FROM users WHERE id = ?').get(caraId).trial, 1);
+      // first real charge after the trial switches the plan on
+      await hook({ id: 'evt_t3', type: 'invoice.paid', data: { object: { customer: 'cus_2', amount_paid: 1200, billing_reason: 'subscription_cycle',
+        subscription: { id: 'sub_2', status: 'active', metadata: { user_id: String(caraId), plan: 'journal', billing: 'monthly' } } } } });
+      cu = db.prepare('SELECT * FROM users WHERE id = ?').get(caraId);
+      assert.strictEqual(cu.trial, 0);
+      assert.strictEqual(cu.plan, 'journal');
+      assert.doesNotMatch((await ct.get('/dashboard')).text, /Start your 15-day free trial/);   // no second card trial
+      process.env.TRIAL_DAYS = '0';
       fake.close();
       for (const k of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_API_BASE']) delete process.env[k];
     }

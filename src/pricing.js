@@ -48,8 +48,8 @@ module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYME
       ${refs.discountFor(req.user) ? `<p class="pl-ref"><span class="pl-ref-tick">✓</span> Your ${refs.discountFor(req.user)}% referral discount is applied to your first payment.</p>` : req.session.ref ? `<p class="pl-ref"><span class="pl-ref-tick">✓</span> Referral code ${esc(req.session.ref)}: create your account to get your discount on the first payment.</p>` : ''}
       <input type="hidden" name="billing" value="${billing}">
       ${planCards({ billing, selected })}
-      <button class="pl-go">${req.user ? 'Continue' : trial ? `Start ${trial}-day free trial` : 'Continue'}</button>
-      <p class="muted small center">${trial ? `Every plan starts with a ${trial}-day free trial of all EAs. ` : ''}Cancel anytime. Prices in USD.</p>
+      <button class="pl-go">${req.user && !(stripe && stripe.needsCardTrial(req.user)) ? 'Continue' : trial ? `Start ${trial}-day free trial` : 'Continue'}</button>
+      <p class="muted small center">${trial ? `Every plan starts with a ${trial}-day free trial of all EAs${stripe && stripe.cardTrial() ? '. Card needed, no charge until the trial ends' : ''}. ` : ''}Cancel anytime. Prices in USD.</p>
     </form>
     <script src="/pricing.js"></script>`);
   });
@@ -61,6 +61,8 @@ module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYME
     if (!req.user) return res.redirect('/signup');
     const off = refs.discountFor(req.user);
     const total = dueNow(plan, billing), cut = Math.round(total * off) / 100;
+    const cardTrial = stripe && stripe.on() && stripe.needsCardTrial(req.user) ? trialDays() : 0;
+    const firstCharge = new Date(Date.now() + cardTrial * 86400000).toISOString().slice(0, 10);
     page(req, res, 'Subscribe', `
     <div class="sub">
       <p><a href="/pricing?plan=${plan.id}&amp;billing=${billing}">← Change plan</a></p>
@@ -72,18 +74,21 @@ module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYME
           <div class="sub-row"><span>${esc(plan.name)} plan, billed ${billing === 'annual' ? 'yearly' : 'monthly'}</span><b>$${dueNow(plan, billing)}</b></div>
           ${billing === 'annual' ? `<div class="sub-row muted"><span>Same as $${perMonth(plan, billing)}/month</span><span>you save $${(plan.monthly - plan.annual) * 12}</span></div>` : ''}
           ${off ? `<div class="sub-row"><span class="sub-badge">${off}% off first payment</span><b class="pos">−$${cut.toFixed(2)}</b></div>` : ''}
+          ${cardTrial ? `<div class="sub-row"><span>${cardTrial}-day free trial</span><b class="pos">until ${firstCharge}</b></div>
+          <div class="sub-row total"><span>Due today</span><b>$0 USD</b></div>
+          <p class="muted small">First charge $${(total - cut).toFixed(off ? 2 : 0)} on ${firstCharge}${off ? `, then $${total}` : ''} per ${billing === 'annual' ? 'year' : 'month'}. Cancel before ${firstCharge} and you pay nothing.</p>` : `
           <div class="sub-row total"><span>Total due</span><b>$${(total - cut).toFixed(off ? 2 : 0)} USD</b></div>
-          ${off ? `<p class="muted small">Then $${total} per ${billing === 'annual' ? 'year' : 'month'}.</p>` : ''}
+          ${off ? `<p class="muted small">Then $${total} per ${billing === 'annual' ? 'year' : 'month'}.</p>` : ''}`}
         </section>
         <section class="card sub-pay">
           <h2>Pay</h2>
           ${stripe && stripe.on() ? (req.user.stripe_sub ? `
           <p>You already have an active subscription. Change plan, update your card or cancel in billing.</p>
           <form method="post" action="/billing"><button class="full">Manage billing</button></form>` : `
-          <p>Pay securely by card with Stripe. Your plan switches on as soon as the payment goes through, and renews ${billing === 'annual' ? 'every year' : 'every month'} until you cancel.</p>
+          <p>${cardTrial ? `Add your card securely with Stripe. Your ${cardTrial}-day free trial of every EA starts straight away, and nothing is charged until ${firstCharge}.` : `Pay securely by card with Stripe. Your plan switches on as soon as the payment goes through, and renews ${billing === 'annual' ? 'every year' : 'every month'} until you cancel.`}</p>
           <form method="post" action="/subscribe">
             <input type="hidden" name="plan" value="${plan.id}"><input type="hidden" name="billing" value="${billing}">
-            <button class="full">Pay $${(total - cut).toFixed(off ? 2 : 0)} by card</button>
+            <button class="full">${cardTrial ? 'Add card and start free trial' : `Pay $${(total - cut).toFixed(off ? 2 : 0)} by card`}</button>
           </form>
           <p class="muted small">Cancel anytime from your dashboard. You keep access until the end of the paid period.</p>`) : `
           <p>Card payments in the site are coming soon. For now, pay with the button below and we switch your plan on${req.user.email ? ` for <b>${esc(req.user.email)}</b>` : ''}, usually within a few hours.</p>
