@@ -9,9 +9,17 @@
 const crypto = require('crypto');
 const express = require('express');
 const { getPlan, cleanBilling, dueNow, BILLING } = require('./plans');
+const { trialDays } = require('./views');
 
 const API = () => (process.env.STRIPE_API_BASE || 'https://api.stripe.com').replace(/\/$/, '');
 const on = () => Boolean(process.env.STRIPE_SECRET_KEY);
+// New sign ups must add a card to start the free trial (Stripe trial, first charge after TRIAL_DAYS).
+// On whenever Stripe and the trial are on; TRIAL_NEEDS_CARD=false keeps the old no-card trial.
+const cardTrial = () => on() && trialDays() > 0 && process.env.TRIAL_NEEDS_CARD !== 'false';
+// this user can still get the card trial: never had a trial or a plan
+// (and has no access yet: early members with no expiry date or users the admin gave time to are left alone)
+const needsCardTrial = (u) => Boolean(u && cardTrial() && !u.is_admin && !u.student && !u.trial_used && !u.trial && !u.plan && !u.stripe_sub
+  && u.expires_at && Date.parse(u.expires_at.replace(' ', 'T') + 'Z') <= Date.now());
 const GRACE_SECONDS = 2 * 86400;   // keeps working this long after the paid period, while a renewal is retried
 
 // Stripe wants form encoding with bracket keys: { a: { b: 1 } } -> a[b]=1
@@ -51,11 +59,15 @@ function verify(raw, header, secret, toleranceSec = 300) {
 
 const sqlTime = (unix) => new Date(unix * 1000).toISOString().slice(0, 19).replace('T', ' ');
 
-module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid }) {
+module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid, startTrial }) {
   db.exec(`CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   const cols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   if (!cols.includes('stripe_customer')) db.exec('ALTER TABLE users ADD COLUMN stripe_customer TEXT');
   if (!cols.includes('stripe_sub')) db.exec('ALTER TABLE users ADD COLUMN stripe_sub TEXT');
+  if (!cols.includes('trial_used')) {   // 1 = already had a free trial or a paid plan (no second card trial)
+    db.exec('ALTER TABLE users ADD COLUMN trial_used INTEGER NOT NULL DEFAULT 0');
+    db.exec("UPDATE users SET trial_used = 1 WHERE trial = 1 OR plan != '' OR stripe_sub IS NOT NULL OR expires_at IS NOT NULL");
+  }
 
   const siteUrl = (req) => process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
 
@@ -80,6 +92,14 @@ module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid }
     };
     if (u.stripe_customer) params.customer = u.stripe_customer;
     else params.customer_email = u.email;
+    if (needsCardTrial(u)) {
+      // free trial: card saved now, first charge when the trial ends
+      params.subscription_data.trial_period_days = trialDays();
+      params.payment_method_collection = 'always';
+      params.metadata.trial = '1';
+      if (discountPct) params.metadata.ref_off = discountPct;   // added to the subscription after checkout, so it hits the first real charge
+      discountPct = 0;
+    }
     if (discountPct) {
       // referral discount: a one-time coupon for the first payment only
       const c = await call('POST', '/v1/coupons', { percent_off: discountPct, duration: 'once', name: `Referral ${discountPct}% off` });
@@ -110,6 +130,7 @@ module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid }
       || null;
     if (!subId || !(Number(inv.amount_paid) >= 0)) return;
     const sub = typeof subId === 'object' ? subId : await call('GET', `/v1/subscriptions/${encodeURIComponent(subId)}`);
+    if (sub.status === 'trialing' || (Number(inv.amount_paid) === 0 && inv.billing_reason === 'subscription_create' && sub.trial_end)) return;   // the $0 trial invoice
     const md = sub.metadata || {};
     let u = md.user_id ? db.prepare('SELECT * FROM users WHERE id = ?').get(Number(md.user_id)) : null;
     if (!u && inv.customer) u = db.prepare('SELECT * FROM users WHERE stripe_customer = ?').get(String(inv.customer));
@@ -137,6 +158,20 @@ module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid }
       if (ev.type === 'checkout.session.completed') {
         const id = Number(obj.client_reference_id || (obj.metadata && obj.metadata.user_id));
         if (id && obj.customer) db.prepare('UPDATE users SET stripe_customer = ?, stripe_sub = COALESCE(?, stripe_sub) WHERE id = ?').run(String(obj.customer), obj.subscription ? String(obj.subscription) : null, id);
+        if (id && obj.metadata && obj.metadata.trial === '1') {
+          // card added: start the free trial now (one extra day so the first charge lands before access ends)
+          const u = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+          if (u && !u.trial_used) {
+            startTrial(id, trialDays());
+            db.prepare(`UPDATE users SET trial_used = 1, plan_request = ?, expires_at = datetime(expires_at, '+1 day') WHERE id = ?`)
+              .run(`${obj.metadata.plan || ''}:${obj.metadata.billing || ''}`, id);
+          }
+          const off = Number(obj.metadata.ref_off);
+          if (off > 0 && obj.subscription) {
+            const c = await call('POST', '/v1/coupons', { percent_off: off, duration: 'once', name: `Referral ${off}% off` });
+            await call('POST', `/v1/subscriptions/${encodeURIComponent(String(obj.subscription))}`, { discounts: { 0: { coupon: c.id } } });
+          }
+        }
       } else if (ev.type === 'invoice.paid') {
         await onInvoicePaid(obj);
       } else if (ev.type === 'customer.subscription.deleted') {
@@ -151,5 +186,5 @@ module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid }
     res.json({ received: true });
   });
 
-  return { on, checkoutUrl, verify };
+  return { on, cardTrial, needsCardTrial, checkoutUrl, verify };
 };

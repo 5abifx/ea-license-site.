@@ -421,7 +421,7 @@ app.get('/signup', (req, res) => {
   page(req, res, 'Create account', authShell(
     trial ? `${trial}-day free trial` : 'New account',
     trial ? `Start your ${trial}-day free trial` : 'Create your account',
-    trial ? `Full access to every EA, no payment needed. After the trial, plans start at ${PRICE_TEXT}.` : 'Use the same email you paid with so we can match your purchase.', `
+    trial ? (stripe.cardTrial() ? `Full access to every EA. Add a card to start, you are not charged for ${trial} days. Cancel anytime before.` : `Full access to every EA, no payment needed. After the trial, plans start at ${PRICE_TEXT}.`) : 'Use the same email you paid with so we can match your purchase.', `
     ${googleOn() ? `${googleButton(trial ? 'Start free trial with Google' : 'Sign up with Google')}
     <p class="muted">We use your Google account to keep one free trial per person. We only receive your name and email.</p>` : `
     <form method="post" action="/signup">
@@ -438,7 +438,15 @@ app.get('/signup', (req, res) => {
 function createCustomer(req, { name, email, passwordHash, googleSub = null }) {
   const trial = trialDays();
   let info;
-  if (trial) {
+  if (trial && stripe.cardTrial()) {
+    // Card trial: the account exists but nothing works until a card is added in Stripe Checkout,
+    // which starts the TRIAL_DAYS free trial (first charge after the trial)
+    info = db.prepare(`INSERT INTO users (email, name, password_hash, status, max_accounts, expires_at, trial, google_sub)
+                       VALUES (?, ?, ?, 'active', ?, datetime('now'), 0, ?)`)
+      .run(email, name, passwordHash, TRIAL_ACCOUNTS, googleSub);
+    grantAllActiveEas(info.lastInsertRowid);
+    flash(req, 'ok', `Account created. Pick a plan and add a card to start your ${trial}-day free trial. You are not charged until the trial ends.`);
+  } else if (trial) {
     // Free trial: active right away, all EAs, expires after TRIAL_DAYS
     info = db.prepare(`INSERT INTO users (email, name, password_hash, status, max_accounts, expires_at, trial, google_sub)
                        VALUES (?, ?, ?, 'active', ?, datetime('now', ?), 1, ?)`)
@@ -580,10 +588,13 @@ app.get('/dashboard', requireUser, (req, res) => {
   const student = isStudent(u);
   const accounts = db.prepare('SELECT * FROM accounts WHERE user_id = ? ORDER BY created_at').all(u.id);
   const full = accounts.length >= u.max_accounts;
-  const expired = isExpired(u);
+  const needsCard = stripe.needsCardTrial(u);
+  const expired = isExpired(u) && !needsCard;
 
   page(req, res, 'My EAs', `
   <h1>Welcome${u.name ? ', ' + esc(u.name) : ''}</h1>
+  ${needsCard ? `<div class="notice"><div><strong>Start your ${trialDays()}-day free trial.</strong>
+    Pick a plan and add a card. You are not charged until the trial ends, and you can cancel anytime before.</div><a class="btn" href="/pricing">Start free trial</a></div>` : ''}
   ${expired ? `<div class="notice error"><div><strong>${u.trial ? 'Your free trial has ended.' : 'Your license has expired.'}</strong>
     Your EAs will stop working until you pick a plan. Plans start at $${PLANS[0].monthly}/month.</div><a class="btn" href="/pricing">See plans</a></div>` : ''}
   ${u.trial && !expired ? `<div class="notice"><div><strong>Free trial: ${daysLeft(u)} day${daysLeft(u) === 1 ? '' : 's'} left</strong>
@@ -646,7 +657,7 @@ app.post('/accounts', requireUser, (req, res) => {
   if (!num) { flash(req, 'error', 'Account number must contain digits only.'); return res.redirect('/dashboard'); }
   const count = db.prepare('SELECT COUNT(*) AS n FROM accounts WHERE user_id = ?').get(u.id).n;
   if (count >= u.max_accounts) { flash(req, 'error', `You can register at most ${u.max_accounts} accounts.`); return res.redirect('/dashboard'); }
-  if (u.trial) {
+  if (u.trial || stripe.needsCardTrial(u)) {
     const used = db.prepare('SELECT user_id FROM trial_accounts WHERE account_number = ?').get(num);
     if (used && used.user_id !== u.id) {
       flash(req, 'error', `MT5 account ${num} has already used a free trial. Subscribe to keep using it.`);
@@ -1120,7 +1131,7 @@ app.post('/admin/eas/:id/delete', requireAdmin, (req, res) => {
 });
 
 require('./help')(app, { db, page });
-const stripe = require('./stripe')(app, { db, flash, requireUser, applyPaid, refs });
+const stripe = require('./stripe')(app, { db, flash, requireUser, applyPaid, startTrial, refs });
 require('./pricing')(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL: process.env.CONTACT_URL || '', refs, stripe });
 require('./pages')(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, TRIAL_ACCOUNTS, MAX_ACCOUNTS_DEFAULT });
 
