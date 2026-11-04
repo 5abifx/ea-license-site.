@@ -107,14 +107,21 @@ function daysLeft(u) {
 function payButton(label) {
   return PAYMENT_URL ? `<a class="btn" href="${esc(PAYMENT_URL)}" target="_blank" rel="noopener">${esc(label)}</a>` : '';
 }
-// Tools that come with every paid plan but not with the free trial (e.g. the Auction Compass indicator)
-const PAID_ONLY = String(process.env.PAID_ONLY_EAS || 'COMPASS').split(',').map((c) => c.trim().toUpperCase()).filter(Boolean);
-const paidOnlyLocked = (u, e) => !!u.trial && PAID_ONLY.includes(String(e.code).toUpperCase());
-// Paid members (any plan, or the Trade Journal) get the paid-only tools without the admin assigning them
-function paidOnlyEas(u) {
-  if (u.trial || !PAID_ONLY.length) return [];
-  const paid = u.plan || db.prepare("SELECT 1 FROM user_eas ue JOIN eas e ON e.id = ue.ea_id WHERE ue.user_id = ? AND e.code = 'JOURNAL'").get(u.id);
-  return paid ? db.prepare(`SELECT * FROM eas WHERE active = 1 AND UPPER(code) IN (${PAID_ONLY.map(() => '?').join(', ')})`).all(...PAID_ONLY) : [];
+// Tools only for the owner's mentorship students (e.g. the Auction Compass indicator).
+// They are never sold in a plan: the admin ticks "Student" on the user's page, and only then
+// does /api/check unlock them (the Journal EA relay passes that on to the indicator).
+const STUDENT_ONLY = String(process.env.STUDENT_ONLY_EAS || 'COMPASS').split(',').map((c) => c.trim().toUpperCase()).filter(Boolean);
+const isStudentOnly = (e) => STUDENT_ONLY.includes(String(e.code || e).toUpperCase());
+const isStudent = (u) => !!(u && (u.student || u.is_admin));
+// Students get every student-only tool without the admin assigning them one by one
+function studentEas(u) {
+  if (!isStudent(u) || !STUDENT_ONLY.length) return [];
+  return db.prepare(`SELECT * FROM eas WHERE active = 1 AND UPPER(code) IN (${STUDENT_ONLY.map(() => '?').join(', ')})`).all(...STUDENT_ONLY);
+}
+
+function studentOnlyNames() {
+  if (!STUDENT_ONLY.length) return '';
+  return db.prepare(`SELECT name FROM eas WHERE UPPER(code) IN (${STUDENT_ONLY.map(() => '?').join(', ')}) ORDER BY name`).all(...STUDENT_ONLY).map((e) => e.name).join(', ');
 }
 
 function grantAllActiveEas(userId) {
@@ -525,8 +532,10 @@ app.get('/dashboard', requireUser, (req, res) => {
       <p>Your account is waiting for approval. Once it is activated you can download your EAs and register your MT5 accounts here.</p></div>`);
   }
   const eas = db.prepare(`SELECT e.* FROM eas e JOIN user_eas ue ON ue.ea_id = e.id
-                          WHERE ue.user_id = ? AND e.active = 1 ORDER BY e.name`).all(u.id);
-  for (const x of paidOnlyEas(u)) if (!eas.some((e) => e.id === x.id)) eas.push(x);
+                          WHERE ue.user_id = ? AND e.active = 1 ORDER BY e.name`).all(u.id)
+    .filter((e) => !isStudentOnly(e));
+  eas.push(...studentEas(u));
+  const student = isStudent(u);
   const accounts = db.prepare('SELECT * FROM accounts WHERE user_id = ? ORDER BY created_at').all(u.id);
   const full = accounts.length >= u.max_accounts;
   const expired = isExpired(u);
@@ -545,8 +554,7 @@ app.get('/dashboard', requireUser, (req, res) => {
       <div class="ea">
         <div><strong>${esc(e.name)}</strong> <span class="tag">v${esc(e.version)}</span>
         ${e.description ? `<p class="muted">${esc(e.description)}</p>` : ''}</div>
-        ${paidOnlyLocked(u, e) ? '<a class="btn secondary" href="/pricing">Included when you subscribe</a>'
-          : e.file_path ? `<a class="btn" href="/download/${e.id}">Download</a>` : '<span class="muted">Coming soon</span>'}
+        ${e.file_path ? `<a class="btn" href="/download/${e.id}">Download</a>` : '<span class="muted">Coming soon</span>'}
       </div>`).join('')}</div>`
     : '<p class="muted">No EAs are assigned to your account yet.</p>'}
   </section>
@@ -573,7 +581,7 @@ app.get('/dashboard', requireUser, (req, res) => {
     <h2>3. Allow the license check in MT5</h2>
     <p>In MetaTrader 5 go to <strong>Tools → Options → Expert Advisors</strong>, tick <strong>Allow WebRequest for listed URL</strong> and add:</p>
     <code class="block">${esc(req.protocol + '://' + req.get('host'))}</code>
-    <p class="muted">Want the 5ABI.FX look on your charts? Download the chart template <a href="/templates/5ABI.FX.tpl" download>5ABI.FX.tpl</a> (or <a href="/templates/5ABI.FX%20Compass.tpl" download>with Auction Compass</a>), put it in <strong>File → Open Data Folder → MQL5 → Profiles → Templates</strong>, then right-click a chart → <strong>Templates</strong>.</p>
+    <p class="muted">Want the 5ABI.FX look on your charts? Download the chart template <a href="/templates/5ABI.FX.tpl" download>5ABI.FX.tpl</a> ${student ? '(or <a href="/templates/5ABI.FX%20Compass.tpl" download>with Auction Compass</a>)' : ''}, put it in <strong>File → Open Data Folder → MQL5 → Profiles → Templates</strong>, then right-click a chart → <strong>Templates</strong>.</p>
     <p class="muted">Prop firm account says <strong>"AutoTrading disabled by server"</strong>? <a href="/help/ea-blocked">Get a ready-to-send email for their support</a>.</p>
   </section>
   </div>
@@ -581,7 +589,7 @@ app.get('/dashboard', requireUser, (req, res) => {
   ${req.hasJournal ? `<section class="card">
     <h2>4. Trade Journal</h2>
     <p>Every trade you close is logged automatically and turned into share cards. <a href="/journal">Open your journal</a> to get your journal key and set up the Trade Journal EA.</p>
-    ${eas.some((e) => PAID_ONLY.includes(String(e.code).toUpperCase())) && !u.trial ? '<p class="muted">Indicators like Auction Compass unlock by themselves while the Trade Journal EA runs on any chart in the same MT5. Put indicators in <strong>MQL5 → Indicators</strong>.</p>' : ''}
+    ${student && eas.some(isStudentOnly) ? '<p class="muted">Indicators like Auction Compass unlock by themselves while the Trade Journal EA runs on any chart in the same MT5. Put indicators in <strong>MQL5 → Indicators</strong>.</p>' : ''}
   </section>` : ''}
   ${u.is_admin ? '' : refs.card(req, u)}
   </div>`);
@@ -618,8 +626,8 @@ app.get('/download/:id', requireUser, (req, res) => {
   const u = req.user;
   const e = db.prepare(`SELECT e.* FROM eas e JOIN user_eas ue ON ue.ea_id = e.id
                         WHERE e.id = ? AND ue.user_id = ? AND e.active = 1`).get(req.params.id, u.id)
-    || paidOnlyEas(u).find((x) => String(x.id) === String(req.params.id));
-  if (u.status !== 'active' || !e || !e.file_path || paidOnlyLocked(u, e)) return res.status(404).send('Not found');
+    || studentEas(u).find((x) => String(x.id) === String(req.params.id));
+  if (u.status !== 'active' || !e || !e.file_path || (isStudentOnly(e) && !isStudent(u))) return res.status(404).send('Not found');
   res.download(path.join(FILES_DIR, e.file_path), e.file_name);
 });
 
@@ -635,26 +643,22 @@ app.get('/api/check', (req, res) => {
   const ea = db.prepare('SELECT * FROM eas WHERE code = ?').get(code);
   if (!ea || !ea.active) return reply(false, 'Unknown or inactive EA');
 
-  // A paid-only tool (Auction Compass) comes with every paid plan (they all include the Trade Journal),
-  // so it works as soon as the account is added, without being assigned one by one.
-  const paidOnly = PAID_ONLY.includes(String(ea.code).toUpperCase());
-  const rows = paidOnly
+  // A student-only tool (Auction Compass) works only for users the admin marked as a student
+  // (or an admin), on any account they added. Plans and per-user EA ticks do not unlock it.
+  const studentOnly = isStudentOnly(ea);
+  const rows = studentOnly
     ? db.prepare(`
       SELECT a.id AS account_id, u.* FROM accounts a
       JOIN users u ON u.id = a.user_id
-      WHERE a.account_number = ? AND u.status = 'active' AND (u.plan != '' OR EXISTS (
-        SELECT 1 FROM user_eas ue JOIN eas e ON e.id = ue.ea_id WHERE ue.user_id = u.id AND (e.id = ? OR e.code = 'JOURNAL')))`).all(num, ea.id)
+      WHERE a.account_number = ? AND u.status = 'active' AND (u.student = 1 OR u.is_admin = 1)`).all(num)
     : db.prepare(`
       SELECT a.id AS account_id, u.* FROM accounts a
       JOIN users u ON u.id = a.user_id
       JOIN user_eas ue ON ue.user_id = u.id AND ue.ea_id = ?
       WHERE a.account_number = ? AND u.status = 'active'`).all(ea.id, num);
-  const ok = rows.find((u) => !isExpired(u) && !(paidOnly && u.trial));
-  if (!ok && paidOnly && rows.some((u) => !isExpired(u))) {
-    return reply(false, 'Included with every paid plan, not with the free trial', { latest_version: ea.version });
-  }
+  const ok = rows.find((u) => !isExpired(u));
   if (!ok) {
-    return reply(false, rows.length ? 'License expired' : 'Account not registered for this EA',
+    return reply(false, rows.length ? 'License expired' : studentOnly ? 'Only for 5ABI.FX students' : 'Account not registered for this EA',
       { latest_version: ea.version });
   }
   db.prepare(`UPDATE accounts SET last_check_at = datetime('now'), last_check_ea = ? WHERE id = ?`).run(ea.code, ok.account_id);
@@ -691,7 +695,7 @@ app.get('/admin', requireAdmin, (req, res) => {
     </div>
     <table><thead><tr><th>User</th><th>Status</th><th>EAs</th><th>Accounts</th><th>Expires</th><th></th></tr></thead><tbody>
     ${users.map((u) => `<tr>
-      <td><a href="/admin/users/${u.id}"><strong>${esc(u.name || '-')}</strong></a><br><span class="muted">${esc(u.email)}</span>${u.is_admin ? ' <span class="tag">admin</span>' : ''}</td>
+      <td><a href="/admin/users/${u.id}"><strong>${esc(u.name || '-')}</strong></a><br><span class="muted">${esc(u.email)}</span>${u.is_admin ? ' <span class="tag">admin</span>' : ''}${u.student ? ' <span class="tag">student</span>' : ''}</td>
       <td><span class="status ${esc(u.status)}">${esc(u.status)}</span>${u.trial ? ' <span class="tag warn">trial</span>' : ''}${u.plan && !u.trial ? ` <span class="tag">${esc((getPlan(u.plan) || {}).name || u.plan)}</span>` : ''}${u.plan_request ? ' <span class="tag warn">wants a plan</span>' : ''}</td>
       <td>${esc(u.ea_codes || '-')}</td>
       <td>${u.n_acc} / ${u.max_accounts}</td>
@@ -784,7 +788,8 @@ app.get('/admin/users/:id', requireAdmin, (req, res) => {
       <label>Status<select name="status">${['pending', 'active', 'disabled'].map((s) => `<option ${s === u.status ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
       <label>Max accounts<input type="number" name="max_accounts" value="${u.max_accounts}" min="0" max="1000"></label>
       <label>Expires (blank = never)<input type="date" name="expires_at" value="${esc(expDate)}"></label>
-      <fieldset><legend>EAs this user can download and run</legend>${eas.map((e) => `<label class="check"><input type="checkbox" name="ea" value="${e.id}" ${e.granted ? 'checked' : ''}> ${esc(e.name)} <span class="muted">(${esc(e.code)})</span></label>`).join('') || '<span class="muted">No EAs yet</span>'}</fieldset>
+      <fieldset><legend>Mentorship</legend><label class="check"><input type="checkbox" name="student" value="1" ${u.student ? 'checked' : ''}> Student: unlocks ${esc(studentOnlyNames() || 'the student-only tools')} on all their MT5 accounts</label></fieldset>
+      <fieldset><legend>EAs this user can download and run</legend>${eas.filter((e) => !isStudentOnly(e)).map((e) => `<label class="check"><input type="checkbox" name="ea" value="${e.id}" ${e.granted ? 'checked' : ''}> ${esc(e.name)} <span class="muted">(${esc(e.code)})</span></label>`).join('') || '<span class="muted">No EAs yet</span>'}</fieldset>
       <div><button>Save</button></div>
     </form>
   </section>
@@ -851,9 +856,9 @@ app.post('/admin/users/:id', requireAdmin, (req, res) => {
   const id = Number(req.params.id);
   const status = ['pending', 'active', 'disabled'].includes(req.body.status) ? req.body.status : 'pending';
   const self = id === req.user.id;
-  db.prepare('UPDATE users SET name = ?, status = ?, max_accounts = ?, expires_at = ? WHERE id = ?')
+  db.prepare('UPDATE users SET name = ?, status = ?, max_accounts = ?, expires_at = ?, student = ? WHERE id = ?')
     .run(String(req.body.name || '').trim(), self ? 'active' : status,
-      Math.max(0, Number(req.body.max_accounts) || 0), parseExpiry(req.body.expires_at), id);
+      Math.max(0, Number(req.body.max_accounts) || 0), parseExpiry(req.body.expires_at), req.body.student ? 1 : 0, id);
   setUserEas(id, req.body.ea);
   flash(req, 'ok', 'Saved.');
   res.redirect(`/admin/users/${id}`);

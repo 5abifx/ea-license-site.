@@ -92,6 +92,7 @@ if (!userCols.includes('billing')) db.exec("ALTER TABLE users ADD COLUMN billing
 if (!userCols.includes('plan_request')) db.exec("ALTER TABLE users ADD COLUMN plan_request TEXT NOT NULL DEFAULT ''"); // "katana:annual" picked on /subscribe, waiting for payment
 if (!userCols.includes('ref_code')) { db.exec('ALTER TABLE users ADD COLUMN ref_code TEXT'); db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ref_code ON users(ref_code)'); }
 if (!userCols.includes('referred_by')) db.exec('ALTER TABLE users ADD COLUMN referred_by INTEGER');                 // user id of the referrer
+if (!userCols.includes('student')) db.exec('ALTER TABLE users ADD COLUMN student INTEGER NOT NULL DEFAULT 0');           // 1 = mentorship student: unlocks student-only tools (Auction Compass)
 if (!userCols.includes('ref_rewarded')) db.exec('ALTER TABLE users ADD COLUMN ref_rewarded INTEGER NOT NULL DEFAULT 0'); // 1 = first payment done, referrer rewarded
 
 // Prop firm rules per account for the Insights page (percent of the start balance; start balance optional)
