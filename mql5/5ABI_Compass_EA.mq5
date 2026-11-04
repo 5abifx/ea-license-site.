@@ -12,7 +12,7 @@
 //|  Private build: distribute the compiled .ex5 only.               |
 //+------------------------------------------------------------------+
 #property copyright   "5ABI FX"
-#property version     "1.10"
+#property version     "1.20"
 #property description "5ABI FX · Compass EA: trades the auction plan"
 
 #define EA_CODE        "BOT"                 // must match the licence code in Admin > EAs
@@ -28,6 +28,11 @@ enum ETrigger { TRIG_CLOSE_BACK = 0, // Close back inside (data TF)
 enum EStop    { STOP_AUTO = 0,       // Auto: passive, else tight if RRR fails
                 STOP_PASSIVE = 1,    // Passive: beyond pHi / pLo
                 STOP_TIGHT = 2 };    // Tight: beyond the trigger structure
+enum EStrat   { STRAT_EMA = 0,       // EMA pullback
+                STRAT_COMPASS = 1,   // Compass auction setups (V1-V4)
+                STRAT_BOTH = 2 };    // Both
+enum EEmaTgt  { EMA_TGT_LEVEL = 0,   // Next Compass level (else R multiple)
+                EMA_TGT_R = 1 };     // Fixed R multiple
 enum EAnchor  { ANCHOR_BROKER = 0,   // Broker midnight (same as the indicator)
                 ANCHOR_CASH = 1 };   // Cash open (COMEX)
 enum EPartAt  { PART_LEVEL = 0,      // At pPOC / first target (else R multiple)
@@ -39,7 +44,24 @@ input bool     InpPush            = false;           // Push notification on eve
 input long     InpMagic           = 0;               // Magic number (0 = auto, unique per symbol)
 input int      InpDeviation       = 30;              // Max slippage (points)
 
-input group "Setups"
+input group "Strategy"
+input EStrat   InpStrategy        = STRAT_EMA;       // Strategy
+
+input group "EMA pullback"
+input ENUM_TIMEFRAMES InpEmaTrendTF = PERIOD_H1;     // Trend timeframe
+input int      InpEmaFast         = 50;              // Trend EMA fast
+input int      InpEmaSlow         = 200;             // Trend EMA slow
+input int      InpEmaPull         = 21;              // Pullback EMA (data TF)
+input int      InpEmaLookback     = 6;               // Pullback extreme: last N candles
+input double   InpEmaStopAtr      = 0.2;             // Stop buffer beyond the pullback (x ATR14)
+input double   InpEmaMinStopAtr   = 0.5;             // Minimum stop (x ATR14)
+input EEmaTgt  InpEmaTarget       = EMA_TGT_LEVEL;   // Target
+input double   InpEmaRR           = 2.0;             // Target R multiple (fixed / fallback)
+input bool     InpEmaLevelFilter  = true;            // Skip when a Compass level sits inside the first R
+input double   InpEmaClearR       = 1.0;             // ...within this many R
+input bool     InpEmaUseBias      = false;           // Also require the Compass bias not to disagree
+
+input group "Compass setups"
 input bool     InpUseV1           = true;            // V1 balance: fade VAH / VAL after acceptance
 input bool     InpUseV2           = true;            // V2 rotation to pPOC, target the open
 input bool     InpUseV3           = true;            // V3 gap held: trend, target naked POCs
@@ -113,6 +135,7 @@ input bool     InpPanel           = true;            // Show the status panel
 #include "Compass_Exec.mqh"
 #include "Compass_Signals.mqh"
 #include "Compass_Triggers.mqh"
+#include "Compass_EMA.mqh"
 
 datetime g_prepDay = 0;
 datetime g_lastBar = 0;
@@ -148,6 +171,8 @@ void Panel()
    if(!InpPanel || MQLInfoInteger(MQL_OPTIMIZATION))
       return;
    string s = "5ABI Compass EA · " + (InpMode == RUN_AUTO ? "AUTO" : "SIGNAL ONLY") + " · " + StateName() + "\n";
+   if(InpStrategy != STRAT_COMPASS)
+      s += "EMA trend: " + (g_emaTrend == 1 ? "UP" : g_emaTrend == -1 ? "DOWN" : "none") + "\n";
    if(g_hn > 0)
       s += "pVAH " + Px(g_h[0].vah) + "  pPOC " + Px(g_h[0].poc) + "  pVAL " + Px(g_h[0].val) + "\n";
    if(g_d.ready)
@@ -211,6 +236,11 @@ int OnInit()
    if(InpRiskPct * 17 > InpMaxDDPct * 0.5)
       PrintFormat("5ABI Compass EA: warning, 17 losses in a row at %.2f%% = %.1f%%, more than half of the %.1f%% max drawdown",
                   InpRiskPct, InpRiskPct * 17, InpMaxDDPct);
+   if(!EmaInit())
+     {
+      Print("5ABI Compass EA: could not create the EMA / ATR indicators");
+      return INIT_FAILED;
+     }
    int r = LicenseOnInit();
    EventSetTimer(60);               // licence re-checks
    return r;
@@ -219,6 +249,7 @@ int OnInit()
 void OnDeinit(const int reason)
   {
    LicenseOnDeinit();
+   EmaDeinit();
    EventKillTimer();
    Comment("");
   }
@@ -285,6 +316,7 @@ void OnTick()
            {
             UpdateArming();
             RunTriggers();
+            EmaCheck();
            }
          if(!g_dayDone && DayGet(g_d.d0, "trades") >= InpMaxTradesDay && OpenCount() == 0 && InpTrigger != TRIG_LIMIT)
             EndDay("max trades today");

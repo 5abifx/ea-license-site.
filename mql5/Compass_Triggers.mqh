@@ -31,7 +31,7 @@ string EntryBlock(int i)
       return "max open positions";
    if(!InHours(TimeCurrent(), why))
       return why;
-   if(InpAnchor == ANCHOR_CASH && InpTradeWindowMins > 0 && TimeCurrent() >= g_d.d0 + (long)InpTradeWindowMins * 60)
+   if(g_set[i].variant <= 4 && InpAnchor == ANCHOR_CASH && InpTradeWindowMins > 0 && TimeCurrent() >= g_d.d0 + (long)InpTradeWindowMins * 60)
       return "after the cash-session trade window";
    if(InpNewsFilter && NewsState(TimeCurrent()) != 0)
       return "news window";
@@ -266,7 +266,7 @@ void PBCheckM1()
    MqlRates last = m[n - 1];
    for(int i = 0; i < SET_N; i++)
      {
-      if(!g_set[i].armed || g_set[i].variant == 3)
+      if(!g_set[i].armed || g_set[i].variant == 3 || g_set[i].variant == 5)
          continue;
       int side = g_set[i].side;
       double L = g_set[i].level;
@@ -319,8 +319,8 @@ void RunTriggers()
    MqlRates bar = g_tr[g_tn - 1];
    for(int i = 0; i < SET_N; i++)
      {
-      if(!g_set[i].armed)
-         continue;
+      if(!g_set[i].armed || g_set[i].variant == 5)
+         continue;               // EMA setups run in EmaCheck()
       if(g_set[i].variant == 3)
         {
          PullbackCheck(i);      // trend trades always wait for a pullback break

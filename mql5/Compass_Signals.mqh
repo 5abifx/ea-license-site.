@@ -6,7 +6,7 @@
 #ifndef COMPASS_SIGNALS_MQH
 #define COMPASS_SIGNALS_MQH
 
-#define SET_N 8   // 0 V1L, 1 V1S, 2 V2L, 3 V2S, 4 V3L, 5 V3S, 6 V4L, 7 V4S
+#define SET_N 10  // 0 V1L, 1 V1S, 2 V2L, 3 V2S, 4 V3L, 5 V3S, 6 V4L, 7 V4S, 8 EMA L, 9 EMA S
 
 struct SSetup
   {
@@ -31,13 +31,13 @@ SDay   g_d;
 
 string SetupName(int i)
   {
-   string n[SET_N] = {"V1 long", "V1 short", "V2 long", "V2 short", "V3 long", "V3 short", "V4 long", "V4 short"};
+   string n[SET_N] = {"V1 long", "V1 short", "V2 long", "V2 short", "V3 long", "V3 short", "V4 long", "V4 short", "EMA long", "EMA short"};
    return i >= 0 && i < SET_N ? n[i] : "?";
   }
 
 string SetupTag(int i)
   {
-   string n[SET_N] = {"V1L", "V1S", "V2L", "V2S", "V3L", "V3S", "V4L", "V4S"};
+   string n[SET_N] = {"V1L", "V1S", "V2L", "V2S", "V3L", "V3S", "V4L", "V4S", "EMAL", "EMAS"};
    return i >= 0 && i < SET_N ? n[i] : "?";
   }
 
@@ -118,6 +118,12 @@ bool TrendTargets(int dir, double px, double &tgt, double &part)
 void UpdateArming()
   {
    double pVAH = g_h[0].vah, pVAL = g_h[0].val, pPOC = g_h[0].poc, pHi = g_h[0].hi, pLo = g_h[0].lo;
+   if(InpStrategy == STRAT_EMA)
+     {
+      for(int k = 0; k < 8; k++)
+         Disarm(k, "Compass strategy off");
+      return;
+     }
    double b = g_buf;
    int v = g_d.variant;
    bool disc = g_d.disc != 0;
@@ -171,6 +177,8 @@ void UpdateArming()
 bool BiasAllows(int i)
   {
    int side = g_set[i].side;
+   if(g_set[i].variant == 5)
+      return !InpEmaUseBias || g_d.bias == 0 || g_d.bias == side;
    if(g_set[i].variant == 3)
       return g_d.bias == side;
    return g_d.bias == 0 || g_d.bias == side;
