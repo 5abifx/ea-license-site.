@@ -832,6 +832,8 @@ button.secondary:hover, .btn.secondary:hover, .btn.ghost:hover { border-color: v
 button.danger { color: var(--danger); }
 button.small, .btn.small { padding: 7px 12px; font-size: 10.5px; }
 button.link, .side-nav button.link { font-family: var(--body); text-transform: none; letter-spacing: 0; font-size: 14px; border-radius: 8px; box-shadow: none; }
+.btn.google { font-family: var(--body); text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 600; padding: 13px 18px; white-space: normal; text-align: center; line-height: 1.25; }
+.btn.google svg { flex: none; }
 input, select, textarea { background: rgba(255,255,255,.025); border: 1px solid var(--line); border-radius: 8px; }
 input:focus, select:focus, textarea:focus { border-color: rgba(var(--glowRGB),.7); box-shadow: 0 0 0 3px rgba(var(--glowRGB),.15); outline: none; }
 .tabs a, .acct { border-radius: 999px; }
