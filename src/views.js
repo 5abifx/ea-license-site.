@@ -60,7 +60,7 @@ function layout(req, title, body, opts = {}) {
        ${u.is_admin ? link('/admin', 'Admin') : ''}
        ${u.google_sub ? '' : link('/password', 'Password')}
        <form method="post" action="/logout" class="inline"><button class="link">Sign out</button></form>`
-    : `<a href="/#how">How it works</a>${link('/mentorship', 'Mentorship')}${link('/pricing', 'Pricing')}${link('/faq', 'FAQ')}${link('/login', 'Sign in')}${signup ? '<a class="btn small" href="/signup">Create account</a>' : ''}`;
+    : `<a href="/#katana">KATANA</a><a href="/#journal">Journal</a>${link('/mentorship', 'Mentorship')}${link('/pricing', 'Pricing')}${link('/faq', 'FAQ')}${link('/login', 'Sign in')}${signup ? `<a class="btn small" href="/signup">${trialDays() ? 'Start free trial' : 'Create account'}</a>` : ''}`;
   const origin = `${req.protocol}://${req.get('host')}`;
   const og = opts.og || {}; // link preview (Discord, iMessage, WhatsApp): { title, desc, image }
   const trial = trialDays();

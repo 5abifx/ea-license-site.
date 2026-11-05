@@ -58,6 +58,19 @@ function client(base) {
     assert.match(r.text, /Gold Scalper/);
     r = await bob.get('/download/1');
     assert.strictEqual(r.text, 'FAKE-EX5');
+    // security headers, and a password change signs out other devices
+    const hr = await fetch(base + '/login');
+    assert.strictEqual(hr.headers.get('x-frame-options'), 'DENY');
+    assert.strictEqual(hr.headers.get('x-content-type-options'), 'nosniff');
+    const bob2 = client(base);
+    await bob2.post('/login', { email: 'bob@test.com', password: 'bobpass123' });
+    assert.match((await bob2.get('/dashboard')).text, /Gold Scalper/);
+    r = await bob.post('/password', { current: 'bobpass123', password: 'bobnewpass1' });
+    assert.match(r.text, /Other devices are signed out/);
+    assert.doesNotMatch((await bob2.get('/dashboard')).text, /Gold Scalper/);
+    assert.match((await bob.get('/dashboard')).text, /Gold Scalper/);
+    await bob.post('/password', { current: 'bobnewpass1', password: 'bobpass123' });
+    assert.match((await bob.get('/dashboard')).text, /Gold Scalper/);
 
     assert.strictEqual((await check('GOLD_SCALPER', '1001')).valid, false);
     for (let i = 0; i < 10; i++) await bob.post('/accounts', { account_number: String(1001 + i) });
