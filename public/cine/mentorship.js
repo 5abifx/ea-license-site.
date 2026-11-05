@@ -1,6 +1,7 @@
+if(!CanvasRenderingContext2D.prototype.roundRect)CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){r=Math.max(0,Math.min(typeof r==='number'?r:(r&&r[0])||0,Math.abs(w)/2,Math.abs(h)/2));this.moveTo(x+r,y);this.arcTo(x+w,y,x+w,y+h,r);this.arcTo(x+w,y+h,x,y+h,r);this.arcTo(x,y+h,x,y,r);this.arcTo(x,y,x+w,y,r);this.closePath();return this};
 
 (function(){
-const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reduce=false; // phones with Reduce Motion on still get the loader and live graphics (owner's choice)
 const ld=document.getElementById('ld'),ldn=document.getElementById('ldn'),ldt=document.getElementById('ldt');
 const steps=['INITIALISING SESSION','LOADING MARKET DATA','CONNECTING TO THE OPEN'];const ls=performance.now();
 (function tick(n){const p=Math.min(1,(n-ls)/1700);ldn.textContent=String(Math.round(100*(1-Math.pow(1-p,2.2)))).padStart(3,'0');ldt.textContent=steps[Math.min(2,Math.floor(p*3))];

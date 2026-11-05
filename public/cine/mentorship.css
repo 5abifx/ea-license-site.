@@ -117,7 +117,6 @@ nav .go:hover,nav .go:focus-visible{border-color:var(--glow);outline:none}
 .js .hero .rv{transition-delay:calc(var(--d,0) * 140ms + .35s)}
 .js.ready .hero .rv{opacity:1;transform:none;filter:none}
 .hero .c{will-change:transform}
-@media(prefers-reduced-motion:reduce){.js .rv{opacity:1!important;transform:none!important;filter:none!important}#ld{display:none}.cyc em,.words div{transition:none}}
 #see{min-height:0}
 /* slides with a live graphic */
 .slide{min-height:100vh;display:flex;align-items:center}
