@@ -111,8 +111,16 @@ module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid, 
     } else {
       params.allow_promotion_codes = 'true';
     }
-    const s = await call('POST', '/v1/checkout/sessions', params);
-    return s.url;
+    try {
+      return (await call('POST', '/v1/checkout/sessions', params)).url;
+    } catch (e) {
+      // a saved customer from test mode (or a deleted one) is unknown to the live key: start fresh with the email
+      if (!params.customer || !/no such customer/i.test(e.message)) throw e;
+      db.prepare('UPDATE users SET stripe_customer = NULL WHERE id = ?').run(u.id);
+      delete params.customer;
+      params.customer_email = u.email;
+      return (await call('POST', '/v1/checkout/sessions', params)).url;
+    }
   }
 
   // Stripe customer portal: update card, cancel, download invoices
