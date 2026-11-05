@@ -190,6 +190,10 @@ function client(base) {
     assert.match((await anon.get('/')).text, /property="og:image" content="http:\/\/127\.0\.0\.1:\d+\/og\.png\?v=3"/);
     assert.match((await anon.get('/mentorship')).text, /property="og:image" content="[^"]+\/og-mentorship\.png\?v=3"/);
     assert.match((await fetch(base + '/robots.txt').then((x) => x.text())), /Disallow: \//);
+    const robots = await fetch(base + '/robots.txt').then((x) => x.text());
+    assert.match(robots, /User-agent: GPTBot\nDisallow: \//);                     // AI training bots stay out
+    assert.match(robots, /User-agent: \*\nAllow: \/\$\nAllow: \/mentorship/);     // search and AI search bots read public pages
+    assert.doesNotMatch(robots, /OAI-SearchBot|PerplexityBot/);
 
     // Sign in with Google: fake token endpoint returns an ID token for a verified Gmail address
     const http = require('http');
