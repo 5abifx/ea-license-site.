@@ -92,7 +92,7 @@ module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid, 
       subscription_data: { metadata: { user_id: u.id, plan: plan.id, billing } },
     };
     if (u.stripe_customer) params.customer = u.stripe_customer;
-    else params.customer_email = u.email;
+    else if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(u.email || '')) params.customer_email = u.email; // Stripe asks for one itself when the login is not an email
     if (needsCardTrial(u)) {
       // free trial: card saved now, first charge when the trial ends
       params.subscription_data.trial_period_days = trialDays();
@@ -118,7 +118,7 @@ module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid, 
       if (!params.customer || !/no such customer/i.test(e.message)) throw e;
       db.prepare('UPDATE users SET stripe_customer = NULL WHERE id = ?').run(u.id);
       delete params.customer;
-      params.customer_email = u.email;
+      if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(u.email || '')) params.customer_email = u.email; // Stripe asks for one itself when the login is not an email
       return (await call('POST', '/v1/checkout/sessions', params)).url;
     }
   }

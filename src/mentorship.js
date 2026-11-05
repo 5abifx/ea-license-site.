@@ -208,7 +208,10 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
     if (parts) params.subscription_data = { metadata: meta };
     else params.payment_intent_data = { metadata: meta };
     if (u.stripe_customer) params.customer = u.stripe_customer;
-    else { params.customer_email = u.email; if (!parts) params.customer_creation = 'always'; }
+    else {
+      if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(u.email || '')) params.customer_email = u.email; // Stripe asks for one itself when the login is not an email
+      if (!parts) params.customer_creation = 'always';
+    }
     try {
       let s;
       try {
@@ -218,7 +221,7 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
         if (!params.customer || !/no such customer/i.test(e.message)) throw e;
         db.prepare('UPDATE users SET stripe_customer = NULL WHERE id = ?').run(u.id);
         delete params.customer;
-        params.customer_email = u.email;
+        if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(u.email || '')) params.customer_email = u.email; // Stripe asks for one itself when the login is not an email
         if (!parts) params.customer_creation = 'always';
         s = await call('POST', '/v1/checkout/sessions', params);
       }
