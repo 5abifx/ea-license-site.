@@ -627,15 +627,16 @@ app.get('/admin', requireAdmin, (req, res) => {
       <label class="row-inline"><input type="number" name="trial_days" value="${trialDays() || 15}" min="1" max="365" style="width:5em" aria-label="Trial days"> days (trial)</label>
       <button class="small secondary">Apply</button>
     </form>
-    <table><thead><tr><th><input type="checkbox" aria-label="Tick all" onclick="document.querySelectorAll('input[form=bulk][name=ids]').forEach((c) => { c.checked = this.checked; })"></th><th>User</th><th>Status</th><th>EAs</th><th>Accounts</th><th>Expires</th><th></th></tr></thead><tbody>
+    <table class="user-list"><thead><tr><th><input type="checkbox" aria-label="Tick all" onclick="document.querySelectorAll('input[form=bulk][name=ids]').forEach((c) => { c.checked = this.checked; })"></th><th>User</th><th>Status</th><th>EAs</th><th>Accounts</th><th>Expires</th><th></th></tr></thead><tbody>
     ${users.map((u) => `<tr>
-      <td><input type="checkbox" form="bulk" name="ids" value="${u.id}" aria-label="Tick ${esc(u.email)}"></td>
-      <td><a href="/admin/users/${u.id}"><strong>${esc(u.name || '-')}</strong></a><br><span class="muted">${esc(u.email)}</span>${u.is_admin ? ' <span class="tag">admin</span>' : ''}${u.student ? ' <span class="tag">student</span>' : ''}</td>
-      <td><span class="status ${esc(u.status)}">${esc(u.status)}</span>${u.trial ? ' <span class="tag warn">trial</span>' : ''}${u.plan && !u.trial ? ` <span class="tag">${esc((getPlan(u.plan) || {}).name || u.plan)}</span>` : ''}${u.plan_request ? ' <span class="tag warn">wants a plan</span>' : ''}</td>
-      <td>${esc((u.ea_codes || '').split(', ').filter((c) => c && !isStudentOnly(c)).join(', ') || '-')}</td>
-      <td>${u.n_acc} / ${u.max_accounts}</td>
-      <td>${u.expires_at ? fmtDate(u.expires_at) : 'never'}${isExpired(u) ? ' <span class="tag warn">expired</span>' : ''}</td>
-      <td class="nowrap">${u.status === 'pending' ? `<form method="post" action="/admin/users/${u.id}/approve" class="inline"><button class="small">Approve</button></form>` : ''}
+      <td class="ul-tick"><input type="checkbox" form="bulk" name="ids" value="${u.id}" aria-label="Tick ${esc(u.email)}"></td>
+      <td class="ul-user"><a href="/admin/users/${u.id}"><strong>${esc(u.name || '-')}</strong></a><br><span class="muted">${esc(u.email)}</span>${u.is_admin ? ' <span class="tag">admin</span>' : ''}${u.student ? ' <span class="tag">student</span>' : ''}</td>
+      <td data-l="Status"><span class="status ${esc(u.status)}">${esc(u.status)}</span>${u.trial ? ' <span class="tag warn">trial</span>' : ''}${u.plan && !u.trial ? ` <span class="tag">${esc((getPlan(u.plan) || {}).name || u.plan)}</span>` : ''}${u.plan_request ? ' <span class="tag warn">wants a plan</span>' : ''}</td>
+      <td data-l="EAs">${esc((u.ea_codes || '').split(', ').filter((c) => c && !isStudentOnly(c)).join(', ') || '-')}</td>
+      <td data-l="Accounts">${u.n_acc} / ${u.max_accounts}</td>
+      <td data-l="Expires">${stripe.needsCardTrial(u) ? '<span class="tag" title="Signed up but has not added a card yet, so the free trial has not started">no card yet</span>'
+        : `${u.expires_at ? fmtDate(u.expires_at) : 'never'}${isExpired(u) ? ' <span class="tag warn">expired</span>' : ''}`}</td>
+      <td class="nowrap ul-act">${u.status === 'pending' ? `<form method="post" action="/admin/users/${u.id}/approve" class="inline"><button class="small">Approve</button></form>` : ''}
         <a class="btn small secondary" href="/admin/users/${u.id}">Manage</a></td>
     </tr>`).join('') || '<tr><td colspan="7" class="muted">No users found.</td></tr>'}
     </tbody></table>
@@ -762,7 +763,7 @@ app.get('/admin/users/:id', requireAdmin, (req, res) => {
 
   <section class="card">
     <div class="row between">
-      <h2>License ${u.trial ? '<span class="tag warn">free trial</span>' : ''}</h2>
+      <h2>License ${u.trial ? '<span class="tag warn">free trial</span>' : ''}${stripe.needsCardTrial(u) ? ' <span class="tag">no card yet</span>' : ''}</h2>
       <form method="post" action="/admin/users/${u.id}/paid" class="row paid-form">
         ${(() => { const [rp, rb] = (u.plan_request || '').split(':'); const cp = rp || u.plan || 'katana', cb = rb || u.billing || 'monthly';
           return `<select name="plan" aria-label="Plan">${PLANS.map((p) => `<option value="${p.id}" ${p.id === cp ? 'selected' : ''}>${esc(p.name)} (${p.accounts} acct)</option>`).join('')}</select>
@@ -773,6 +774,7 @@ app.get('/admin/users/:id', requireAdmin, (req, res) => {
       <span class="muted">Free trial:</span>
       <input type="number" name="trial_days" value="${trialDays() || 15}" min="1" max="365" style="width:5em" aria-label="Trial days"> <span class="muted">days from today</span>
       <button class="small secondary">${u.trial ? 'Restart free trial' : 'Start free trial'}</button></form>`}
+    ${stripe.needsCardTrial(u) ? `<p class="notice"><span>Signed up but has not added a card yet, so the ${trialDays()}-day free trial has not started. Nothing runs until they pick a plan and add a card (or you start a trial or mark them paid).</span></p>` : ''}
     ${u.plan_request ? `<p class="notice"><span>Requested on the site: <strong>${esc((getPlan(u.plan_request.split(':')[0]) || {}).name || u.plan_request)}</strong>, ${esc(u.plan_request.split(':')[1] || '')}. Check the payment, then press Mark as paid.</span></p>` : ''}
     ${refs.adminNote(u)}
     ${u.plan ? `<p class="muted">Current plan: <strong>${esc((getPlan(u.plan) || {}).name || u.plan)}</strong> · ${esc(u.billing)}</p>` : ''}

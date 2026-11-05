@@ -915,3 +915,18 @@ strong.warn { color: var(--warn); }
 .note-form > button { justify-self: start; }
 .mentor-chart [hidden] { display: none !important; }
 .bot-check { margin: 4px 0 14px; min-height: 65px; }
+
+/* Admin user list on phones: one card per user instead of a wide table */
+@media (max-width: 760px) {
+  .user-list thead { display: none; }
+  .user-list, .user-list tbody { display: block; }
+  .user-list tr { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .user-list td { display: block; padding: 0; border: 0; }
+  .user-list .ul-tick { grid-row: 1; padding-top: 2px; }
+  .user-list .ul-user { grid-row: 1; overflow-wrap: anywhere; }
+  .user-list td[data-l], .user-list .ul-act { grid-column: 1 / -1; }
+  .user-list td[data-l] { display: flex; justify-content: flex-end; align-items: center; gap: 8px; text-align: right; flex-wrap: wrap; }
+  .user-list td[data-l]::before { content: attr(data-l); margin-right: auto; font: 500 11px var(--mono, monospace); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: left; }
+  .user-list .ul-act { white-space: normal; margin-top: 4px; }
+  .user-list .ul-act .btn, .user-list .ul-act form { display: inline-block; }
+}
