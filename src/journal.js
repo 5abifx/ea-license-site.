@@ -96,23 +96,49 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   const priv = (real, mask) => `<span class="priv"><span class="priv-real">${real}</span><span class="priv-mask">${mask}</span></span>`;
   const acctLabel = (a) => priv(`${esc(a.broker || 'Account')} · ${esc(a.account_number)}`, `Account ••${esc(String(a.account_number).slice(-2))}`);
 
-  // accounts: live ones are still on My EAs; removed ones keep their trades in their own tab.
-  // ?account= picks one; without it, all live accounts.
+  // accounts: live ones are still on My EAs; removed ones keep their trades in their own tab;
+  // hidden ones (user's choice) are left out of the tabs and "All accounts" until shown again.
+  // ?account= picks one (hidden ones too); without it, all live, not hidden accounts.
   const scope = (req) => {
     const u = req.user;
     const live = new Set(db.prepare('SELECT account_number FROM accounts WHERE user_id = ?').all(u.id).map((a) => a.account_number));
+    const hidden = new Set(db.prepare('SELECT account_number FROM journal_hidden WHERE user_id = ?').all(u.id).map((a) => a.account_number));
     const accts = db.prepare(`SELECT account_number, COUNT(*) AS n, SUM(net) AS net, MAX(broker) AS broker, MAX(currency) AS cur
         FROM journal_trades WHERE user_id = ? GROUP BY account_number ORDER BY MAX(close_time) DESC`).all(u.id);
-    accts.forEach((a) => { a.removed = !live.has(a.account_number); });
-    const liveAccts = accts.filter((a) => !a.removed), removedAccts = accts.filter((a) => a.removed);
+    accts.forEach((a) => { a.removed = !live.has(a.account_number); a.hidden = hidden.has(a.account_number); });
+    const shown = accts.filter((a) => !a.hidden);
+    const liveAccts = shown.filter((a) => !a.removed), removedAccts = shown.filter((a) => a.removed);
+    const hiddenAccts = accts.filter((a) => a.hidden);
     const q = cleanAccount(req.query.account);
     const sel = accts.find((a) => a.account_number === q) || null;
     const liveNums = liveAccts.map((a) => a.account_number);
     const where = sel ? 'user_id = ? AND account_number = ?'
       : `user_id = ? AND account_number IN (${liveNums.map(() => '?').join(', ') || "''"})`;
     const args = sel ? [u.id, sel.account_number] : [u.id, ...liveNums];
-    return { accts, liveAccts, removedAccts, sel, where, args };
+    return { accts, liveAccts, removedAccts, hiddenAccts, sel, where, args };
   };
+
+  // account tabs (journal and insights pages) + the hide / show bar of the picked account
+  const acctBar = (req, base, qs, { accts, liveAccts, removedAccts, hiddenAccts, sel }, cur) => {
+    if (!accts.length) return '';
+    const chip = (a, label, sub, href, on) => `<a class="acct${a && (a.removed || a.hidden) ? ' removed' : ''}${on ? ' on' : ''}" href="${href}">
+      <small>${label}</small><b class="${cls(a ? a.net : 0)}">${a ? money(a.net, a.cur) : ''}</b><small>${sub}</small></a>`;
+    const allNet = liveAccts.reduce((s, a) => s + (a.net || 0), 0), allN = liveAccts.reduce((s, a) => s + a.n, 0);
+    const openHidden = hiddenAccts.length && (req.query.hidden === '1' || (sel && sel.hidden));
+    const back = encodeURIComponent(base + qs({}));
+    const bar = sel ? `<div class="acct-hidebar">${sel.hidden
+      ? `<span class="muted small">This account is hidden: it is left out of the tabs and "All accounts". Its trades are kept.</span>
+        <form method="post" action="/journal/accounts/${esc(sel.account_number)}/show?back=${back}" class="inline"><button class="small">Show account again</button></form>`
+      : `<form method="post" action="/journal/accounts/${esc(sel.account_number)}/hide?back=${encodeURIComponent(base)}" class="inline"><button class="small secondary" title="Leaves this account out of the tabs and All accounts. Its trades stay saved and you can show it again.">Hide this account</button></form>`}</div>` : '';
+    return `<div class="accts" role="navigation" aria-label="Accounts">
+      ${liveAccts.length > 1 || removedAccts.length || (hiddenAccts.length && liveAccts.length) ? `<a class="acct${sel ? '' : ' on'}" href="${base}${qs({ account: '' })}"><small>All accounts</small><b class="${cls(allNet)}">${money(allNet, cur)}</b><small>${allN} trades</small></a>` : ''}
+      ${liveAccts.map((a) => chip(a, acctLabel(a), `${a.n} trades`, `${base}${qs({ account: a.account_number })}`, sel === a || (!sel && liveAccts.length === 1 && !removedAccts.length && !hiddenAccts.length))).join('')}
+      ${removedAccts.map((a) => chip(a, acctLabel(a), '<span class="tag">Removed</span>', `${base}${qs({ account: a.account_number })}`, sel === a)).join('')}
+      ${openHidden ? hiddenAccts.map((a) => chip(a, acctLabel(a), '<span class="tag">Hidden</span>', `${base}${qs({ account: a.account_number })}`, sel === a)).join('')
+        : hiddenAccts.length ? `<a class="acct acct-more" href="${base}${qs({ hidden: '1' })}"><small>Hidden accounts</small><b>${hiddenAccts.length}</b><small>Tap to see</small></a>` : ''}
+    </div>${bar}`;
+  };
+
   // columns the insights read
   const INS_COLS = `account_number, symbol, side, lots, entry, exit, sl, tp, open_time, close_time, net, r, risk_pct,
     balance_after, mfe, mae, candles, setup, emotion, mistakes`;
@@ -121,7 +147,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const u = req.user;
     const key = ensureKey(u);
 
-    const { accts, liveAccts, removedAccts, sel, where, args } = scope(req);
+    const sc = scope(req);
+    const { accts, liveAccts, removedAccts, sel, where, args } = sc;
 
     // month shown: ?month=YYYY-MM, else the month of the latest trade
     const latest = db.prepare(`SELECT MAX(close_time) AS t FROM journal_trades WHERE ${where}`).get(...args).t;
@@ -201,19 +228,12 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       ${insightsView.stripHtml(ins, { money: (v) => money(v, cur), href: insHref })}
     </section>`;
 
-    const chip = (a, label, sub, href, on) => `<a class="acct${a && a.removed ? ' removed' : ''}${on ? ' on' : ''}" href="${href}">
-      <small>${label}</small><b class="${cls(a ? a.net : 0)}">${a ? money(a.net, a.cur) : ''}</b><small>${sub}</small></a>`;
-    const allNet = liveAccts.reduce((s, a) => s + (a.net || 0), 0), allN = liveAccts.reduce((s, a) => s + a.n, 0);
     const site = req.protocol + '://' + req.get('host');
 
     page(req, res, 'Trade Journal', `
     <div class="row between page-head"><h1>Trade Journal</h1>
       <button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers, your name and the journal key, so you can screenshot this page">Hide private info</button></div>
-    ${accts.length ? `<div class="accts" role="navigation" aria-label="Accounts">
-      ${liveAccts.length > 1 || removedAccts.length ? `<a class="acct${sel ? '' : ' on'}" href="/journal${qs({ account: '' })}"><small>All accounts</small><b class="${cls(allNet)}">${money(allNet, cur)}</b><small>${allN} trades</small></a>` : ''}
-      ${liveAccts.map((a) => chip(a, acctLabel(a), `${a.n} trades`, `/journal${qs({ account: a.account_number })}`, sel === a || (!sel && liveAccts.length === 1 && !removedAccts.length))).join('')}
-      ${removedAccts.map((a) => chip(a, acctLabel(a), '<span class="tag">Removed</span>', `/journal${qs({ account: a.account_number })}`, sel === a)).join('')}
-    </div>` : ''}
+    ${acctBar(req, '/journal', qs, sc, cur)}
 
     ${sel && sel.removed ? `<section class="card notice">
       <p><strong>Account ${esc(sel.account_number)} is no longer on <a href="/dashboard">My EAs</a>.</strong> Its ${sel.n} trades are kept here and left out of "All accounts". Add the account again on My EAs to bring it back, or delete these trades for good.</p>
@@ -270,6 +290,22 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     res.redirect('/journal');
   });
 
+  // hide / show an account in the journal (its trades stay saved)
+  const backTo = (req) => { const b = String(req.query.back || ''); return /^\/journal(\/insights)?(\?[\w=&%.-]*)?$/.test(b) ? b : '/journal'; };
+  app.post('/journal/accounts/:num/hide', requireUser, requireJournal, (req, res) => {
+    const num = cleanAccount(req.params.num);
+    if (num && db.prepare('SELECT 1 FROM journal_trades WHERE user_id = ? AND account_number = ? LIMIT 1').get(req.user.id, num)) {
+      db.prepare('INSERT OR IGNORE INTO journal_hidden (user_id, account_number) VALUES (?, ?)').run(req.user.id, num);
+      flash(req, 'ok', `Account ${num} is hidden. Its trades are kept; tap "Hidden accounts" in the tabs to show it again.`);
+    }
+    res.redirect(backTo(req));
+  });
+  app.post('/journal/accounts/:num/show', requireUser, requireJournal, (req, res) => {
+    const num = cleanAccount(req.params.num);
+    if (num) db.prepare('DELETE FROM journal_hidden WHERE user_id = ? AND account_number = ?').run(req.user.id, num);
+    res.redirect(backTo(req));
+  });
+
   app.post('/journal/key', requireUser, requireJournal, (req, res) => {
     db.prepare('UPDATE users SET journal_key = ? WHERE id = ?').run(crypto.randomBytes(16).toString('hex'), req.user.id);
     flash(req, 'ok', 'New journal key created. Paste it into the EA inputs.');
@@ -280,7 +316,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   const PERIODS = { 30: 'Last 30 days', 90: 'Last 90 days', 365: 'Last 12 months', all: 'All time' };
   app.get('/journal/insights', requireUser, requireJournal, (req, res) => {
     const u = req.user;
-    const { accts, liveAccts, removedAccts, sel, where, args } = scope(req);
+    const sc = scope(req);
+    const { accts, liveAccts, removedAccts, sel, where, args } = sc;
     const cur = (sel ? sel.cur : liveAccts[0]?.cur) || '';
     const m = (v) => money(v, cur);
     const period = Object.keys(PERIODS).includes(String(req.query.days)) ? String(req.query.days) : '90';
@@ -304,18 +341,10 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     }
 
     const qs = (o) => '?' + new URLSearchParams(Object.entries({ account: sel ? sel.account_number : '', days: period, ...o }).filter(([, v]) => v)).toString();
-    const chip = (a2, label, sub, href, on) => `<a class="acct${a2 && a2.removed ? ' removed' : ''}${on ? ' on' : ''}" href="${href}">
-      <small>${label}</small><b class="${cls(a2 ? a2.net : 0)}">${a2 ? money(a2.net, a2.cur) : ''}</b><small>${sub}</small></a>`;
-    const allNet = liveAccts.reduce((s, x) => s + (x.net || 0), 0), allN = liveAccts.reduce((s, x) => s + x.n, 0);
-
     page(req, res, 'Insights', `
     <div class="row between page-head"><h1>Insights</h1>
       <button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers and your name, so you can screenshot this page">Hide private info</button></div>
-    ${accts.length ? `<div class="accts" role="navigation" aria-label="Accounts">
-      ${liveAccts.length > 1 || removedAccts.length ? `<a class="acct${sel ? '' : ' on'}" href="/journal/insights${qs({ account: '' })}"><small>All accounts</small><b class="${cls(allNet)}">${money(allNet, cur)}</b><small>${allN} trades</small></a>` : ''}
-      ${liveAccts.map((x) => chip(x, acctLabel(x), `${x.n} trades`, `/journal/insights${qs({ account: x.account_number })}`, sel === x || (!sel && liveAccts.length === 1 && !removedAccts.length))).join('')}
-      ${removedAccts.map((x) => chip(x, acctLabel(x), '<span class="tag">Removed</span>', `/journal/insights${qs({ account: x.account_number })}`, sel === x)).join('')}
-    </div>` : ''}
+    ${acctBar(req, '/journal/insights', qs, sc, cur)}
     <div class="periods" role="navigation" aria-label="Period">${Object.entries(PERIODS).map(([k, l]) => `<a href="/journal/insights${qs({ days: k })}"${k === period ? ' class="on" aria-current="true"' : ''}>${l}</a>`).join('')}
       ${a.locked ? '' : `<span class="muted small">${a.count} trades${sel ? '' : liveAccts.length > 1 ? ' · all accounts' : ''}</span>`}</div>
     ${latest ? insightsView.fullHtml(a, { money: m, cur, prop }) : `<section class="card"><p class="muted">No trades yet. Connect the Trade Journal EA on the <a href="/journal">Journal</a> page; insights start after ${a.need} closed trades.</p></section>`}`);

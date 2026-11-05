@@ -365,6 +365,23 @@ function client(base, ip) {
     r = await bob.get('/journal');
     assert.match(r.text, /October 2026/);
     assert.match(r.text, /data-day="2026-10-28"/);
+    // hiding an account: out of the tabs and "All accounts", trades kept, can be shown again
+    r = await bob.get('/journal?account=1001');
+    assert.match(r.text, /Hide this account/);
+    r = await bob.post('/journal/accounts/1001/hide?back=%2Fjournal', {});
+    assert.match(r.text, /Account 1001 is hidden/);
+    assert.match(r.text, /Hidden accounts/);
+    assert.doesNotMatch(r.text, /href="\/journal\/\d+"/);
+    assert.doesNotMatch((await bob.get('/journal/insights')).text, /\?account=1001/);
+    r = await bob.get('/journal?hidden=1');
+    assert.match(r.text, /\?account=1001/);
+    r = await bob.get('/journal?account=1001');
+    assert.match(r.text, /This account is hidden/);
+    assert.match(r.text, /href="\/journal\/\d+"/);
+    assert.strictEqual((await bob.post('/journal/accounts/1001/hide?back=https%3A%2F%2Fevil.com', {})).status, 200);   // open redirect refused
+    r = await bob.post('/journal/accounts/1001/show?back=%2Fjournal', {});
+    assert.match(r.text, /href="\/journal\/\d+"/);
+    assert.doesNotMatch(r.text, /Hidden accounts/);
     // removing the account keeps its trades in a separate Removed tab, out of "All accounts"
     const accId = (await bob.get('/dashboard')).text.match(/action="\/accounts\/(\d+)\/delete"/)[1];
     await bob.post(`/accounts/${accId}/delete`, {});

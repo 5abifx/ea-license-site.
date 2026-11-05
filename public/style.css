@@ -930,3 +930,8 @@ strong.warn { color: var(--warn); }
   .user-list .ul-act { white-space: normal; margin-top: 4px; }
   .user-list .ul-act .btn, .user-list .ul-act form { display: inline-block; }
 }
+
+/* journal: hide / show an account */
+.acct-hidebar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 12px; margin: -8px 0 16px; }
+.acct.acct-more { border-style: dashed; min-width: 120px; opacity: .85; }
+.acct.acct-more b { color: var(--muted); }
