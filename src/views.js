@@ -79,7 +79,7 @@ function layout(req, title, body, opts = {}) {
 <meta property="og:title" content="${esc(og.title || `${SITE_NAME} · Your rules. Enforced on every trade.`)}">
 <meta property="og:description" content="${esc(og.desc || desc)}">
 <meta property="og:url" content="${esc(origin + req.path)}">
-<meta property="og:image" content="${esc(origin)}/${og.image || 'og.png'}?v=2">
+<meta property="og:image" content="${esc(origin)}/${og.image || 'og.png'}?v=3">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
