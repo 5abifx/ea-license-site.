@@ -278,3 +278,6 @@ a.pb{text-decoration:none;display:inline-flex;align-items:center;justify-content
 .amt a.lock{text-decoration:none;color:inherit}
 .pfine a{color:var(--glow)}
 @media(max-width:600px){.navr .hide-s{display:none}}
+.tier .act form{flex-direction:column;align-items:flex-start}.tier .act form .pbs{display:flex;gap:8px;flex-wrap:wrap}
+.agree{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.45;color:var(--dim);cursor:pointer;margin-bottom:4px}
+.agree input{margin-top:2px;width:16px;height:16px;accent-color:var(--glow);flex:none}.agree a{color:var(--fg)}

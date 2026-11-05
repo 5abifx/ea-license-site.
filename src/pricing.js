@@ -35,6 +35,10 @@ function billingToggle(billing) {
 }
 
 module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL, refs, stripe }) {
+  db.exec(`CREATE TABLE IF NOT EXISTS agreements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    plan TEXT NOT NULL, version TEXT NOT NULL, ip TEXT NOT NULL DEFAULT '', user_agent TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   app.get('/pricing', (req, res) => {
     const billing = cleanBilling(req.query.billing);
     const selected = getPlan(req.query.plan) ? req.query.plan : 'katana';
@@ -90,12 +94,14 @@ module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYME
           <p>${cardTrial ? `Add your card securely with Stripe. Your ${cardTrial}-day free trial of every EA starts straight away, and nothing is charged until ${firstCharge}.` : `Pay securely by card with Stripe. Your plan switches on as soon as the payment goes through, and renews ${billing === 'annual' ? 'every year' : 'every month'} until you cancel.`}</p>
           <form method="post" action="/subscribe">
             <input type="hidden" name="plan" value="${plan.id}"><input type="hidden" name="billing" value="${billing}">
+            <label class="agree"><input type="checkbox" name="agree" value="1" required> <span>I have read and agree to the <a href="/terms" target="_blank" rel="noopener">Terms of service</a>. Payments are final and non-refundable; I can cancel future renewals anytime.</span></label>
             <button class="full">${cardTrial ? 'Add card and start free trial' : `Pay $${(total - cut).toFixed(off ? 2 : 0)} by card`}</button>
           </form>
           <p class="muted small">Cancel anytime from your dashboard. You keep access until the end of the paid period.</p>`) : `
           <p>Card payments in the site are coming soon. For now, pay with the button below and we switch your plan on${req.user.email ? ` for <b>${esc(req.user.email)}</b>` : ''}, usually within a few hours.</p>
           <form method="post" action="/subscribe">
             <input type="hidden" name="plan" value="${plan.id}"><input type="hidden" name="billing" value="${billing}">
+            <label class="agree"><input type="checkbox" name="agree" value="1" required> <span>I have read and agree to the <a href="/terms" target="_blank" rel="noopener">Terms of service</a>. Payments are final and non-refundable; I can cancel future renewals anytime.</span></label>
             <button class="full">${PAYMENT_URL ? 'Continue to payment' : 'Request this plan'}</button>
           </form>
           <p class="muted small">Mention your account email when you pay so we can match it.</p>`}
@@ -109,6 +115,13 @@ module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYME
     if (!plan) return res.redirect('/pricing');
     const billing = cleanBilling(req.body.billing);
     if (stripe && stripe.on() && req.user.stripe_sub) return res.redirect(307, '/billing');
+    if (req.body.agree !== '1') {
+      req.session.flash = { type: 'error', msg: 'Please tick the box to accept the Terms of service (no refunds) before paying.' };
+      return res.redirect(`/subscribe?plan=${plan.id}&billing=${billing}`);
+    }
+    // proof of acceptance for payment disputes: when, which plan, which terms version, from where
+    db.prepare('INSERT INTO agreements (user_id, plan, version, ip, user_agent) VALUES (?, ?, ?, ?, ?)')
+      .run(req.user.id, `${plan.id}:${billing}`, TERMS_VERSION, String(req.ip || ''), String(req.get('user-agent') || '').slice(0, 300));
     db.prepare('UPDATE users SET plan_request = ? WHERE id = ?').run(`${plan.id}:${billing}`, req.user.id);
     if (stripe && stripe.on()) {
       try {
@@ -127,3 +140,4 @@ module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYME
 };
 
 module.exports.planCards = planCards;
+const TERMS_VERSION = require('./pages').TERMS_VERSION;

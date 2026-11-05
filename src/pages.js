@@ -4,7 +4,7 @@ const { esc, SITE_NAME } = require('./views');
 module.exports = function pages(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, TRIAL_ACCOUNTS, MAX_ACCOUNTS_DEFAULT }) {
   const CONTACT_URL = process.env.CONTACT_URL || process.env.PAYMENT_URL || '';
   const contact = (text) => (CONTACT_URL ? `<a href="${esc(CONTACT_URL)}" target="_blank" rel="noopener">${esc(text)}</a>` : esc(text));
-  const updated = '29 October 2026';
+  const updated = '5 November 2026';
   const name = esc(SITE_NAME);
 
   app.get('/robots.txt', (req, res) => {
@@ -48,8 +48,12 @@ module.exports = function pages(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, T
       <p>New accounts may receive a free trial for a limited number of days. One trial is allowed per person and per MT5 account number. We may end a trial early if we see abuse, such as multiple accounts.</p>
       <h2>3. Price and payment</h2>
       <p>After any trial, access costs the price of your plan shown on the <a href="/pricing">pricing page</a> (from ${esc(PRICE_TEXT)}), paid in advance. Each payment extends your license by ${PAID_DAYS} days, or 365 days on annual billing. Prices may change; a change applies from your next payment.</p>
-      <h2>4. Cancellation and refunds</h2>
-      <p>You can stop paying at any time and your license ends when the paid period runs out. Because you can test the EA during the free trial, payments are not refundable unless the law requires otherwise.</p>
+      <h2>4. Cancellation. All payments are final, no refunds</h2>
+      <p>You can cancel at any time from your dashboard (Manage billing). Cancelling stops future renewals; you keep access until the end of the period you already paid for. Because you can test every EA and the Trade Journal during the free trial, <strong>every payment is final and non-refundable</strong>, in full or in part, once it is made. This includes renewals you forgot to cancel, unused time, accounts you stopped trading, prop firm or broker rules that block EAs, and trading losses.</p>
+      <h2>4a. Chargebacks and disputes</h2>
+      <p>You agree to contact us first about any problem and not to open a chargeback or payment dispute for a payment covered by these terms. If a dispute is opened, we may share these terms, your acceptance record (date, time, plan, IP address and device), your license checks and your journal activity with the payment provider, and we may suspend your licenses while it is open.</p>
+      <h2>4b. Trade Journal</h2>
+      <p>The Trade Journal, Insights, edge score, prop firm guard and share cards are tools to review your own trading. Their numbers come from what your MT5 account and the Journal EA send, and may be incomplete or delayed. They are not financial advice or a guarantee of prop firm rules; always check your firm's own dashboard. You are responsible for what you share publicly from your journal.</p>
       <h2>5. Trading risk</h2>
       <p>Trading forex, CFDs and other leveraged products carries a high level of risk and may not be suitable for you. You can lose some or all of your money. ${name} provides software, not financial advice. Past or simulated performance does not guarantee future results. You alone decide whether and how to use the EA and you are responsible for all trades on your accounts.</p>
       <h2>6. Availability</h2>
@@ -101,3 +105,4 @@ module.exports = function pages(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, T
     </div>`);
   });
 };
+module.exports.TERMS_VERSION = '2026-11-05';   // change when the terms change (saved with each buyer's acceptance)

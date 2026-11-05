@@ -867,3 +867,7 @@ input:focus, select:focus, textarea:focus { border-color: rgba(var(--glowRGB),.7
 .cal-grid .wk { background: transparent; border-color: var(--line); border-radius: 8px; }
 main h1, .plan-price, .plan-price b, .lp-hero h1, h2.section, .lp-head h2, .lp-final h2 { font-family: var(--display); font-weight: 300 !important; letter-spacing: -.03em; }
 .plan-name { font-family: var(--mono); font-weight: 500; letter-spacing: .14em; }
+
+/* "I agree" tick box before paying */
+.agree{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.45;color:var(--muted,#8a8a94);cursor:pointer;margin:4px 0 12px}
+.agree input{margin-top:2px;width:16px;height:16px;accent-color:var(--accent,#ff5a1f);flex:none}

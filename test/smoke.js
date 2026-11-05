@@ -120,7 +120,8 @@ function client(base) {
     r = await tia.get('/subscribe?plan=journal&billing=annual');
     assert.match(r.text, /Journal · Annual/);
     assert.match(r.text, /\$108 USD/);
-    r = await tia.post('/subscribe', { plan: 'journal', billing: 'annual' });
+    assert.match((await tia.post('/subscribe', { plan: 'journal', billing: 'annual' })).text, /accept the Terms of service/);   // no tick, no payment
+    r = await tia.post('/subscribe', { plan: 'journal', billing: 'annual', agree: '1' });
     assert.match((await admin.get('/admin')).text, /wants a plan/);
     assert.match((await admin.get(`/admin/users/${tiaId}`)).text, /Requested on the site: <strong>Journal<\/strong>, annual/);
     // Journal plan: 1 account, only the JOURNAL EA, a year added
@@ -423,7 +424,7 @@ function client(base) {
       await payer.post('/login', { email: 'payer@test.com', password: 'payerpass1' });
       r = await payer.get('/subscribe?plan=pro&billing=annual');
       assert.match(r.text, /Pay \$348 by card/);
-      r = await payer.post('/subscribe', { plan: 'pro', billing: 'annual' });
+      r = await payer.post('/subscribe', { plan: 'pro', billing: 'annual', agree: '1' });
       assert.strictEqual(r.location, 'https://checkout.stripe.com/c/pay/cs_1');
       const cs = calls.find((c) => c.url === '/v1/checkout/sessions');
       assert.strictEqual(cs.auth, 'Bearer sk_test_x');
@@ -483,7 +484,7 @@ function client(base) {
       assert.match(r.text, /Due today<\/span><b>\$0 USD/);
       assert.match(r.text, /Add card and start free trial/);
       calls.length = 0;
-      r = await ct.post('/subscribe', { plan: 'journal', billing: 'monthly' });
+      r = await ct.post('/subscribe', { plan: 'journal', billing: 'monthly', agree: '1' });
       const cs2 = calls.find((c) => c.url === '/v1/checkout/sessions');
       assert.strictEqual(cs2.body.get('subscription_data[trial_period_days]'), '15');
       assert.strictEqual(cs2.body.get('payment_method_collection'), 'always');
@@ -529,6 +530,8 @@ function client(base) {
       assert.match(r.text, /\$2,880/);                                                    // 3,200 less 10%
       calls.length = 0;
       r = await ct.post('/mentorship/checkout', { plan: 'full', pay: 'once' });
+      assert.match(r.text, /Mentorship Agreement/);                                  // no tick, no payment
+      r = await ct.post('/mentorship/checkout', { plan: 'full', pay: 'once', agree: '1' });
       assert.strictEqual(r.location, 'https://checkout.stripe.com/c/pay/cs_1');
       const ms = calls.find((c) => c.url === '/v1/checkout/sessions');
       assert.strictEqual(ms.body.get('mode'), 'payment');
@@ -551,13 +554,13 @@ function client(base) {
       r = await admin.post('/admin/mentorship/add', { email: 'payer@test.com', plan: 'mentorship' });
       assert.match(r.text, /added as a Mentorship student/);
       calls.length = 0;
-      await payer.post('/subscribe', { plan: 'journal', billing: 'monthly' });
+      await payer.post('/subscribe', { plan: 'journal', billing: 'monthly', agree: '1' });
       const co = calls.find((c) => c.url === '/v1/coupons');
       assert.strictEqual(co.body.get('percent_off'), '30');
       assert.strictEqual(co.body.get('duration'), 'forever');
       // 3 monthly parts: a subscription that is cancelled after the 3rd payment; paying upgrades to Full
       calls.length = 0;
-      await payer.post('/mentorship/checkout', { plan: 'full', pay: 'parts' });
+      await payer.post('/mentorship/checkout', { plan: 'full', pay: 'parts', agree: '1' });
       const mp = calls.find((c) => c.url === '/v1/checkout/sessions');
       assert.strictEqual(mp.body.get('mode'), 'subscription');
       assert.strictEqual(mp.body.get('line_items[0][price_data][unit_amount]'), '109900');

@@ -90,6 +90,7 @@ module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid, 
       } },
       metadata: { user_id: u.id, plan: plan.id, billing },
       subscription_data: { metadata: { user_id: u.id, plan: plan.id, billing } },
+      custom_text: { submit: { message: `By subscribing you accept the 5ABI.FX Terms of service (${siteUrl(req)}/terms). Payments are final and non-refundable. Cancel future renewals anytime from your dashboard.` } },
     };
     if (u.stripe_customer) params.customer = u.stripe_customer;
     else if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(u.email || '')) params.customer_email = u.email; // Stripe asks for one itself when the login is not an email
