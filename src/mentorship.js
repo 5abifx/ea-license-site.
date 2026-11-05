@@ -210,11 +210,23 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
     if (u.stripe_customer) params.customer = u.stripe_customer;
     else { params.customer_email = u.email; if (!parts) params.customer_creation = 'always'; }
     try {
-      const s = await call('POST', '/v1/checkout/sessions', params);
+      let s;
+      try {
+        s = await call('POST', '/v1/checkout/sessions', params);
+      } catch (e) {
+        // a saved customer from test mode (or a deleted one) is unknown to the live key: start fresh with the email
+        if (!params.customer || !/no such customer/i.test(e.message)) throw e;
+        db.prepare('UPDATE users SET stripe_customer = NULL WHERE id = ?').run(u.id);
+        delete params.customer;
+        params.customer_email = u.email;
+        if (!parts) params.customer_creation = 'always';
+        s = await call('POST', '/v1/checkout/sessions', params);
+      }
       res.redirect(303, s.url);
     } catch (e) {
       console.error('Stripe mentorship checkout:', e.message);
-      flash(req, 'error', 'Card payment could not start. Please try again in a minute or contact us.');
+      // Stripe's own reason (never contains the secret key) helps the owner fix setup problems
+      flash(req, 'error', `Card payment could not start: ${String(e.message || 'unknown error').slice(0, 200)} Please try again in a minute or contact us.`);
       res.redirect('/mentorship#price');
     }
   });
