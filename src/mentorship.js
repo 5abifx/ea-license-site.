@@ -23,7 +23,8 @@ const MENTOR_PLANS = [
   { id: 'full', name: 'Full Mentorship', price: 3200, part: 1099, eaMonths: 6 },
 ];
 const PARTS = 3;                 // "or 3 × $975": a monthly Stripe subscription that stops after 3 payments
-const EA_DISCOUNT = 30;          // % off every EA plan for paying mentorship students
+const EA_DISCOUNT = 30;
+const AGREEMENT_VERSION = '2026-11-05';   // change the date when the agreement text changes          // % off every EA plan for paying mentorship students
 const getMentorPlan = (id) => MENTOR_PLANS.find((p) => p.id === id && !p.soon) || null;
 const money = (n) => `$${Number(n).toLocaleString('en-US')}`;
 const eaDiscountFor = (u) => (u && getMentorPlan(u.mentor_plan) ? EA_DISCOUNT : 0);
@@ -46,6 +47,15 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
     plan       TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE (user_id, event, plan)
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS agreements (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    plan       TEXT NOT NULL,
+    version    TEXT NOT NULL,
+    ip         TEXT NOT NULL DEFAULT '',
+    user_agent TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`);
   db.exec('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
   const getSetting = (k) => (db.prepare('SELECT value FROM settings WHERE key = ?').get(k) || {}).value || '';
@@ -108,8 +118,9 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
       : '<form method="post" action="/mentorship/waitlist"><button class="pb" type="submit">Notify me when it opens</button></form>';
     else if (u.mentor_plan === p.id) action = '<p class="ok">✓ You\'re in. Check your email and Discord for your first class.</p>';
     else action = `<form method="post" action="/mentorship/checkout"><input type="hidden" name="plan" value="${p.id}">
-        <button class="pb${pri}" name="pay" value="once">Pay ${money(cut(p.price, off))}</button>
-        ${p.part ? `<button class="pb ghost" name="pay" value="parts">Pay in ${PARTS} parts</button>` : ''}</form>`;
+        <label class="agree"><input type="checkbox" name="agree" value="1" required> <span>I have read and agree to the <a href="/mentorship/agreement" target="_blank" rel="noopener">Mentorship Agreement</a>. All payments are final and non-refundable.</span></label>
+        <span class="pbs"><button class="pb${pri}" name="pay" value="once">Pay ${money(cut(p.price, off))}</button>
+        ${p.part ? `<button class="pb ghost" name="pay" value="parts">Pay in ${PARTS} parts</button>` : ''}</span></form>`;
     const nudge = p.id === 'mentorship'
       ? `<p class="nudge">Get the trading software (worth $3,500+) and 4 private calls for just <b>${u ? `${money(cut(getMentorPlan('full').price, pr) - cut(p.price, pr))} more` : 'a little more'}</b> →</p>` : '';
     return `<article class="tier${p.id === 'full' ? ' top' : ''}${p.soon ? ' soon' : ''}">${HEAD[p.id][1]}<h3>${esc(p.name)}</h3><p class="for">${HEAD[p.id][0]}</p>
@@ -178,19 +189,28 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
     return data;
   }
 
+  app.get('/mentorship/agreement', (req, res) => page(req, res, 'Mentorship Agreement', agreementHtml(), { og: OG }));
+
   app.post('/mentorship/checkout', requireUser, async (req, res) => {
     const p = getMentorPlan(req.body.plan);
     if (!p) return res.redirect('/mentorship#price');
     const parts = req.body.pay === 'parts' && p.part;
     const u = req.user;
     const pr = promoFor(u);
+    if (req.body.agree !== '1') {
+      flash(req, 'error', 'Please tick the box to accept the Mentorship Agreement (no refunds) before paying.');
+      return res.redirect('/mentorship#price');
+    }
+    // proof of acceptance: when, which plan, which version, from where (kept for chargeback disputes)
+    db.prepare('INSERT INTO agreements (user_id, plan, version, ip, user_agent) VALUES (?, ?, ?, ?, ?)')
+      .run(u.id, p.id, AGREEMENT_VERSION, String(req.ip || ''), String(req.get('user-agent') || '').slice(0, 300));
     track(u.id, 'checkout', p.id);
     if (!stripeOn()) {
       if (PAYMENT_URL) return res.redirect(303, PAYMENT_URL);
       flash(req, 'ok', `Thanks! We got your request for ${p.name}. We will contact you to finish payment.`);
       return res.redirect('/mentorship#price');
     }
-    const meta = { kind: 'mentorship', user_id: u.id, mplan: p.id, parts: parts ? PARTS : 1 };
+    const meta = { kind: 'mentorship', user_id: u.id, mplan: p.id, parts: parts ? PARTS : 1, agreement: AGREEMENT_VERSION, agreed_at: new Date().toISOString() };
     const params = {
       mode: parts ? 'subscription' : 'payment',
       client_reference_id: String(u.id),
@@ -203,6 +223,7 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
         product_data: { name: `5ABI.FX ${p.name}${parts ? ` (${PARTS} monthly payments)` : ''}${pr ? ` · ${pr.pct}% mystery discount` : ''}` },
       } } },
       metadata: meta,
+      custom_text: { submit: { message: `By paying you accept the 5ABI.FX Mentorship Agreement (${siteUrl(req)}/mentorship/agreement). All payments are final and non-refundable${parts ? `, and all ${PARTS} monthly payments are owed` : ''}.` } },
       ...(pr ? {} : { allow_promotion_codes: 'true' }),
     };
     if (parts) params.subscription_data = { metadata: meta };
@@ -379,3 +400,50 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
 
 module.exports.MENTOR_PLANS = MENTOR_PLANS;
 module.exports.eaDiscountFor = eaDiscountFor;
+
+// The agreement every buyer ticks before paying (/mentorship/agreement). Bump AGREEMENT_VERSION when it changes.
+function agreementHtml() {
+  return `<div class="prose">
+  <h1>Mentorship Agreement</h1>
+  <p class="muted">Version ${AGREEMENT_VERSION}. Please read this before you pay. By ticking the box and paying, you agree to all of it.</p>
+
+  <h2>1. Who this is between</h2>
+  <p>This agreement is between you (the "Student") and 5ABI.FX ("we", "us"), for the 5ABI.FX Mentorship plan you buy (Mentorship or Full Mentorship). You must be at least 18 years old and legally able to enter into this agreement.</p>
+
+  <h2>2. What you get</h2>
+  <p>The program runs for 8 weeks with your batch and includes the items listed for your plan on the <a href="/mentorship#price">mentorship page</a> on the day you pay. We may change class times, the order of topics, the platform used for calls or classes, or replace an item with one of equal or greater value. If a class has to move, we reschedule it or give you the recording. Group classes run at the times set for your batch; missing a class does not extend the program.</p>
+
+  <h2>3. All payments are final. No refunds.</h2>
+  <p>Seats are limited and your seat is held for you the moment you pay, so <strong>every payment is final and non-refundable</strong>, in full or in part, once it is made. This includes, but is not limited to: changing your mind, missing classes, not using the software or calls, not finishing the program, being removed under section 8, or trading losses.</p>
+  <p>If you choose to pay in 3 parts, you agree to pay all 3 parts. Stopping or failing a payment does not cancel what you owe; your access pauses until the payment is made.</p>
+  <p>The only exception: if we cancel your batch before it starts and cannot offer you a place in another batch, we refund what you paid for that batch.</p>
+
+  <h2>4. Chargebacks and disputes</h2>
+  <p>You agree to contact us first about any problem and not to open a chargeback or payment dispute for a payment covered by this agreement. If a dispute is opened, we may share this agreement, your acceptance record (date, time, plan, IP address and device) and your use of the program with the payment provider, and we may pause your access while it is open.</p>
+
+  <h2>5. Education only, not financial advice</h2>
+  <p>The mentorship is education about trading. Nothing in it, including live trades, examples, replays, signals, indicators, tools or answers in Discord, is financial, investment, tax or legal advice, or a recommendation to buy or sell anything. Any trades shown are for teaching. You alone decide every trade you place and you are fully responsible for the results.</p>
+
+  <h2>6. Trading risk and no guarantees</h2>
+  <p>Trading forex, futures, CFDs, crypto and other leveraged products carries a high risk of loss, and you can lose more than you put in. Past results, student reviews, replays and illustrations do not guarantee future results. We do not promise that you will make money, pass a prop firm challenge, or reach any income level.</p>
+
+  <h2>7. Software, tools and data</h2>
+  <p>Trading software included with Full Mentorship is supplied under its maker's own licence terms, which you must accept and follow. Licences are personal and are not refundable or transferable. Live market data is billed separately by the data provider unless we say otherwise in writing. We are not responsible for outages, changes, bugs or price changes of third-party software, brokers, data feeds or prop firms. The 5ABI.FX EAs and the student indicator are covered by our <a href="/terms">Terms of service</a>.</p>
+
+  <h2>8. Your conduct and our material</h2>
+  <p>All classes, recordings, replays, notes, indicators and files are for your personal use only. You may not record, screenshot for sharing, copy, publish, resell, teach or share them, or share your access with anyone. You agree to treat other students with respect. If you break this section we may remove you from the program, Discord and tools straight away, without a refund, and take further action to protect our material.</p>
+
+  <h2>9. Trader Awareness Test</h2>
+  <p>The Trader Awareness Test is a self-awareness tool to help you understand your trading habits. It is not a medical, psychological or professional diagnosis. Your report is private and is shared only with you.</p>
+
+  <h2>10. Limitation of liability</h2>
+  <p>To the fullest extent the law allows, we are not liable for any trading losses, lost profits, or indirect or consequential losses, and our total liability to you for anything related to the mentorship is limited to the amount you paid for it.</p>
+
+  <h2>11. Privacy</h2>
+  <p>We handle your details as described in our <a href="/privacy">Privacy policy</a>. Live classes may be recorded and replayed to students. Your own trades are only shown to the group if you share them.</p>
+
+  <h2>12. General</h2>
+  <p>This agreement, the plan details on the day you pay, our <a href="/terms">Terms of service</a> and <a href="/privacy">Privacy policy</a> are the whole agreement between us. If any part is found unenforceable, the rest still applies. Nothing in this agreement removes rights that the consumer law where you live gives you and that cannot be waived. This agreement is governed by the laws of the province of Canada where 5ABI.FX is based.</p>
+  <p>Questions before you pay? Ask us on Discord or Instagram <a href="https://www.instagram.com/5abi.fx/" target="_blank" rel="noopener">@5abi.fx</a>.</p>
+</div>`;
+}
