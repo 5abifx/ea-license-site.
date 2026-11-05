@@ -115,4 +115,11 @@ db.exec(`CREATE TABLE IF NOT EXISTS trial_accounts (
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 )`);
 
+// Journal accounts the user chose to hide (left out of the account tabs and "All accounts"; trades are kept)
+db.exec(`CREATE TABLE IF NOT EXISTS journal_hidden (
+  user_id        INTEGER NOT NULL,
+  account_number TEXT NOT NULL,
+  PRIMARY KEY (user_id, account_number)
+)`);
+
 module.exports = { db, DATA_DIR, FILES_DIR: path.join(DATA_DIR, 'ea-files') };
