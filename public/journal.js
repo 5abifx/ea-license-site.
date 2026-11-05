@@ -3,10 +3,13 @@
   const trade = JSON.parse(document.getElementById('trade-data').textContent);
   const c1 = document.getElementById('c1'), c2 = document.getElementById('c2');
   const val = (id) => document.getElementById(id);
+  // the card style is remembered in this browser
+  try { const st = localStorage.getItem('cardStyle'); if (st && val('style').querySelector(`option[value="${st}"]`)) val('style').value = st; } catch (e) {}
+  val('style').addEventListener('change', () => { try { localStorage.setItem('cardStyle', val('style').value); } catch (e) {} });
   const draw = () => window.TradeCards.render(c1, c2, trade, {
-    tpl: 'katana', size: 'story', mode: val('mode').value, rm: val('rm').checked,
+    tpl: val('style').value, mode: val('mode').value, rm: val('rm').checked,
   });
-  ['mode', 'rm'].forEach((id) => val(id).addEventListener('change', draw));
+  ['style', 'mode', 'rm'].forEach((id) => val(id).addEventListener('change', draw));
   document.querySelectorAll('[data-save]').forEach((b) => b.addEventListener('click', () => {
     const cv = val(b.dataset.save);
     cv.toBlob((blob) => {
@@ -47,9 +50,9 @@
   draw(); drawOv();
   if (document.fonts) {
     Promise.all([
-      document.fonts.load('900 100px "Big Shoulders Display"'), document.fonts.load('800 100px "Big Shoulders Display"'),
-      document.fonts.load('600 30px "IBM Plex Mono"'), document.fonts.load('500 30px "IBM Plex Mono"'),
-      document.fonts.load('700 30px "Hanken Grotesk"'), document.fonts.load('500 30px "Hanken Grotesk"'),
+      document.fonts.load('200 100px Sora'), document.fonts.load('300 100px Sora'), document.fonts.load('400 40px Sora'),
+      document.fonts.load('400 30px "JetBrains Mono"'), document.fonts.load('500 30px "JetBrains Mono"'),
+      document.fonts.load('400 30px Manrope'),
       ...(ov ? [document.fonts.load('400 100px "DM Serif Display"'), document.fonts.load('italic 400 100px "DM Serif Display"'),
         document.fonts.load('600 30px Montserrat'), document.fonts.load('500 30px Montserrat')] : []),
     ]).catch(() => {}).finally(() => { draw(); drawOv(); });
