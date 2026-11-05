@@ -203,3 +203,6 @@ module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid, 
 
   return { on, cardTrial, needsCardTrial, checkoutUrl, verify };
 };
+
+// also usable without the app (the members menu plan box)
+module.exports.needsCardTrial = needsCardTrial;
