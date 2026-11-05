@@ -250,7 +250,7 @@ nav .go:hover,nav .go:focus-visible{border-color:var(--glow);outline:none}
 .pb.pri{background:var(--glow);border-color:var(--glow);color:#120700}.pb.pri:hover{background:var(--glow2)}
 .pb.ghost{border-color:var(--line);color:var(--dim)}
 .pfine{color:var(--dimmer);font-size:12.5px;text-align:center;margin-top:22px}
-.mys{position:fixed;right:18px;bottom:76px;width:250px;z-index:40;background:rgba(12,12,16,.96);border:1px solid var(--line);border-left:3px solid var(--glow);border-radius:8px;padding:14px 16px;box-shadow:0 20px 50px -10px rgba(0,0,0,.7);animation:mysin .6s cubic-bezier(.2,.7,.2,1)}
+.mys{position:fixed;right:18px;bottom:88px;width:250px;z-index:40;background:rgba(12,12,16,.96);border:1px solid var(--line);border-left:3px solid var(--glow);border-radius:8px;padding:14px 16px;box-shadow:0 20px 50px -10px rgba(0,0,0,.7);animation:mysin .6s cubic-bezier(.2,.7,.2,1)}
 .mys b{display:block;font-size:14px;padding-right:18px}.mys p{margin:4px 0 8px;color:var(--dim);font-size:13px}.mys .mono{font-family:var(--mono);color:var(--glow2)}
 .mys a{font:500 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--glow);text-decoration:none}
 .mys [data-x]{position:absolute;top:6px;right:8px;background:none;border:0;color:var(--dim);font-size:18px;cursor:pointer}
