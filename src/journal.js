@@ -10,7 +10,7 @@ const EMOTIONS = ['', 'Calm', 'Confident', 'Patient', 'Anxious', 'Greedy', 'Fear
 
 const KEEP_IF_EDITED = ['sl', 'r', 'risk_money', 'risk_pct'];   // columns the trader can correct
 
-module.exports = function registerJournal(app, { db, page, flash, requireUser, isExpired, cleanAccount }) {
+module.exports = function registerJournal(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox }) {
   const hasJournal = (u) => !!u && (u.is_admin || (u.status === 'active' && !isExpired(u) && !!db.prepare(`
     SELECT 1 FROM user_eas ue JOIN eas e ON e.id = ue.ea_id
     WHERE ue.user_id = ? AND e.code = ? AND e.active = 1`).get(u.id, JOURNAL_CODE)));
@@ -424,6 +424,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         <div><button>Save notes</button></div>
       </form>
     </section>
+
+    ${mentorBox ? mentorBox(req, t) : ''}
 
     ${req.user.is_admin ? '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Montserrat:wght@500;600&display=swap">' : ''}
     <script id="trade-data" type="application/json">${json}</script>

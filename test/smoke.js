@@ -274,6 +274,38 @@ function client(base) {
     assert.match(r.text, /"partials":\[\{"time":"2026-10-28T15:12:00"/);          // final close is not a partial
     assert.strictEqual((await eve.get(`/journal/${tid}`)).status !== 200 || !(await eve.get(`/journal/${tid}`)).text.includes('XAUUSD'), true);
 
+    // Mentor Mode: only students; Bob shares, asks about a trade, the mentor replies, Bob sees the reply
+    assert.doesNotMatch((await bob.get(`/journal/${tid}`)).text, /Mentor review/);     // not a student
+    assert.strictEqual((await bob.post(`/journal/${tid}/note`, { body: 'hi' })).status, 404);
+    db.prepare("UPDATE users SET student = 1 WHERE email = 'bob@test.com'").run();
+    r = await bob.get(`/journal/${tid}`);
+    assert.match(r.text, /Share my journal with my mentor/);
+    assert.strictEqual((await admin.get(`/mentor/trade/${tid}`)).status, 404);          // not shared yet
+    await bob.post('/journal/mentor/share', { share: '1', back: `/journal/${tid}` });
+    r = await bob.post(`/journal/${tid}/note`, { body: 'Was my <stop> too tight?' });
+    assert.match(r.text, /Sent to your mentor/);
+    assert.match(r.text, /Waiting for your mentor/);
+    r = await admin.get('/mentor');
+    assert.match(r.text, /Was my &lt;stop&gt; too tight\?/);
+    assert.match(r.text, /<em class="count">1<\/em>/);
+    r = await admin.get(`/mentor/trade/${tid}`);
+    assert.match(r.text, /London breakout/);
+    assert.match(r.text, /Account ••01/);
+    assert.doesNotMatch(r.text, /Account 1001/);
+    r = await admin.post(`/mentor/trade/${tid}/note`, { body: 'Stop was fine, entry was early.' });
+    assert.match(r.text, /Sent\. The student sees it/);
+    assert.doesNotMatch((await admin.get('/mentor')).text, /<em class="count">/);
+    r = await bob.get('/journal/mentor');
+    assert.match(r.text, /1 new from mentor/);
+    assert.match(r.text, /<em class="count">1<\/em>/);
+    r = await bob.get(`/journal/${tid}`);
+    assert.match(r.text, /Stop was fine, entry was early\./);
+    assert.doesNotMatch((await bob.get('/journal/mentor')).text, /new from mentor/);   // read now
+    assert.strictEqual((await bob.post(`/mentor/trade/${tid}/note`, { body: 'x' })).status, 404);   // students cannot post as mentor
+    await bob.post('/journal/mentor/share', { share: '0' });
+    assert.strictEqual((await admin.get(`/mentor/trade/${tid}`)).status, 404);          // stopped sharing
+    db.prepare("UPDATE users SET student = 0 WHERE email = 'bob@test.com'").run();
+
     // insights: locked under 10 trades, then a revenge-trade pattern shows up
     assert.match((await bob.get('/journal')).text, /Insights unlock after 10 closed trades\. 1 so far/);
     for (let i = 0; i < 6; i++) {
