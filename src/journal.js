@@ -359,8 +359,9 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       <h2>Share cards <span class="tag">5ABI.FX story · 9:16</span></h2>
       <p class="muted">Swipe story: card 1 is the result, card 2 is the real MT5 chart of this trade.</p>
       <div class="row">
+        <select id="style" aria-label="Card style"><option value="a">Style: Cinematic</option><option value="b">Style: Chart first</option><option value="c">Style: Ticket</option></select>
         <select id="mode"><option value="money">Show $ amount</option><option value="pct">Show % of account</option><option value="r">Show R multiple</option></select>
-        <label class="check"><input type="checkbox" id="rm" checked> KATANA badge</label>
+        <label class="check"><input type="checkbox" id="rm" checked> KATANA risk line</label>
       </div>
       <div class="cards">
         <figure><canvas id="c1"></canvas><button class="small" data-save="c1">Save card 1</button></figure>
@@ -424,7 +425,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       </form>
     </section>
 
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800;900&family=Hanken+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@500;600${req.user.is_admin ? '&family=DM+Serif+Display:ital@0;1&family=Montserrat:wght@500;600' : ''}&display=swap">
+    ${req.user.is_admin ? '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Montserrat:wght@500;600&display=swap">' : ''}
     <script id="trade-data" type="application/json">${json}</script>
     <script src="/cards.js"></script>
     ${req.user.is_admin ? '<script src="/overlay.js"></script>' : ''}
