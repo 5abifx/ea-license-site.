@@ -115,7 +115,8 @@ module.exports = function pricing(app, { db, page, requireUser, trialDays, PAYME
         return res.redirect(303, await stripe.checkoutUrl(req, req.user, plan, billing, refs.discountFor(req.user), eaDiscountFor(req.user)));
       } catch (e) {
         console.error('Stripe checkout:', e.message);
-        req.session.flash = { type: 'error', msg: 'Card payment could not start. Please try again in a minute or contact us.' };
+        // Stripe's own reason (never contains the secret key) helps the owner fix setup problems
+        req.session.flash = { type: 'error', msg: `Card payment could not start: ${String(e.message || 'unknown error').slice(0, 200)} Please try again in a minute or contact us.` };
         return res.redirect(`/subscribe?plan=${plan.id}&billing=${billing}`);
       }
     }
