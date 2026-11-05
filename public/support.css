@@ -1,0 +1,52 @@
+/* Floating "Need help?" button + contact panel (src/support.js). Self-contained so it looks the same on
+   the cinematic pages, the public pages and the members area. Sits under the mystery-discount note (.mys). */
+.sup{--s-or:#ff5a1f;--s-or2:#ffb07a;--s-bg:rgba(12,12,16,.97);--s-line:rgba(255,255,255,.1);--s-fg:#f2f2f0;--s-dim:#9a9aa2;
+  position:fixed;right:max(18px,env(safe-area-inset-right,0px));bottom:max(18px,env(safe-area-inset-bottom,0px));z-index:45;
+  font:500 14px/1.4 Manrope,Inter,system-ui,-apple-system,sans-serif;color:var(--s-fg);-webkit-font-smoothing:antialiased}
+.sup *{box-sizing:border-box}
+.sup-btn{position:relative;display:flex;align-items:center;gap:0;height:56px;min-width:56px;margin-left:auto;padding:0 16px;border:0;border-radius:999px;cursor:pointer;
+  background:var(--s-or);color:#140600;box-shadow:0 14px 34px -10px rgba(255,90,31,.65),0 2px 8px rgba(0,0,0,.45);transition:transform .2s,background .2s,box-shadow .2s;
+  font:600 14px Manrope,Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+.sup-btn:hover{background:#ff6c35;transform:translateY(-2px)}
+.sup-btn:focus-visible{outline:2px solid var(--s-or2);outline-offset:3px}
+.sup-btn svg{display:block}
+.sup-o,.sup-x{display:grid;place-items:center;width:24px;height:24px}
+.sup-x{display:none}
+.sup-btn em{font-style:normal;max-width:0;overflow:hidden;white-space:nowrap;opacity:0;transition:max-width .35s,opacity .25s,margin .35s}
+.sup.peek .sup-btn em{max-width:120px;opacity:1;margin-left:8px}
+@media (hover:hover){.sup-btn:hover em{max-width:120px;opacity:1;margin-left:8px}}
+.sup.open .sup-btn{background:#1b1b21;color:var(--s-fg);box-shadow:0 10px 30px -8px rgba(0,0,0,.8);border:1px solid var(--s-line)}
+.sup.open .sup-o,.sup.open .sup-btn em{display:none}
+.sup.open .sup-x{display:grid}
+.sup-btn::after{content:"";position:absolute;top:8px;right:9px;width:9px;height:9px;border-radius:50%;background:#26c6a0;border:2px solid var(--s-or)}
+.sup.open .sup-btn::after,.sup.seen .sup-btn::after{display:none}
+
+.sup-panel{position:absolute;right:0;bottom:70px;width:320px;max-width:calc(100vw - 36px);max-height:calc(100vh - 110px);overflow:auto;
+  background:var(--s-bg);border:1px solid var(--s-line);border-top:3px solid var(--s-or);border-radius:14px;padding:18px 16px 14px;
+  box-shadow:0 30px 70px -14px rgba(0,0,0,.85);transform-origin:bottom right;animation:supin .28s cubic-bezier(.2,.7,.2,1)}
+.sup-panel[hidden]{display:none}
+@keyframes supin{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+.sup-head b{display:block;font:400 22px/1.15 Sora,Manrope,system-ui,sans-serif;letter-spacing:-.02em}
+.sup-head p{margin:6px 0 14px;color:var(--s-dim);font-size:13.5px}
+.sup-list{display:grid;gap:8px}
+.sup-ch{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--s-line);border-radius:10px;background:rgba(255,255,255,.03);
+  color:var(--s-fg);text-decoration:none;transition:border-color .2s,background .2s}
+.sup-ch:hover{border-color:rgba(255,90,31,.55);background:rgba(255,90,31,.07)}
+.sup-ch>span:nth-child(2){flex:1;min-width:0}
+.sup-ch b{display:block;font-weight:600;font-size:14.5px}
+.sup-ch small{display:block;color:var(--s-dim);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sup-ch i{font-style:normal;color:var(--s-dim);font-size:20px;line-height:1}
+.sup-ic{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;flex:none;background:rgba(255,255,255,.06);color:var(--s-fg)}
+.sup-telegram .sup-ic{background:rgba(42,171,238,.14);color:#5cc4f5}
+.sup-foot{display:flex;gap:8px;align-items:flex-start;margin-top:12px;padding-top:12px;border-top:1px solid var(--s-line);color:var(--s-dim);font-size:12.5px}
+.sup-foot svg{flex:none;margin-top:1px}
+.sup-foot a{color:var(--s-or2);text-decoration:none}.sup-foot a:hover{text-decoration:underline}
+
+/* stay out of the way of the phone menu and the cinematic loader */
+body.menu-open .sup{display:none}
+@media (max-width:640px){
+  .sup{right:max(14px,env(safe-area-inset-right,0px));bottom:max(14px,env(safe-area-inset-bottom,0px))}
+  .sup-btn{height:52px;min-width:52px;padding:0 14px}
+  .sup-panel{position:fixed;left:12px;right:12px;bottom:calc(max(14px,env(safe-area-inset-bottom,0px)) + 64px);width:auto;max-width:none}
+}
+@media print{.sup{display:none}}

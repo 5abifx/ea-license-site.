@@ -51,6 +51,7 @@ function cinePage(req, name, slots, opts = {}) {
 ${body}
 <p class="risk">${RISK}</p>
 <script src="/cine/${name}.js?v=${v}"></script>
+${require('./support').supportWidget(req)}
 </body></html>`;
 }
 const STARTED = Date.now();
