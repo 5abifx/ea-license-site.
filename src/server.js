@@ -53,6 +53,19 @@ app.use((req, res, next) => {
     || req.path.startsWith('/api/') || (req.method !== 'GET' && req.method !== 'HEAD')) return next();
   res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
 });
+// Security headers: no framing (clickjacking), no MIME sniffing, HTTPS only once on the live site
+app.use((req, res, next) => {
+  res.set({
+    'X-Frame-Options': 'DENY',
+    'Content-Security-Policy': "frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+    'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+  });
+  if (req.secure) res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  next();
+});
 app.use(express.urlencoded({ extended: false }));
 app.use((req, res, next) => { req.body = req.body || {}; next(); });
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -64,6 +77,8 @@ app.use(cookieSession({
   httpOnly: true,
   secure: process.env.COOKIE_SECURE === 'true',
 }));
+// On HTTPS (the live site behind Render's proxy) the sign-in cookie is always marked Secure
+app.use((req, res, next) => { if (req.secure && req.sessionOptions) req.sessionOptions.secure = true; next(); });
 
 // Block cross-site form posts (simple CSRF protection on top of SameSite cookies)
 app.use((req, res, next) => {
@@ -81,12 +96,16 @@ app.use((req, res, next) => {
   req.user = null;
   if (req.session && req.session.uid) {
     const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.uid);
-    if (u && u.status !== 'disabled') req.user = u;
-    else req.session = null;
+    // a password change signs out every other device: the session remembers which password it was made with
+    if (u && u.status !== 'disabled' && (!req.session.pv || req.session.pv === pwTag(u))) {
+      req.user = u;
+      if (!req.session.pv) req.session.pv = pwTag(u);
+    } else req.session = null;
   }
   next();
 });
 
+function pwTag(u) { return crypto.createHash('sha256').update(String(u.password_hash || '')).digest('hex').slice(0, 12); }
 const flash = (req, type, msg) => { req.session.flash = { type, msg }; };
 const page = (req, res, title, body, opts) => res.send(layout(req, title, body, opts));
 const refs = referrals.setup(app, { db, page });
@@ -211,6 +230,7 @@ app.post('/login', (req, res) => {
     flash(req, 'error', 'This account is disabled. Please contact support.');
     return res.redirect('/login');
   }
+  req.session.pv = null;
   req.session.uid = u.id;
   res.redirect(takeNext(req, u.is_admin ? '/admin' : '/dashboard'));
 });
@@ -301,6 +321,7 @@ app.post('/signup', (req, res) => {
     flash(req, 'error', 'That email is already registered. Please sign in.');
     return res.redirect('/login');
   }
+  req.session.pv = null;
   req.session.uid = createCustomer(req, { name, email, passwordHash: bcrypt.hashSync(password, 10) });
   res.redirect(takeNext(req, '/dashboard'));
 });
@@ -365,6 +386,7 @@ app.get('/auth/google/callback', async (req, res) => {
     u = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
   }
   if (u.status === 'disabled') return fail('This account is disabled. Please contact support.');
+  req.session.pv = null;
   req.session.uid = u.id;
   res.redirect(takeNext(req, u.is_admin ? '/admin' : '/dashboard'));
 });
@@ -385,8 +407,10 @@ app.post('/password', requireUser, (req, res) => {
     flash(req, 'error', 'Current password is wrong or the new one is shorter than 8 characters.');
     return res.redirect('/password');
   }
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(pw, 10), req.user.id);
-  flash(req, 'ok', 'Password changed.');
+  const hash = bcrypt.hashSync(pw, 10);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.user.id);
+  req.session.pv = pwTag({ password_hash: hash });   // this device stays signed in, others are signed out
+  flash(req, 'ok', 'Password changed. Other devices are signed out.');
   res.redirect('/dashboard');
 });
 
