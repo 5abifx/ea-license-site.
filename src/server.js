@@ -13,6 +13,7 @@ const { esc, fmtDate, layout, authShell, SITE_NAME, PRICE_TEXT, trialDays } = re
 const { PLANS, BILLING, getPlan, cleanBilling, maxSave } = require('./plans');
 const { cinePage } = require('./cine');
 const referrals = require('./referrals');
+const botCheck = require('./turnstile');
 
 // ---------- config ----------
 const PORT = Number(process.env.PORT || 3000);
@@ -147,6 +148,11 @@ function grantAllActiveEas(userId) {
   db.prepare(`INSERT OR IGNORE INTO user_eas (user_id, ea_id) SELECT ?, id FROM eas WHERE active = 1`).run(userId);
 }
 
+// Wrong passwords per network in the last 15 minutes: after 3 the sign-in form asks for the bot check
+const LOGIN_FAILS = 3;
+const fails = new Map();
+const failCount = (ip) => { const f = fails.get(ip); return f && f.reset > Date.now() ? f.n : 0; };
+const addFail = (ip) => { const n = failCount(ip) + 1; fails.set(ip, { n, reset: Date.now() + 15 * 60 * 1000 }); };
 // Very small in-memory rate limiter for login / signup
 const hits = new Map();
 function rateLimit(key, max, windowMs) {
@@ -212,18 +218,24 @@ app.get('/login', (req, res) => {
     <form method="post" action="/login">
       <label>Email<input name="email" required autofocus autocomplete="username"></label>
       <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
+      ${failCount(req.ip) >= LOGIN_FAILS ? botCheck.widget() : ''}
       <button>Continue</button>
     </form>
     ${SIGNUP_MODE !== 'closed' ? '<p class="muted">No account yet? <a href="/signup">Create one</a></p>' : ''}`));
 });
 
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
   if (rateLimit('login:' + req.ip, 10, 15 * 60 * 1000)) {
     flash(req, 'error', 'Too many attempts. Try again in 15 minutes.');
     return res.redirect('/login');
   }
+  if (failCount(req.ip) >= LOGIN_FAILS && !(await botCheck.passed(req))) {
+    flash(req, 'error', 'Please complete the quick check above the button, then sign in again.');
+    return res.redirect('/login');
+  }
   const u = db.prepare('SELECT * FROM users WHERE email = ?').get(String(req.body.email || '').trim());
   if (!u || !bcrypt.compareSync(String(req.body.password || ''), u.password_hash)) {
+    addFail(req.ip);
     flash(req, 'error', 'Wrong email or password.');
     return res.redirect('/login');
   }
@@ -231,6 +243,7 @@ app.post('/login', (req, res) => {
     flash(req, 'error', 'This account is disabled. Please contact support.');
     return res.redirect('/login');
   }
+  fails.delete(req.ip);
   req.session.pv = null;
   req.session.uid = u.id;
   res.redirect(takeNext(req, u.is_admin ? '/admin' : '/dashboard'));
@@ -251,6 +264,7 @@ app.get('/signup', (req, res) => {
       <label>Name<input name="name" required maxlength="80" autocomplete="name"></label>
       <label>Email<input type="email" name="email" required maxlength="120" autocomplete="email"></label>
       <label>Password<input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters"></label>
+      ${botCheck.widget()}
       <button>See the prices</button>
     </form>`}
     <p class="muted">Already have an account? <a href="/login?next=mentorship">Sign in</a></p>`));
@@ -265,6 +279,7 @@ app.get('/signup', (req, res) => {
       <label>Name<input name="name" required maxlength="80" autocomplete="name"></label>
       <label>Email<input type="email" name="email" required maxlength="120" autocomplete="email"></label>
       <label>Password<input type="password" name="password" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters"></label>
+      ${botCheck.widget()}
       <button>${trial ? 'Start free trial' : 'Create account'}</button>
     </form>`}
     ${!trial && SIGNUP_MODE === 'approval' ? '<p class="muted">Your account will be activated after we confirm your purchase.</p>' : ''}
@@ -301,7 +316,7 @@ function createCustomer(req, { name, email, passwordHash, googleSub = null }) {
   return Number(info.lastInsertRowid);
 }
 
-app.post('/signup', (req, res) => {
+app.post('/signup', async (req, res) => {
   if (SIGNUP_MODE === 'closed') return res.redirect('/login');
   if (googleOn()) {
     flash(req, 'error', 'Please sign up with your Google account.');
@@ -309,6 +324,10 @@ app.post('/signup', (req, res) => {
   }
   if (rateLimit('signup:' + req.ip, 5, 60 * 60 * 1000)) {
     flash(req, 'error', 'Too many sign ups from your network. Try again later.');
+    return res.redirect('/signup');
+  }
+  if (!(await botCheck.passed(req))) {
+    flash(req, 'error', 'Please complete the quick check above the button, then try again.');
     return res.redirect('/signup');
   }
   const name = String(req.body.name || '').trim().slice(0, 80);
@@ -387,6 +406,7 @@ app.get('/auth/google/callback', async (req, res) => {
     u = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
   }
   if (u.status === 'disabled') return fail('This account is disabled. Please contact support.');
+  fails.delete(req.ip);
   req.session.pv = null;
   req.session.uid = u.id;
   res.redirect(takeNext(req, u.is_admin ? '/admin' : '/dashboard'));

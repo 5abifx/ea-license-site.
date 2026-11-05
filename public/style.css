@@ -912,3 +912,4 @@ strong.warn { color: var(--warn); }
 .mentor-chart .cards canvas { max-width: 420px; }
 .note-form > button { justify-self: start; }
 .mentor-chart [hidden] { display: none !important; }
+.bot-check { margin: 4px 0 14px; min-height: 65px; }

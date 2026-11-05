@@ -13,10 +13,11 @@ process.env.TRIAL_DAYS = '0';          // trial is switched on further down
 const app = require('../src/server');
 const { db } = require('../src/db');
 
-function client(base) {
+function client(base, ip) {
   let cookies = {};
   const go = async (method, url, body) => {
     const headers = { cookie: Object.entries(cookies).map(([k, v]) => `${k}=${v}`).join('; ') };
+    if (ip) headers['x-forwarded-for'] = ip;   // its own network, for the per-network limits
     let payload = body;
     if (body && !(body instanceof FormData)) {
       headers['content-type'] = 'application/x-www-form-urlencoded';
@@ -627,6 +628,37 @@ function client(base) {
       process.env.TRIAL_DAYS = '0';
       fake.close();
       for (const k of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_API_BASE']) delete process.env[k];
+    }
+
+    // bot check (Cloudflare Turnstile): off without keys; on: sign-up needs it, sign-in after 3 wrong passwords
+    {
+      const http = require('http');
+      const ts = http.createServer((q, s2) => { let b = ''; q.on('data', (c) => { b += c; }); q.on('end', () => {
+        const p = new URLSearchParams(b); s2.setHeader('content-type', 'application/json');
+        s2.end(JSON.stringify({ success: p.get('secret') === 'sec' && p.get('response') === 'good' })); }); });
+      await new Promise((ok) => ts.listen(0, ok));
+      assert.doesNotMatch((await fetch(base + '/signup').then((x) => x.text())), /cf-turnstile/);
+      Object.assign(process.env, { TURNSTILE_SITE_KEY: 'site-key', TURNSTILE_SECRET_KEY: 'sec', TURNSTILE_API: `http://127.0.0.1:${ts.address().port}/` });
+      const vis = client(base, '10.9.0.1');
+      r = await vis.get('/signup');
+      assert.match(r.text, /class="cf-turnstile" data-sitekey="site-key"/);
+      r = await vis.post('/signup', { name: 'Bot', email: 'bot@test.com', password: 'botpass123' });
+      assert.match(r.text, /complete the quick check/);
+      assert.strictEqual(db.prepare("SELECT 1 FROM users WHERE email = 'bot@test.com'").get(), undefined);
+      const guess = client(base, '10.9.0.2');
+      assert.doesNotMatch((await guess.get('/login')).text, /cf-turnstile/);
+      for (let i = 0; i < 3; i++) await guess.post('/login', { email: 'bob@test.com', password: 'wrong-one' });
+      r = await guess.get('/login');
+      assert.match(r.text, /cf-turnstile/);
+      r = await guess.post('/login', { email: 'bob@test.com', password: 'bobpass123' });
+      assert.match(r.text, /complete the quick check/);                                  // right password, no check: refused
+      r = await guess.post('/login', { email: 'bob@test.com', password: 'bobpass123', 'cf-turnstile-response': 'bad' });
+      assert.match(r.text, /complete the quick check/);
+      r = await guess.post('/login', { email: 'bob@test.com', password: 'bobpass123', 'cf-turnstile-response': 'good' });
+      assert.match(r.text, /Gold Scalper/);                                               // passed: signed in, counter reset
+      assert.doesNotMatch((await client(base, '10.9.0.3').get('/login')).text, /cf-turnstile/);
+      ts.close();
+      for (const k of ['TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY', 'TURNSTILE_API']) delete process.env[k];
     }
 
     console.log('All smoke tests passed');
