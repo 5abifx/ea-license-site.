@@ -12,6 +12,7 @@ const { db, FILES_DIR } = require('./db');
 const { esc, fmtDate, layout, authShell, SITE_NAME, PRICE_TEXT, trialDays } = require('./views');
 const { PLANS, BILLING, getPlan, cleanBilling, maxSave } = require('./plans');
 const { cinePage } = require('./cine');
+const { cardStepHtml } = require('./cardstep');
 const referrals = require('./referrals');
 const botCheck = require('./turnstile');
 
@@ -455,13 +456,12 @@ app.get('/dashboard', requireUser, (req, res) => {
 
   page(req, res, 'My EAs', `
   <h1>Welcome${u.name ? ', ' + esc(u.name) : ''}</h1>
-  ${needsCard ? `<div class="notice"><div><strong>Start your ${trialDays()}-day free trial.</strong>
-    Pick a plan and add a card. You are not charged until the trial ends, and you can cancel anytime before.</div><a class="btn" href="/pricing">Start free trial</a></div>` : ''}
+  ${needsCard ? cardStepHtml({ trial: trialDays() }) : ''}
   ${expired ? `<div class="notice error"><div><strong>${u.trial ? 'Your free trial has ended.' : 'Your license has expired.'}</strong>
     Your EAs will stop working until you pick a plan. Plans start at $${PLANS[0].monthly}/month.</div><a class="btn" href="/pricing">See plans</a></div>` : ''}
   ${u.trial && !expired ? `<div class="notice"><div><strong>Free trial: ${daysLeft(u)} day${daysLeft(u) === 1 ? '' : 's'} left</strong>
     (until ${fmtDate(u.expires_at)} UTC). Pick a plan to keep trading after that.</div><a class="btn" href="/pricing">See plans</a></div>` : ''}
-  ${u.expires_at && !expired && !u.trial ? `<p class="muted">${getPlan(u.plan) ? `${esc(getPlan(u.plan).name)} plan (${esc(BILLING[cleanBilling(u.billing)].label.toLowerCase())}) · ` : ''}License valid until ${fmtDate(u.expires_at)} (UTC) · <a href="/pricing">Plans</a></p>` : ''}
+  ${u.expires_at && !expired && !u.trial && !needsCard ? `<p class="muted">${getPlan(u.plan) ? `${esc(getPlan(u.plan).name)} plan (${esc(BILLING[cleanBilling(u.billing)].label.toLowerCase())}) · ` : ''}License valid until ${fmtDate(u.expires_at)} (UTC) · <a href="/pricing">Plans</a></p>` : ''}
 
   ${req.query.paid && u.plan_request ? '<div class="notice"><div><strong>Thanks for your payment!</strong> Your plan switches on in a moment. Refresh this page if it does not show yet.</div></div>' : ''}
   ${u.stripe_customer ? `<form method="post" action="/billing" class="row"><span class="muted">${u.stripe_sub ? 'Card subscription active.' : 'Card subscription ended.'}</span><button class="small secondary">Manage billing</button></form>` : ''}

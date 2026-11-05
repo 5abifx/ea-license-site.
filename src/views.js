@@ -44,7 +44,9 @@ function planBox(u) {
   const expired = u.expires_at && new Date(u.expires_at + 'Z') < new Date();
   const plan = require('./plans').getPlan(u.plan);
   const name = u.is_admin && !u.plan ? 'Owner' : u.trial ? 'Free trial' : plan ? `${plan.name} · ${u.billing === 'annual' ? 'annual' : 'monthly'}` : 'Member';
-  const state = u.status === 'pending' ? ['warn', 'Waiting'] : expired ? ['bad', 'Expired'] : ['ok', 'Active'];
+  // signed up but no card yet: the free trial has not started (same rule as stripe.needsCardTrial, loaded late to avoid a require loop)
+  const noCard = require('./stripe').needsCardTrial(u);
+  const state = u.status === 'pending' ? ['warn', 'Waiting'] : noCard ? ['warn', 'Add card'] : expired ? ['bad', 'Expired'] : ['ok', 'Active'];
   return `<a class="plan-box" href="/pricing"><span>Plan</span><b>${esc(name)}</b><i class="${state[0]}">${state[1]}</i></a>`;
 }
 
