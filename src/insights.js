@@ -106,6 +106,8 @@ function leaks(trades, { money, esc }) {
   const items = [];
   const add = (it) => items.push({ saved: 0, ...it });
   const overallWin = winPct(trades);
+  const amt = (v) => String(money(Math.abs(v))).replace(/^[+−-]/, '');   // a size without + / −: "lost 3,885.43 USD"
+  const avgLoss = (() => { const l = trades.filter((t) => t.net < 0); return l.length ? -sum(l) / l.length : 0; })();
 
   // per account, in open order (for streaks and trade numbers)
   const byAcct = {};
@@ -134,11 +136,15 @@ function leaks(trades, { money, esc }) {
   // L2 revenge trades: opened within REVENGE_MIN minutes after a losing trade closed on the same account
   const rev = trades.filter((t) => Number.isFinite(t.o) && trades.some((p) => p !== t && p.account_number === t.account_number && p.net < 0
     && Number.isFinite(p.c) && p.c <= t.o && t.o - p.c <= REVENGE_MIN * 60000));
-  if (rev.length >= 2) {
+  // shown when they lose money, or when they win less often than your other trades
+  const revWin = winPct(rev);
+  if (rev.length >= 2 && (sum(rev) < 0 || revWin < overallWin)) {
     const rn = sum(rev);
     add({ code: 'L2', kind: 'revenge', tag: 'Revenge trades', tone: rn < 0 ? 'bad' : 'info', saved: Math.max(0, -rn),
-      title: `Revenge trades cost you ${money(rn)}.`,
-      html: `<b>${rev.length} revenge trades</b>, opened within ${REVENGE_MIN} min of a loss. ${rn < 0 ? `They cost you <b>${money(rn)}</b>.` : `Net ${money(rn)}, but they win only ${winPct(rev)}% of the time.`}`,
+      title: rn < 0 ? `Revenge trades cost you ${amt(rn)}.` : 'Trades right after a loss win less often.',
+      html: `<b>${rev.length} revenge trades</b>, opened within ${REVENGE_MIN} min of a loss. ${rn < 0
+        ? `Together they lost <b>${amt(rn)}</b>.`
+        : `They still made <b>${amt(rn)}</b>, but they win <b>${revWin}%</b> of the time, against <b>${overallWin}%</b> for your other trades.`}`,
       fix: 'After a loss, stand up and wait 30 minutes before the next trade.', rule: 'After a loss, wait 30 minutes before the next trade.' });
   }
 
@@ -178,7 +184,7 @@ function leaks(trades, { money, esc }) {
     const whatIf = big.reduce((s, t) => s + t.net * scale(t), 0);
     add({ code: 'L4', kind: 'risk', tag: 'Risk creep', tone: 'bad', saved: Math.max(0, whatIf - sum(big)),
       title: 'Your bigger positions are your losing ones.',
-      html: `Trades sized above your usual ${usual !== null ? `<b>${usual.toFixed(2)}%</b> risk` : 'lot size'} lost <b>${money(sum(big))}</b> over ${big.length} trades.${afterLoss ? ` ${afterLoss} of them came right after a loss.` : ''}`,
+      html: `Trades sized above your usual ${usual !== null ? `<b>${usual.toFixed(2)}%</b> risk` : 'lot size'} lost <b>${amt(sum(big))}</b> over ${big.length} trades.${afterLoss ? ` ${afterLoss} of them came right after a loss.` : ''}`,
       fix: `Same risk on every trade${usual !== null ? ` (${usual.toFixed(2)}%)` : ''}. Never size up to win a loss back. KATANA can cap the lot size for you.`,
       rule: `Same risk on every trade${usual !== null ? `: ${usual.toFixed(2)}%` : ''}.` });
   }
@@ -188,7 +194,7 @@ function leaks(trades, { money, esc }) {
   if (gave.length >= 2) {
     add({ code: 'L5', kind: 'gaveback', tag: 'Gave back winners', tone: 'bad', saved: -sum(gave),
       title: 'Winning trades are turning into losses.',
-      html: `<b>${gave.length} trades</b> were +1R in profit and still closed red. Cost <b>${money(sum(gave))}</b>.`,
+      html: `<b>${gave.length} trades</b> were +1R in profit and still closed red. Together they lost <b>${amt(sum(gave))}</b>.`,
       fix: 'At +1R, move the stop to break-even or take half off.', rule: 'At +1R, stop to break-even or take a partial.' });
   }
 
@@ -218,7 +224,7 @@ function leaks(trades, { money, esc }) {
   if (right.length >= 2) {
     add({ code: 'L7', kind: 'stopped', tag: 'Stopped, then right', tone: 'bad',
       title: 'Your stops get hit, then price goes your way.',
-      html: `<b>${right.length} of ${stopped.length}</b> stopped-out trades reached your target within 20 candles after the stop. They cost <b>${money(sum(right))}</b>.`,
+      html: `<b>${right.length} of ${stopped.length}</b> stopped-out trades reached your target within 20 candles after the stop. Together they lost <b>${amt(sum(right))}</b>.`,
       fix: 'Your stops sit too close. Put them beyond the swing high or low, and use smaller lots so the risk stays the same.',
       rule: 'Stop beyond the swing, smaller lots, same risk.' });
   }
@@ -226,14 +232,14 @@ function leaks(trades, { money, esc }) {
   // L8 no stop, or lost more than the stop
   const noSL = trades.filter((t) => !fin(t.sl) || !Number(t.sl));
   const overStop = trades.filter((t) => t.r !== null && t.r < -1.2);
-  const noSLbad = noSL.length >= 2 && sum(noSL) < 0;
+  const noSLbad = noSL.length >= 2 && sum(noSL) < 0 && -sum(noSL) >= avgLoss * 0.5;   // ignore a few cents
   if (noSLbad || overStop.length >= 2) {
     const p = [];
-    if (noSLbad) p.push(`<b>${noSL.length} trades</b> had no stop-loss and lost <b>${money(sum(noSL))}</b>.`);
-    if (overStop.length >= 2) p.push(`<b>${overStop.length} trades</b> lost more than 1.2R, so the stop was moved or skipped (<b>${money(sum(overStop))}</b>).`);
+    if (noSLbad) p.push(`<b>${noSL.length} trades</b> had no stop-loss and lost <b>${amt(sum(noSL))}</b>.`);
+    if (overStop.length >= 2) p.push(`<b>${overStop.length} trades</b> lost more than 1.2R, so the stop was moved or skipped. Together they lost <b>${amt(sum(overStop))}</b>.`);
     const extra = overStop.reduce((s, t) => s + t.net + t.net / t.r, 0);   // the part lost beyond −1R
     add({ code: 'L8', kind: 'nostop', tag: 'Stop discipline', tone: 'bad', saved: Math.max(0, -extra),
-      title: 'Some trades lose more than the stop allows.', html: p.join(' '),
+      title: 'Some trades lose more than the stop allows.', html: p.join('<br>'),
       fix: 'Every trade gets a stop before entry. Never move it further away.', rule: 'Stop set before entry, never widened.' });
   }
 
@@ -295,7 +301,7 @@ function leaks(trades, { money, esc }) {
   const badEmo = ew[0] && ew[0].w < overallWin - 10 ? ew[0] : null;
   if (mw.length || badEmo) {
     const p = [];
-    if (mw.length) p.push(`Trades tagged <b>“${esc(mw[0][0])}”</b> cost <b>${money(sum(mw[0][1]))}</b> over ${mw[0][1].length} trades.`);
+    if (mw.length) p.push(`Trades tagged <b>“${esc(mw[0][0])}”</b> lost <b>${amt(sum(mw[0][1]))}</b> over ${mw[0][1].length} trades.`);
     if (mw[1]) p.push(`Next: <b>“${esc(mw[1][0])}”</b> ${money(sum(mw[1][1]))}.`);
     if (badEmo) p.push(`Trades marked <b>${esc(badEmo.k)}</b> win only <b>${badEmo.w}%</b>.`);
     add({ code: 'L13', kind: 'mistakes', tag: 'Mistake cost', tone: 'bad', saved: mw.length ? -sum(mw[0][1]) : 0,
@@ -401,4 +407,4 @@ function insights(rows, opts) {
   return { locked: false, count: a.count, items: a.items.slice(0, 6), analysis: a };
 }
 
-module.exports = { insights, analyze, propGuard, MIN_TRADES, REVENGE_MIN };
+module.exports = { insights, analyze, propGuard, prep, numbers, score, MIN_TRADES, REVENGE_MIN };
