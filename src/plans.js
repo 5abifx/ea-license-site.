@@ -8,7 +8,7 @@ const PLANS = [
   { id: 'katana', name: 'KATANA', tagline: 'for active traders', popular: true,
     monthly: 20, annual: 15, accounts: 3, eas: 'all',
     extrasTitle: 'Everything in Journal, plus',
-    features: ['KATANA risk manager', 'Daily loss and drawdown limits', 'Auto lot size and stop loss', 'Up to 3 MT5 accounts', 'Prop-firm support email'] },
+    features: ['KATANA risk manager', 'Shield: closes all + locks at your daily or max loss', 'Prop firm presets, trailing drawdown', 'News lock and tilt guard', 'Phone alerts', 'Auto lot size and stop loss', 'Up to 3 MT5 accounts', 'Prop-firm support email'] },
   { id: 'pro', name: 'Pro', tagline: 'for funded and multi-account traders',
     monthly: 39, annual: 29, accounts: 10, eas: 'all',
     extrasTitle: 'Everything in KATANA, plus',

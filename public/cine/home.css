@@ -360,3 +360,11 @@ nav.sc{background:rgba(5,5,7,.78);backdrop-filter:blur(14px);-webkit-backdrop-fi
 .fine a{color:inherit;text-decoration:none}.fine a:hover{color:var(--fg)}
 .risk{max-width:var(--max,1240px);margin:0 auto;padding:0 clamp(16px,4vw,56px) 28px;color:var(--dimmer);font-size:12px;position:relative}
 a.pb{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+/* KATANA Shield: six feature tiles */
+.sh6{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin-top:48px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--line)}
+.sh6 article{background:linear-gradient(180deg,var(--ink2),var(--ink));padding:clamp(20px,2.6vw,30px);display:flex;flex-direction:column;gap:10px}
+.sh6 article .k{color:var(--glow2)}
+.sh6 h3{margin:0;font-weight:400;font-size:clamp(19px,1.8vw,24px);letter-spacing:-.01em}
+.sh6 p{margin:0;color:var(--dim);font-size:15px;line-height:1.55}
+@media (max-width:900px){.sh6{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.sh6{grid-template-columns:1fr}}

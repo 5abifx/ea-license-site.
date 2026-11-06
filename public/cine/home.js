@@ -116,7 +116,7 @@ const draws=[];
 
 /* 3. how a trade flows: one small picture per step */
 (function(){const [c,x]=canv('scene');const st=document.getElementById('scene-t');const ws=[...document.querySelectorAll('#words div')];let cur=-1,t0=0;
- const T=['You set risk per trade, daily loss and max drawdown once. KATANA remembers them on every chart.','You pick the trade. KATANA works out the lot size from your risk and places the stop for you.','Hit the daily limit and new trades are blocked until tomorrow. No "one more trade".','Every closed trade lands in your calendar by day and account, with no spreadsheet.','Turn a real trade into a 9:16 story card with the real candles and your R.'];
+ const T=['You set risk per trade, daily loss and max drawdown once. KATANA remembers them on every chart.','You pick the trade. KATANA works out the lot size from your risk and places the stop for you.','Hit the daily limit and KATANA closes every trade and locks trading until tomorrow. No "one more trade".','Every closed trade lands in your calendar by day and account, with no spreadsheet.','Turn a real trade into a 9:16 story card with the real candles and your R.'];
  const pick=()=>{let a=0;ws.forEach((d,i)=>{if(d.classList.contains('on'))a=i});return a};
  const ease=p=>1-Math.pow(1-Math.max(0,Math.min(1,p)),3);
  draws.push([c,t=>{const w=c.width,h=c.height,d=c._d;const a=pick();if(a!==cur){cur=a;t0=t;st.textContent=T[a]}const e=reduce?99:(t-t0)/1000;

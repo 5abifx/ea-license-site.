@@ -148,7 +148,7 @@ function authShell(eyebrow, title, sub, form) {
     <h1>Trade with<br><em>discipline.</em></h1>
     <p>Risk management, licensed EAs and a trade journal for serious traders, in one place.</p>
     <div class="feats">
-      <div class="feat"><i>⚔</i><b>KATANA risk manager</b><span>Daily loss, drawdown and position size, enforced.</span></div>
+      <div class="feat"><i>⚔</i><b>KATANA risk manager</b><span>Lot size, news lock and a Shield that closes all and locks at your limit.</span></div>
       <div class="feat"><i>▤</i><b>Trade Journal</b><span>Every MT5 trade logged by day and account.</span></div>
       <div class="feat"><i>◆</i><b>Share cards</b><span>Story-ready cards from your real trades.</span></div>
       <div class="feat"><i>⛨</i><b>Licensed per account</b><span>Your EAs run only on your accounts.</span></div>

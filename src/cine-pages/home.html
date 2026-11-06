@@ -33,8 +33,8 @@
     <div class="stack">
       <p class="k">KATANA risk manager</p>
       <h2 class="rv">It sits between you<br><span class="m">and the oversized trade.</span></h2>
-      <p class="lede rv">Every lot is sized from your risk %, every trade gets a stop, and trading locks the moment your daily loss limit is hit. Watch a day play out on the panel.</p>
-      <ul class="ticks rv"><li>Lot size worked out from your risk, not your mood</li><li>Stop loss placed on every trade</li><li>New trades blocked once the day's limit is reached</li><li>Drawdown watched against your prop firm's rules</li></ul>
+      <p class="lede rv">Every lot is sized from your risk %, every trade gets a stop, and the moment your daily loss limit is hit KATANA closes every trade and locks trading until tomorrow. Watch a day play out on the panel.</p>
+      <ul class="ticks rv"><li>Lot size worked out from your risk, not your mood</li><li>Stop loss placed on every trade</li><li>Daily limit hit: all trades closed, trading locked</li><li>Drawdown watched against your prop firm's rules</li></ul>
     </div>
     <div class="kpx rv" id="kp" aria-label="Example of the KATANA panel during a trading day">
       <div class="kh"><b>KATANA <small>Risk manager</small></b><span class="st" id="kp-st"><i></i>Armed</span></div>
@@ -42,7 +42,23 @@
       <div class="km"><div><span>Daily loss used</span><b><em id="kp-used">$0</em> / $3,000</b></div><div class="kb"><i id="kp-bar"></i></div></div>
       <div class="kc"><div><span>Risk / trade</span><b>0.5%</b><small>$500</small></div><div><span>Stop loss</span><b id="kp-sl">18.0</b><small>pips</small></div><div class="hi"><span>Lot size</span><b id="kp-lot">2.77</b><small>auto</small></div></div>
       <ol class="klog" id="kp-log"></ol>
-      <div class="klock" id="kp-lock"><b>Trading locked</b><span>Daily limit reached. New trades blocked until tomorrow.</span></div>
+      <div class="klock" id="kp-lock"><b>Shield locked</b><span>Daily limit reached. Every trade closed, trading locked until tomorrow.</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="band g" id="shield">
+  <div class="in">
+    <p class="k rv">New in KATANA · Shield</p>
+    <h2 class="rv">Most challenges fail in one session.<br><span class="m">Shield makes sure yours doesn't.</span></h2>
+    <p class="lede rv">Open losses count against the firm's limit before you close them. Shield watches the whole account and acts before the firm does.</p>
+    <div class="sh6 rv">
+      <article><span class="k">01 · Close all + lock</span><h3>Stops the bad day for you</h3><p>Daily loss or max drawdown hit, open trades included: every trade on the account closes, pending orders go, trading locks. Even after an MT5 restart.</p></article>
+      <article><span class="k">02 · Safety buffer</span><h3>Stops before the firm does</h3><p>KATANA stops you a little before the firm's line, so spread and slippage never break the rule for you.</p></article>
+      <article><span class="k">03 · Firm presets</span><h3>Pick your firm, done</h3><p>FundedNext, FTMO, FundingPips and The5ers rules fill in with one tap. Static, trailing or end-of-day drawdown.</p></article>
+      <article><span class="k">04 · News lock</span><h3>No trades into red news</h3><p>Reads MT5's own calendar and pauses new trades minutes before and after high-impact news for your pair. A countdown shows on the chart.</p></article>
+      <article><span class="k">05 · Tilt guard</span><h3>No revenge trades</h3><p>Done for the day after losses in a row, a short break after a loss, a cap on trades per day, and no bigger lot after a loss.</p></article>
+      <article><span class="k">06 · Phone alerts</span><h3>Know without watching</h3><p>Push alerts at 50% and 80% of your limits, before news, on a lock, and when a stop or target is hit.</p></article>
     </div>
   </div>
 </section>
