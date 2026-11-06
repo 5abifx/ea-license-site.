@@ -2,6 +2,8 @@
 const crypto = require('crypto');
 const { analyze, propGuard, prep, numbers, score, MIN_TRADES } = require('./insights');
 const insightsView = require('./insights-view');
+const desk = require('./desk');
+const deskView = require('./desk-view');
 const express = require('express');
 const { esc, fmtDate } = require('./views');
 
@@ -144,6 +146,18 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   // columns the insights read
   const INS_COLS = `account_number, symbol, side, lots, entry, exit, sl, tp, open_time, close_time, net, r, risk_pct,
     balance_after, mfe, mae, candles, setup, emotion, mistakes`;
+  // lighter set for the recap, the desk and the Time / Habits tabs
+  const DESK_COLS = 'id, account_number, symbol, side, lots, open_time, close_time, net, r, balance_after, setup';
+  const PROP_COLS = 'prop_daily, prop_max, prop_target, prop_start, prop_consistency, prop_firm';
+  const limitsOf = (a) => ({ daily: a.prop_daily, max: a.prop_max, target: a.prop_target, start: a.prop_start, consistency: a.prop_consistency, firm: a.prop_firm });
+  const maskNum = (n) => `Account ••${esc(String(n).slice(-2))}`;
+  // prop firm desk cards for these accounts (all their trades)
+  const deskCards = (u, accounts, cur, linkTo) => accounts.map((a) => {
+    const L = limitsOf(db.prepare(`SELECT ${PROP_COLS} FROM accounts WHERE user_id = ? AND account_number = ?`).get(u.id, a.account_number) || {});
+    const rows = desk.prepRows(db.prepare(`SELECT ${DESK_COLS} FROM journal_trades WHERE user_id = ? AND account_number = ? ORDER BY close_time`).all(u.id, a.account_number));
+    const D = desk.desk(rows, L, desk.serverToday(u.ny_offset ?? desk.NY_DEFAULT));
+    return { has: !!D, html: deskView.deskCard(D, { title: priv(`${esc(a.broker || 'Account')} · ${esc(a.account_number)}`, maskNum(a.account_number)), money: (v) => money(v, cur), href: linkTo(a) }) };
+  });
 
   app.get('/journal', requireUser, requireJournal, (req, res) => {
     const u = req.user;
@@ -156,7 +170,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const latest = db.prepare(`SELECT MAX(close_time) AS t FROM journal_trades WHERE ${where}`).get(...args).t;
     const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(req.query.month || '') ? req.query.month
       : (latest || new Date().toISOString()).slice(0, 7);
-    const trades = db.prepare(`SELECT id, account_number, symbol, side, lots, net, r, close_time, setup, currency, broker
+    const trades = db.prepare(`SELECT id, account_number, symbol, side, lots, net, r, open_time, close_time, balance_after, setup, currency, broker
         FROM journal_trades WHERE ${where} AND substr(close_time, 1, 7) = ? ORDER BY close_time`).all(...args, month);
     const cur = (sel ? sel.cur : liveAccts[0]?.cur) || '';
     const days = {};
@@ -232,6 +246,24 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
     const site = req.protocol + '://' + req.get('host');
 
+    // hero: the month's P&L big, with four tiles under it
+    const N = numbers(prep(trades));
+    const rT = trades.filter((t) => t.r !== null && t.r !== undefined);
+    const dayNets = dayKeys.map((d) => sum(days[d]));
+    const heroHtml = deskView.heroHtml({ label: monthName, n: trades.length, net, wins, losses: trades.filter((t) => t.net < 0).length,
+      winRate: N.winRate, pf: N.pf, avgW: N.avgW, avgL: N.avgL, avgR: rT.length ? rT.reduce((a, t) => a + Number(t.r), 0) / rT.length : null,
+      pct: N.start ? (net / N.start) * 100 : null, days: dayKeys.length, greenDays, bestDay, worstDay: dayNets.length ? Math.min(...dayNets) : null },
+    { cur, shareHref: accts.length ? `/journal/report${qs({})}` : '' });
+    // recap: the week of the latest trade, the last session, recent trades
+    const recent = latest ? desk.prepRows(db.prepare(`SELECT ${DESK_COLS} FROM journal_trades WHERE ${where} ORDER BY close_time DESC LIMIT 300`).all(...args).reverse()) : [];
+    const multi = !sel && liveAccts.length > 1;
+    const recapHtml = deskView.recapHtml(desk.recap(recent), { money: (v) => money(v, cur), mask: (t) => (multi ? priv(esc(t.account_number), maskNum(t.account_number)) : esc(t.side)) });
+    // prop firm desk: accounts with rules
+    const dk = deskCards(u, sel ? (sel.removed ? [] : [sel]) : liveAccts, cur, (a) => `/journal/insights?tab=prop&account=${encodeURIComponent(a.account_number)}`);
+    const deskHtml = !liveAccts.length ? '' : dk.some((x) => x.has)
+      ? `<section class="desk-row"><div class="row between"><h2>Prop firm desk</h2><a class="small" href="/journal/insights?tab=prop${sel ? '&account=' + encodeURIComponent(sel.account_number) : ''}">All rules ›</a></div><div class="dk-grid">${dk.filter((x) => x.has).map((x) => x.html).join('')}</div></section>`
+      : `<p class="small muted desk-hint">Trading a prop firm? <a href="/journal/insights?tab=prop${sel ? '&account=' + encodeURIComponent(sel.account_number) : ''}">Add its rules</a> to see the room left today, the room to max loss and the target on this page.</p>`;
+
     page(req, res, 'Trade Journal', `
     <div class="row between page-head"><h1>Trade Journal</h1>
       <span class="head-btns">${accts.length ? `<a class="btn small" href="/journal/report${qs({})}" title="A picture of this month's results to share, like the trade cards">Share report</a>` : ''}
@@ -244,15 +276,10 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         <button class="small danger">Delete these trades</button></form>
     </section>` : ''}
 
-    <div class="stats">
-      <div><span>${esc(monthName)}</span><strong class="${cls(net)}">${trades.length ? bigMoney(net, cur) : '-'}</strong></div>
-      <div><span>Trades</span><strong>${trades.length}</strong></div>
-      <div><span>Win rate</span><strong>${trades.length ? Math.round((wins / trades.length) * 100) + '%' : '-'}</strong></div>
-      <div><span>Green days</span><strong>${dayKeys.length ? `${greenDays} / ${dayKeys.length}` : '-'}</strong></div>
-      <div><span>Best day</span><strong class="${cls(bestDay)}">${bestDay === null ? '-' : bigMoney(bestDay, cur)}</strong></div>
-    </div>
-
-    <div class="cal-split">
+    ${heroHtml}
+    ${recapHtml}
+    ${deskHtml}
+    <div class="cal-split" id="cal">
       <section class="card">
         <div class="row between cal-head"><h2>${esc(monthName)}</h2>
           <span><a class="btn small secondary" href="/journal${qs({ month: shift(-1) })}" aria-label="Previous month">‹</a>
@@ -264,6 +291,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       <aside class="card day-panel" aria-live="polite">${panels || `<p class="muted">${accts.length ? 'No trades this month. Use ‹ › to change month.' : 'Tap a day to see its trades.'}</p>`}</aside>
     </div>
     <script src="/calendar.js"></script>
+    <script src="/hero.js"></script>
 
     ${insightsHtml}
 
@@ -420,29 +448,48 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       ? new Date(Date.parse(latest.slice(0, 10) + 'T00:00:00Z') - (Number(period) - 1) * 864e5).toISOString().slice(0, 10) : '';
     const rows = latest ? db.prepare(`SELECT ${INS_COLS} FROM journal_trades WHERE ${where}${since ? ' AND close_time >= ?' : ''} ORDER BY close_time`)
       .all(...args, ...(since ? [since] : [])) : [];
-    const a = analyze(rows, { money: m, esc });
+    const TABS = { overview: 'Overview', time: 'Time', habits: 'Habits', prop: 'Prop firm' };
+    const tab = Object.keys(TABS).includes(String(req.query.tab)) ? String(req.query.tab) : 'overview';
+    const tz = req.query.tz === 'mt5' ? 'mt5' : 'ny';
+    const qs = (o) => '?' + new URLSearchParams(Object.entries({ account: sel ? sel.account_number : '', days: period, tab: tab === 'overview' ? '' : tab, tz: tz === 'mt5' ? 'mt5' : '', ...o }).filter(([, v]) => v)).toString();
+    const insHref = (a2) => `/journal/insights${qs({ tab: 'prop', account: a2.account_number })}`;
 
-    // prop firm guard: one live account, all its trades
-    let prop = '';
-    if (sel && !sel.removed) {
-      const acc = db.prepare('SELECT prop_daily, prop_max, prop_target, prop_start FROM accounts WHERE user_id = ? AND account_number = ?').get(u.id, sel.account_number);
-      const limits = { daily: acc.prop_daily, max: acc.prop_max, target: acc.prop_target, start: acc.prop_start };
-      const P = propGuard(db.prepare(`SELECT ${INS_COLS} FROM journal_trades WHERE user_id = ? AND account_number = ? ORDER BY close_time`)
-        .all(u.id, sel.account_number), limits, { money: m });
-      prop = insightsView.propHtml(P, sel.account_number, limits);
-    } else if (liveAccts.length) {
-      prop = `<section class="card prop"><h2>Prop firm guard</h2><p class="muted small">Pick one account above to type its prop firm rules (daily loss, max loss, profit target) and see how close you are to each.</p></section>`;
+    let body = '';
+    if (!latest) body = `<section class="card"><p class="muted">No trades yet. Connect the Trade Journal EA on the <a href="/journal">Journal</a> page; insights start after ${MIN_TRADES} closed trades.</p></section>`;
+    else if (tab === 'overview') body = insightsView.fullHtml(analyze(rows, { money: m, esc }), { money: m, cur, prop: '' });
+    else if (tab === 'time' || tab === 'habits') {
+      const dr = desk.prepRows(db.prepare(`SELECT ${DESK_COLS} FROM journal_trades WHERE ${where}${since ? ' AND close_time >= ?' : ''} ORDER BY close_time`).all(...args, ...(since ? [since] : [])));
+      const off = tz === 'mt5' ? 0 : (u.ny_offset ?? desk.NY_DEFAULT);
+      const offsetForm = `<div class="tz-pick"><a href="/journal/insights${qs({ tz: '' })}"${tz === 'ny' ? ' class="on"' : ''}>New York</a><a href="/journal/insights${qs({ tz: 'mt5' })}"${tz === 'mt5' ? ' class="on"' : ''}>MT5 time</a>
+        <form method="post" action="/journal/settings/ny-offset" class="tz-off"><input type="hidden" name="back" value="/journal/insights${esc(qs({}))}"><label>MT5 = NY +<input name="offset" type="number" min="-12" max="14" value="${u.ny_offset ?? desk.NY_DEFAULT}"> h</label><button class="small secondary">Save</button></form></div>`;
+      body = tab === 'time'
+        ? deskView.timeHtml(desk.timeStats(dr, off), { money: m, offsetForm, tzName: tz === 'mt5' ? 'MT5 server time' : 'New York time' })
+        : dr.length ? deskView.habitsHtml(desk.habits(dr), { money: (v) => money(v) }) : '<section class="card"><p class="muted">No trades in this period.</p></section>';
+    } else {
+      // prop firm: one account in full (desk + history + rules form), or a card per account
+      if (sel && !sel.removed) {
+        const acc = db.prepare(`SELECT ${PROP_COLS} FROM accounts WHERE user_id = ? AND account_number = ?`).get(u.id, sel.account_number);
+        const L = limitsOf(acc);
+        const card = deskCards(u, [sel], cur, () => '')[0];
+        const P = propGuard(db.prepare(`SELECT ${INS_COLS} FROM journal_trades WHERE user_id = ? AND account_number = ? ORDER BY close_time`).all(u.id, sel.account_number), L, { money: m });
+        body = `<div class="dk-detail"><section class="card"><h2>Today</h2>${card.has ? card.html : '<p class="muted small">Add the rules on the right to see the room left today, the room to max loss and the target.</p>'}</section>
+          <section class="card"><h2>Your firm's rules</h2>${deskView.deskForm(sel.account_number, L)}</section></div>
+          ${P && !P.error ? insightsView.propHtml(P, sel.account_number, L).replace(/<details[\s\S]*<\/details>/, '') : ''}`;
+      } else if (liveAccts.length) {
+        const dk = deskCards(u, liveAccts, cur, insHref);
+        body = `<p class="muted small">Pick an account above to type or change its rules.</p><div class="dk-grid">${dk.map((x) => x.html).join('')}</div>`;
+      } else body = '<section class="card"><p class="muted">No live accounts. Add one on My EAs.</p></section>';
     }
-
-    const qs = (o) => '?' + new URLSearchParams(Object.entries({ account: sel ? sel.account_number : '', days: period, ...o }).filter(([, v]) => v)).toString();
+    const tabsNav = `<nav class="ins-tabs" aria-label="Insights">${Object.entries(TABS).map(([k, l]) => `<a href="/journal/insights${qs({ tab: k === 'overview' ? '' : k })}"${k === tab ? ' class="on" aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
     page(req, res, 'Insights', `
     <div class="row between page-head"><h1>Insights</h1>
       <span class="head-btns">${latest ? `<a class="btn small" href="/journal/report?${new URLSearchParams(Object.entries({ account: sel ? sel.account_number : '', period: period === '365' ? 'all' : period }).filter(([, v]) => v)).toString()}">Share report</a>` : ''}
       <button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers and your name, so you can screenshot this page">Hide private info</button></span></div>
     ${acctBar(req, '/journal/insights', qs, sc, cur)}
+    ${tabsNav}
     <div class="periods" role="navigation" aria-label="Period">${Object.entries(PERIODS).map(([k, l]) => `<a href="/journal/insights${qs({ days: k })}"${k === period ? ' class="on" aria-current="true"' : ''}>${l}</a>`).join('')}
-      ${a.locked ? '' : `<span class="muted small">${a.count} trades${sel ? '' : liveAccts.length > 1 ? ' · all accounts' : ''}</span>`}</div>
-    ${latest ? insightsView.fullHtml(a, { money: m, cur, prop }) : `<section class="card"><p class="muted">No trades yet. Connect the Trade Journal EA on the <a href="/journal">Journal</a> page; insights start after ${a.need} closed trades.</p></section>`}`);
+      <span class="muted small">${rows.length} trades${sel ? '' : liveAccts.length > 1 ? ' · all accounts' : ''}</span></div>
+    ${body}`);
   });
 
   // prop firm rules of one account (percent of the start balance)
@@ -451,10 +498,19 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const acc = num && db.prepare('SELECT id FROM accounts WHERE user_id = ? AND account_number = ?').get(req.user.id, num);
     if (!acc) { flash(req, 'error', 'Pick one of your accounts first.'); return res.redirect('/journal/insights'); }
     const p = (v, max) => { const x = Number(String(v ?? '').replace(',', '.').replace('%', '').trim()); return String(v ?? '').trim() && Number.isFinite(x) && x > 0 && x <= max ? x : null; };
-    db.prepare('UPDATE accounts SET prop_daily = ?, prop_max = ?, prop_target = ?, prop_start = ? WHERE id = ?')
-      .run(p(req.body.daily, 100), p(req.body.max, 100), p(req.body.target, 1000), p(req.body.start, 1e9), acc.id);
-    flash(req, 'ok', 'Prop firm limits saved.');
-    res.redirect(`/journal/insights?account=${encodeURIComponent(num)}`);
+    const firm = Object.keys(desk.FIRMS).includes(String(req.body.firm)) ? String(req.body.firm) : '';
+    db.prepare('UPDATE accounts SET prop_daily = ?, prop_max = ?, prop_target = ?, prop_start = ?, prop_consistency = ?, prop_firm = ? WHERE id = ?')
+      .run(p(req.body.daily, 100), p(req.body.max, 100), p(req.body.target, 1000), p(req.body.start, 1e9), p(req.body.consistency, 100), firm, acc.id);
+    flash(req, 'ok', 'Prop firm rules saved.');
+    res.redirect(`/journal/insights?tab=prop&account=${encodeURIComponent(num)}`);
+  });
+
+  // hours between New York time and the trader's MT5 server clock (Time tab)
+  app.post('/journal/settings/ny-offset', requireUser, requireJournal, (req, res) => {
+    const n = Math.round(Number(req.body.offset));
+    if (Number.isFinite(n) && n >= -12 && n <= 14) db.prepare('UPDATE users SET ny_offset = ? WHERE id = ?').run(n, req.user.id);
+    const back = String(req.body.back || '');
+    res.redirect(back.startsWith('/journal/insights') ? back : '/journal/insights?tab=time');
   });
 
   const getTrade = (req) => db.prepare('SELECT * FROM journal_trades WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);

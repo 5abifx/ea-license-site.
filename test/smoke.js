@@ -271,7 +271,7 @@ function client(base, ip) {
     assert.strictEqual(jr.status, 200);
     r = await bob.get('/journal');
     assert.match(r.text, /XAUUSD/);
-    assert.strictEqual((r.text.match(/href="\/journal\/\d+"/g) || []).length, 1);
+    assert.strictEqual(new Set(r.text.match(/href="\/journal\/\d+"/g) || []).size, 1);   // one trade (links to it appear in the calendar and the recap)
     const tid = r.text.match(/href="\/journal\/(\d+)"/)[1];
     assert.match(r.text, /Share report/);
     r = await bob.get('/journal/report');
@@ -334,16 +334,24 @@ function client(base, ip) {
     assert.match(r.text, /This week's focus/);
     assert.match(r.text, /class="fix"/);
     assert.match(r.text, /Equity and drawdown/);
-    assert.match(r.text, /Pick one account above/);
-    r = await bob.get('/journal/insights?account=1001&days=all');
+    assert.match((await bob.get('/journal/insights?tab=prop')).text, /Pick an account above/);
+    // Time and Habits tabs, journal hero + recap
+    assert.match((await bob.get('/journal/insights?tab=time')).text, /Session clock[\s\S]*Sessions, ranked[\s\S]*Hour by weekday/);
+    assert.match((await bob.get('/journal/insights?tab=time&tz=mt5')).text, /MT5 server time/);
+    assert.match((await bob.get('/journal/insights?tab=habits')).text, /Trade number of the day[\s\S]*After a win, after a loss/);
+    assert.match((await bob.get('/journal')).text, /class="pl-hero"[\s\S]*This week[\s\S]*Last session[\s\S]*Recent trades/);
+    r = await bob.get('/journal/insights?account=1001&days=all&tab=prop');
     assert.match(r.text, /All time/);
-    assert.match(r.text, /Prop firm guard/);
-    r = await bob.post('/journal/insights/limits', { account: '1001', daily: '5', max: '10', target: '8', start: '10000' });
-    assert.match(r.text, /Prop firm limits saved/);
+    assert.match(r.text, /Your firm's rules/);
+    r = await bob.post('/journal/insights/limits', { account: '1001', daily: '5', max: '10', target: '8', start: '10000', consistency: '40', firm: 'ftmo' });
+    assert.match(r.text, /Prop firm rules saved/);
+    assert.match(r.text, /Room left today/);
+    assert.match(r.text, /FTMO \(2-Step\)/);
+    assert.match((await bob.get('/journal')).text, /Prop firm desk/);
     assert.match(r.text, /Worst day <b>−[\d.]+%<\/b>/);
     assert.match(r.text, /Set KATANA&#39;s daily loss limit to 3%/);
     r = await eve.post('/journal/insights/limits', { account: '1001', daily: '1' });
-    assert.doesNotMatch(r.text, /Prop firm limits saved/);
+    assert.doesNotMatch(r.text, /Prop firm rules saved/);
     for (let i = 0; i < 6; i++) for (const p of ['L', 'R']) assert.ok(db.prepare("DELETE FROM journal_trades WHERE position_id = ?").run(p + i).changes);
     // stop moved to break-even before the EA saw it: no fake R, and the trader can type the real stop
     const be = { position_id: 'BE1', symbol: 'XAUUSD', side: 'BUY', lots: 0.1, entry: 3944.16, exit: 3948.03, sl: 3944.37, tp: 3964.62, digits: 2,
