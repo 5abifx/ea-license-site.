@@ -38,3 +38,13 @@ services:
         sync: false          # card payments (see README)
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      - key: BACKUP_PASSWORD
+        sync: false          # nightly backup lock (see README: Security and backups)
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false

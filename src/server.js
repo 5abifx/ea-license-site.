@@ -8,7 +8,7 @@ const express = require('express');
 const cookieSession = require('cookie-session');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
-const { db, FILES_DIR, logSale } = require('./db');
+const { db, DATA_DIR, FILES_DIR, logSale } = require('./db');
 const sales = require('./sales');
 const { esc, fmtDate, layout, authShell, SITE_NAME, PRICE_TEXT, trialDays } = require('./views');
 const { PLANS, BILLING, getPlan, cleanBilling, maxSave, dueNow } = require('./plans');
@@ -155,6 +155,7 @@ function grantAllActiveEas(userId) {
 
 // Wrong passwords per network in the last 15 minutes: after 3 the sign-in form asks for the bot check
 const LOGIN_FAILS = 3;
+const ACCOUNT_FAILS = 8;   // wrong passwords for one email (any network) before that sign-in waits 15 minutes
 const fails = new Map();
 const failCount = (ip) => { const f = fails.get(ip); return f && f.reset > Date.now() ? f.n : 0; };
 const addFail = (ip) => { const n = failCount(ip) + 1; fails.set(ip, { n, reset: Date.now() + 15 * 60 * 1000 }); };
@@ -176,6 +177,20 @@ function takeNext(req, fallback) {
   if (req.session) req.session.next = null;
   return n || fallback;
 }
+
+// Password or Google accepted. Anyone with the sign-in code on (Admin > Security) gives the 6-digit code first.
+function finishSignIn(req, res, u, codeDone = false) {
+  if (u.totp_secret && !codeDone) {
+    req.session.uid = null;
+    req.session.code2 = { uid: u.id, at: Date.now() };
+    return res.redirect('/login/code');
+  }
+  req.session.pv = null;
+  req.session.uid = u.id;
+  res.redirect(takeNext(req, u.is_admin ? '/admin' : '/dashboard'));
+}
+const backup = require('./backup')(db, DATA_DIR);
+require('./security')(app, { db, page, flash, requireAdmin, rateLimit, finishSignIn, backup, SITE_NAME });
 
 const { studentBox: mentorBox } = require('./mentor')(app, { db, page, flash, requireUser, requireAdmin });
 require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox });
@@ -238,9 +253,17 @@ app.post('/login', async (req, res) => {
     flash(req, 'error', 'Please complete the quick check above the button, then sign in again.');
     return res.redirect('/login');
   }
-  const u = db.prepare('SELECT * FROM users WHERE email = ?').get(String(req.body.email || '').trim());
+  const email = String(req.body.email || '').trim();
+  // Wrong passwords per account, from any network: stops slow guessing spread over many IPs
+  const emailKey = 'email:' + email.toLowerCase();
+  if (failCount(emailKey) >= ACCOUNT_FAILS) {
+    flash(req, 'error', 'Too many wrong passwords for this account. Try again in 15 minutes.');
+    return res.redirect('/login');
+  }
+  const u = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
   if (!u || !bcrypt.compareSync(String(req.body.password || ''), u.password_hash)) {
     addFail(req.ip);
+    addFail(emailKey);
     flash(req, 'error', 'Wrong email or password.');
     return res.redirect('/login');
   }
@@ -249,9 +272,8 @@ app.post('/login', async (req, res) => {
     return res.redirect('/login');
   }
   fails.delete(req.ip);
-  req.session.pv = null;
-  req.session.uid = u.id;
-  res.redirect(takeNext(req, u.is_admin ? '/admin' : '/dashboard'));
+  fails.delete(emailKey);
+  finishSignIn(req, res, u);
 });
 
 app.post('/logout', (req, res) => { req.session = null; res.redirect('/login'); });
@@ -413,9 +435,7 @@ app.get('/auth/google/callback', async (req, res) => {
   }
   if (u.status === 'disabled') return fail('This account is disabled. Please contact support.');
   fails.delete(req.ip);
-  req.session.pv = null;
-  req.session.uid = u.id;
-  res.redirect(takeNext(req, u.is_admin ? '/admin' : '/dashboard'));
+  finishSignIn(req, res, u);
 });
 
 app.get('/password', requireUser, (req, res) => page(req, res, 'Change password', `
@@ -609,7 +629,7 @@ app.get('/admin', requireAdmin, (req, res) => {
 
   page(req, res, 'Admin', `
   <h1>Admin</h1>
-  <div class="tabs"><a href="/admin/sales">Dashboard</a><a class="on" href="/admin">Users</a><a href="/admin/eas">EAs (${eas.length})</a><a href="/admin/mentorship">Mentorship</a></div>
+  <div class="tabs"><a href="/admin/sales">Dashboard</a><a class="on" href="/admin">Users</a><a href="/admin/eas">EAs (${eas.length})</a><a href="/admin/mentorship">Mentorship</a><a href="/admin/security">Security</a></div>
 
   <section class="card">
     <div class="row between">
@@ -930,7 +950,7 @@ app.get('/admin/eas', requireAdmin, (req, res) => {
 
   page(req, res, 'EAs', `
   <h1>Admin</h1>
-  <div class="tabs"><a href="/admin/sales">Dashboard</a><a href="/admin">Users</a><a class="on" href="/admin/eas">EAs (${eas.length})</a><a href="/admin/mentorship">Mentorship</a></div>
+  <div class="tabs"><a href="/admin/sales">Dashboard</a><a href="/admin">Users</a><a class="on" href="/admin/eas">EAs (${eas.length})</a><a href="/admin/mentorship">Mentorship</a><a href="/admin/security">Security</a></div>
   ${eas.map((e) => `<section class="card">
     <div class="row between"><h2>${esc(e.name)} <span class="tag">v${esc(e.version)}</span> ${e.active ? '' : '<span class="tag warn">inactive</span>'}</h2>
     <span class="muted">${e.n_users} users · code <code>${esc(e.code)}</code></span></div>
@@ -1005,7 +1025,7 @@ app.post('/admin/eas/:id/delete', requireAdmin, (req, res) => {
 require('./help')(app, { db, page });
 const mentor = require('./mentorship')(app, { db, page, flash, requireUser, requireAdmin, grantAllActiveEas, PAYMENT_URL });
 const stripe = require('./stripe')(app, { db, flash, requireUser, applyPaid, startTrial, refs, mentor });
-sales.routes(app, { db, page, requireAdmin, stripe, mentorPlans: require('./mentorship').MENTOR_PLANS });
+sales.routes(app, { db, page, requireAdmin, stripe, backup, mentorPlans: require('./mentorship').MENTOR_PLANS });
 require('./pricing')(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL: process.env.CONTACT_URL || '', refs, stripe });
 require('./pages')(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, TRIAL_ACCOUNTS, MAX_ACCOUNTS_DEFAULT });
 

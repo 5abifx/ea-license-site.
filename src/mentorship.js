@@ -330,7 +330,7 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
     const emails = (list) => list.map((r) => r.email).join(', ');
     page(req, res, 'Mentorship', `
   <h1>Admin</h1>
-  <div class="tabs"><a href="/admin/sales">Dashboard</a><a href="/admin">Users</a><a href="/admin/eas">EAs</a><a class="on" href="/admin/mentorship">Mentorship</a></div>
+  <div class="tabs"><a href="/admin/sales">Dashboard</a><a href="/admin">Users</a><a href="/admin/eas">EAs</a><a class="on" href="/admin/mentorship">Mentorship</a><a href="/admin/security">Security</a></div>
   <div class="stats">
     <div><span class="muted">Students</span><strong>${students.length}</strong></div>
     <div><span class="muted">Started paying, not finished</span><strong>${unpaid.length}</strong></div>
