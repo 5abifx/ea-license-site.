@@ -1,6 +1,6 @@
 // Trade Journal: receives trades from the Trade Journal EA and shows them to the customer.
 const crypto = require('crypto');
-const { analyze, propGuard } = require('./insights');
+const { analyze, propGuard, prep, numbers, score, MIN_TRADES } = require('./insights');
 const insightsView = require('./insights-view');
 const express = require('express');
 const { esc, fmtDate } = require('./views');
@@ -89,8 +89,10 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   });
 
   // ---------- pages ----------
-  const money = (v, cur = '') => (v === null || v === undefined ? '-' : `${v < 0 ? '−' : '+'}${Math.abs(v).toFixed(2)}${cur ? ' ' + esc(cur) : ''}`);
+  const money = (v, cur = '') => (v === null || v === undefined ? '-' : `${v < 0 ? '−' : '+'}${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cur ? ' ' + esc(cur) : ''}`);
   const cls = (v) => (v > 0 ? 'pos' : v < 0 ? 'neg' : '');
+  // big numbers in the stat boxes: the currency is small, so "+1,868.45 USD" fits the box
+  const bigMoney = (v, cur) => `${money(v)}${cur ? `<small class="u">${esc(cur)}</small>` : ''}`;
 
   // private text (account numbers, broker servers): hidden when "Hide private info" is on
   const priv = (real, mask) => `<span class="priv"><span class="priv-real">${real}</span><span class="priv-mask">${mask}</span></span>`;
@@ -184,7 +186,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     for (let d = 1; d <= nDays; d++, cell++) {
       const l = days[iso(d)] || [], s = sum(l), weekend = cell % 7 >= 5;
       grid += l.length
-        ? `<button type="button" class="day ${s >= 0 ? 'win' : 'loss'}" data-day="${iso(d)}" aria-pressed="${iso(d) === pickDay}"><span class="d">${d}</span><span class="v ${cls(s)}">${short(s)}</span><span class="n">${l.length} trade${l.length > 1 ? 's' : ''}</span></button>`
+        ? `<button type="button" class="day ${s >= 0 ? 'win' : 'loss'}" data-day="${iso(d)}" aria-pressed="${iso(d) === pickDay}"><span class="d">${d}</span><span class="v ${cls(s)}">${short(s)}</span><span class="n" title="${l.length} trade${l.length > 1 ? 's' : ''}">${l.length}<span class="w"> trade${l.length > 1 ? 's' : ''}</span></span></button>`
         : `<div class="day${weekend ? ' off' : ''}"><span class="d">${d}</span></div>`;
       week.push(l);
       if ((cell + 1) % 7 === 0) weekCell();
@@ -232,7 +234,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
     page(req, res, 'Trade Journal', `
     <div class="row between page-head"><h1>Trade Journal</h1>
-      <button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers, your name and the journal key, so you can screenshot this page">Hide private info</button></div>
+      <span class="head-btns">${accts.length ? `<a class="btn small" href="/journal/report${qs({})}" title="A picture of this month's results to share, like the trade cards">Share report</a>` : ''}
+      <button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers, your name and the journal key, so you can screenshot this page">Hide private info</button></span></div>
     ${acctBar(req, '/journal', qs, sc, cur)}
 
     ${sel && sel.removed ? `<section class="card notice">
@@ -242,11 +245,11 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     </section>` : ''}
 
     <div class="stats">
-      <div><span>${esc(monthName)}</span><strong class="${cls(net)}">${trades.length ? money(net, cur) : '-'}</strong></div>
+      <div><span>${esc(monthName)}</span><strong class="${cls(net)}">${trades.length ? bigMoney(net, cur) : '-'}</strong></div>
       <div><span>Trades</span><strong>${trades.length}</strong></div>
       <div><span>Win rate</span><strong>${trades.length ? Math.round((wins / trades.length) * 100) + '%' : '-'}</strong></div>
       <div><span>Green days</span><strong>${dayKeys.length ? `${greenDays} / ${dayKeys.length}` : '-'}</strong></div>
-      <div><span>Best day</span><strong class="${cls(bestDay)}">${bestDay === null ? '-' : money(bestDay, cur)}</strong></div>
+      <div><span>Best day</span><strong class="${cls(bestDay)}">${bestDay === null ? '-' : bigMoney(bestDay, cur)}</strong></div>
     </div>
 
     <div class="cal-split">
@@ -276,6 +279,91 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       <form method="post" action="/journal/key" onsubmit="return confirm('Make a new key? The old key stops working and you must paste the new one into the EA.')">
         <button class="small secondary">Make a new key</button></form>
     </details>`);
+  });
+
+  // ---------- account report: share cards of a whole account (or all accounts) ----------
+  // ?period=YYYY-MM (a month) | 30 | 90 | all, ?account= as on the journal. Account numbers are always masked.
+  app.get('/journal/report', requireUser, requireJournal, (req, res) => {
+    const u = req.user;
+    const sc = scope(req);
+    const { liveAccts, sel, where, args } = sc;
+    const cur = (sel ? sel.cur : liveAccts[0]?.cur) || '';
+    const latest = db.prepare(`SELECT MAX(close_time) AS t FROM journal_trades WHERE ${where}`).get(...args).t;
+    if (!latest) return res.redirect('/journal');
+    const q = String(req.query.period || req.query.month || '');
+    const period = /^\d{4}-(0[1-9]|1[0-2])$/.test(q) || ['30', '90', 'all'].includes(q) ? q : latest.slice(0, 7);
+    const isMonth = period.length === 7;
+    let from = '', to = '';
+    if (isMonth) {
+      const [y, m] = period.split('-').map(Number);
+      from = period + '-01'; to = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+    } else if (period !== 'all') {
+      from = new Date(Date.parse(latest.slice(0, 10) + 'T00:00:00Z') - (Number(period) - 1) * 864e5).toISOString().slice(0, 10);
+    }
+    const rows = db.prepare(`SELECT ${INS_COLS} FROM journal_trades WHERE ${where}${from ? ' AND close_time >= ?' : ''}${to ? ' AND close_time < ?' : ''} ORDER BY close_time`)
+      .all(...args, ...(from ? [from] : []), ...(to ? [to] : []));
+    const trades = prep(rows);
+    const N = numbers(trades);
+    const S = trades.length >= MIN_TRADES ? score(N) : null;
+
+    // per day: money, R and count (for the calendar card)
+    const days = {};
+    trades.forEach((t) => { const d = t.close_time.slice(0, 10); const x = (days[d] ||= { net: 0, r: 0, n: 0, rn: 0 }); x.net += t.net; x.n++; if (t.r !== null) { x.r += t.r; x.rn++; } });
+    const rT = trades.filter((t) => t.r !== null);
+    let run = 0, bestRun = 0, lrun = 0, worstRun = 0;
+    trades.forEach((t) => { if (t.net > 0) { run++; lrun = 0; } else if (t.net < 0) { lrun++; run = 0; } bestRun = Math.max(bestRun, run); worstRun = Math.max(worstRun, lrun); });
+    const step = Math.max(1, Math.ceil(N.equity.length / 240));
+    const eq = N.equity.filter((e, i) => i % step === 0 || i === N.equity.length - 1).map((e) => Math.round(e.eq * 100) / 100);
+    const dayNets = Object.values(days).map((d) => d.net);
+    const symbols = {};
+    trades.forEach((t) => { const k = t.symbol; (symbols[k] ||= { n: 0, net: 0 }); symbols[k].n++; symbols[k].net += t.net; });
+
+    const monthName = (ym) => new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1, 1)).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    const label = isMonth ? monthName(period) : period === 'all' ? 'All time' : `Last ${period} days`;
+    const first = trades[0]?.close_time.slice(0, 10) || '', last = trades.at(-1)?.close_time.slice(0, 10) || '';
+    const acctName = sel ? `Account ••${String(sel.account_number).slice(-2)}` : liveAccts.length > 1 ? `${liveAccts.length} accounts` : liveAccts[0] ? `Account ••${String(liveAccts[0].account_number).slice(-2)}` : '';
+    const data = {
+      label, isMonth, month: isMonth ? period : '', from: first, to: last, acct: acctName, cur, handle: u.card_handle || '',
+      n: N.n, net: N.net, wins: N.wins, losses: N.losses, winRate: N.winRate, pf: Number.isFinite(N.pf) ? N.pf : (N.pf === Infinity ? 'inf' : null),
+      avgW: N.avgW, avgL: N.avgL, start: N.start, maxDD: N.maxDD, maxDDPct: N.maxDDPct,
+      totalR: rT.length ? rT.reduce((s, t) => s + t.r, 0) : null, avgR: rT.length ? rT.reduce((s, t) => s + t.r, 0) / rT.length : null,
+      bestTradeR: rT.length ? Math.max(...rT.map((t) => t.r)) : null, bestTrade: trades.length ? Math.max(...trades.map((t) => t.net)) : null,
+      bestDay: dayNets.length ? Math.max(...dayNets) : null, worstDay: dayNets.length ? Math.min(...dayNets) : null,
+      days: N.days, greenDays: N.greenDays, bestRun, worstRun, score: S ? S.total : null, scoreLabel: S ? S.label : '',
+      equity: eq, daily: days,
+      symbols: Object.entries(symbols).sort((a, b) => b[1].n - a[1].n).slice(0, 3).map(([k, v]) => ({ s: k, n: v.n, net: v.net })),
+    };
+    const json = JSON.stringify(data).replace(/</g, '\\u003c');
+
+    // periods to pick: the last 6 months with trades + ranges
+    const months = db.prepare(`SELECT DISTINCT substr(close_time, 1, 7) AS m FROM journal_trades WHERE ${where} ORDER BY m DESC LIMIT 6`).all(...args).map((r) => r.m);
+    if (isMonth && !months.includes(period)) months.unshift(period);
+    const opts = [...months.map((m) => [m, monthName(m)]), ['30', 'Last 30 days'], ['90', 'Last 90 days'], ['all', 'All time']];
+    const acctOpts = [...(liveAccts.length > 1 ? [['', 'All accounts']] : []), ...liveAccts.map((a) => [a.account_number, `Account ••${String(a.account_number).slice(-2)}`]),
+      ...(sel && !liveAccts.includes(sel) ? [[sel.account_number, `Account ••${String(sel.account_number).slice(-2)}`]] : [])];
+    const back = `/journal?${new URLSearchParams(Object.entries({ account: sel ? sel.account_number : '', month: isMonth ? period : '' }).filter(([, v]) => v)).toString()}`;
+
+    page(req, res, 'Share report', `
+    <div class="row between page-head"><h1>Share report</h1><a class="btn small secondary" href="${back}">‹ Back to journal</a></div>
+    <section class="card report-card">
+      <p class="muted">Your whole account on two pictures, ready for Instagram stories or Discord. Account numbers are never shown.</p>
+      <form method="get" action="/journal/report" class="card-controls report-pick">
+        <label>Period <select name="period" onchange="this.form.submit()">${opts.map(([k, l]) => `<option value="${esc(k)}"${k === period ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
+        ${acctOpts.length > 1 ? `<label>Account <select name="account" onchange="this.form.submit()">${acctOpts.map(([k, l]) => `<option value="${esc(k)}"${(sel ? sel.account_number : '') === k ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>` : sel ? `<input type="hidden" name="account" value="${esc(sel.account_number)}">` : ''}
+        <label>Show <select id="rmode">
+          <option value="money">Money ($)</option>${N.start ? '<option value="pct">Percent of account</option>' : ''}<option value="r">R only (hide money)</option></select></label>
+        <label class="check"><input type="checkbox" id="rkat" checked> KATANA line</label>
+        <noscript><button class="small">Show</button></noscript>
+      </form>
+      ${trades.length ? `<div class="cards">
+        <figure><canvas id="r1"></canvas><span class="share-btns"><button type="button" class="small" data-save="r1">Save card 1</button><button type="button" class="small secondary" data-share="r1" hidden>Share</button></span></figure>
+        <figure><canvas id="r2"></canvas><span class="share-btns"><button type="button" class="small" data-save="r2">Save card 2</button><button type="button" class="small secondary" data-share="r2" hidden>Share</button></span></figure>
+      </div>` : '<p class="muted">No closed trades in this period. Pick another one above.</p>'}
+      <p class="muted small">Your handle on the cards: <strong>${esc(u.card_handle || '5abifx.com')}</strong>. Change it on any trade page.</p>
+    </section>
+    <script id="report-data" type="application/json">${json}</script>
+    <script src="/cards.js"></script>
+    <script src="/report.js"></script>`);
   });
 
   // delete the trades of an account that was removed from My EAs (live accounts are refused)
@@ -343,7 +431,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const qs = (o) => '?' + new URLSearchParams(Object.entries({ account: sel ? sel.account_number : '', days: period, ...o }).filter(([, v]) => v)).toString();
     page(req, res, 'Insights', `
     <div class="row between page-head"><h1>Insights</h1>
-      <button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers and your name, so you can screenshot this page">Hide private info</button></div>
+      <span class="head-btns">${latest ? `<a class="btn small" href="/journal/report?${new URLSearchParams(Object.entries({ account: sel ? sel.account_number : '', period: period === '365' ? 'all' : period }).filter(([, v]) => v)).toString()}">Share report</a>` : ''}
+      <button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers and your name, so you can screenshot this page">Hide private info</button></span></div>
     ${acctBar(req, '/journal/insights', qs, sc, cur)}
     <div class="periods" role="navigation" aria-label="Period">${Object.entries(PERIODS).map(([k, l]) => `<a href="/journal/insights${qs({ days: k })}"${k === period ? ' class="on" aria-current="true"' : ''}>${l}</a>`).join('')}
       ${a.locked ? '' : `<span class="muted small">${a.count} trades${sel ? '' : liveAccts.length > 1 ? ' · all accounts' : ''}</span>`}</div>

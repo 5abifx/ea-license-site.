@@ -28,7 +28,7 @@ module.exports = function registerMentor(app, { db, page, flash, requireUser, re
 
   // mentorship students (paid or ticked as Student); admins can try it on their own journal
   const eligible = (u) => !!u && !!(u.student || u.mentor_plan || u.is_admin);
-  const money = (v, cur = '') => (v === null || v === undefined ? '-' : `${v < 0 ? '−' : '+'}${Math.abs(v).toFixed(2)}${cur ? ' ' + esc(cur) : ''}`);
+  const money = (v, cur = '') => (v === null || v === undefined ? '-' : `${v < 0 ? '−' : '+'}${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cur ? ' ' + esc(cur) : ''}`);
   const cls = (v) => (v > 0 ? 'pos' : v < 0 ? 'neg' : '');
   const mask = (n) => `Account ••${esc(String(n).slice(-2))}`;
   const ago = (s) => {

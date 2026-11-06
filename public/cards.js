@@ -15,7 +15,8 @@ const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','
 
 const LOGO = new Image();
 let last = null;
-LOGO.onload = () => { if (last) render(...last); };
+const logoWait = [];
+LOGO.onload = () => { if (last) render(...last); logoWait.forEach((f) => f()); };
 LOGO.src = '/logo.png';
 
 /* ---------- numbers ---------- */
@@ -276,5 +277,8 @@ function render(resultCanvas, chartCanvas, trade, opts) {
   DRAW[state.tpl](resultCanvas.getContext('2d'), trade);
   cardChart(chartCanvas.getContext('2d'), trade);
 }
-window.TradeCards = { render, styles: { a: 'Cinematic', b: 'Chart first', c: 'Ticket' } };
+window.TradeCards = { render, styles: { a: 'Cinematic', b: 'Chart first', c: 'Ticket' },
+  // drawing kit for the account report cards (public/report.js)
+  kit: { W, H, PAD, D, M, B, INK, SOFT, DIM, FAINT, ORANGE, WIN, LOSS, LINE, MINUS, MON, T, fitSize, bg, brand,
+    onLogo: (f) => { if (LOGO.complete && LOGO.width) f(); else logoWait.push(f); } } };
 })();

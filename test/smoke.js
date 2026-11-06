@@ -273,6 +273,11 @@ function client(base, ip) {
     assert.match(r.text, /XAUUSD/);
     assert.strictEqual((r.text.match(/href="\/journal\/\d+"/g) || []).length, 1);
     const tid = r.text.match(/href="\/journal\/(\d+)"/)[1];
+    assert.match(r.text, /Share report/);
+    r = await bob.get('/journal/report');
+    assert.match(r.text, /id="report-data"/);
+    assert.doesNotMatch(r.text.split('report-data')[1], /\d{6,}/);   // no full account number in the card data
+    r = await bob.get('/journal');
     r = await bob.post(`/journal/${tid}`, { setup: 'London breakout', emotion: 'Calm', rating: '5', notes: 'Clean <b>setup</b>' });
     assert.match(r.text, /Notes saved/);
     assert.match(r.text, /Clean &lt;b&gt;setup&lt;\/b&gt;/);
