@@ -464,7 +464,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       const offsetForm = `<div class="tz-pick"><a href="/journal/insights${qs({ tz: '' })}"${tz === 'ny' ? ' class="on"' : ''}>New York</a><a href="/journal/insights${qs({ tz: 'mt5' })}"${tz === 'mt5' ? ' class="on"' : ''}>MT5 time</a>
         <form method="post" action="/journal/settings/ny-offset" class="tz-off"><input type="hidden" name="back" value="/journal/insights${esc(qs({}))}"><label>MT5 = NY +<input name="offset" type="number" min="-12" max="14" value="${u.ny_offset ?? desk.NY_DEFAULT}"> h</label><button class="small secondary">Save</button></form></div>`;
       body = tab === 'time'
-        ? deskView.timeHtml(desk.timeStats(dr, off), { money: m, offsetForm, tzName: tz === 'mt5' ? 'MT5 server time' : 'New York time' })
+        ? deskView.timeHtml(desk.timeStats(dr, off), { money: m, offsetForm, tzName: tz === 'mt5' ? 'MT5 server time' : 'New York time', shift: tz === 'mt5' ? (u.ny_offset ?? desk.NY_DEFAULT) : 0 })
         : dr.length ? deskView.habitsHtml(desk.habits(dr), { money: (v) => money(v, cur === 'USD' ? 'USD' : '') }) : '<section class="card"><p class="muted">No trades in this period.</p></section>';
     } else {
       // prop firm: one account in full (desk + history + rules form), or a card per account

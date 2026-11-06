@@ -1224,3 +1224,48 @@ select option:disabled { color: #6b6b73; }
 .app-body .ins b, .app-body .ins p b, .app-body .fix, .app-body .fix b, .app-body .fix::before, .app-body .strip-score b, .app-body .score-num b, .app-body .ins-nums strong { font-family: var(--body); letter-spacing: -.01em; }
 .app-body .fix::before { letter-spacing: 0; text-transform: none; }
 .side-label { font-family: var(--body); text-transform: none; letter-spacing: 0; font-size: 12px; color: #6f6f78; }
+
+/* session clock v2: glow, live hand, hover */
+.ck .ck-h { font-family: var(--body); font-size: 10px; fill: rgba(255,255,255,.38); letter-spacing: .05em; }
+.ck .ck-s { font-family: var(--body); font-size: 10px; letter-spacing: .22em; fill: rgba(255,255,255,.45); font-weight: 600; }
+.ck .ck-s.on { fill: #ff9a5c; }
+.ck .ck-c1 { font-size: 8px; letter-spacing: .3em; fill: rgba(255,255,255,.4); font-family: var(--body); }
+.ck .ck-c2 { font-size: 19px; font-weight: 600; fill: #fff; font-family: var(--body); font-variant-numeric: tabular-nums; }
+.ck .ck-c3 { font-size: 9px; fill: #ff9a5c; font-family: var(--body); letter-spacing: .08em; }
+.ck .ck-hand { transition: transform .6s cubic-bezier(.2,.7,.2,1); }
+.ck [data-s] { transition: opacity .25s; }
+.ck[data-hl] [data-s] { opacity: .14; }
+.ck[data-hl="asia"] [data-s="asia"], .ck[data-hl="london"] [data-s="london"], .ck[data-hl="nyam"] [data-s="nyam"], .ck[data-hl="nypm"] [data-s="nypm"], .ck[data-hl="off"] [data-s="off"] { opacity: 1; }
+.ck-l { grid-template-columns: 18px 1fr auto 64px; cursor: default; border-radius: 8px; padding: 6px 8px; margin: 0 -8px; transition: background .2s; }
+.ck-l b { text-align: right; font-size: 13px; }
+.ck-l.hl { background: rgba(255,255,255,.05); }
+.tm-clock .ck { filter: drop-shadow(0 0 30px rgba(0,0,0,.4)); }
+
+/* ranked sessions dial */
+.dial { position: relative; min-height: 330px; outline: none; }
+.dial-arc { display: none; }
+.dial-btns { display: none; }
+.dial.live .rank { position: relative; height: 330px; overflow: hidden; margin-left: 40px; }
+.dial.live .dial-arc { display: block; position: absolute; left: 0; top: 0; width: 40px; height: 330px; }
+.dial.live .dial-btns { display: flex; flex-direction: column; gap: 6px; position: absolute; right: 0; bottom: 0; }
+.dial.live .dial-btns button { width: 34px; height: 34px; padding: 0; border-radius: 50%; font-size: 11px; }
+.dial.live .rank li { position: absolute; left: 0; right: 0; top: 50%; border: 0; padding: 0; cursor: pointer; transform-origin: left center;
+  transition: transform .55s cubic-bezier(.2,.7,.2,1), opacity .45s; grid-template-columns: 96px 1fr 150px; }
+.dial.live .rank li::before { content: ''; position: absolute; left: -38px; top: 50%; width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.35); transform: translateY(-50%); }
+.dial.live .rank li.cur::before { background: #fff; box-shadow: 0 0 14px rgba(255,255,255,.7); }
+.dial.live .rk-n { font-size: 44px; font-weight: 200; color: var(--text); opacity: 1; letter-spacing: -.04em; transition: font-size .4s; }
+.dial.live li.cur .rk-n { font-size: 74px; font-weight: 300; }
+.dial.live .rk-name { font-size: 15px; } .dial.live li.cur .rk-name { font-size: 18px; }
+.dial.live .rk-net { font-size: 14px; } .dial.live li.cur .rk-net { font-size: 22px; font-weight: 600; }
+.dial.live .rk-more, .dial.live .rk-spark { opacity: 0; transition: opacity .3s; }
+.dial.live li.cur .rk-more, .dial.live li.cur .rk-spark { opacity: 1; }
+.rk-b { display: grid; gap: 2px; } .rk-more { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.dial.live .spark { width: 150px; height: 46px; }
+@media (max-width: 560px) { .dial.live .rank li { grid-template-columns: 64px 1fr; } .dial.live li.cur .rk-n { font-size: 52px; } .dial.live .rk-n { font-size: 32px; } .rk-spark { display: none; } }
+.ck-wrap { grid-template-columns: minmax(240px, 1fr) 210px; }
+.ck-l { grid-template-columns: 18px 1fr 56px; } .ck-l span small { display: block; font-size: 11px; }
+.dial.live .rank li { transform-origin: left center; }
+@media (max-width: 560px) { .ck-wrap { grid-template-columns: 1fr; } }
+.dial.live li:not(.cur) .rk-more { display: none; }
+.dial.live li:not(.cur) .rk-spark { visibility: hidden; }
+.dial.live li.cur .rk-more { white-space: nowrap; }

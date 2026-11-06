@@ -93,37 +93,55 @@ function deskForm(acct, L) {
 }
 
 // ---------- time ----------
-function sessionClock(T) {
-  const C = 170, R0 = 92, MAXL = 42, mx = Math.max(1, ...T.halves.map((h) => Math.abs(h.net)));
+function sessionClock(T, shift) {
+  const C = 200, R0 = 104, MAXL = 46, mx = Math.max(1, ...T.halves.map((h) => Math.abs(h.net)));
   const ang = (min) => (min / 1440) * Math.PI * 2 - Math.PI / 2;
-  const P = (min, r) => [C + Math.cos(ang(min)) * r, C + Math.sin(ang(min)) * r];
-  let s = `<circle cx="${C}" cy="${C}" r="${R0}" fill="none" stroke="var(--line)" stroke-width="1.5"/>`;
-  for (let h = 0; h < 24; h++) { const [x1, y1] = P(h * 60, R0 - 4), [x2, y2] = P(h * 60, R0 - (h % 6 ? 8 : 14)); s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--line)" stroke-width="1.5"/>`; }
-  [0, 6, 12, 18].forEach((h) => { const [x, y] = P(h * 60, R0 - 30); s += `<text x="${x}" y="${y + 5}" text-anchor="middle" class="ck-h">${String(h).padStart(2, '0')}</text>`; });
+  const P = (min, r) => [+(C + Math.cos(ang(min)) * r).toFixed(1), +(C + Math.sin(ang(min)) * r).toFixed(1)];
+  const sessOf = (min) => (T.sessions.find((x) => (x.from < x.to ? min >= x.from && min < x.to : min >= x.from || min < x.to)) || {}).key;
+  const RIM = R0 + MAXL + 18, best = T.ranked[0] ? T.ranked[0].key : '';
+  let s = `<defs>
+    <radialGradient id="ckbg"><stop offset="0" stop-color="#fff" stop-opacity=".055"/><stop offset=".7" stop-color="#fff" stop-opacity=".015"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="ckhot" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb35c"/><stop offset="1" stop-color="#ff5a1f"/></linearGradient>
+    <filter id="ckglow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <circle cx="${C}" cy="${C}" r="${R0 - 2}" fill="url(#ckbg)"/>
+    <circle cx="${C}" cy="${C}" r="${R0}" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="1"/>
+    <circle cx="${C}" cy="${C}" r="${R0 - 34}" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="1" stroke-dasharray="2 5"/>`;
+  // fine ticks: every half hour, hours longer, 6-hour marks longest
+  for (let i = 0; i < 48; i++) { const big = i % 12 === 0, hr = i % 2 === 0, [x1, y1] = P(i * 30, RIM + 10), [x2, y2] = P(i * 30, RIM + (big ? 20 : hr ? 15 : 12));
+    s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(255,255,255,${big ? 0.5 : hr ? 0.22 : 0.1})" stroke-width="${big ? 1.6 : 1}"/>`; }
+  [0, 6, 12, 18].forEach((h) => { const [x, y] = P(h * 60, R0 - 20); s += `<text x="${x}" y="${y + 4}" text-anchor="middle" class="ck-h">${String(h).padStart(2, '0')}</text>`; });
+  // the half hours: a bar out made money, a bar in lost it
   T.halves.forEach((h) => {
     if (!h.n) return;
-    const len = Math.max(4, (Math.abs(h.net) / mx) * MAXL), r1 = h.net >= 0 ? R0 + 4 : R0 - 4, r2 = h.net >= 0 ? R0 + 4 + len : Math.max(40, R0 - 4 - len * 0.7);
-    const [x1, y1] = P(h.from + 15, r1), [x2, y2] = P(h.from + 15, r2);
-    s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${h.net >= 0 ? 'var(--ok)' : 'var(--danger)'}" stroke-width="7" stroke-linecap="round"><title>${hhmm(h.from)}–${hhmm(h.from + 30)}: ${h.n} trades</title></line>`;
+    const k = Math.abs(h.net) / mx, len = Math.max(5, k * MAXL), m = h.from + 15;
+    const [x1, y1] = P(m, h.net >= 0 ? R0 + 5 : R0 - 5), [x2, y2] = P(m, h.net >= 0 ? R0 + 5 + len : R0 - 5 - Math.min(26, len * 0.6));
+    s += `<line data-s="${sessOf(h.from)}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${h.net >= 0 ? 'var(--ok)' : 'var(--danger)'}" stroke-opacity="${(0.55 + 0.45 * k).toFixed(2)}" stroke-width="4.5" stroke-linecap="round" filter="url(#ckglow)"><title>${hhmm(h.from)}–${hhmm(h.from + 30)} · ${h.n} trades</title></line>`;
   });
-  // sessions on the rim
-  const RIM = R0 + MAXL + 16;
+  // the sessions on the rim, names written along the arc
   T.sessions.filter((x) => x.key !== 'off').forEach((x) => {
-    const a = x.from, b = x.to < x.from ? x.to + 1440 : x.to, [x1, y1] = P(a + 8, RIM), [x2, y2] = P(b - 8, RIM), large = b - a > 720 ? 1 : 0;
-    const best = T.ranked[0] && T.ranked[0].key === x.key;
-    s += `<path d="M${x1} ${y1} A${RIM} ${RIM} 0 ${large} 1 ${x2} ${y2}" fill="none" stroke="${best ? 'var(--accent)' : 'var(--muted)'}" stroke-opacity="${best ? 1 : 0.55}" stroke-width="${best ? 4 : 2.5}" stroke-linecap="round"/>`;
-    const [lx, ly] = P((a + b) / 2, RIM + 16);
-    s += `<text x="${lx}" y="${ly + 4}" text-anchor="middle" class="ck-s${best ? ' on' : ''}">${esc(x.name)}</text>`;
+    const a = x.from, b = x.to < x.from ? x.to + 1440 : x.to, [x1, y1] = P(a + 6, RIM), [x2, y2] = P(b - 6, RIM), large = b - a > 720 ? 1 : 0, on = x.key === best;
+    const [t1x, t1y] = P(a, RIM + 30), [t2x, t2y] = P(b, RIM + 30), bottom = ((a + b) / 2) % 1440 > 360 && ((a + b) / 2) % 1440 < 1080;
+    s += `<path data-s="${x.key}" d="M${x1} ${y1} A${RIM} ${RIM} 0 ${large} 1 ${x2} ${y2}" fill="none" stroke="${on ? 'url(#ckhot)' : 'rgba(255,255,255,.32)'}" stroke-width="${on ? 6 : 3}" stroke-linecap="round"${on ? ' filter="url(#ckglow)"' : ''}/>`;
+    s += `<path id="ckt-${x.key}" d="${bottom ? `M${t2x} ${t2y} A${RIM + 30} ${RIM + 30} 0 ${large} 0 ${t1x} ${t1y}` : `M${t1x} ${t1y} A${RIM + 30} ${RIM + 30} 0 ${large} 1 ${t2x} ${t2y}`}" fill="none"/>
+      <text data-s="${x.key}" class="ck-s${on ? ' on' : ''}" dy="${bottom ? 10 : 0}"><textPath href="#ckt-${x.key}" startOffset="50%" text-anchor="middle">${esc(x.name.toUpperCase())}</textPath></text>`;
   });
-  return `<svg class="ck" viewBox="-24 -10 ${C * 2 + 48} ${C * 2 + 20}" role="img" aria-label="Profit by half hour of the day">${s}</svg>`;
+  // live "now" hand + centre read-out (public/clock.js)
+  s += `<g class="ck-hand" data-shift="${shift}"><line x1="${C}" y1="${C}" x2="${C}" y2="${C - RIM + 4}" stroke="url(#ckhot)" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="${C}" cy="${C - RIM + 4}" r="5" fill="#ff7a3d" filter="url(#ckglow)"/></g>
+    <circle cx="${C}" cy="${C}" r="44" fill="#0b0b0d" stroke="rgba(255,255,255,.08)"/>
+    <text x="${C}" y="${C - 12}" text-anchor="middle" class="ck-c1">NOW</text>
+    <text x="${C}" y="${C + 10}" text-anchor="middle" class="ck-c2" id="ck-time">--:--</text>
+    <text x="${C}" y="${C + 27}" text-anchor="middle" class="ck-c3" id="ck-sess"></text>`;
+  return `<svg class="ck" viewBox="-10 -10 ${C * 2 + 20} ${C * 2 + 20}" role="img" aria-label="Profit by half hour of the day" data-sessions='${JSON.stringify(T.sessions.map((x) => ({ k: x.key, n: x.name, f: x.from, t: x.to })))}'>${s}</svg>`;
 }
 function spark(pts) {
   if (pts.length < 2) return '';
   const W = 140, H = 34, lo = Math.min(0, ...pts), hi = Math.max(0, ...pts), sp = hi - lo || 1;
-  const d = pts.map((v, i) => `${i ? 'L' : 'M'}${((i / (pts.length - 1)) * W).toFixed(1)} ${(H - ((v - lo) / sp) * H).toFixed(1)}`).join(' ');
-  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${d}" fill="none" stroke="${pts.at(-1) >= 0 ? 'var(--ok)' : 'var(--danger)'}" stroke-width="2"/></svg>`;
+  const pt = (v, i) => `${((i / (pts.length - 1)) * W).toFixed(1)} ${(H - ((v - lo) / sp) * H).toFixed(1)}`;
+  const d = pts.map((v, i) => `${i ? 'L' : 'M'}${pt(v, i)}`).join(' '), col = pts.at(-1) >= 0 ? 'var(--ok)' : 'var(--danger)';
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${d} L${W} ${H} L0 ${H} Z" fill="${col}" fill-opacity=".1"/><path d="${d}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
 }
-function timeHtml(T, { money, offsetForm, tzName }) {
+function timeHtml(T, { money, offsetForm, tzName, shift = 0 }) {
   if (!T.ranked.length) return '<section class="card"><p class="muted">No trades in this period.</p></section>';
   const mx = Math.max(1, ...T.rows.flatMap((r) => r.cells.map((c) => Math.abs(c.net))));
   const rows = T.rows.filter((r, i) => i < 5 || r.n);
@@ -133,18 +151,25 @@ function timeHtml(T, { money, offsetForm, tzName }) {
   </div>`;
   const top = T.ranked[0];
   return `<div class="tm-top">
-    <section class="card tm-clock"><h2>Session clock</h2><p class="muted small">Every half hour of the day (${esc(tzName)}). A bar out made money, a bar in lost it. The sessions sit on the rim.</p>
-      <div class="ck-wrap">${sessionClock(T)}
-        <div class="ck-side">${T.sessions.filter((x) => x.key !== 'off').map((x) => `<div class="ck-l${top.key === x.key ? ' on' : ''}"><i></i><span>${esc(x.name)}</span><span class="mono muted">${hhmm(x.from)}–${hhmm(x.to)}</span></div>`).join('')}
-          <hr>${T.best ? `<p class="small">Best half hour <b class="mono">${hhmm(T.best.from)}–${hhmm(T.best.from + 30)}</b><br><b class="${cls(T.best.net)}">${money(T.best.net)}</b> <span class="muted">· ${T.best.n} trades</span></p>` : ''}
-          ${T.worst && T.worst !== T.best && T.worst.net < 0 ? `<p class="small">Worst half hour <b class="mono">${hhmm(T.worst.from)}–${hhmm(T.worst.from + 30)}</b><br><b class="neg">${money(T.worst.net)}</b> <span class="muted">· ${T.worst.n} trades</span></p>` : ''}</div></div>
+    <section class="card tm-clock"><h2>Session clock</h2><p class="muted small">Every half hour of the day, ${esc(tzName)}. A bar out made money, a bar in lost it. The sessions sit on the rim. Hover one to light it up.</p>
+      <div class="ck-wrap">${sessionClock(T, shift)}
+        <div class="ck-side">${T.sessions.filter((x) => x.key !== 'off').map((x) => { const r = T.ranked.find((y) => y.key === x.key);
+          return `<div class="ck-l${top.key === x.key ? ' on' : ''}" data-s="${x.key}" tabindex="0"><i></i><span>${esc(x.name)}<small class="muted">${hhmm(x.from)}–${hhmm(x.to)}</small></span><b class="${r ? cls(r.net) : ''}">${r ? short(r.net) : '-'}</b></div>`; }).join('')}
+          <hr>${T.best ? `<p class="small"><span class="muted">Best half hour</span><br><b>${hhmm(T.best.from)}–${hhmm(T.best.from + 30)}</b> <b class="${cls(T.best.net)}">${money(T.best.net)}</b> <span class="muted">· ${T.best.n} trades</span></p>` : ''}
+          ${T.worst && T.worst !== T.best && T.worst.net < 0 ? `<p class="small"><span class="muted">Worst half hour</span><br><b>${hhmm(T.worst.from)}–${hhmm(T.worst.from + 30)}</b> <b class="neg">${money(T.worst.net)}</b> <span class="muted">· ${T.worst.n} trades</span></p>` : ''}</div></div>
     </section>
-    <section class="card tm-rank"><h2>Sessions, ranked</h2><p class="muted small">${esc(top.name)} made the most.</p>
-      <ol class="rank">${T.ranked.map((x, i) => `<li class="${i ? '' : 'first'}"><span class="rk-n">${String(i + 1).padStart(2, '0')}</span>
-        <div class="rk-b"><b>${esc(x.name)}</b><small class="muted mono">${x.range}</small><span><b class="${cls(x.net)}">${money(x.net)}</b> <span class="muted">· ${x.win}% win · ${x.n} trades${x.avgR !== null ? ` · ${rTxt(x.avgR)} avg` : ''}</span></span></div>${spark(x.spark)}</li>`).join('')}</ol>
+    <section class="card tm-rank"><h2>Sessions, ranked</h2><p class="muted small">${esc(top.name)} made the most. Scroll, tap or use the arrows to turn the dial.</p>
+      <div class="dial" tabindex="0" aria-label="Sessions ranked by profit">
+        <svg class="dial-arc" viewBox="0 0 60 400" preserveAspectRatio="none" aria-hidden="true"><path d="M48 0 Q-8 200 48 400" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="1.5"/></svg>
+        <ol class="rank">${T.ranked.map((x, i) => `<li data-i="${i}" class="${i ? '' : 'first'}"><span class="rk-n">${String(i + 1).padStart(2, '0')}</span>
+          <div class="rk-b"><b class="rk-name">${esc(x.name)}</b><span class="rk-net ${cls(x.net)}">${money(x.net)}</span>
+            <small class="rk-more">${x.win}% win · ${x.n} trades${x.avgR !== null ? ` · ${rTxt(x.avgR)} avg` : ''}<br>${x.range}</small></div><span class="rk-spark">${spark(x.spark)}</span></li>`).join('')}</ol>
+        <span class="dial-btns"><button type="button" class="small secondary" data-d="-1" aria-label="Previous">▲</button><button type="button" class="small secondary" data-d="1" aria-label="Next">▼</button></span>
+      </div>
     </section></div>
   <section class="card"><div class="row between"><h2>Hour by weekday</h2>${offsetForm}</div>
-    <p class="muted small">Open time of each trade, ${esc(tzName)}. Brighter = more money made (green) or lost (red).</p>${heat}</section>`;
+    <p class="muted small">Open time of each trade, ${esc(tzName)}. Brighter = more money made (green) or lost (red).</p>${heat}</section>
+  <script src="/clock.js"></script>`;
 }
 
 // ---------- habits ----------
