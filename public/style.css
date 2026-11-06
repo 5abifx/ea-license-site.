@@ -1051,3 +1051,7 @@ select option:disabled { color: #6b6b73; }
 .report-pick { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin: 12px 0 18px; }
 .report-pick label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .share-btns { display: flex; gap: 8px; justify-content: center; }
+/* account report: the big 4:3 sheet */
+.report-big-h { margin: 28px 0 10px; font-size: 1.1rem; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.report-big { margin: 0; display: grid; gap: 10px; justify-items: center; }
+.report-big canvas { width: 100%; max-width: 980px; height: auto; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.25); }

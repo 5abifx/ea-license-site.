@@ -346,7 +346,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     page(req, res, 'Share report', `
     <div class="row between page-head"><h1>Share report</h1><a class="btn small secondary" href="${back}">‹ Back to journal</a></div>
     <section class="card report-card">
-      <p class="muted">Your whole account on two pictures, ready for Instagram stories or Discord. Account numbers are never shown.</p>
+      <p class="muted">Your whole account as two story cards (Instagram, WhatsApp) or one big picture (Discord, X, iPad). Account numbers are never shown.</p>
       <form method="get" action="/journal/report" class="card-controls report-pick">
         <label>Period <select name="period" onchange="this.form.submit()">${opts.map(([k, l]) => `<option value="${esc(k)}"${k === period ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
         ${acctOpts.length > 1 ? `<label>Account <select name="account" onchange="this.form.submit()">${acctOpts.map(([k, l]) => `<option value="${esc(k)}"${(sel ? sel.account_number : '') === k ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>` : sel ? `<input type="hidden" name="account" value="${esc(sel.account_number)}">` : ''}
@@ -358,7 +358,9 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       ${trades.length ? `<div class="cards">
         <figure><canvas id="r1"></canvas><span class="share-btns"><button type="button" class="small" data-save="r1">Save card 1</button><button type="button" class="small secondary" data-share="r1" hidden>Share</button></span></figure>
         <figure><canvas id="r2"></canvas><span class="share-btns"><button type="button" class="small" data-save="r2">Save card 2</button><button type="button" class="small secondary" data-share="r2" hidden>Share</button></span></figure>
-      </div>` : '<p class="muted">No closed trades in this period. Pick another one above.</p>'}
+      </div>
+      <h2 class="report-big-h">Big report <span class="muted small">one picture, iPad / desktop size (4:3)</span></h2>
+      <figure class="report-big"><canvas id="r3"></canvas><span class="share-btns"><button type="button" class="small" data-save="r3">Save big report</button><button type="button" class="small secondary" data-share="r3" hidden>Share</button></span></figure>` : '<p class="muted">No closed trades in this period. Pick another one above.</p>'}
       <p class="muted small">Your handle on the cards: <strong>${esc(u.card_handle || '5abifx.com')}</strong>. Change it on any trade page.</p>
     </section>
     <script id="report-data" type="application/json">${json}</script>
