@@ -16,6 +16,7 @@
 // counter), MENTOR_YOUTUBE, MENTOR_DISCORD, MENTOR_INSTAGRAM, MENTOR_X, MENTOR_WHATSAPP (links on the page).
 const { esc, fmtDate } = require('./views');
 const { cinePage } = require('./cine');
+const { logSale } = require('./db');
 
 const MENTOR_PLANS = [
   { id: 'selfstudy', name: 'Self-Study', price: 997, soon: true },
@@ -280,7 +281,10 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
     const md = obj.metadata || {};
     if (type === 'checkout.session.completed' && md.kind === 'mentorship') {
       if (obj.customer) db.prepare('UPDATE users SET stripe_customer = COALESCE(stripe_customer, ?) WHERE id = ?').run(String(obj.customer), Number(md.user_id));
-      if (obj.mode === 'payment' && obj.payment_status === 'paid') applyMentorPaid(md.user_id, md.mplan);
+      if (obj.mode === 'payment' && obj.payment_status === 'paid') {
+        logSale(md.user_id, 'mentorship', { plan: md.mplan, amount: Number(obj.amount_total) / 100, via: 'stripe' });
+        applyMentorPaid(md.user_id, md.mplan);
+      }
       if (obj.mode === 'subscription' && obj.subscription) {
         // stop after the 3rd monthly payment: cancel 2 months + 15 days from now, with no proration
         const end = new Date(); end.setUTCMonth(end.getUTCMonth() + PARTS - 1); end.setUTCDate(end.getUTCDate() + 15);
@@ -298,7 +302,10 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
         m = sub.metadata || {};
       }
       if (m.kind !== 'mentorship') return false;
-      if (Number(obj.amount_paid) > 0) applyMentorPaid(m.user_id, m.mplan);
+      if (Number(obj.amount_paid) > 0) {
+        logSale(m.user_id, 'mentorship', { plan: m.mplan, billing: 'parts', amount: Number(obj.amount_paid) / 100, via: 'stripe' });
+        applyMentorPaid(m.user_id, m.mplan);
+      }
       return true;
     }
     if (type === 'customer.subscription.deleted' && md.kind === 'mentorship') return true;
@@ -323,7 +330,7 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
     const emails = (list) => list.map((r) => r.email).join(', ');
     page(req, res, 'Mentorship', `
   <h1>Admin</h1>
-  <div class="tabs"><a href="/admin">Users</a><a href="/admin/eas">EAs</a><a class="on" href="/admin/mentorship">Mentorship</a></div>
+  <div class="tabs"><a href="/admin/sales">Dashboard</a><a href="/admin">Users</a><a href="/admin/eas">EAs</a><a class="on" href="/admin/mentorship">Mentorship</a></div>
   <div class="stats">
     <div><span class="muted">Students</span><strong>${students.length}</strong></div>
     <div><span class="muted">Started paying, not finished</span><strong>${unpaid.length}</strong></div>
@@ -390,6 +397,7 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
     const u = db.prepare('SELECT * FROM users WHERE email = ?').get(String(req.body.email || '').trim());
     const p = getMentorPlan(req.body.plan);
     if (!u || !p) { flash(req, 'error', 'No account with that email. Ask the student to sign up first.'); return res.redirect('/admin/mentorship'); }
+    if (!db.prepare("SELECT 1 FROM mentor_events WHERE user_id = ? AND event = 'paid' AND plan = ?").get(u.id, p.id)) logSale(u.id, 'mentorship', { plan: p.id, amount: p.price, via: 'admin' });
     applyMentorPaid(u.id, p.id);
     flash(req, 'ok', `${u.email} added as a ${p.name} student.`);
     res.redirect('/admin/mentorship');

@@ -543,7 +543,7 @@ function client(base, ip) {
         body: new URLSearchParams({ name: 'Cara', email: 'cara@test.com', password: 'carapass123' }).toString() });
       assert.strictEqual(su.status, 302);
       r = await ct.post('/login', { email: 'cara@test.com', password: 'carapass123' });
-      assert.match(r.text, /Start your 15-day free trial/);
+      assert.match(r.text, /Your 15-day free trial is ready/);
       const caraId = db.prepare("SELECT id FROM users WHERE email = 'cara@test.com'").get().id;
       await ct.post('/accounts', { account_number: '4242' });
       assert.strictEqual((await check('GOLD_SCALPER', '4242')).valid, false);          // no card yet: nothing works
@@ -641,6 +641,23 @@ function client(base, ip) {
       pu = db.prepare('SELECT * FROM users WHERE id = ?').get(payId);
       assert.strictEqual(pu.mentor_plan, 'full');
       assert.strictEqual(pu.plan, 'pro');
+
+      // sales track record: payments, trials and mentorship sales are logged; the dashboard shows them
+      const sl = db.prepare('SELECT kind, via, amount FROM sales_log').all();
+      assert.ok(sl.some((x) => x.kind === 'trial' && x.via === 'stripe'));
+      assert.ok(sl.some((x) => x.kind === 'ea' && x.via === 'stripe'));
+      assert.ok(sl.some((x) => x.kind === 'mentorship' && x.amount === 1099));
+      r = await admin.get('/admin/sales');
+      assert.strictEqual(r.status, 200);
+      assert.match(r.text, /Where people drop off/);
+      assert.match(r.text, /Track record by month/);
+      assert.match(r.text, /People to follow up/);
+      for (const pp of ['30', '90', '365', 'all', 'junk']) assert.strictEqual((await admin.get('/admin/sales?p=' + pp)).status, 200);
+      assert.strictEqual((await payer.get('/admin/sales')).status, 404);
+      // visitors are counted once a day per page, with the source from ?utm_source
+      const vc = client(base, '10.8.0.1');
+      await vc.get('/?utm_source=Instagram'); await vc.get('/'); await vc.get('/pricing');
+      assert.strictEqual(db.prepare("SELECT COUNT(*) AS n FROM visits WHERE src = 'instagram'").get().n, 2);
 
       process.env.TRIAL_DAYS = '0';
       fake.close();

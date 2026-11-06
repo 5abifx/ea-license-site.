@@ -122,4 +122,34 @@ db.exec(`CREATE TABLE IF NOT EXISTS journal_hidden (
   PRIMARY KEY (user_id, account_number)
 )`);
 
-module.exports = { db, DATA_DIR, FILES_DIR: path.join(DATA_DIR, 'ea-files') };
+// Sales track record for the Admin dashboard (src/sales.js): one row per trial start, payment or cancel.
+// kind: trial | ea | mentorship | cancel. amount = US dollars actually paid (NULL when not known).
+db.exec(`CREATE TABLE IF NOT EXISTS sales_log (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER NOT NULL,
+  kind       TEXT NOT NULL,
+  plan       TEXT NOT NULL DEFAULT '',
+  billing    TEXT NOT NULL DEFAULT '',
+  amount     REAL,
+  via        TEXT NOT NULL DEFAULT '',   -- stripe | admin | signup
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_sales_log_at ON sales_log(created_at)');
+const logSale = (userId, kind, { plan = '', billing = '', amount = null, via = '' } = {}) => {
+  try {
+    db.prepare('INSERT INTO sales_log (user_id, kind, plan, billing, amount, via) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(Number(userId), kind, plan || '', billing || '', amount == null || Number.isNaN(Number(amount)) ? null : Number(amount), via);
+  } catch (e) { console.error('sales_log:', e.message); }   // never break a payment over the log
+};
+
+// Unique visitors per day and page (no IP stored: a random id in the visitor's cookie), and where they came from
+db.exec(`CREATE TABLE IF NOT EXISTS visits (
+  day  TEXT NOT NULL,
+  path TEXT NOT NULL,
+  vid  TEXT NOT NULL,
+  src  TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (day, path, vid)
+)`);
+if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'source')) db.exec("ALTER TABLE users ADD COLUMN source TEXT NOT NULL DEFAULT ''");   // where the sign-up came from (instagram, discord, referral...)
+
+module.exports = { db, DATA_DIR, logSale, FILES_DIR: path.join(DATA_DIR, 'ea-files') };

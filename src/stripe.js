@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { getPlan, cleanBilling, dueNow, BILLING } = require('./plans');
 const { trialDays } = require('./views');
+const { logSale } = require('./db');
 
 const API = () => (process.env.STRIPE_API_BASE || 'https://api.stripe.com').replace(/\/$/, '');
 const on = () => Boolean(process.env.STRIPE_SECRET_KEY);
@@ -156,7 +157,7 @@ module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid, 
       || (sub.items && sub.items.data && sub.items.data[0] && sub.items.data[0].current_period_end);
     db.prepare('UPDATE users SET stripe_customer = COALESCE(?, stripe_customer), stripe_sub = ? WHERE id = ?')
       .run(inv.customer ? String(inv.customer) : null, sub.id, u.id);
-    applyPaid(u, plan, billing, end ? sqlTime(Number(end) + GRACE_SECONDS) : null);
+    applyPaid(u, plan, billing, end ? sqlTime(Number(end) + GRACE_SECONDS) : null, { amount: Number(inv.amount_paid) / 100, via: 'stripe' });
   }
 
   app.post('/api/stripe/webhook', express.raw({ type: '*/*', limit: '1mb' }), async (req, res) => {
@@ -177,7 +178,7 @@ module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid, 
           // card added: start the free trial now (one extra day so the first charge lands before access ends)
           const u = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
           if (u && !u.trial_used) {
-            startTrial(id, trialDays());
+            startTrial(id, trialDays(), 'stripe');
             db.prepare(`UPDATE users SET trial_used = 1, plan_request = ?, expires_at = datetime(expires_at, '+1 day') WHERE id = ?`)
               .run(`${obj.metadata.plan || ''}:${obj.metadata.billing || ''}`, id);
           }
@@ -191,6 +192,8 @@ module.exports = function stripeSetup(app, { db, flash, requireUser, applyPaid, 
         await onInvoicePaid(obj);
       } else if (ev.type === 'customer.subscription.deleted') {
         // cancelled: nothing is cut off now, the licence runs to the end of what was paid
+        const gone = db.prepare('SELECT id, plan, billing FROM users WHERE stripe_sub = ?').get(String(obj.id));
+        if (gone) logSale(gone.id, 'cancel', { plan: gone.plan, billing: gone.billing, via: 'stripe' });
         db.prepare('UPDATE users SET stripe_sub = NULL WHERE stripe_sub = ?').run(String(obj.id));
       }
     } catch (e) {

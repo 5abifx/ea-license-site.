@@ -985,6 +985,52 @@ strong.warn { color: var(--warn); }
   .cs-ticks { justify-content: center; }
 }
 
+/* ---------- Admin: sales dashboard (/admin/sales) ---------- */
+.sd-head { margin: 4px 0 12px; flex-wrap: wrap; gap: 10px; }
+.sd-head h2 { margin: 0; }
+.sd-head .seg { flex-wrap: wrap; }
+.sd-kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.sd-sub { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 4px; }
+.sd-fix ol { margin: 8px 0 0; padding: 0; list-style: none; counter-reset: fx; display: grid; gap: 10px; }
+.sd-fix li { counter-increment: fx; position: relative; padding: 12px 14px 12px 46px; background: var(--card-2); border: 1px solid var(--line); border-radius: 10px; display: grid; gap: 4px; }
+.sd-fix li::before { content: counter(fx); position: absolute; left: 14px; top: 12px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  font: 700 12px var(--mono); background: rgba(255,90,31,.14); color: var(--accent); }
+.sd-fix li:first-child { border-color: rgba(255,90,31,.45); }
+.sd-fix li b { color: var(--text); }
+.sd-fix li span { color: #c9c9ce; font-size: 14px; line-height: 1.5; }
+.sd-funnel { display: grid; gap: 10px; margin-top: 10px; }
+.sd-step { display: grid; grid-template-columns: minmax(150px, 220px) 1fr 86px; gap: 14px; align-items: center; padding: 8px 10px; border-radius: 10px; }
+.sd-step.leak { background: rgba(240,70,75,.08); box-shadow: inset 0 0 0 1px rgba(240,70,75,.35); }
+.sd-step-h { display: grid; gap: 2px; }
+.sd-step-h b { color: var(--text); }
+.sd-bar { position: relative; height: 30px; background: var(--card-2); border-radius: 8px; overflow: hidden; }
+.sd-bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #ff5a1f, #ff8a4d); border-radius: 8px; }
+.sd-step.leak .sd-bar i { background: linear-gradient(90deg, #f0464b, #ff7a6b); }
+.sd-bar span { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font: 700 14px var(--mono); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+.sd-step-r { display: grid; text-align: right; }
+.sd-step-r strong { font: 700 16px var(--mono); color: var(--text); }
+.sd-step.leak .sd-step-r strong { color: var(--danger); }
+.sd-legend { display: flex; gap: 16px; font-size: 13px; color: var(--muted); margin: 4px 0 6px; }
+.sd-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.sd-legend .b1, .sd-chart .b1 { background: #6f7480; fill: #6f7480; }
+.sd-legend .b2, .sd-chart .b2 { background: var(--accent); fill: var(--accent); }
+.sd-chart { width: 100%; height: auto; display: block; margin-bottom: 8px; }
+.sd-chart .ax { stroke: var(--line); }
+.sd-chart text { font: 600 11px var(--mono); fill: var(--muted); text-anchor: middle; }
+.sd-chart text.v { fill: #c9c9ce; } .sd-chart text.o { fill: var(--accent-2); }
+.sd-scroll { overflow-x: auto; }
+.sd-table td, .sd-table th { white-space: nowrap; }
+.sd-table td:not(:first-child) { font-family: var(--mono); }
+.sd-list { border: 1px solid var(--line); border-radius: 10px; padding: 0 14px; margin-top: 10px; background: var(--card-2); }
+.sd-list summary { cursor: pointer; padding: 12px 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--text); }
+.sd-list[open] { padding-bottom: 12px; }
+.sd-list textarea { width: 100%; }
+.sd-two { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+@media (max-width: 720px) {
+  .sd-step { grid-template-columns: 1fr 64px; gap: 6px 10px; }
+  .sd-step-h { grid-column: 1 / -1; }
+  .sd-two { grid-template-columns: 1fr; }
+}
 /* dropdown lists: the closed box is see-through, so Windows Chrome drew the open list white with light text.
    Give the list and its options a solid dark background and readable text on every page. */
 select { background-color: #141417; color: var(--text); color-scheme: dark; }

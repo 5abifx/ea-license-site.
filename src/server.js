@@ -8,9 +8,10 @@ const express = require('express');
 const cookieSession = require('cookie-session');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
-const { db, FILES_DIR } = require('./db');
+const { db, FILES_DIR, logSale } = require('./db');
+const sales = require('./sales');
 const { esc, fmtDate, layout, authShell, SITE_NAME, PRICE_TEXT, trialDays } = require('./views');
-const { PLANS, BILLING, getPlan, cleanBilling, maxSave } = require('./plans');
+const { PLANS, BILLING, getPlan, cleanBilling, maxSave, dueNow } = require('./plans');
 const { cinePage } = require('./cine');
 const { cardStepHtml } = require('./cardstep');
 const referrals = require('./referrals');
@@ -106,6 +107,9 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// first-party visitor counter for the Admin sales dashboard (src/sales.js)
+app.use(sales.trackVisits(db));
 
 function pwTag(u) { return crypto.createHash('sha256').update(String(u.password_hash || '')).digest('hex').slice(0, 12); }
 const flash = (req, type, msg) => { req.session.flash = { type, msg }; };
@@ -314,6 +318,7 @@ function createCustomer(req, { name, email, passwordHash, googleSub = null }) {
     if (status === 'active') grantAllActiveEas(info.lastInsertRowid);
   }
   refs.attach(req, Number(info.lastInsertRowid));
+  sales.attachSource(req, Number(info.lastInsertRowid));
   return Number(info.lastInsertRowid);
 }
 
@@ -604,7 +609,7 @@ app.get('/admin', requireAdmin, (req, res) => {
 
   page(req, res, 'Admin', `
   <h1>Admin</h1>
-  <div class="tabs"><a class="on" href="/admin">Users</a><a href="/admin/eas">EAs (${eas.length})</a><a href="/admin/mentorship">Mentorship</a></div>
+  <div class="tabs"><a href="/admin/sales">Dashboard</a><a class="on" href="/admin">Users</a><a href="/admin/eas">EAs (${eas.length})</a><a href="/admin/mentorship">Mentorship</a></div>
 
   <section class="card">
     <div class="row between">
@@ -674,7 +679,7 @@ app.post('/admin/users', requireAdmin, (req, res) => {
   const pw = String(req.body.password || '');
   if (!email || pw.length < 8) { flash(req, 'error', 'Email and a password of 8+ characters are required.'); return res.redirect('/admin'); }
   if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(email)) { flash(req, 'error', 'That email already exists.'); return res.redirect('/admin'); }
-  const info = db.prepare(`INSERT INTO users (email, name, password_hash, status, max_accounts, expires_at) VALUES (?, ?, ?, 'active', ?, ?)`)
+  const info = db.prepare(`INSERT INTO users (email, name, password_hash, status, max_accounts, expires_at, source) VALUES (?, ?, ?, 'active', ?, ?, 'admin')`)
     .run(email, String(req.body.name || '').trim(), bcrypt.hashSync(pw, 10),
       Math.max(0, Number(req.body.max_accounts) || 0), parseExpiry(req.body.expires_at));
   setUserEas(info.lastInsertRowid, req.body.ea);
@@ -685,10 +690,11 @@ app.post('/admin/users', requireAdmin, (req, res) => {
 // Put an existing user on a free trial: active, every active EA, expires in `days` days from now.
 // Clears any paid plan. Their MT5 accounts are recorded as trial accounts, like a new sign-up's.
 const cleanTrialDays = (v) => Math.min(365, Math.max(1, Math.round(Number(v)) || trialDays() || 15));
-function startTrial(userId, days) {
+function startTrial(userId, days, via = 'admin') {
   const r = db.prepare(`UPDATE users SET trial = 1, status = 'active', plan = '', billing = '', plan_request = '',
     expires_at = datetime('now', ?) WHERE id = ? AND is_admin = 0`).run(`+${days} days`, userId);
   if (!r.changes) return 0;
+  logSale(userId, 'trial', { via, plan: String(days) });
   grantAllActiveEas(userId);
   db.prepare('INSERT OR IGNORE INTO trial_accounts (account_number, user_id) SELECT account_number, user_id FROM accounts WHERE user_id = ?').run(userId);
   return 1;
@@ -827,7 +833,7 @@ app.post('/admin/users/:id/paid', requireAdmin, (req, res) => {
   if (!u) return res.redirect('/admin');
   const plan = getPlan(req.body && req.body.plan);
   const billing = cleanBilling(req.body && req.body.billing);
-  const refNote = applyPaid(u, plan, billing);
+  const refNote = applyPaid(u, plan, billing, null, { via: 'admin' });
   const after = db.prepare('SELECT expires_at FROM users WHERE id = ?').get(u.id).expires_at;
   flash(req, 'ok', `${u.email} marked as paid${plan ? ` on ${plan.name} (${billing})` : ''}. License now valid until ${after.slice(0, 16)} UTC.${refNote}`);
   res.redirect(`/admin/users/${u.id}`);
@@ -836,7 +842,9 @@ app.post('/admin/users/:id/paid', requireAdmin, (req, res) => {
 // A payment came in (admin "Mark as paid" or Stripe): end the trial, apply the plan, extend the licence
 // from today or from the current expiry, whichever is later. `until` (UTC 'YYYY-MM-DD HH:MM:SS', e.g. the
 // end of the Stripe billing period) is used instead when it is later. Returns the referral note ('' if none).
-function applyPaid(u, plan, billing, until = null) {
+// `paid`: { amount (US$ actually paid, if known), via: 'stripe' | 'admin' } for the sales track record
+function applyPaid(u, plan, billing, until = null, paid = {}) {
+  logSale(u.id, 'ea', { plan: plan ? plan.id : '', billing: plan ? billing : '', amount: paid.amount != null ? paid.amount : plan ? dueNow(plan, billing) : null, via: paid.via || 'admin' });
   const days = plan && billing === 'annual' ? BILLING.annual.days : PAID_DAYS;
   const from = u.expires_at && !isExpired(u) ? u.expires_at : new Date().toISOString().slice(0, 19).replace('T', ' ');
   let refNote = '';
@@ -922,7 +930,7 @@ app.get('/admin/eas', requireAdmin, (req, res) => {
 
   page(req, res, 'EAs', `
   <h1>Admin</h1>
-  <div class="tabs"><a href="/admin">Users</a><a class="on" href="/admin/eas">EAs (${eas.length})</a><a href="/admin/mentorship">Mentorship</a></div>
+  <div class="tabs"><a href="/admin/sales">Dashboard</a><a href="/admin">Users</a><a class="on" href="/admin/eas">EAs (${eas.length})</a><a href="/admin/mentorship">Mentorship</a></div>
   ${eas.map((e) => `<section class="card">
     <div class="row between"><h2>${esc(e.name)} <span class="tag">v${esc(e.version)}</span> ${e.active ? '' : '<span class="tag warn">inactive</span>'}</h2>
     <span class="muted">${e.n_users} users · code <code>${esc(e.code)}</code></span></div>
@@ -997,6 +1005,7 @@ app.post('/admin/eas/:id/delete', requireAdmin, (req, res) => {
 require('./help')(app, { db, page });
 const mentor = require('./mentorship')(app, { db, page, flash, requireUser, requireAdmin, grantAllActiveEas, PAYMENT_URL });
 const stripe = require('./stripe')(app, { db, flash, requireUser, applyPaid, startTrial, refs, mentor });
+sales.routes(app, { db, page, requireAdmin, stripe, mentorPlans: require('./mentorship').MENTOR_PLANS });
 require('./pricing')(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL: process.env.CONTACT_URL || '', refs, stripe });
 require('./pages')(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, TRIAL_ACCOUNTS, MAX_ACCOUNTS_DEFAULT });
 

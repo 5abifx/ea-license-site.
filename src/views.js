@@ -125,7 +125,7 @@ function appShell(req, u, flashHtml, body, title) {
       ${req.mentorEligible && (req.hasJournal || u.mentor_share) ? item('/journal/mentor', 'chat', `Mentor review${req.mentorNew ? `<em class="count">${req.mentorNew}</em>` : ''}`, on('/journal/mentor')) : ''}`)}
     ${group('Account', `${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}
       ${u.google_sub ? '' : item('/password', 'lock', 'Password')}`)}
-    ${u.is_admin ? group('Owner', `${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas'))}${item('/admin/eas', 'upload', 'EAs')}${item('/mentor', 'cap', `Mentor${req.mentorWaiting ? `<em class="count">${req.mentorWaiting}</em>` : ''}`)}`) : ''}
+    ${u.is_admin ? group('Owner', `${item('/admin/sales', 'insights', 'Sales')}${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas') && !on('/admin/sales'))}${item('/admin/eas', 'upload', 'EAs')}${item('/mentor', 'cap', `Mentor${req.mentorWaiting ? `<em class="count">${req.mentorWaiting}</em>` : ''}`)}`) : ''}
     <div class="side-group side-end">
       ${item('/faq', 'help', 'Help &amp; FAQ')}
       <form method="post" action="/logout"><button class="link">${icon('out')}<span>Sign out</span></button></form>
