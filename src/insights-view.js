@@ -170,11 +170,12 @@ function propHtml(P, acct, limits) {
 }
 
 // full page body (between the page head and the footer)
-function fullHtml(a, { money, cur, prop }) {
+function fullHtml(a, { money, cur, prop, whatif = '' }) {
   if (a.locked) return `<section class="card"><p class="muted">Insights unlock after ${a.need} closed trades. ${a.have} so far.</p></section>${prop || ''}`;
   const bad = a.items.filter((i) => i.tone !== 'good'), good = a.items.filter((i) => i.tone === 'good');
   return `<div class="ins-top">${scoreCard(a.score)}${focusCard(a, money)}</div>
     ${numsRow(a.numbers, money, cur)}
+    ${whatif}
     <section class="card"><div class="row between"><h2>Leaks to fix</h2><span class="muted small">Biggest cost first</span></div>
       ${bad.length ? `<div class="ins-grid">${bad.map(itemCard).join('')}</div>` : '<p class="muted">No leaks found in this period. Nice.</p>'}</section>
     ${good.length ? `<section class="card"><h2>What works</h2><div class="ins-grid">${good.map(itemCard).join('')}</div></section>` : ''}

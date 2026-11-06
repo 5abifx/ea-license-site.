@@ -145,7 +145,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   };
 
   // columns the insights read
-  const INS_COLS = `account_number, symbol, side, lots, entry, exit, sl, tp, open_time, close_time, net, r, risk_pct,
+  const INS_COLS = `id, account_number, symbol, side, lots, entry, exit, sl, tp, open_time, close_time, net, r, risk_pct,
     balance_after, mfe, mae, candles, setup, emotion, mistakes`;
   // lighter set for the recap, the desk and the Time / Habits tabs
   const DESK_COLS = 'id, account_number, symbol, side, lots, open_time, close_time, net, r, balance_after, setup';
@@ -338,9 +338,6 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     // per day: money, R and count (for the calendar card)
     const days = {};
     trades.forEach((t) => { const d = t.close_time.slice(0, 10); const x = (days[d] ||= { net: 0, r: 0, n: 0, rn: 0 }); x.net += t.net; x.n++; if (t.r !== null) { x.r += t.r; x.rn++; } });
-    // per hour of the open (MT5 server time), for the big report
-    const hours = Array.from({ length: 24 }, () => ({ net: 0, r: 0, n: 0 }));
-    trades.forEach((t) => { const h = Number(String(t.open_time || t.close_time).slice(11, 13)); if (h >= 0 && h < 24) { hours[h].net += t.net; hours[h].n++; if (t.r !== null) hours[h].r += t.r; } });
     const rT = trades.filter((t) => t.r !== null);
     let run = 0, bestRun = 0, lrun = 0, worstRun = 0;
     trades.forEach((t) => { if (t.net > 0) { run++; lrun = 0; } else if (t.net < 0) { lrun++; run = 0; } bestRun = Math.max(bestRun, run); worstRun = Math.max(worstRun, lrun); });
@@ -362,7 +359,13 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       bestTradeR: rT.length ? Math.max(...rT.map((t) => t.r)) : null, bestTrade: trades.length ? Math.max(...trades.map((t) => t.net)) : null,
       bestDay: dayNets.length ? Math.max(...dayNets) : null, worstDay: dayNets.length ? Math.min(...dayNets) : null,
       days: N.days, greenDays: N.greenDays, bestRun, worstRun, score: S ? S.total : null, scoreLabel: S ? S.label : '',
-      equity: eq, daily: days, hours,
+      equity: eq, daily: days,
+      // where the edge is: sessions in New York time + buys vs sells (big report)
+      sessions: desk.timeStats(trades, u.ny_offset ?? desk.NY_DEFAULT).ranked.slice(0, 4).map((x) => ({ k: x.name, n: x.n, net: x.net, win: x.win, avgR: x.avgR })),
+      sides: [['Buys', trades.filter((t) => t.side !== 'SELL')], ['Sells', trades.filter((t) => t.side === 'SELL')]].map(([k, l]) => {
+        const rl = l.filter((t) => t.r !== null);
+        return { k, n: l.length, net: l.reduce((a, t) => a + t.net, 0), win: l.length ? Math.round(l.filter((t) => t.net > 0).length / l.length * 100) : 0, avgR: rl.length ? rl.reduce((a, t) => a + t.r, 0) / rl.length : null };
+      }),
       parts: S ? S.parts.map((x) => ({ n: x.name, v: x.v })) : null, weakest: S ? S.weakest.name : '',
       symbols: Object.entries(symbols).sort((a, b) => b[1].n - a[1].n).slice(0, 3).map(([k, v]) => ({ s: k, n: v.n, net: v.net })),
     };
@@ -457,14 +460,22 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
     let body = '';
     if (!latest) body = `<section class="card"><p class="muted">No trades yet. Connect the Trade Journal EA on the <a href="/journal">Journal</a> page; insights start after ${MIN_TRADES} closed trades.</p></section>`;
-    else if (tab === 'overview') body = insightsView.fullHtml(analyze(rows, { money: m, esc }), { money: m, cur, prop: '' });
+    else if (tab === 'overview') {
+      const pr = desk.prepRows(rows);
+      const wiData = JSON.stringify({ cur, ...desk.tagTrades(pr, u.ny_offset ?? desk.NY_DEFAULT) }).replace(/</g, '\\u003c');
+      const whatif = `<section class="card wi" id="whatif"><div class="row between"><h2>What if…</h2><button type="button" class="small secondary" data-wi-reset hidden>Reset</button></div>
+        <p class="muted small">Switch off a session, a day, a symbol or a side, or cap your trades a day, and see what this period would have looked like. Your journal does not change.</p>
+        <div class="wi-body"><div class="wi-ctl"></div><div class="wi-res"></div></div></section>
+        <script id="wi-data" type="application/json">${wiData}</script><script src="/whatif.js"></script>`;
+      body = insightsView.fullHtml(analyze(rows, { money: m, esc }), { money: m, cur, prop: '', whatif });
+    }
     else if (tab === 'time' || tab === 'habits') {
       const dr = desk.prepRows(db.prepare(`SELECT ${DESK_COLS} FROM journal_trades WHERE ${where}${since ? ' AND close_time >= ?' : ''} ORDER BY close_time`).all(...args, ...(since ? [since] : [])));
       const off = tz === 'mt5' ? 0 : (u.ny_offset ?? desk.NY_DEFAULT);
       const offsetForm = `<div class="tz-pick"><a href="/journal/insights${qs({ tz: '' })}"${tz === 'ny' ? ' class="on"' : ''}>New York</a><a href="/journal/insights${qs({ tz: 'mt5' })}"${tz === 'mt5' ? ' class="on"' : ''}>MT5 time</a>
         <form method="post" action="/journal/settings/ny-offset" class="tz-off"><input type="hidden" name="back" value="/journal/insights${esc(qs({}))}"><label>MT5 = NY +<input name="offset" type="number" min="-12" max="14" value="${u.ny_offset ?? desk.NY_DEFAULT}"> h</label><button class="small secondary">Save</button></form></div>`;
       body = tab === 'time'
-        ? deskView.timeHtml(desk.timeStats(dr, off), { money: m, offsetForm, tzName: tz === 'mt5' ? 'MT5 server time' : 'New York time', shift: tz === 'mt5' ? (u.ny_offset ?? desk.NY_DEFAULT) : 0 })
+        ? deskView.timeHtml(desk.timeStats(dr, off), { data: JSON.stringify({ cur, ...desk.tagTrades(dr, off) }).replace(/</g, '\\u003c'), money: m, offsetForm, tzName: tz === 'mt5' ? 'MT5 server time' : 'New York time', shift: tz === 'mt5' ? (u.ny_offset ?? desk.NY_DEFAULT) : 0 })
         : dr.length ? deskView.habitsHtml(desk.habits(dr), { money: (v) => money(v, cur === 'USD' ? 'USD' : '') }) : '<section class="card"><p class="muted">No trades in this period.</p></section>';
     } else {
       // prop firm: one account in full (desk + history + rules form), or a card per account

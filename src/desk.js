@@ -176,5 +176,14 @@ function serverToday(offset = NY_DEFAULT, now = new Date()) {
   return new Date(Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour) + offset * 3600e3).toISOString().slice(0, 10);
 }
 
-module.exports = { timeStats, habits, recap, desk, FIRMS, NY_DEFAULT, serverToday, hhmm };
+// compact rows for the browser (What if simulator, tap-to-see-trades): one array per trade
+function tagTrades(trades, offset) {
+  const syms = [...new Set(trades.map((t) => t.symbol))];
+  return { offset, syms, sess: SESS.map((s) => [s.key, s.name]),
+    t: trades.map((t) => { const k = clock(t, offset), day = Math.floor(((Number.isFinite(t.o) ? t.o : t.c) - offset * 3600e3) / 864e5);
+      return [t.id || 0, t.c, Math.round(t.net * 100) / 100, t.r === null ? null : Math.round(t.r * 100) / 100, syms.indexOf(t.symbol), t.side === 'SELL' ? 1 : 0,
+        SESS.findIndex((s) => inSess(s, k.min)), k.dow, day, k.min]; }) };
+}
+
+module.exports = { tagTrades, timeStats, habits, recap, desk, FIRMS, NY_DEFAULT, serverToday, hhmm };
 module.exports.prepRows = (rows) => require('./insights').prep(rows);

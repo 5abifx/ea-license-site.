@@ -334,24 +334,6 @@
       T(c, tv, mx0 + mw, yy + 36, { fam: M, size: 26, color: v >= 0 ? WIN : LOSS, align: 'right' });
     });
   }
-  function weekdays(c, x, y, w, h) {
-    const by = [0, 0, 0, 0, 0, 0, 0], rb = [0, 0, 0, 0, 0, 0, 0], nb = [0, 0, 0, 0, 0, 0, 0];
-    Object.entries(d.daily).forEach(([k, v]) => { const i = (new Date(k + 'T00:00:00Z').getUTCDay() + 6) % 7; by[i] += v.net; rb[i] += v.r; nb[i] += v.n; });
-    const idx = [0, 1, 2, 3, 4].concat(nb[5] ? [5] : [], nb[6] ? [6] : []);
-    const vals = idx.map((i) => (st.mode === 'r' ? rb[i] : by[i])), mx = Math.max(...vals.map(Math.abs), 1e-9);
-    const P = Math.max(0, ...vals), N = Math.max(0, ...vals.map((v) => -v)), span = h - 36;
-    const unit = span / (P + N || 1), mid = y + 6 + P * unit;
-    const bw = w / idx.length;
-    c.fillStyle = 'rgba(255,255,255,.14)'; c.fillRect(x, mid, w, 2);
-    idx.forEach((i, j) => {
-      const v = vals[j], bh = Math.max(nb[i] ? 4 : 0, Math.abs(v) * unit), cx = x + j * bw + bw * 0.22, ww = bw * 0.56;
-      rrect(c, cx, v >= 0 ? mid - bh : mid + 2, ww, bh, 8); c.fillStyle = v >= 0 ? WIN : LOSS; c.fill();
-      T(c, DOW[i], cx + ww / 2, y + h + 4, { fam: M, size: 16, color: FAINT, align: 'center', ls: 3 });
-    });
-    // name the best weekday
-    let bi = 0; vals.forEach((v, j) => { if (v > vals[bi]) bi = j; });
-    return vals[bi] > 0 ? DOW[idx[bi]] : '';
-  }
   function radar(c, cx, cy, r, parts) {
     const n = parts.length, ang = (i) => -Math.PI / 2 + (i / n) * Math.PI * 2;
     const P = (i, v) => [cx + Math.cos(ang(i)) * r * v, cy + Math.sin(ang(i)) * r * v];
@@ -372,19 +354,38 @@
       T(c, String(p.v), x, y + 28, { fam: M, size: 19, color: FAINT, align: al });
     });
   }
-  function hoursChart(c, x, y, w, h) {
-    const hs = d.hours || [], vals = hs.map((v) => (st.mode === 'r' ? v.r : v.net));
-    const P = Math.max(0, ...vals), N = Math.max(0, ...vals.map((v) => -v)), span = h - 40, unit = span / (P + N || 1), mid = y + P * unit;
-    const bw = w / 24;
-    c.fillStyle = 'rgba(255,255,255,.14)'; c.fillRect(x, mid, w, 2);
-    vals.forEach((v, i) => {
-      if (!hs[i].n) return;
-      const bh = Math.max(4, Math.abs(v) * unit);
-      rrect(c, x + i * bw + bw * 0.18, v >= 0 ? mid - bh : mid + 2, bw * 0.64, bh, 5); c.fillStyle = v >= 0 ? WIN : LOSS; c.fill();
+  // sessions ranked by result (bars), then buys vs sells: the share-worthy "where my edge is" panel
+  function edgeMap(c, x, y, w, h) {
+    const ss = d.sessions || [], r = st.mode === 'r';
+    const valOf = (q) => (r ? q.avgR : q.net);
+    const txt = (q) => (r ? (fin(q.avgR) ? rTxt(q.avgR) + ' avg' : '—') : st.mode === 'pct' ? pct(pctOf(q.net)) : moneyShort(q.net));
+    if (!ss.length) { T(c, 'Needs more trades', x + w / 2, y + h / 2, { fam: M, size: 26, color: FAINT, align: 'center' }); return; }
+    const mx = Math.max(1e-9, ...ss.map((q) => Math.abs(valOf(q) || 0)));
+    const nameW = 150, valW = 190, bx = x + nameW, bw = w - nameW - valW, rh = 46;
+    ss.forEach((q, i) => {
+      const yy = y + i * rh, v = valOf(q) || 0, top = i === 0 && v > 0;
+      T(c, q.k, x, yy + 27, { fam: M, size: 22, color: top ? INK : SOFT, w: top ? 600 : 400 });
+      rrect(c, bx, yy + 8, bw, 22, 11); c.fillStyle = 'rgba(255,255,255,.05)'; c.fill();
+      const L = Math.max(14, (Math.abs(v) / mx) * bw);
+      rrect(c, bx, yy + 8, L, 22, 11); c.fillStyle = v < 0 ? LOSS : top ? ORANGE : 'rgba(255,255,255,.82)'; c.fill();
+      T(c, txt(q), x + w, yy + 25, { fam: M, size: 22, color: v < 0 ? LOSS : INK, align: 'right', w: 600 });
+      T(c, `${q.win}% WIN · ${q.n} TRADES`, x + w, yy + 45, { fam: M, size: 15, color: FAINT, align: 'right', ls: 2 });
     });
-    [0, 6, 12, 18, 23].forEach((i) => T(c, String(i).padStart(2, '0'), x + i * bw + bw / 2, y + h + 4, { fam: M, size: 17, color: FAINT, align: 'center' }));
-    let bi = -1; vals.forEach((v, i) => { if (hs[i].n && (bi < 0 || v > vals[bi])) bi = i; });
-    return bi >= 0 && vals[bi] > 0 ? `${String(bi).padStart(2, '0')}:00–${String((bi + 1) % 24).padStart(2, '0')}:00` : '';
+    // buys vs sells
+    const sd = (d.sides || []).filter((q) => q.n), ty = y + Math.max(3, ss.length) * rh + 26;
+    if (!sd.length) return;
+    c.fillStyle = LINE; c.fillRect(x, ty - 14, w, 2);
+    const tot = sd.reduce((a, q) => a + q.n, 0);
+    let cx = x;
+    sd.forEach((q, i) => {
+      const sw = (q.n / tot) * w, v = valOf(q) || 0;
+      rrect(c, cx + (i ? 4 : 0), ty + 10, sw - 4, 10, 5); c.fillStyle = v < 0 ? LOSS : i ? 'rgba(255,255,255,.45)' : 'rgba(255,255,255,.82)'; c.fill();
+      cx += sw;
+    });
+    sd.forEach((q, i) => {
+      const v = valOf(q) || 0, label = `${q.k.toUpperCase()}  ${txt(q)}  ·  ${q.win}%`;
+      T(c, label, i ? x + w : x, ty + 56, { fam: M, size: fitSize(c, label, w / 2 - 10, 20, M, 400), color: v < 0 ? LOSS : SOFT, align: i ? 'right' : 'left', ls: 1 });
+    });
   }
   function tile(c, x, y, w, h, label, value, sub, color) {
     rrect(c, x, y, w, h, 26); c.fillStyle = 'rgba(255,255,255,.035)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.08)'; c.lineWidth = 2; c.stroke();
@@ -441,13 +442,8 @@
     const cy = 1315, ch = 400;
     panel(c, BP, cy, LW, ch, d.isMonth ? 'CALENDAR' : 'DAILY HEATMAP', `${d.greenDays} OF ${d.days} DAYS GREEN`);
     if (d.isMonth) bigMonth(c, BP + 40, cy + 90, LW - 80, ch - 110); else bigHeat(c, BP + 40, cy + 90, LW - 80, ch - 110);
-    panel(c, RX, cy, RW, ch, 'WHEN YOU WIN');
-    T(c, 'BY HOUR · MT5 TIME', RX + 40, cy + 112, { fam: M, size: 17, color: DIM, ls: 3 });
-    const bh = hoursChart(c, RX + 40, cy + 130, RW - 80, 90);
-    if (bh) T(c, 'BEST ' + bh, RX + RW - 40, cy + 112, { fam: M, size: 17, color: WIN, align: 'right', ls: 2 });
-    T(c, 'BY WEEKDAY', RX + 40, cy + 272, { fam: M, size: 17, color: DIM, ls: 3 });
-    const bw = weekdays(c, RX + 40, cy + 284, RW - 80, 104);
-    if (bw) T(c, 'BEST ' + bw, RX + RW - 40, cy + 272, { fam: M, size: 17, color: WIN, align: 'right', ls: 2 });
+    panel(c, RX, cy, RW, ch, 'WHERE THE EDGE IS', 'NEW YORK TIME');
+    edgeMap(c, RX + 40, cy + 100, RW - 80, ch - 120);
 
     // footer
     const fy = BH - 40;
