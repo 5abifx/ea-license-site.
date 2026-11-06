@@ -94,45 +94,48 @@ function deskForm(acct, L) {
 
 // ---------- time ----------
 function sessionClock(T, shift) {
-  const C = 200, R0 = 104, MAXL = 46, mx = Math.max(1, ...T.halves.map((h) => Math.abs(h.net)));
+  // "heat ring": 48 half-hour tiles round the day, brighter teal = more profit, red = loss; sessions on the rim;
+  // the centre shows the session you are in now and how it usually goes (filled by public/clock.js)
+  const C = 200, RR = 124, RW = 40, mx = Math.max(1, ...T.halves.map((h) => Math.abs(h.net)));
   const ang = (min) => (min / 1440) * Math.PI * 2 - Math.PI / 2;
   const P = (min, r) => [+(C + Math.cos(ang(min)) * r).toFixed(1), +(C + Math.sin(ang(min)) * r).toFixed(1)];
+  const arc = (a, b, r) => { const [x1, y1] = P(a, r), [x2, y2] = P(b, r); return `M${x1} ${y1} A${r} ${r} 0 ${b - a > 720 ? 1 : 0} 1 ${x2} ${y2}`; };
   const sessOf = (min) => (T.sessions.find((x) => (x.from < x.to ? min >= x.from && min < x.to : min >= x.from || min < x.to)) || {}).key;
-  const RIM = R0 + MAXL + 18, best = T.ranked[0] ? T.ranked[0].key : '';
+  const RIM = RR + RW / 2 + 14, best = T.ranked[0] ? T.ranked[0].key : '';
   let s = `<defs>
-    <radialGradient id="ckbg"><stop offset="0" stop-color="#fff" stop-opacity=".055"/><stop offset=".7" stop-color="#fff" stop-opacity=".015"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="ckbg"><stop offset="0" stop-color="#fff" stop-opacity=".05"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
     <linearGradient id="ckhot" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb35c"/><stop offset="1" stop-color="#ff5a1f"/></linearGradient>
-    <filter id="ckglow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-    <circle cx="${C}" cy="${C}" r="${R0 - 2}" fill="url(#ckbg)"/>
-    <circle cx="${C}" cy="${C}" r="${R0}" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="1"/>
-    <circle cx="${C}" cy="${C}" r="${R0 - 34}" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="1" stroke-dasharray="2 5"/>`;
-  // fine ticks: every half hour, hours longer, 6-hour marks longest
-  for (let i = 0; i < 48; i++) { const big = i % 12 === 0, hr = i % 2 === 0, [x1, y1] = P(i * 30, RIM + 10), [x2, y2] = P(i * 30, RIM + (big ? 20 : hr ? 15 : 12));
-    s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(255,255,255,${big ? 0.5 : hr ? 0.22 : 0.1})" stroke-width="${big ? 1.6 : 1}"/>`; }
-  [0, 6, 12, 18].forEach((h) => { const [x, y] = P(h * 60, R0 - 20); s += `<text x="${x}" y="${y + 4}" text-anchor="middle" class="ck-h">${String(h).padStart(2, '0')}</text>`; });
-  // the half hours: a bar out made money, a bar in lost it
+    <filter id="ckglow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="ckglow2" filterUnits="userSpaceOnUse" x="-20" y="-20" width="440" height="440"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <circle cx="${C}" cy="${C}" r="${RR - RW / 2 - 4}" fill="url(#ckbg)"/>`;
+  // the 48 tiles
   T.halves.forEach((h) => {
-    if (!h.n) return;
-    const k = Math.abs(h.net) / mx, len = Math.max(5, k * MAXL), m = h.from + 15;
-    const [x1, y1] = P(m, h.net >= 0 ? R0 + 5 : R0 - 5), [x2, y2] = P(m, h.net >= 0 ? R0 + 5 + len : R0 - 5 - Math.min(26, len * 0.6));
-    s += `<line data-s="${sessOf(h.from)}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${h.net >= 0 ? 'var(--ok)' : 'var(--danger)'}" stroke-opacity="${(0.55 + 0.45 * k).toFixed(2)}" stroke-width="4.5" stroke-linecap="round" filter="url(#ckglow)"><title>${hhmm(h.from)}–${hhmm(h.from + 30)} · ${h.n} trades</title></line>`;
+    const k = Math.abs(h.net) / mx, col = !h.n ? 'rgba(255,255,255,.045)'
+      : h.net >= 0 ? `rgba(38,198,160,${(0.2 + 0.8 * k).toFixed(2)})` : `rgba(240,70,75,${(0.28 + 0.72 * k).toFixed(2)})`;
+    s += `<path data-s="${sessOf(h.from)}" class="ck-t" d="${arc(h.from + 1.6, h.from + 28.4, RR)}" stroke="${col}" stroke-width="${RW}" fill="none"${h.n && k > 0.6 && h.net > 0 ? ' filter="url(#ckglow2)"' : ''}><title>${hhmm(h.from)}–${hhmm(h.from + 30)} · ${h.n} trades</title></path>`;
   });
+  // fine ticks just outside the ring, hour labels inside
+  for (let i = 0; i < 24; i++) { const big = i % 6 === 0, [x1, y1] = P(i * 60, RR + RW / 2 + 3), [x2, y2] = P(i * 60, RR + RW / 2 + (big ? 9 : 6));
+    s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(255,255,255,${big ? 0.45 : 0.16})" stroke-width="1"/>`; }
+  [0, 6, 12, 18].forEach((h) => { const [x, y] = P(h * 60, RR - RW / 2 - 13); s += `<text x="${x}" y="${y + 4}" text-anchor="middle" class="ck-h">${String(h).padStart(2, '0')}</text>`; });
   // the sessions on the rim, names written along the arc
   T.sessions.filter((x) => x.key !== 'off').forEach((x) => {
-    const a = x.from, b = x.to < x.from ? x.to + 1440 : x.to, [x1, y1] = P(a + 6, RIM), [x2, y2] = P(b - 6, RIM), large = b - a > 720 ? 1 : 0, on = x.key === best;
-    const [t1x, t1y] = P(a, RIM + 30), [t2x, t2y] = P(b, RIM + 30), bottom = ((a + b) / 2) % 1440 > 360 && ((a + b) / 2) % 1440 < 1080;
-    s += `<path data-s="${x.key}" d="M${x1} ${y1} A${RIM} ${RIM} 0 ${large} 1 ${x2} ${y2}" fill="none" stroke="${on ? 'url(#ckhot)' : 'rgba(255,255,255,.32)'}" stroke-width="${on ? 6 : 3}" stroke-linecap="round"${on ? ' filter="url(#ckglow)"' : ''}/>`;
-    s += `<path id="ckt-${x.key}" d="${bottom ? `M${t2x} ${t2y} A${RIM + 30} ${RIM + 30} 0 ${large} 0 ${t1x} ${t1y}` : `M${t1x} ${t1y} A${RIM + 30} ${RIM + 30} 0 ${large} 1 ${t2x} ${t2y}`}" fill="none"/>
-      <text data-s="${x.key}" class="ck-s${on ? ' on' : ''}" dy="${bottom ? 10 : 0}"><textPath href="#ckt-${x.key}" startOffset="50%" text-anchor="middle">${esc(x.name.toUpperCase())}</textPath></text>`;
+    const a = x.from, b = x.to < x.from ? x.to + 1440 : x.to, large = b - a > 720 ? 1 : 0, on = x.key === best;
+    const [t1x, t1y] = P(a, RIM + 16), [t2x, t2y] = P(b, RIM + 16), bottom = ((a + b) / 2) % 1440 > 360 && ((a + b) / 2) % 1440 < 1080;
+    s += `<path data-s="${x.key}" d="${arc(a + 8, b - 8, RIM)}" fill="none" stroke="${on ? 'url(#ckhot)' : 'rgba(255,255,255,.28)'}" stroke-width="${on ? 4 : 2}" stroke-linecap="round"${on ? ' filter="url(#ckglow)"' : ''}/>`;
+    s += `<path id="ckt-${x.key}" d="${bottom ? `M${t2x} ${t2y} A${RIM + 16} ${RIM + 16} 0 ${large} 0 ${t1x} ${t1y}` : `M${t1x} ${t1y} A${RIM + 16} ${RIM + 16} 0 ${large} 1 ${t2x} ${t2y}`}" fill="none"/>
+      <text data-s="${x.key}" class="ck-s${on ? ' on' : ''}" dy="${bottom ? 9 : 0}"><textPath href="#ckt-${x.key}" startOffset="50%" text-anchor="middle">${esc(x.name.toUpperCase())}</textPath></text>`;
   });
-  // live "now" hand + centre read-out (public/clock.js)
-  s += `<g class="ck-hand" data-shift="${shift}"><line x1="${C}" y1="${C}" x2="${C}" y2="${C - RIM + 4}" stroke="url(#ckhot)" stroke-width="2" stroke-linecap="round"/>
-      <circle cx="${C}" cy="${C - RIM + 4}" r="5" fill="#ff7a3d" filter="url(#ckglow)"/></g>
-    <circle cx="${C}" cy="${C}" r="44" fill="#0b0b0d" stroke="rgba(255,255,255,.08)"/>
-    <text x="${C}" y="${C - 12}" text-anchor="middle" class="ck-c1">NOW</text>
-    <text x="${C}" y="${C + 10}" text-anchor="middle" class="ck-c2" id="ck-time">--:--</text>
-    <text x="${C}" y="${C + 27}" text-anchor="middle" class="ck-c3" id="ck-sess"></text>`;
-  return `<svg class="ck" viewBox="-10 -10 ${C * 2 + 20} ${C * 2 + 20}" role="img" aria-label="Profit by half hour of the day" data-sessions='${JSON.stringify(T.sessions.map((x) => ({ k: x.key, n: x.name, f: x.from, t: x.to })))}'>${s}</svg>`;
+  // live "now" tick across the ring + centre read-out
+  s += `<g class="ck-hand" data-shift="${shift}"><line x1="${C}" y1="${C - RR + RW / 2 + 4}" x2="${C}" y2="${C - RIM - 4}" stroke="#fff" stroke-width="2.5" stroke-linecap="round" filter="url(#ckglow2)"/>
+      <circle cx="${C}" cy="${C - RIM - 4}" r="3.5" fill="#fff"/></g>
+    <text x="${C}" y="${C - 30}" text-anchor="middle" class="ck-c3" id="ck-sess"></text>
+    <text x="${C}" y="${C + 8}" text-anchor="middle" class="ck-c2" id="ck-net"></text>
+    <text x="${C}" y="${C + 28}" text-anchor="middle" class="ck-c1" id="ck-sub"></text>
+    <text x="${C}" y="${C + 48}" text-anchor="middle" class="ck-c1 ck-now" id="ck-time">--:--</text>`;
+  const stats = T.sessions.map((x) => { const r = T.ranked.find((y) => y.key === x.key);
+    return { k: x.key, n: x.name, f: x.from, t: x.to, net: r ? short(r.net) : '', pos: r ? r.net >= 0 : true, sub: r ? `${r.win}% win · ${r.n} trades` : 'No trades yet' }; });
+  return `<svg class="ck" viewBox="-14 -14 ${C * 2 + 28} ${C * 2 + 28}" role="img" aria-label="Profit by half hour of the day" data-sessions='${esc(JSON.stringify(stats))}'>${s}</svg>`;
 }
 function spark(pts) {
   if (pts.length < 2) return '';
@@ -151,7 +154,7 @@ function timeHtml(T, { money, offsetForm, tzName, shift = 0 }) {
   </div>`;
   const top = T.ranked[0];
   return `<div class="tm-top">
-    <section class="card tm-clock"><h2>Session clock</h2><p class="muted small">Every half hour of the day, ${esc(tzName)}. A bar out made money, a bar in lost it. The sessions sit on the rim. Hover one to light it up.</p>
+    <section class="card tm-clock"><h2>Session clock</h2><p class="muted small">Every half hour of the day, ${esc(tzName)}. Brighter teal made more money, red lost it. The sessions sit on the rim, and the white tick is now. Hover a session to light it up.</p>
       <div class="ck-wrap">${sessionClock(T, shift)}
         <div class="ck-side">${T.sessions.filter((x) => x.key !== 'off').map((x) => { const r = T.ranked.find((y) => y.key === x.key);
           return `<div class="ck-l${top.key === x.key ? ' on' : ''}" data-s="${x.key}" tabindex="0"><i></i><span>${esc(x.name)}<small class="muted">${hhmm(x.from)}–${hhmm(x.to)}</small></span><b class="${r ? cls(r.net) : ''}">${r ? short(r.net) : '-'}</b></div>`; }).join('')}

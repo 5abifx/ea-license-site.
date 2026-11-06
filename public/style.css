@@ -1269,3 +1269,8 @@ select option:disabled { color: #6b6b73; }
 .dial.live li:not(.cur) .rk-more { display: none; }
 .dial.live li:not(.cur) .rk-spark { visibility: hidden; }
 .dial.live li.cur .rk-more { white-space: nowrap; }
+/* heat ring clock */
+.ck .ck-t { transition: opacity .25s; }
+.ck .ck-c2 { font-size: 34px; font-weight: 300; letter-spacing: -.02em; fill: #fff; } .ck .ck-c2.neg { fill: var(--danger); }
+.ck .ck-c3 { font-size: 10px; letter-spacing: .22em; font-weight: 600; fill: #ff9a5c; }
+.ck .ck-c1 { font-size: 10px; letter-spacing: .06em; fill: rgba(255,255,255,.5); } .ck .ck-now { fill: rgba(255,255,255,.32); letter-spacing: .18em; font-size: 8.5px; }

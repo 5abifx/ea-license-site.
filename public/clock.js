@@ -13,7 +13,11 @@
       if (hand) hand.setAttribute('transform', `rotate(${(min / 1440) * 360} 200 200)`);
       if (tEl) tEl.textContent = `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
       const s = sess.find((x) => (x.f < x.t ? min >= x.f && min < x.t : min >= x.f || min < x.t));
-      if (sEl) sEl.textContent = s ? s.n : '';
+      if (sEl) sEl.textContent = (s ? s.n : 'Market quiet').toUpperCase();
+      const nEl = svg.querySelector('#ck-net'), uEl = svg.querySelector('#ck-sub');
+      if (nEl) { nEl.textContent = s && s.net ? s.net : '-'; nEl.classList.toggle('neg', !!(s && !s.pos)); }
+      if (uEl) uEl.textContent = s ? s.sub : '';
+      if (tEl) tEl.textContent = 'NOW ' + tEl.textContent;
     };
     tick(); setInterval(tick, 30000);
     const light = (k) => { if (k) svg.dataset.hl = k; else delete svg.dataset.hl;
