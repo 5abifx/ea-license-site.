@@ -309,6 +309,9 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     // per day: money, R and count (for the calendar card)
     const days = {};
     trades.forEach((t) => { const d = t.close_time.slice(0, 10); const x = (days[d] ||= { net: 0, r: 0, n: 0, rn: 0 }); x.net += t.net; x.n++; if (t.r !== null) { x.r += t.r; x.rn++; } });
+    // per hour of the open (MT5 server time), for the big report
+    const hours = Array.from({ length: 24 }, () => ({ net: 0, r: 0, n: 0 }));
+    trades.forEach((t) => { const h = Number(String(t.open_time || t.close_time).slice(11, 13)); if (h >= 0 && h < 24) { hours[h].net += t.net; hours[h].n++; if (t.r !== null) hours[h].r += t.r; } });
     const rT = trades.filter((t) => t.r !== null);
     let run = 0, bestRun = 0, lrun = 0, worstRun = 0;
     trades.forEach((t) => { if (t.net > 0) { run++; lrun = 0; } else if (t.net < 0) { lrun++; run = 0; } bestRun = Math.max(bestRun, run); worstRun = Math.max(worstRun, lrun); });
@@ -330,7 +333,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       bestTradeR: rT.length ? Math.max(...rT.map((t) => t.r)) : null, bestTrade: trades.length ? Math.max(...trades.map((t) => t.net)) : null,
       bestDay: dayNets.length ? Math.max(...dayNets) : null, worstDay: dayNets.length ? Math.min(...dayNets) : null,
       days: N.days, greenDays: N.greenDays, bestRun, worstRun, score: S ? S.total : null, scoreLabel: S ? S.label : '',
-      equity: eq, daily: days,
+      equity: eq, daily: days, hours,
+      parts: S ? S.parts.map((x) => ({ n: x.name, v: x.v })) : null, weakest: S ? S.weakest.name : '',
       symbols: Object.entries(symbols).sort((a, b) => b[1].n - a[1].n).slice(0, 3).map(([k, v]) => ({ s: k, n: v.n, net: v.net })),
     };
     const json = JSON.stringify(data).replace(/</g, '\\u003c');

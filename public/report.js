@@ -298,8 +298,9 @@
       if (x2) { c.fillStyle = shade(x2.net, max, 0.18, 0.62); c.fill(); c.strokeStyle = x2.net >= 0 ? 'rgba(47,211,166,.75)' : 'rgba(255,90,100,.75)'; }
       else { c.fillStyle = 'rgba(255,255,255,.025)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.07)'; }
       c.lineWidth = 2; c.stroke();
-      T(c, String(day), cx + 14, cy + 28, { fam: M, size: 18, color: x2 ? 'rgba(255,255,255,.8)' : FAINT });
-      if (x2) { const v = dayVal(x2); T(c, v, cx + cw - 14, cy + ch - 16, { fam: D, w: 400, size: fitSize(c, v, cw - 50, 30, D, 400), align: 'right' }); }
+      const ty2 = ch < 70 ? cy + ch / 2 + 7 : cy + 28, vy = ch < 70 ? cy + ch / 2 + 10 : cy + ch - 16;
+      T(c, String(day), cx + 14, ty2, { fam: M, size: 18, color: x2 ? 'rgba(255,255,255,.8)' : FAINT });
+      if (x2) { const v = dayVal(x2); T(c, v, cx + cw - 14, vy, { fam: D, w: 400, size: fitSize(c, v, cw - 60, Math.min(30, ch * 0.62), D, 400), align: 'right' }); }
     }
   }
   function bigHeat(c, x, y, w, h) {
@@ -338,106 +339,122 @@
     Object.entries(d.daily).forEach(([k, v]) => { const i = (new Date(k + 'T00:00:00Z').getUTCDay() + 6) % 7; by[i] += v.net; rb[i] += v.r; nb[i] += v.n; });
     const idx = [0, 1, 2, 3, 4].concat(nb[5] ? [5] : [], nb[6] ? [6] : []);
     const vals = idx.map((i) => (st.mode === 'r' ? rb[i] : by[i])), mx = Math.max(...vals.map(Math.abs), 1e-9);
-    const P = Math.max(0, ...vals), N = Math.max(0, ...vals.map((v) => -v)), span = h - 60;
+    const P = Math.max(0, ...vals), N = Math.max(0, ...vals.map((v) => -v)), span = h - 36;
     const unit = span / (P + N || 1), mid = y + 6 + P * unit;
     const bw = w / idx.length;
     c.fillStyle = 'rgba(255,255,255,.14)'; c.fillRect(x, mid, w, 2);
     idx.forEach((i, j) => {
       const v = vals[j], bh = Math.max(nb[i] ? 4 : 0, Math.abs(v) * unit), cx = x + j * bw + bw * 0.22, ww = bw * 0.56;
       rrect(c, cx, v >= 0 ? mid - bh : mid + 2, ww, bh, 8); c.fillStyle = v >= 0 ? WIN : LOSS; c.fill();
-      T(c, DOW[i], cx + ww / 2, y + h - 4, { fam: M, size: 18, color: FAINT, align: 'center', ls: 3 });
+      T(c, DOW[i], cx + ww / 2, y + h + 4, { fam: M, size: 16, color: FAINT, align: 'center', ls: 3 });
     });
     // name the best weekday
     let bi = 0; vals.forEach((v, j) => { if (v > vals[bi]) bi = j; });
     return vals[bi] > 0 ? DOW[idx[bi]] : '';
   }
-  function topSymbols(c, x, y, w) {
-    const list = d.symbols.slice(0, 3), mx = Math.max(...list.map((s) => Math.abs(s.net)), 1e-9);
-    list.forEach((s, j) => {
-      const yy = y + j * 64;
-      T(c, s.s, x, yy + 34, { fam: M, size: 28, color: INK });
-      T(c, `${s.n} trade${s.n === 1 ? '' : 's'}`, x, yy + 62, { fam: M, size: 18, color: FAINT, ls: 2 });
-      const bx = x + 250, bwMax = w - 250 - 190;
-      rrect(c, bx, yy + 18, Math.max(8, bwMax * Math.abs(s.net) / mx), 22, 8); c.fillStyle = s.net >= 0 ? WIN : LOSS; c.fill();
-      const v = st.mode === 'r' ? '' : st.mode === 'pct' && d.start ? pct(pctOf(s.net)) : moneyShort(s.net);
-      if (v) T(c, v, x + w, yy + 40, { fam: M, size: 28, color: s.net >= 0 ? WIN : LOSS, align: 'right' });
+  function radar(c, cx, cy, r, parts) {
+    const n = parts.length, ang = (i) => -Math.PI / 2 + (i / n) * Math.PI * 2;
+    const P = (i, v) => [cx + Math.cos(ang(i)) * r * v, cy + Math.sin(ang(i)) * r * v];
+    c.strokeStyle = 'rgba(255,255,255,.1)'; c.lineWidth = 2;
+    [0.33, 0.66, 1].forEach((k) => { c.beginPath(); parts.forEach((_, i) => { const [x, y] = P(i, k); i ? c.lineTo(x, y) : c.moveTo(x, y); }); c.closePath(); c.stroke(); });
+    parts.forEach((_, i) => { const [x, y] = P(i, 1); c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke(); });
+    c.beginPath(); parts.forEach((p, i) => { const [x, y] = P(i, Math.max(0.04, p.v / 100)); i ? c.lineTo(x, y) : c.moveTo(x, y); }); c.closePath();
+    c.fillStyle = 'rgba(255,90,31,.22)'; c.fill(); c.strokeStyle = ORANGE; c.lineWidth = 4; c.lineJoin = 'round'; c.stroke();
+    parts.forEach((p, i) => { const [x, y] = P(i, Math.max(0.04, p.v / 100)); c.fillStyle = INK; c.beginPath(); c.arc(x, y, 6, 0, 7); c.fill(); });
+    parts.forEach((p, i) => {
+      const cosv = Math.cos(ang(i)), sinv = Math.sin(ang(i)), [x, y] = P(i, 1.16);
+      if (Math.abs(cosv) < 0.2) {   // top / bottom spoke: one line
+        T(c, `${p.n}  ${p.v}`, x, sinv < 0 ? y - 4 : y + 22, { fam: M, size: 19, color: SOFT, align: 'center' });
+        return;
+      }
+      const al = cosv > 0 ? 'left' : 'right';
+      T(c, p.n, x, y + 2, { fam: M, size: 19, color: SOFT, align: al });
+      T(c, String(p.v), x, y + 28, { fam: M, size: 19, color: FAINT, align: al });
     });
   }
-  function ring(c, cx, cy, r, score) {
-    c.lineCap = 'round';
-    c.strokeStyle = 'rgba(255,255,255,.09)'; c.lineWidth = 22; c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke();
-    if (fin(score)) {
-      const g = c.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
-      g.addColorStop(0, '#ffb35c'); g.addColorStop(1, ORANGE);
-      c.strokeStyle = g; c.beginPath(); c.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + (Math.max(2, score) / 100) * Math.PI * 2); c.stroke();
-    }
-    c.lineCap = 'butt';
-    T(c, fin(score) ? String(score) : '—', cx, cy + 26, { fam: D, w: 300, size: 76, align: 'center', ls: -2 });
+  function hoursChart(c, x, y, w, h) {
+    const hs = d.hours || [], vals = hs.map((v) => (st.mode === 'r' ? v.r : v.net));
+    const P = Math.max(0, ...vals), N = Math.max(0, ...vals.map((v) => -v)), span = h - 40, unit = span / (P + N || 1), mid = y + P * unit;
+    const bw = w / 24;
+    c.fillStyle = 'rgba(255,255,255,.14)'; c.fillRect(x, mid, w, 2);
+    vals.forEach((v, i) => {
+      if (!hs[i].n) return;
+      const bh = Math.max(4, Math.abs(v) * unit);
+      rrect(c, x + i * bw + bw * 0.18, v >= 0 ? mid - bh : mid + 2, bw * 0.64, bh, 5); c.fillStyle = v >= 0 ? WIN : LOSS; c.fill();
+    });
+    [0, 6, 12, 18, 23].forEach((i) => T(c, String(i).padStart(2, '0'), x + i * bw + bw / 2, y + h + 4, { fam: M, size: 17, color: FAINT, align: 'center' }));
+    let bi = -1; vals.forEach((v, i) => { if (hs[i].n && (bi < 0 || v > vals[bi])) bi = i; });
+    return bi >= 0 && vals[bi] > 0 ? `${String(bi).padStart(2, '0')}:00–${String((bi + 1) % 24).padStart(2, '0')}:00` : '';
+  }
+  function tile(c, x, y, w, h, label, value, sub, color) {
+    rrect(c, x, y, w, h, 26); c.fillStyle = 'rgba(255,255,255,.035)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.08)'; c.lineWidth = 2; c.stroke();
+    T(c, label, x + 36, y + 52, { fam: M, size: 19, color: FAINT, ls: 4 });
+    const v = String(value || '—');
+    T(c, v, x + 34, y + 124, { fam: D, w: 400, size: fitSize(c, v, w - 70, 64, D, 400, -1), color: color || INK, ls: -1 });
+    if (sub) T(c, sub, x + 36, y + 162, { fam: M, size: fitSize(c, sub, w - 72, 20, M, 400), color: DIM });
   }
   function card3(c) {
     bigBg(c);
-    // header
+    const CW = BW - 2 * BP;
+    // header: brand · period · handle
     K.brand(c, BP, 150);
+    T(c, d.label, BW / 2, 172, { fam: D, w: 300, size: fitSize(c, d.label, 900, 66, D, 300, -2), align: 'center', ls: -2 });
     const h = d.handle || '5abifx.com';
-    T(c, h, BW - BP, 164, { fam: M, size: fitSize(c, h, 600, 30, M, 400, 2), color: DIM, align: 'right', ls: 2 });
-    const tag = 'SYNCED FROM MT5';
-    c.font = `400 20px ${M}`; const tw = c.measureText(tag).width + 20 * 3 + 60;
-    const tx = BW / 2 - tw / 2;
-    rrect(c, tx, 118, tw, 54, 27); c.fillStyle = 'rgba(47,211,166,.08)'; c.fill(); c.strokeStyle = 'rgba(47,211,166,.45)'; c.lineWidth = 2; c.stroke();
-    c.fillStyle = WIN; c.beginPath(); c.arc(tx + 34, 145, 7, 0, 7); c.fill();
-    T(c, tag, tx + 56, 152, { fam: M, size: 20, color: WIN, ls: 3 });
-    c.fillStyle = LINE; c.fillRect(BP, 236, BW - 2 * BP, 2);
+    T(c, h, BW - BP, 164, { fam: M, size: fitSize(c, h, 520, 30, M, 400, 2), color: DIM, align: 'right', ls: 2 });
+    c.fillStyle = LINE; c.fillRect(BP, 236, CW, 2);
 
-    // left: the hero
-    const LW = 800;
-    T(c, 'ACCOUNT REPORT', BP, 330, { fam: M, size: 26, color: ORANGE, ls: 6 });
-    T(c, d.label, BP - 4, 450, { fam: D, w: 300, size: fitSize(c, d.label, LW, 112, D, 300, -3), ls: -3 });
-    const sub = [d.acct, d.symbols.map((s) => s.s).join(' · ')].filter(Boolean).join('  ·  ').toUpperCase();
-    T(c, sub, BP, 512, { fam: M, size: fitSize(c, sub, LW, 26, M, 400, 2), color: SOFT, ls: 2 });
+    // hero: the result, centred
+    const kick = ['NET RESULT', d.acct, d.symbols.map((x) => x.s).join(' · ')].filter(Boolean).join('  ·  ').toUpperCase();
+    T(c, kick, BW / 2, 318, { fam: M, size: fitSize(c, kick, CW, 24, M, 400, 5), color: ORANGE, align: 'center', ls: 5 });
     const p = primary();
-    T(c, p, BP - 12, 745, { fam: D, w: 200, size: fitSize(c, p, LW, 220, D, 200, -8), color: acc, ls: -8 });
-    const s2 = secondary();
-    T(c, s2, BP, 815, { fam: M, size: fitSize(c, s2, LW, 32, M, 400), color: SOFT });
-    // edge score
-    ring(c, BP + 120, 1010, 104, d.score);
-    T(c, 'EDGE SCORE', BP + 290, 965, { fam: M, size: 22, color: FAINT, ls: 5 });
-    const sl = fin(d.score) ? (d.scoreLabel || '') : 'Needs more trades';
-    T(c, sl, BP + 290, 1030, { fam: D, w: 400, size: fitSize(c, sl, LW - 290, 52, D, 400), color: INK });
-    T(c, 'out of 100, from risk, consistency and discipline', BP + 290, 1074, { fam: M, size: 19, color: FAINT });
-    // key numbers
-    c.fillStyle = LINE; c.fillRect(BP, 1172, LW, 2);
-    const r = st.mode === 'r', pf = d.pf === 'inf' ? '∞' : fin(d.pf) ? d.pf.toFixed(2) : '—';
-    const cellsB = [
-      ['WIN RATE', Math.round(d.winRate * 100) + '%'], ['PROFIT FACTOR', pf],
-      ['AVG R', fin(d.avgR) ? rTxt(d.avgR) : '—'], r ? ['BEST TRADE', rTxt(d.bestTradeR)] : ['BEST DAY', amount(d.bestDay)],
-      ['GREEN DAYS', d.days ? `${d.greenDays} / ${d.days}` : '—'], r ? ['LOSS STREAK', String(d.worstRun)] : ['MAX DRAWDOWN', d.maxDD > 0 ? amount(-d.maxDD) : '0'],
-      ['AVG WIN ÷ AVG LOSS', fin(d.avgW) && fin(d.avgL) && d.avgL ? (d.avgW / Math.abs(d.avgL)).toFixed(2) + '×' : '—'], ['TRADES', `${d.n}  (${d.wins}W ${d.losses}L)`],
-    ];
-    const cw = LW / 2;
-    cellsB.forEach(([k, v], i) => {
-      const x = BP + (i % 2) * cw, y = 1240 + Math.floor(i / 2) * 104, sv = String(v || '—');
-      T(c, k, x, y, { fam: M, size: 19, color: FAINT, ls: 4 });
-      T(c, sv, x, y + 48, { fam: M, size: fitSize(c, sv, cw - 30, 38, M, 400), color: sv.startsWith(MINUS) ? LOSS : sv.startsWith('+') ? WIN : INK });
-    });
+    T(c, p, BW / 2, 505, { fam: D, w: 300, size: fitSize(c, p, CW - 200, 200, D, 300, -6), color: acc, align: 'center', ls: -6 });
+    const s2 = secondary() + `  ·  ${d.wins}W / ${d.losses}L`;
+    T(c, s2, BW / 2, 572, { fam: M, size: fitSize(c, s2, CW, 30, M, 400), color: SOFT, align: 'center' });
 
-    // right: panels
-    const RX = BP + LW + 90, RW = BW - BP - RX;
-    panel(c, RX, 290, RW, 560, 'EQUITY CURVE', range());
-    bigEquity(c, RX + 40, 420, RW - 80, 400);
-    const calTitle = d.isMonth ? 'CALENDAR' : 'DAILY HEATMAP';
-    panel(c, RX, 880, RW, 470, calTitle, `${d.greenDays} OF ${d.days} DAYS GREEN`);
-    if (d.isMonth) bigMonth(c, RX + 40, 960, RW - 80, 370); else bigHeat(c, RX + 40, 960, RW - 80, 370);
-    const half = (RW - 30) / 2;
-    panel(c, RX, 1380, half, 280, 'BY WEEKDAY');
-    const bestWd = weekdays(c, RX + 40, 1460, half - 80, 180);
-    if (bestWd) T(c, 'BEST ' + bestWd, RX + half - 40, 1442, { fam: M, size: 22, color: WIN, align: 'right', ls: 3 });
-    panel(c, RX + half + 30, 1380, half, 280, 'TOP SYMBOLS');
-    topSymbols(c, RX + half + 70, 1462, half - 80);
+    // four tiles
+    const r = st.mode === 'r', pf = d.pf === 'inf' ? '∞' : fin(d.pf) ? d.pf.toFixed(2) : '—';
+    const tw = (CW - 3 * 30) / 4, ty = 625, th = 190;
+    const ratio = fin(d.avgW) && fin(d.avgL) && d.avgL ? (d.avgW / Math.abs(d.avgL)).toFixed(2) + '×' : '—';
+    const avgWL = r ? (fin(d.bestTradeR) ? 'Best trade ' + rTxt(d.bestTradeR) : '') : `Avg win ${amount(Math.abs(d.avgW))}  ·  Avg loss ${amount(-Math.abs(d.avgL))}`;
+    const dd = r ? String(d.worstRun) : d.maxDD > 0 ? (st.mode === 'pct' && fin(d.maxDDPct) ? MINUS + Math.abs(d.maxDDPct).toFixed(2) + '%' : money(-d.maxDD)) : '0';
+    tile(c, BP, ty, tw, th, 'WIN RATE', Math.round(d.winRate * 100) + '%', `${d.greenDays} of ${d.days} days green`);
+    tile(c, BP + (tw + 30), ty, tw, th, 'PROFIT FACTOR', pf, fin(d.avgR) ? `Avg ${rTxt(d.avgR)} a trade` : `${d.n} trades`);
+    tile(c, BP + 2 * (tw + 30), ty, tw, th, 'AVG WIN ÷ AVG LOSS', ratio, avgWL);
+    tile(c, BP + 3 * (tw + 30), ty, tw, th, r ? 'WORST LOSING STREAK' : 'MAX DRAWDOWN', dd, `Win streak ${d.bestRun}  ·  Loss streak ${d.worstRun}`, r ? INK : d.maxDD > 0 ? LOSS : INK);
+
+    // equity + score
+    const LW = 1300, RX = BP + LW + 30, RW = CW - LW - 30;
+    panel(c, BP, 845, LW, 440, 'EQUITY CURVE', range());
+    bigEquity(c, BP + 40, 985, LW - 80, 280);
+    panel(c, RX, 845, RW, 440, 'EDGE SCORE');
+    if (d.parts && d.parts.length) {
+      radar(c, RX + RW * 0.36, 1090, 120, d.parts);
+      T(c, String(d.score), RX + RW - 40, 970, { fam: D, w: 300, size: 110, align: 'right', ls: -3 });
+      T(c, d.scoreLabel || '', RX + RW - 40, 1015, { fam: M, size: 22, color: SOFT, align: 'right', ls: 2 });
+      if (d.weakest) {
+        T(c, 'WORK ON', RX + RW - 40, 1200, { fam: M, size: 18, color: FAINT, align: 'right', ls: 4 });
+        T(c, d.weakest, RX + RW - 40, 1238, { fam: M, size: fitSize(c, d.weakest, 300, 24, M, 400), color: ORANGE, align: 'right' });
+      }
+    } else T(c, 'Needs more trades', RX + RW / 2, 1080, { fam: M, size: 28, color: FAINT, align: 'center' });
+
+    // calendar + time
+    const cy = 1315, ch = 400;
+    panel(c, BP, cy, LW, ch, d.isMonth ? 'CALENDAR' : 'DAILY HEATMAP', `${d.greenDays} OF ${d.days} DAYS GREEN`);
+    if (d.isMonth) bigMonth(c, BP + 40, cy + 90, LW - 80, ch - 110); else bigHeat(c, BP + 40, cy + 90, LW - 80, ch - 110);
+    panel(c, RX, cy, RW, ch, 'WHEN YOU WIN');
+    T(c, 'BY HOUR · MT5 TIME', RX + 40, cy + 112, { fam: M, size: 17, color: DIM, ls: 3 });
+    const bh = hoursChart(c, RX + 40, cy + 130, RW - 80, 90);
+    if (bh) T(c, 'BEST ' + bh, RX + RW - 40, cy + 112, { fam: M, size: 17, color: WIN, align: 'right', ls: 2 });
+    T(c, 'BY WEEKDAY', RX + 40, cy + 272, { fam: M, size: 17, color: DIM, ls: 3 });
+    const bw = weekdays(c, RX + 40, cy + 284, RW - 80, 104);
+    if (bw) T(c, 'BEST ' + bw, RX + RW - 40, cy + 272, { fam: M, size: 17, color: WIN, align: 'right', ls: 2 });
 
     // footer
-    const fy = BH - 70;
-    T(c, st.kat ? 'PROTECTED BY KATANA' : '5ABI.FX JOURNAL', BP, fy, { fam: M, size: 24, color: ORANGE, ls: 4 });
-    T(c, 'ACCOUNT NUMBERS HIDDEN  ·  5ABIFX.COM', BW - BP, fy, { fam: M, size: 22, color: DIM, align: 'right', ls: 4 });
+    const fy = BH - 40;
+    T(c, st.kat ? 'PROTECTED BY KATANA' : '5ABI.FX JOURNAL', BP, fy, { fam: M, size: 22, color: ORANGE, ls: 4 });
+    const tag = 'SYNCED FROM MT5';
+    T(c, '●  ' + tag, BW / 2, fy, { fam: M, size: 20, color: WIN, align: 'center', ls: 3 });
+    T(c, 'ACCOUNT NUMBERS HIDDEN  ·  5ABIFX.COM', BW - BP, fy, { fam: M, size: 20, color: DIM, align: 'right', ls: 4 });
   }
 
   /* ---------- controls ---------- */
