@@ -86,7 +86,7 @@ module.exports = function pages(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, T
       <h2>Why we use it</h2>
       <p>To run your account, check your license, match payments to your account, prevent abuse of free trials and contact you about your account. We do not sell your data or use it for advertising.</p>
       <h2>Cookies</h2>
-      <p>We use a single cookie to keep you signed in. It is required for the site to work, so there is no cookie banner. We do not use tracking or advertising cookies.</p>
+      <p>We use a single cookie to keep you signed in. It is required for the site to work, so there is no cookie banner. The same cookie holds a random visitor number so we can count how many people open our pages and which link brought them (no IP address is stored and nothing is shared). We do not use advertising or third-party tracking cookies.</p>
       <p>To keep bots out, the sign-up form (and the sign-in form after a few wrong passwords) may show a quick check by Cloudflare Turnstile. It does not track you for advertising.</p>
       <h2>Payments</h2>
       <p>Payments are handled by the payment provider you choose at checkout, under their own privacy policy. We do not see or store your card details.</p>
