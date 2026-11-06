@@ -97,7 +97,10 @@ if (!userCols.includes('ref_rewarded')) db.exec('ALTER TABLE users ADD COLUMN re
 
 // Prop firm rules per account for the Insights page (percent of the start balance; start balance optional)
 const accCols = db.prepare('PRAGMA table_info(accounts)').all().map((c) => c.name);
-for (const c of ['prop_daily', 'prop_max', 'prop_target', 'prop_start']) if (!accCols.includes(c)) db.exec(`ALTER TABLE accounts ADD COLUMN ${c} REAL`);
+for (const c of ['prop_daily', 'prop_max', 'prop_target', 'prop_start', 'prop_consistency']) if (!accCols.includes(c)) db.exec(`ALTER TABLE accounts ADD COLUMN ${c} REAL`);
+if (!accCols.includes('prop_firm')) db.exec("ALTER TABLE accounts ADD COLUMN prop_firm TEXT NOT NULL DEFAULT ''");   // preset key (src/desk.js FIRMS)
+// hours between New York time and the trader's MT5 server clock (most prop servers: NY + 7)
+if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'ny_offset')) db.exec('ALTER TABLE users ADD COLUMN ny_offset INTEGER NOT NULL DEFAULT 7');
 
 // Journal: 1 = the trader typed the original stop-loss on the trade page, so EA re-sends keep it
 const jCols = db.prepare('PRAGMA table_info(journal_trades)').all().map((c) => c.name);
