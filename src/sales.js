@@ -45,7 +45,7 @@ const LABEL = { '': 'Direct / unknown', referral: 'Referral link', instagram: 'I
   whatsapp: 'WhatsApp', facebook: 'Facebook', tiktok: 'TikTok', x: 'X (Twitter)', google: 'Google', search: 'Other search', reddit: 'Reddit', linkedin: 'LinkedIn', admin: 'Added by you' };
 const srcLabel = (s) => LABEL[s] || s;
 
-function routes(app, { db, page, requireAdmin, stripe, mentorPlans }) {
+function routes(app, { db, page, requireAdmin, stripe, mentorPlans, backup }) {
 
   const PERIODS = { 30: 'Last 30 days', 90: 'Last 90 days', 365: 'Last 12 months', all: 'All time' };
   const now = () => Date.now();
@@ -179,6 +179,12 @@ function routes(app, { db, page, requireAdmin, stripe, mentorPlans }) {
     const referred = all.filter((u) => u.referred_by).length;
     if (paying.length + students >= 3 && referred === 0) add(50, 'Nobody has signed up through a referral link yet', 'Ask paying members and students to share their link (their friend gets a discount, they get free days). Put the link on the share cards.', '/dashboard');
     if (!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)) add(45, 'Google sign-in is off', 'One-tap sign up gets more people through the first step. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on Render.', null);
+    if (backup) {
+      const bk = backup.status();
+      if (!bk.cloudOn) add(95, 'Nightly backup is not set up', 'There is only one copy of your members, licences and journals. Set up the automatic backup (a few keys on Render).', '/admin/security');
+      else if (!bk.healthy) add(97, 'The nightly backup is late', bk.error ? `Last problem: ${bk.error}` : 'No backup in the last 30 hours. Open Security and press Back up now.', '/admin/security');
+    }
+    if (req.user && !req.user.totp_secret) add(92, 'Your admin sign-in code is off', 'A stolen password would open Admin. Turn on the 6-digit code from Google Authenticator (2 minutes).', '/admin/security');
     if (!stripe.on()) add(55, 'Card payments are off', 'People can only pay by contacting you. Add the Stripe key on Render so they can pay on the spot.', null);
     const lastSign = all[0] && ts(all[0].created_at);
     if (!lastSign || now() - lastSign > 14 * 86400000) add(78, 'No new sign-ups in the last 14 days', 'Traffic is the problem, not the site. Post the ad kit, go live on Instagram, and share a trade card with your link.', null);
@@ -229,7 +235,7 @@ function routes(app, { db, page, requireAdmin, stripe, mentorPlans }) {
 
     page(req, res, 'Sales dashboard', `
   <h1>Admin</h1>
-  <div class="tabs"><a class="on" href="/admin/sales">Dashboard</a><a href="/admin">Users</a><a href="/admin/eas">EAs</a><a href="/admin/mentorship">Mentorship</a></div>
+  <div class="tabs"><a class="on" href="/admin/sales">Dashboard</a><a href="/admin">Users</a><a href="/admin/eas">EAs</a><a href="/admin/mentorship">Mentorship</a><a href="/admin/security">Security</a></div>
   <div class="row between sd-head">
     <h2>Sales dashboard</h2>
     <form method="get" action="/admin/sales" class="seg" role="group" aria-label="Period">${Object.entries(PERIODS).map(([k, t]) => `<button name="p" value="${k}" aria-pressed="${k === p}">${t}</button>`).join('')}</form>

@@ -708,6 +708,75 @@ function client(base, ip) {
       for (const k of ['TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY', 'TURNSTILE_API']) delete process.env[k];
     }
 
+    // ---- Admin > Security: nightly backup to S3-compatible storage, locked with BACKUP_PASSWORD ----
+    {
+      const http = require('http');
+      const { decrypt } = require('../src/backup');
+      const puts = [];
+      const s3 = http.createServer((q, s) => { const b = []; q.on('data', (c) => b.push(c)); q.on('end', () => { puts.push({ url: q.url, auth: q.headers.authorization, body: Buffer.concat(b) }); s.end(); }); });
+      await new Promise((ok) => s3.listen(0, ok));
+      r = await admin.get('/admin/security');
+      assert.match(r.text, /Nightly backup <span class="tag warn">NOT SET UP/);
+      Object.assign(process.env, { BACKUP_PASSWORD: 'correct horse battery', R2_ACCESS_KEY_ID: 'kid', R2_SECRET_ACCESS_KEY: 'sk', R2_BUCKET: 'site-backups', BACKUP_S3_ENDPOINT: `http://127.0.0.1:${s3.address().port}` });
+      r = await admin.post('/admin/security/backup');
+      assert.match(r.text, /Backup sent to your storage/);
+      assert.match(r.text, /WORKING/);
+      assert.strictEqual(puts.length, 1);
+      assert.match(puts[0].url, /^\/site-backups\/backups\/backup-day-\d\d\.5abi$/);
+      assert.match(puts[0].auth, /^AWS4-HMAC-SHA256 Credential=kid\//);
+      assert.strictEqual(decrypt(puts[0].body, 'correct horse battery').subarray(0, 15).toString(), 'SQLite format 3');
+      assert.throws(() => decrypt(puts[0].body, 'wrong password!!'));
+      const dl = await admin.get('/admin/security/download');
+      assert.strictEqual(dl.status, 200);
+      assert.strictEqual((await client(base).get('/admin/security/download')).status, 404);   // admins only
+      s3.close();
+      for (const k of ['BACKUP_PASSWORD', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET', 'BACKUP_S3_ENDPOINT']) delete process.env[k];
+    }
+
+    // ---- Admin sign-in code (authenticator app) ----
+    {
+      const { totp } = require('../src/security');
+      const step = () => Math.floor(Date.now() / 30000);
+      r = await admin.get('/admin/security');
+      assert.match(r.text, /Sign-in code <span class="tag warn">OFF/);
+      r = await admin.post('/admin/security/code/start');
+      const secret = db.prepare("SELECT totp_pending FROM users WHERE email = 'admin@test.com'").get().totp_pending;
+      assert.match(r.text, /otpauth:\/\/totp\//);
+      r = await admin.post('/admin/security/code/confirm', { code: '000000' === totp(secret, step()) ? '111111' : '000000' });
+      assert.match(r.text, /That code is not right/);
+      r = await admin.post('/admin/security/code/confirm', { code: totp(secret, step()) });
+      assert.match(r.text, /Save these recovery codes/);
+      const rec = r.text.match(/<pre class="rec-codes">([^<]+)<\/pre>/)[1].split('\n');
+      assert.strictEqual(rec.length, 8);
+
+      const a2 = client(base, '10.8.0.1');
+      r = await a2.post('/login', { email: 'admin@test.com', password: 'adminpass123' });
+      assert.match(r.text, /Enter your sign-in code/);
+      assert.strictEqual((await a2.get('/admin')).status, 404);                 // password alone does not open Admin
+      r = await a2.post('/login/code', { code: totp(secret, step()) });          // same code as set-up: already used
+      assert.match(r.text, /That code is not right/);
+      r = await a2.post('/login/code', { code: totp(secret, step() + 1) });
+      assert.match(r.text, /Users/);
+
+      const a3 = client(base, '10.8.0.2');
+      await a3.post('/login', { email: 'admin@test.com', password: 'adminpass123' });
+      r = await a3.post('/login/code', { code: rec[0] });
+      assert.match(r.text, /Recovery code used\. 7 left/);
+      const a4 = client(base, '10.8.0.3');
+      await a4.post('/login', { email: 'admin@test.com', password: 'adminpass123' });
+      r = await a4.post('/login/code', { code: rec[0] });                       // each recovery code works once
+      assert.match(r.text, /That code is not right/);
+      assert.strictEqual((await client(base).get('/login/code')).text.includes('sign-in code'), false);   // nothing pending: back to sign in
+      db.prepare("UPDATE users SET totp_secret = NULL WHERE email = 'admin@test.com'").run();
+    }
+
+    // ---- wrong passwords for one account from many networks: that account waits ----
+    {
+      for (let i = 0; i < 8; i++) await client(base, `10.7.0.${i + 1}`).post('/login', { email: 'bob@test.com', password: 'nope-nope' });
+      r = await client(base, '10.7.1.1').post('/login', { email: 'bob@test.com', password: 'bobpass123' });
+      assert.match(r.text, /Too many wrong passwords for this account/);
+    }
+
     console.log('All smoke tests passed');
   } finally {
     server.close();

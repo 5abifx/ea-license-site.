@@ -1319,3 +1319,10 @@ select option:disabled { color: #6b6b73; }
   .drill-in { transform: translateY(40px); } }
 .hw i[role="button"], svg.ck .ck-t, .ck-l, svg.ck text[data-s] { cursor: pointer; }
 .hw i[role="button"]:hover, .hw i[role="button"]:focus-visible { outline: 1px solid rgba(255,255,255,.6); outline-offset: 1px; }
+
+/* Admin tabs: scroll sideways on phones instead of widening the page */
+.tabs { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs a { white-space: nowrap; flex: none; }
+.setup-key { display: block; margin: 6px 0 2px; word-break: break-all; }
+.rec-codes { font-family: var(--mono, ui-monospace, monospace); font-size: 1.05em; line-height: 1.8; padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; }

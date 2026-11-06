@@ -140,6 +140,12 @@ Auction Compass is only for mentorship students: tick **Student** on the user's 
 - Every decision (ARM, SKIP with its reason, ENTRY, PARTIAL, EXIT, CLOSE with P/L and R) is written to `MQL5\Files\5ABI_CompassEA\<symbol>_log.csv`.
 - Mode *Signal only* sends alerts without placing orders.
 
+## Security and backups (Admin > Security)
+
+- **Sign-in code:** Admin > Security > Set up sign-in code. Scan/enter the key in Google Authenticator; every sign-in (password or Google) then asks for the 6-digit code. 8 one-time recovery codes are shown once. Lost phone and codes: set `TOTP_RESET_EMAIL` to your email on Render, deploy, sign in, then remove it.
+- **Login limits:** 10 tries per network per 15 min, bot check after 3 wrong passwords, and 8 wrong passwords for one email (from any network) locks that sign-in for 15 min.
+- **Nightly backup:** set `BACKUP_PASSWORD` (12+ chars) and `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` (Cloudflare R2). Each night after `BACKUP_HOUR_UTC` (default 10) the database is copied, gzipped, locked with AES-256-GCM and uploaded as `backups/backup-day-DD.5abi` (last ~30 nights kept). Any S3-compatible store works via `BACKUP_S3_ENDPOINT` + `BACKUP_S3_REGION`. To open one: `node scripts/backup-decrypt.js backup-day-07.5abi licenses.db`.
+
 ## Daily use
 
 - **New EA**: Admin → EAs → *Add a new EA* (name, license code, version, file). Tick *Give to all active users* or choose per customer.
