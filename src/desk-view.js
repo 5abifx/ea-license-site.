@@ -112,7 +112,7 @@ function sessionClock(T, shift) {
   T.halves.forEach((h) => {
     const k = Math.abs(h.net) / mx, col = !h.n ? 'rgba(255,255,255,.045)'
       : h.net >= 0 ? `rgba(38,198,160,${(0.2 + 0.8 * k).toFixed(2)})` : `rgba(240,70,75,${(0.28 + 0.72 * k).toFixed(2)})`;
-    s += `<path data-s="${sessOf(h.from)}" class="ck-t" d="${arc(h.from + 1.6, h.from + 28.4, RR)}" stroke="${col}" stroke-width="${RW}" fill="none"${h.n && k > 0.6 && h.net > 0 ? ' filter="url(#ckglow2)"' : ''}><title>${hhmm(h.from)}–${hhmm(h.from + 30)} · ${h.n} trades</title></path>`;
+    s += `<path data-s="${sessOf(h.from)}" class="ck-t" data-m="${h.from}" d="${arc(h.from + 1.6, h.from + 28.4, RR)}" stroke="${col}" stroke-width="${RW}" fill="none"${h.n && k > 0.6 && h.net > 0 ? ' filter="url(#ckglow2)"' : ''}><title>${hhmm(h.from)}–${hhmm(h.from + 30)} · ${h.n} trades</title></path>`;
   });
   // fine ticks just outside the ring, hour labels inside
   for (let i = 0; i < 24; i++) { const big = i % 6 === 0, [x1, y1] = P(i * 60, RR + RW / 2 + 3), [x2, y2] = P(i * 60, RR + RW / 2 + (big ? 9 : 6));
@@ -144,34 +144,35 @@ function spark(pts) {
   const d = pts.map((v, i) => `${i ? 'L' : 'M'}${pt(v, i)}`).join(' '), col = pts.at(-1) >= 0 ? 'var(--ok)' : 'var(--danger)';
   return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${d} L${W} ${H} L0 ${H} Z" fill="${col}" fill-opacity=".1"/><path d="${d}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
 }
-function timeHtml(T, { money, offsetForm, tzName, shift = 0 }) {
+function timeHtml(T, { money, offsetForm, tzName, shift = 0, data = '' }) {
   if (!T.ranked.length) return '<section class="card"><p class="muted">No trades in this period.</p></section>';
   const mx = Math.max(1, ...T.rows.flatMap((r) => r.cells.map((c) => Math.abs(c.net))));
   const rows = T.rows.filter((r, i) => i < 5 || r.n);
   const heat = `<div class="hw" style="--cols:24">
     <span></span>${Array.from({ length: 24 }, (_, h) => `<span class="hw-h">${h % 3 ? '' : String(h).padStart(2, '0')}</span>`).join('')}<span class="hw-h">Total</span>
-    ${rows.map((r) => `<span class="hw-d">${DOW[r.dow]}</span>${r.cells.map((c, h) => `<i title="${DOW[r.dow]} ${String(h).padStart(2, '0')}:00 · ${c.n} trades${c.n ? ' · ' + money(c.net) : ''}" style="${c.n ? `background:${c.net >= 0 ? 'rgba(38,198,160,' : 'rgba(240,70,75,'}${(0.18 + 0.72 * Math.min(1, Math.abs(c.net) / mx)).toFixed(2)})` : ''}"></i>`).join('')}<b class="${cls(r.total)}">${r.n ? short(r.total) : '-'}</b>`).join('')}
+    ${rows.map((r) => `<span class="hw-d">${DOW[r.dow]}</span>${r.cells.map((c, h) => `<i data-d="${r.dow}" data-h="${h}"${c.n ? ' tabindex="0" role="button"' : ''} title="${DOW[r.dow]} ${String(h).padStart(2, '0')}:00 · ${c.n} trades${c.n ? ' · ' + money(c.net) : ''}" style="${c.n ? `background:${c.net >= 0 ? 'rgba(38,198,160,' : 'rgba(240,70,75,'}${(0.18 + 0.72 * Math.min(1, Math.abs(c.net) / mx)).toFixed(2)})` : ''}"></i>`).join('')}<b class="${cls(r.total)}">${r.n ? short(r.total) : '-'}</b>`).join('')}
   </div>`;
   const top = T.ranked[0];
   return `<div class="tm-top">
-    <section class="card tm-clock"><h2>Session clock</h2><p class="muted small">Every half hour of the day, ${esc(tzName)}. Brighter teal made more money, red lost it. The sessions sit on the rim, and the white tick is now. Hover a session to light it up.</p>
+    <section class="card tm-clock"><h2>Session clock</h2><p class="muted small">Every half hour of the day, ${esc(tzName)}. Brighter teal made more money, red lost it. The sessions sit on the rim, and the white tick is now. Hover a session to light it up, tap it to see its trades.</p>
       <div class="ck-wrap">${sessionClock(T, shift)}
         <div class="ck-side">${T.sessions.filter((x) => x.key !== 'off').map((x) => { const r = T.ranked.find((y) => y.key === x.key);
           return `<div class="ck-l${top.key === x.key ? ' on' : ''}" data-s="${x.key}" tabindex="0"><i></i><span>${esc(x.name)}<small class="muted">${hhmm(x.from)}–${hhmm(x.to)}</small></span><b class="${r ? cls(r.net) : ''}">${r ? short(r.net) : '-'}</b></div>`; }).join('')}
           <hr>${T.best ? `<p class="small"><span class="muted">Best half hour</span><br><b>${hhmm(T.best.from)}–${hhmm(T.best.from + 30)}</b> <b class="${cls(T.best.net)}">${money(T.best.net)}</b> <span class="muted">· ${T.best.n} trades</span></p>` : ''}
           ${T.worst && T.worst !== T.best && T.worst.net < 0 ? `<p class="small"><span class="muted">Worst half hour</span><br><b>${hhmm(T.worst.from)}–${hhmm(T.worst.from + 30)}</b> <b class="neg">${money(T.worst.net)}</b> <span class="muted">· ${T.worst.n} trades</span></p>` : ''}</div></div>
     </section>
-    <section class="card tm-rank"><h2>Sessions, ranked</h2><p class="muted small">${esc(top.name)} made the most. Scroll, tap or use the arrows to turn the dial.</p>
+    <section class="card tm-rank"><h2>Sessions, ranked</h2><p class="muted small">${esc(top.name)} made the most. Scroll, tap or use the arrows to turn the dial. Tap the big one to see its trades.</p>
       <div class="dial" tabindex="0" aria-label="Sessions ranked by profit">
         <svg class="dial-arc" viewBox="0 0 60 400" preserveAspectRatio="none" aria-hidden="true"><path d="M48 0 Q-8 200 48 400" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="1.5"/></svg>
-        <ol class="rank">${T.ranked.map((x, i) => `<li data-i="${i}" class="${i ? '' : 'first'}"><span class="rk-n">${String(i + 1).padStart(2, '0')}</span>
+        <ol class="rank">${T.ranked.map((x, i) => `<li data-i="${i}" data-s="${x.key}" class="${i ? '' : 'first'}"><span class="rk-n">${String(i + 1).padStart(2, '0')}</span>
           <div class="rk-b"><b class="rk-name">${esc(x.name)}</b><span class="rk-net ${cls(x.net)}">${money(x.net)}</span>
             <small class="rk-more">${x.win}% win · ${x.n} trades${x.avgR !== null ? ` · ${rTxt(x.avgR)} avg` : ''}<br>${x.range}</small></div><span class="rk-spark">${spark(x.spark)}</span></li>`).join('')}</ol>
         <span class="dial-btns"><button type="button" class="small secondary" data-d="-1" aria-label="Previous">▲</button><button type="button" class="small secondary" data-d="1" aria-label="Next">▼</button></span>
       </div>
     </section></div>
   <section class="card"><div class="row between"><h2>Hour by weekday</h2>${offsetForm}</div>
-    <p class="muted small">Open time of each trade, ${esc(tzName)}. Brighter = more money made (green) or lost (red).</p>${heat}</section>
+    <p class="muted small">Open time of each trade, ${esc(tzName)}. Brighter = more money made (green) or lost (red). Tap a square to see those trades.</p>${heat}</section>
+  ${data ? `<script id="drill-data" type="application/json">${data}</script><script src="/drill.js"></script>` : ''}
   <script src="/clock.js"></script>`;
 }
 
