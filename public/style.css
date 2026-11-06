@@ -1031,3 +1031,9 @@ strong.warn { color: var(--warn); }
   .sd-step-h { grid-column: 1 / -1; }
   .sd-two { grid-template-columns: 1fr; }
 }
+/* dropdown lists: the closed box is see-through, so Windows Chrome drew the open list white with light text.
+   Give the list and its options a solid dark background and readable text on every page. */
+select { background-color: #141417; color: var(--text); color-scheme: dark; }
+select option, select optgroup { background-color: #141417; color: #ececee; }
+select option:checked { background-color: #ff5a1f; color: #fff; }
+select option:disabled { color: #6b6b73; }
