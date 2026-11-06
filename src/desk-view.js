@@ -10,7 +10,8 @@ const short = (v) => `${sgn(v)}${Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFi
 const rTxt = (v) => (v === null || v === undefined ? '' : `${sgn(v)}${Math.abs(v).toFixed(2)}R`);
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const dayName = (iso) => `${DOW[(new Date(iso + 'T00:00:00Z').getUTCDay() + 6) % 7]} ${Number(iso.slice(8))} ${new Date(iso + 'T00:00:00Z').toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })}`;
-const unit = (cur) => (cur ? `<small class="u">${esc(cur)}</small>` : '');
+const unit = (cur) => (cur && cur !== 'USD' ? `<small class="u">${esc(cur)}</small>` : '');
+const dol = (cur) => (cur === 'USD' ? '$' : '');
 
 // ---------- hero: the month's P&L, big, counting up on load ----------
 function heroHtml(h, { cur, shareHref }) {
@@ -18,14 +19,14 @@ function heroHtml(h, { cur, shareHref }) {
   const ratio = h.avgL ? (h.avgW / h.avgL).toFixed(2) : '-';
   return `<section class="pl-hero" data-net="${h.n ? h.net : 0}" data-label="${esc(h.label)}">
     <span class="kicker">${esc(h.label)} · Net P&amp;L</span>
-    <div class="pl-big ${cls(h.net)}"><span class="pl-num" data-count="${h.n ? h.net : 0}">${h.n ? sgn(h.net) + f2(h.net) : '0.00'}</span>${unit(cur)}</div>
+    <div class="pl-big ${cls(h.net)}"><span class="pl-num" data-count="${h.n ? h.net : 0}" data-pre="${dol(cur)}">${h.n ? sgn(h.net) + dol(cur) + f2(h.net) : dol(cur) + '0.00'}</span>${unit(cur)}</div>
     <p class="pl-sub">${h.pct !== null && h.n ? `<b class="${cls(h.pct)}">${h.pct >= 0 ? '↗' : '↘'} ${sgn(h.pct)}${Math.abs(h.pct).toFixed(2)}%</b> · ` : ''}${h.wins}W / ${h.losses}L · ${h.n} trade${h.n === 1 ? '' : 's'}${h.n && shareHref ? ` · <a href="${shareHref}">Share report ›</a>` : ''}</p>
   </section>
   <div class="pl-tiles">
     <div class="pl-tile"><span>Win rate</span><strong>${h.n ? Math.round(h.winRate * 100) + '%' : '-'}</strong><small>${h.days ? `${h.greenDays} of ${h.days} days green` : 'No trades yet'}</small></div>
     <div class="pl-tile"><span>Profit factor</span><strong>${pf}</strong><small>${h.avgR !== null ? `Avg ${rTxt(h.avgR)} a trade` : 'Needs a stop-loss for R'}</small></div>
-    <div class="pl-tile"><span>Avg win / avg loss</span><strong>${ratio}${ratio !== '-' ? '×' : ''}</strong><small>${h.n ? `Win ${f2(h.avgW)} · Loss ${f2(h.avgL)}` : '-'}</small></div>
-    <div class="pl-tile"><span>Best day</span><strong class="${cls(h.bestDay)}">${h.bestDay === null ? '-' : sgn(h.bestDay) + f2(h.bestDay)}</strong><small>${h.worstDay === null ? '-' : `Worst ${sgn(h.worstDay)}${f2(h.worstDay)}`}</small></div>
+    <div class="pl-tile"><span>Avg win / avg loss</span><strong>${ratio}${ratio !== '-' ? '×' : ''}</strong><small>${h.n ? `Win ${dol(cur)}${f2(h.avgW)} · Loss ${dol(cur)}${f2(h.avgL)}` : '-'}</small></div>
+    <div class="pl-tile"><span>Best day</span><strong class="${cls(h.bestDay)}">${h.bestDay === null ? '-' : sgn(h.bestDay) + dol(cur) + f2(h.bestDay)}</strong><small>${h.worstDay === null ? '-' : `Worst ${sgn(h.worstDay)}${dol(cur)}${f2(h.worstDay)}`}</small></div>
   </div>`;
 }
 
@@ -62,12 +63,13 @@ function meter(label, frac, txt, col) {
 }
 const room = (used) => (used >= 0.9 ? 'var(--danger)' : used >= 0.7 ? 'var(--warn)' : 'var(--ok)');
 function deskCard(D, { title, money, href }) {
+  const abs$ = (v) => money(v).replace(/^[+−]/, '');
   if (!D) return `<div class="dk-card empty"><div class="row between"><b>${title}</b></div><p class="muted small">No prop firm rules yet. <a href="${href}">Set them ›</a></p></div>`;
   if (D.error) return `<div class="dk-card empty"><div class="row between"><b>${title}</b></div><p class="muted small">${esc(D.error)} <a href="${href}">Open ›</a></p></div>`;
   const m = [];
-  if (D.daily) { const u = D.daily.used / D.daily.allow; m.push(meter(`Room left today <small class="muted">(${D.daily.pct}% daily)</small>`, 1 - u, `${money(D.daily.left).replace('+', '')} of ${f2(D.daily.allow)}`, room(u))); }
-  if (D.max) { const u = 1 - D.max.left / D.max.allow; m.push(meter(`Room to max loss <small class="muted">(${D.max.pct}%)</small>`, 1 - u, `${money(D.max.left).replace('+', '')} left · floor ${f2(D.max.floor)}`, room(u))); }
-  if (D.target) m.push(meter(`Profit target <small class="muted">(${D.target.pct}%)</small>`, D.target.done, D.target.done >= 1 ? 'Reached' : `${Math.round(D.target.done * 100)}% · ${f2(D.target.left)} to go`, 'var(--accent)'));
+  if (D.daily) { const u = D.daily.used / D.daily.allow; m.push(meter(`Room left today <small class="muted">(${D.daily.pct}% daily)</small>`, 1 - u, `${money(D.daily.left).replace('+', '')} of ${abs$(D.daily.allow)}`, room(u))); }
+  if (D.max) { const u = 1 - D.max.left / D.max.allow; m.push(meter(`Room to max loss <small class="muted">(${D.max.pct}%)</small>`, 1 - u, `${money(D.max.left).replace('+', '')} left · floor ${abs$(D.max.floor)}`, room(u))); }
+  if (D.target) m.push(meter(`Profit target <small class="muted">(${D.target.pct}%)</small>`, D.target.done, D.target.done >= 1 ? 'Reached' : `${Math.round(D.target.done * 100)}% · ${abs$(D.target.left)} to go`, 'var(--accent)'));
   if (D.consistency) m.push(meter(`Best day share <small class="muted">(max ${D.consistency.pct}%)</small>`, D.consistency.share / D.consistency.pct, `${Math.round(D.consistency.share)}%`, D.consistency.ok ? 'var(--ok)' : 'var(--danger)'));
   return `<div class="dk-card ${D.status}"><div class="row between"><b>${title}</b>${statusTag(D.status)}</div>
     <div class="dk-top"><strong class="${cls(D.gain)}">${money(D.gain)}</strong><span class="muted small">${D.gainPct >= 0 ? '+' : '−'}${Math.abs(D.gainPct).toFixed(2)}% · ${D.days} trading day${D.days === 1 ? '' : 's'}${D.firm ? ' · ' + esc(D.firm) : ''}</span></div>

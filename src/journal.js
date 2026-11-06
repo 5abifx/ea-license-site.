@@ -91,10 +91,11 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   });
 
   // ---------- pages ----------
-  const money = (v, cur = '') => (v === null || v === undefined ? '-' : `${v < 0 ? '−' : '+'}${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cur ? ' ' + esc(cur) : ''}`);
+  // "+$1,234.56" for dollar accounts (app-like), "+1,234.56 EUR" for the rest
+  const money = (v, cur = '') => (v === null || v === undefined ? '-' : `${v < 0 ? '−' : '+'}${cur === 'USD' ? '$' : ''}${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cur && cur !== 'USD' ? ' ' + esc(cur) : ''}`);
   const cls = (v) => (v > 0 ? 'pos' : v < 0 ? 'neg' : '');
   // big numbers in the stat boxes: the currency is small, so "+1,868.45 USD" fits the box
-  const bigMoney = (v, cur) => `${money(v)}${cur ? `<small class="u">${esc(cur)}</small>` : ''}`;
+  const bigMoney = (v, cur) => (cur === 'USD' ? money(v, cur) : `${money(v)}${cur ? `<small class="u">${esc(cur)}</small>` : ''}`);
 
   // private text (account numbers, broker servers): hidden when "Hide private info" is on
   const priv = (real, mask) => `<span class="priv"><span class="priv-real">${real}</span><span class="priv-mask">${mask}</span></span>`;
@@ -464,7 +465,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         <form method="post" action="/journal/settings/ny-offset" class="tz-off"><input type="hidden" name="back" value="/journal/insights${esc(qs({}))}"><label>MT5 = NY +<input name="offset" type="number" min="-12" max="14" value="${u.ny_offset ?? desk.NY_DEFAULT}"> h</label><button class="small secondary">Save</button></form></div>`;
       body = tab === 'time'
         ? deskView.timeHtml(desk.timeStats(dr, off), { money: m, offsetForm, tzName: tz === 'mt5' ? 'MT5 server time' : 'New York time' })
-        : dr.length ? deskView.habitsHtml(desk.habits(dr), { money: (v) => money(v) }) : '<section class="card"><p class="muted">No trades in this period.</p></section>';
+        : dr.length ? deskView.habitsHtml(desk.habits(dr), { money: (v) => money(v, cur === 'USD' ? 'USD' : '') }) : '<section class="card"><p class="muted">No trades in this period.</p></section>';
     } else {
       // prop firm: one account in full (desk + history + rules form), or a card per account
       if (sel && !sel.removed) {

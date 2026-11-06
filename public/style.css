@@ -1169,3 +1169,58 @@ select option:disabled { color: #6b6b73; }
 .hb-r b { text-align: right; font-size: 13px; }
 .hb-note { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); } .hb-note b { color: var(--text); }
 @media (max-width: 420px) { .hab { grid-template-columns: 1fr; } .hb-r { grid-template-columns: 110px 1fr 80px; } }
+
+/* ---------- quiet premium: members area (journal, insights, mentor) ----------
+   One font, calm sentence-case labels, colour only on the numbers that matter, soft borderless tiles. */
+.app-body { --q-tile: #101012; --q-tile-2: #151518; --q-edge: rgba(255,255,255,.055); --q-label: #8e8e96; --q-bar: rgba(255,255,255,.82); }
+.app-body .card, .app-body .pl-tile, .app-body .dk-card, .app-body .stats div {
+  background: linear-gradient(180deg, var(--q-tile-2), var(--q-tile)); border: 1px solid var(--q-edge); border-radius: 18px; box-shadow: 0 1px 0 rgba(255,255,255,.03) inset; }
+.app-body .card { padding: 22px 24px; }
+.app-body .recap, .app-body .pl-tiles, .app-body .dk-grid, .app-body .hab, .app-body .tm-top { gap: 14px; }
+/* one font: numbers in the body font with even digits, no mono */
+.app-body .pos, .app-body .neg, .app-body .mono, .app-body .acct b, .app-body .cal-grid .day .v, .app-body .cal-grid .wk b, .app-body .arow .v,
+.app-body .wkhead span:last-child, .app-body .rc-kv dd, .app-body .rc-val b, .app-body .rk-b b, .app-body .hb-r b, .app-body .pl-sub b,
+.app-body .day-panel td:first-child, .app-body .hw b, .app-body .hw-h, .app-body .rk-n, .app-body .rc-line b, .app-body .rc-bars span, .app-body .stats strong {
+  font-family: var(--body); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.app-body .pl-big, .app-body .pl-tile strong, .app-body .rc-big, .app-body .dk-top strong, .app-body .plx-n { font-family: var(--body); font-weight: 600; letter-spacing: -.035em; }
+.app-body .rk-n { font-weight: 300; }
+/* calm labels: grey, sentence case, no mono */
+.app-body th, .app-body .stats span, .app-body .tag, .app-body .status, .app-body legend, .app-body .kicker, .app-body .pl-hero .kicker,
+.app-body .recap .kicker, .app-body .ins-tag, .app-body .cal-grid .dow, .app-body .cal-grid .wk span, .app-body .cal-grid .day .n {
+  font-family: var(--body); text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 500; color: var(--q-label); }
+.app-body .pl-hero .kicker { font-size: 13px; }
+.app-body h2 { font-size: 17px; font-weight: 500; letter-spacing: -.015em; }
+/* buttons: sentence case, quiet */
+.app-body button, .app-body .btn, .app-head-btns button { font-family: var(--body); text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 600; }
+.app-body button.small, .app-body .btn.small { font-size: 12.5px; padding: 7px 14px; }
+.app-body button.secondary, .app-body .btn.secondary { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.08); color: var(--text); }
+/* tags: a dot, not a coloured box */
+.app-body .tag { background: rgba(255,255,255,.05); border: 0; padding: 3px 10px 3px 9px; color: #c9c9cf; }
+.app-body .tag::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #77777f; margin-right: 6px; vertical-align: 1px; }
+.app-body .tag.ok::before { background: var(--ok); } .app-body .tag.bad::before { background: var(--danger); } .app-body .tag.warn::before { background: var(--warn); }
+.app-body .tag.ok, .app-body .tag.bad, .app-body .tag.warn { color: #d7d7dc; }
+/* less colour: winning bars are white, only losses stay red */
+.app-body .rc-bars i, .app-body .hb-t i, .app-body .tbars i { background: var(--q-bar) !important; }
+.app-body .rc-bars i.down, .app-body .hb-t i.down { background: rgba(240,70,75,.85) !important; }
+.app-body .dk-m .t i { background: var(--q-bar) !important; } .app-body .dk-m .t { background: rgba(255,255,255,.06); }
+.app-body .dk-card.breached { border-color: rgba(240,70,75,.4); } .app-body .dk-card.passed { border-color: var(--q-edge); }
+.app-body .pl-big.pos { color: #fff; text-shadow: 0 0 46px rgba(255,255,255,.22); }
+.app-body .pl-big.neg { color: #fff; text-shadow: 0 0 46px rgba(240,70,75,.35); }
+.app-body .pl-tile strong.pos, .app-body .pl-tile strong { color: #fff; }
+.app-body .rc-big.pos, .app-body .dk-top strong.pos { color: #fff; }
+.app-body .rk-b b.pos { color: var(--text); }
+.app-body .pl-hero::before { background: radial-gradient(45% 60% at 50% 55%, rgba(255,255,255,.05), transparent 70%); }
+.plx.pos .plx-n { color: #fff; text-shadow: 0 0 60px rgba(255,255,255,.3); font-family: var(--body); font-weight: 600; letter-spacing: -.035em; }
+/* account chips and tabs: softer */
+.app-body .acct { background: rgba(255,255,255,.03); border: 1px solid var(--q-edge); border-radius: 14px; }
+.app-body .acct.on { border-color: rgba(255,255,255,.22); box-shadow: none; background: rgba(255,255,255,.06); }
+.app-body .periods a { border-color: var(--q-edge); } .app-body .periods a.on { border-color: rgba(255,255,255,.25); box-shadow: none; background: rgba(255,255,255,.06); color: #fff; }
+/* the calendar: soft fills, no bright borders */
+.app-body .cal-grid .day { border-color: transparent; background: rgba(255,255,255,.025); border-radius: 12px; }
+.app-body .cal-grid .day.win { background: rgba(38,198,160,.13); } .app-body .cal-grid .day.loss { background: rgba(240,70,75,.12); }
+.app-body .cal-grid .day[aria-pressed="true"] { box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.5); }
+.app-body .cal-grid .wk { border-color: transparent; background: rgba(255,255,255,.02); border-radius: 12px; }
+.app-top { font-family: var(--body); text-transform: none; letter-spacing: 0; font-size: 13px; }
+.app-body .ins b, .app-body .ins p b, .app-body .fix, .app-body .fix b, .app-body .fix::before, .app-body .strip-score b, .app-body .score-num b, .app-body .ins-nums strong { font-family: var(--body); letter-spacing: -.01em; }
+.app-body .fix::before { letter-spacing: 0; text-transform: none; }
+.side-label { font-family: var(--body); text-transform: none; letter-spacing: 0; font-size: 12px; color: #6f6f78; }
