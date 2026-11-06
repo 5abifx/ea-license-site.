@@ -9,7 +9,8 @@ process.env.SESSION_SECRET = 'test-secret-1234567890';
 process.env.ADMIN_EMAIL = 'admin@test.com';
 process.env.ADMIN_PASSWORD = 'adminpass123';
 process.env.SIGNUP_MODE = 'approval';
-process.env.TRIAL_DAYS = '0';          // trial is switched on further down
+process.env.TRIAL_DAYS = '0';
+process.env.RATE_LIMIT_PER_MIN = '100000';   // the tests send many requests from one address; the limit test lowers it          // trial is switched on further down
 const app = require('../src/server');
 const { db } = require('../src/db');
 
@@ -775,6 +776,30 @@ function client(base, ip) {
       for (let i = 0; i < 8; i++) await client(base, `10.7.0.${i + 1}`).post('/login', { email: 'bob@test.com', password: 'nope-nope' });
       r = await client(base, '10.7.1.1').post('/login', { email: 'bob@test.com', password: 'bobpass123' });
       assert.match(r.text, /Too many wrong passwords for this account/);
+    }
+
+    // ---- site-wide request limit per network ----
+    {
+      process.env.RATE_LIMIT_PER_MIN = '5';
+      process.env.RATE_LIMIT_API_PER_MIN = '3';
+      const hit = (url, ip, extra = {}) => fetch(base + url, { headers: { 'x-forwarded-for': ip, ...extra }, redirect: 'manual' });
+      for (let i = 0; i < 5; i++) assert.notStrictEqual((await hit('/login', '10.6.0.1')).status, 429);
+      let x = await hit('/login', '10.6.0.1');
+      assert.strictEqual(x.status, 429);
+      assert.ok(Number(x.headers.get('retry-after')) > 0);
+      assert.match(await x.text(), /Too many requests/);
+      assert.strictEqual((await hit('/style.css', '10.6.0.1')).status, 200);       // files never count
+      assert.notStrictEqual((await hit('/login', '10.6.0.2')).status, 429);        // other networks are not affected
+      for (let i = 0; i < 3; i++) await hit('/api/check?ea=X&account=1', '10.6.0.3');
+      x = await hit('/api/check?ea=X&account=1', '10.6.0.3');
+      assert.strictEqual(x.status, 429);
+      assert.strictEqual((await x.json()).error, 'too_many_requests');
+      // behind Cloudflare: each visitor counted by their own address, and a faked header from elsewhere is ignored
+      for (let i = 0; i < 5; i++) assert.notStrictEqual((await hit('/login', '104.16.0.9', { 'cf-connecting-ip': `10.5.0.${i}` })).status, 429);
+      for (let i = 0; i < 5; i++) await hit('/login', '10.6.0.4', { 'cf-connecting-ip': `10.4.0.${i}` });
+      assert.strictEqual((await hit('/login', '10.6.0.4', { 'cf-connecting-ip': '10.4.0.99' })).status, 429);
+      process.env.RATE_LIMIT_PER_MIN = '100000';
+      delete process.env.RATE_LIMIT_API_PER_MIN;
     }
 
     console.log('All smoke tests passed');
