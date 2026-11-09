@@ -30,7 +30,7 @@
     const ov = document.createElement('div');
     ov.className = 'intro'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Welcome');
     ov.innerHTML = `<canvas class="in-bg"></canvas><div class="in-scene" id="in-s"></div>
-      <div class="in-foot"><span class="in-set" id="in-set"></span><span class="in-btns"><button type="button" class="in-skip" id="in-cz">Customize</button><button type="button" class="in-skip" id="in-skip">Skip</button></span></div>
+      <div class="in-foot"><span class="in-set" id="in-set"></span><span class="in-btns"><button type="button" class="in-pill" id="in-cz"><svg viewBox="0 0 20 20"><path d="M10 2.5l1.6 4.4 4.4 1.6-4.4 1.6L10 14.5l-1.6-4.4L4 8.5l4.4-1.6zM15.5 13l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>Customize</button><button type="button" class="in-skip" id="in-skip">Skip</button></span></div>
       <div class="in-panel" id="in-panel" hidden></div>`;
     document.body.appendChild(ov);
     document.documentElement.classList.add('intro-on');
@@ -176,37 +176,79 @@
     });
     $('in-skip').addEventListener('click', (e) => { e.stopPropagation(); close(); });
 
-    // Customize: the student's own welcome (style, font, colour, name, quote), previewed live
+    // Customize studio: the student's own welcome (style, font, colour, name, quote), previewed live behind the panel
     const FONTS = [['steel', 'Steel'], ['wide', 'Bold wide'], ['tech', 'Tech'], ['luxe', 'Luxury'], ['brush', 'Brush'], ['goth', 'Gothic'], ['serif', 'Classic']];
     const COLORS = [['chrome', 'Chrome'], ['gold', 'Gold'], ['ember', 'Ember'], ['teal', 'Teal'], ['ice', 'Ice']];
+    const IDEAS = ['Calm mind, sharp entries.', 'Protect the account first.', 'One good trade beats ten rushed ones.', 'Discipline is my edge.'];
+    const DEF = { style: (D.look && D.look.style === 'boot' && !D.look.myName) ? 'boot' : 'name', font: 'steel', color: 'chrome', myName: '', myQuote: '' };
+    const ICON = {
+      style: '<svg viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2.5"/><path d="M6 8h8M6 11h5"/></svg>',
+      font: '<svg viewBox="0 0 20 20"><path d="M4 16 9.5 4h1L16 16M6.5 12h7"/></svg>',
+      color: '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/><path d="M10 3.5v13"/></svg>',
+      words: '<svg viewBox="0 0 20 20"><path d="M4 6h12M4 10h12M4 14h7"/></svg>',
+    };
+    let tab = 'style';
     function openPanel() {
       customizing = true; clear();
       const P = $('in-panel');
-      const seg = (k, opts, cls = '') => `<div class="in-seg ${cls}" data-k="${k}">${opts.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${L[k] === v}"${cls ? ` title="${l}"` : ''}>${cls ? `<i class="sw c-${v}"></i>` : ''}<span>${l}</span></button>`).join('')}</div>`;
-      P.innerHTML = `<div class="in-ph"><b>Customize your welcome</b><button type="button" class="in-link" id="in-x">Close</button></div>
-        <label class="in-f"><span>Style</span>${seg('style', [['name', 'Your name'], ['boot', 'Desk boot']])}</label>
-        <label class="in-f"><span>Font</span>${seg('font', FONTS)}</label>
-        <label class="in-f"><span>Colour</span>${seg('color', COLORS, 'sws')}</label>
-        <div class="in-two"><label class="in-f"><span>Name to show</span><input id="in-nm" maxlength="14" placeholder="${esc(D.name)}" value="${esc(L.myName)}"></label>
-        <label class="in-f"><span>Your quote</span><input id="in-qt" maxlength="90" placeholder="${esc(D.quote)}" value="${esc(L.myQuote)}"></label></div>
-        <div class="in-pa"><span class="in-msg" id="in-msg"></span><button type="button" class="in-save" id="in-sv">Save my welcome</button></div>`;
+      const shortName = () => (L.myName || D.name).slice(0, 10);
+      const check = '<em class="in-ok" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 6.2 5 8.6l4.6-5"/></svg></em>';
+      const body = {
+        style: () => `<div class="in-cards">
+            <button type="button" class="in-card" data-k="style" data-v="name" aria-pressed="${L.style === 'name'}">${check}
+              <span class="in-thumb t-name"><span class="tl"></span><b class="c-${L.color}"><span>${esc(shortName().slice(0, 1).toUpperCase())}</span></b><span class="tl s"></span></span>
+              <span class="in-cl"><b>Your name</b><small>Big letters, your font and colour</small></span></button>
+            <button type="button" class="in-card" data-k="style" data-v="boot" aria-pressed="${L.style === 'boot'}">${check}
+              <span class="in-thumb t-boot"><i><u>✓</u>licence</i><i><u>✓</u>journal</i><i><u>✓</u>streak</i><i class="w">Welcome back_</i></span>
+              <span class="in-cl"><b>Desk boot</b><small>Your desk checks in, then greets you</small></span></button></div>`,
+        font: () => `<div class="in-fonts">${FONTS.map(([v, l]) => `<button type="button" class="in-tile" data-k="font" data-v="${v}" aria-pressed="${L.font === v}">${check}
+            <span class="in-name f-${v} c-${L.color} in-sample">${[...shortName()].map((c) => (c === ' ' ? '<span class="sp"></span>' : `<span>${esc(c)}</span>`)).join('')}</span><small>${l}</small></button>`).join('')}</div>`,
+        color: () => `<div class="in-colors">${COLORS.map(([v, l]) => `<button type="button" class="in-orb" data-k="color" data-v="${v}" aria-pressed="${L.color === v}" aria-label="${l}"><i class="orb o-${v}"></i><small>${l}</small></button>`).join('')}</div>
+            <div class="in-strip"><span class="in-name f-${L.font} c-${L.color} in-sample">${[...shortName()].map((c) => (c === ' ' ? '<span class="sp"></span>' : `<span>${esc(c)}</span>`)).join('')}</span></div>`,
+        words: () => `<label class="in-f"><span>Name to show <em id="in-nmc">${L.myName.length}/14</em></span>
+              <input id="in-nm" maxlength="14" autocomplete="off" placeholder="${esc(D.name)}" value="${esc(L.myName)}"></label>
+            <label class="in-f"><span>Your quote <em id="in-qtc">${L.myQuote.length}/90</em></span>
+              <textarea id="in-qt" maxlength="90" rows="2" placeholder="${esc(D.quote)}">${esc(L.myQuote)}</textarea></label>
+            <div class="in-ideas"><span>Ideas</span>${IDEAS.map((q) => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`,
+      };
+      const draw = () => {
+        P.innerHTML = `<span class="in-grab" aria-hidden="true"></span>
+          <div class="in-ph"><div><span class="in-eb">Make it yours</span><h3>Your welcome</h3></div>
+            <button type="button" class="in-x" id="in-x" aria-label="Close"><svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></button></div>
+          <div class="in-tabs" role="tablist">${[['style', 'Style'], ['font', 'Font'], ['color', 'Colour'], ['words', 'Words']].map(([v, l]) =>
+            `<button type="button" role="tab" data-tab="${v}" aria-selected="${tab === v}">${ICON[v]}<span>${l}</span></button>`).join('')}<i class="in-ind" style="--i:${['style', 'font', 'color', 'words'].indexOf(tab)}"></i></div>
+          <div class="in-body" role="tabpanel">${body[tab]()}</div>
+          <div class="in-pa"><button type="button" class="in-reset" id="in-rs">Reset</button><button type="button" class="in-save" id="in-sv"><span>Save my welcome</span></button></div>`;
+      };
+      draw();
       P.hidden = false; ov.classList.add('cz');
       const replay = () => { clear(); welcome(null); };
       P.onclick = (e) => {
         e.stopPropagation();
-        const b = e.target.closest('.in-seg button');
-        if (b) { const sg = b.parentElement; L[sg.dataset.k] = b.dataset.v; sg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b)); if (sg.dataset.k !== 'style' && L.style === 'boot' && sg.dataset.k === 'font') { L.style = 'name'; P.querySelectorAll('[data-k="style"] button').forEach((x) => x.setAttribute('aria-pressed', x.dataset.v === 'name')); } replay(); }
-        if (e.target.id === 'in-x') { customizing = false; P.hidden = true; ov.classList.remove('cz'); replay(); later(4000, () => (R ? reveal() : close())); }
-        if (e.target.id === 'in-sv') {
+        const t = e.target.closest('[data-tab]');
+        if (t) { tab = t.dataset.tab; draw(); return; }
+        const b = e.target.closest('[data-k]');
+        if (b) { L[b.dataset.k] = b.dataset.v; if (b.dataset.k === 'font' || b.dataset.k === 'color') L.style = 'name'; draw(); replay(); return; }
+        const q = e.target.closest('[data-q]');
+        if (q) { L.myQuote = q.dataset.q; draw(); replay(); return; }
+        if (e.target.closest('#in-x')) { customizing = false; P.hidden = true; ov.classList.remove('cz'); replay(); later(4000, () => (R ? reveal() : close())); return; }
+        if (e.target.closest('#in-rs')) { Object.assign(L, DEF); draw(); replay(); return; }
+        const sv = e.target.closest('#in-sv');
+        if (sv) {
+          sv.classList.add('busy');
           fetch('/api/intro/pref', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ look: { style: L.style, font: L.font, color: L.color, name: L.myName, quote: L.myQuote } }) })
-            .then((r) => { $('in-msg').textContent = r.ok ? 'Saved. This is your welcome from now on.' : 'Could not save, try again.'; });
+            .then((r) => {
+              sv.classList.remove('busy'); sv.classList.add(r.ok ? 'done' : 'err');
+              sv.querySelector('span').textContent = r.ok ? 'Saved' : 'Try again';
+              setTimeout(() => { sv.classList.remove('done', 'err'); sv.querySelector('span').textContent = 'Save my welcome'; }, 2200);
+            });
         }
       };
       let tm;
       P.oninput = (e) => {
-        if (e.target.id === 'in-nm') L.myName = e.target.value.trim();
-        if (e.target.id === 'in-qt') L.myQuote = e.target.value.trim();
+        if (e.target.id === 'in-nm') { L.myName = e.target.value.trim(); $('in-nmc').textContent = `${e.target.value.length}/14`; }
+        if (e.target.id === 'in-qt') { L.myQuote = e.target.value.trim(); $('in-qtc').textContent = `${e.target.value.length}/90`; }
         clearTimeout(tm); tm = setTimeout(replay, 450);
       };
       replay();
