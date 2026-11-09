@@ -57,3 +57,47 @@ html.intro-on { overflow: hidden; }
 @keyframes inBreath { 0%, 100% { transform: scale(.84); } 50% { transform: scale(1.08); box-shadow: 0 0 40px 4px rgba(242,180,65,.14); } }
 .intro .fade { opacity: 0; transform: translateY(12px); transition: opacity .7s, transform .7s; }
 .intro .fade.in { opacity: 1; transform: none; }
+
+/* the student's own look: fonts */
+.in-name.f-wide { font-family: "Unbounded", "Sora", sans-serif; font-weight: 800; font-size: clamp(40px, 8vw, 92px); letter-spacing: -.01em; }
+.in-name.f-tech { font-family: "Michroma", "Sora", sans-serif; font-weight: 400; font-size: clamp(28px, 6vw, 70px); letter-spacing: .18em; padding-left: .18em; }
+.in-name.f-luxe { font-family: "Bodoni Moda", Georgia, serif; font-style: italic; font-weight: 800; text-transform: none; font-size: clamp(56px, 11vw, 124px); letter-spacing: -.02em; }
+.in-name.f-brush { font-family: "Kaushan Script", cursive; font-weight: 400; text-transform: none; font-size: clamp(58px, 11vw, 128px); line-height: 1.15; letter-spacing: 0; }
+.in-name.f-goth { font-family: "UnifrakturMaguntia", serif; font-weight: 400; text-transform: none; font-size: clamp(58px, 11vw, 128px); line-height: 1.1; letter-spacing: 0; }
+.in-name.f-serif { font-family: "Instrument Serif", Georgia, serif; font-style: italic; font-weight: 400; text-transform: none; font-size: clamp(58px, 11vw, 132px); letter-spacing: -.01em; }
+/* colours */
+.c-gold span, .sw.c-gold { background-image: linear-gradient(180deg, #fff8dc 0%, #f1cf6e 38%, #8a6a1f 52%, #f6d77c 68%, #fff3c4 100%); }
+.c-ember span, .sw.c-ember { background-image: linear-gradient(180deg, #ffffff 0%, #ffd2bf 40%, #ff5a1f 70%, #b83a0c 100%); }
+.c-teal span, .sw.c-teal { background-image: linear-gradient(180deg, #effffb 0%, #8ff3de 38%, #13806b 52%, #2fd3b4 68%, #d9fff6 100%); }
+.c-ice span, .sw.c-ice { background-image: linear-gradient(180deg, #ffffff 0%, #d6e9ff 40%, #4f7fc4 52%, #b9d6ff 68%, #ffffff 100%); }
+.sw.c-chrome { background-image: linear-gradient(180deg, #ffffff 0%, #e4e7ec 40%, #7d8591 50%, #c9ced6 62%, #ffffff 100%); }
+
+/* Customize panel */
+.in-btns { display: flex; gap: 8px; }
+.in-panel { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); width: min(720px, calc(100vw - 24px)); max-height: calc(100vh - 120px); overflow: auto;
+  background: rgba(16,18,22,.94); border: 1px solid #262b34; border-radius: 18px; padding: 14px 16px; display: grid; gap: 12px; cursor: default;
+  backdrop-filter: blur(10px); box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.in-panel[hidden] { display: none; }
+.in-ph { display: flex; justify-content: space-between; align-items: center; } .in-ph b { font: 600 15px "Sora", sans-serif; }
+.in-f { display: grid; gap: 6px; } .in-f > span { font-size: 12px; color: #8b929d; }
+.in-seg { display: flex; flex-wrap: wrap; gap: 4px; background: #171a20; border-radius: 10px; padding: 3px; }
+.in-seg button { border: 0; background: none; color: #8b929d; font: 500 13px "Manrope", sans-serif; padding: 7px 11px; border-radius: 8px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; text-transform: none; letter-spacing: 0; }
+.in-seg button[aria-pressed="true"] { background: #1f232b; color: #eef0f3; font-weight: 600; }
+.sw { width: 14px; height: 14px; border-radius: 50%; display: inline-block; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2); }
+.in-two { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+@media (max-width: 560px) { .in-two { grid-template-columns: 1fr; } .in-panel { bottom: 58px; padding: 12px; } }
+.in-f input { background: #171a20; border: 1px solid #262b34; border-radius: 10px; color: #eef0f3; font: 14px "Manrope", sans-serif; padding: 9px 12px; width: 100%; }
+.in-f input:focus { outline: 2px solid #ff5a1f; outline-offset: 1px; }
+.in-pa { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.in-msg { font-size: 12px; color: #2fd3b4; }
+.in-save { border: 0; border-radius: 99px; background: #ff5a1f; color: #160800; font: 700 13px "Manrope", sans-serif; padding: 9px 18px; cursor: pointer; text-transform: none; letter-spacing: 0; }
+/* while customizing: panel on the side (PC) or bottom (phone), preview stays visible */
+.in-panel { left: auto; right: 16px; top: 16px; bottom: 64px; transform: none; width: 360px; max-height: none; align-content: start; }
+.in-panel .in-two { grid-template-columns: 1fr; }
+.intro.cz .in-scene { padding-right: 392px; }
+.in-seg button:focus { outline: none; } .in-seg button:focus-visible { outline: 2px solid #ff5a1f; outline-offset: 1px; }
+@media (max-width: 760px) {
+  .in-panel { left: 8px; right: 8px; top: auto; bottom: 56px; width: auto; height: 52vh; }
+  .intro.cz { place-items: start center; }
+  .intro.cz .in-scene { padding: 0; height: 40vh; transform: scale(.62); transform-origin: 50% 40%; }
+}

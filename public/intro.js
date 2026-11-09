@@ -3,7 +3,7 @@
 (function () {
   const me = document.currentScript;
   if (!me) return;
-  const wantW = me.dataset.w === '1', revPref = me.dataset.r || '', style = me.dataset.ws === 'boot' ? 'boot' : 'name';
+  const wantW = me.dataset.w === '1', revPref = me.dataset.r || '';
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
   const get = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const set = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } };
@@ -23,18 +23,21 @@
   function start(D, showW, R) {
     if (!document.querySelector('link[data-intro]')) {
       const f = document.createElement('link'); f.rel = 'stylesheet'; f.dataset.intro = '1';
-      f.href = 'https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@900&family=Instrument+Serif:ital@0;1&display=swap';
+      f.href = 'https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@900&family=Instrument+Serif:ital@0;1&family=Unbounded:wght@800&family=Michroma&family=Bodoni+Moda:ital,opsz,wght@1,6..96,800&family=Kaushan+Script&family=UnifrakturMaguntia&display=swap';
       document.head.appendChild(f);
       const c = document.createElement('link'); c.rel = 'stylesheet'; c.href = '/intro.css'; c.dataset.intro = '1'; document.head.appendChild(c);
     }
     const ov = document.createElement('div');
     ov.className = 'intro'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Welcome');
     ov.innerHTML = `<canvas class="in-bg"></canvas><div class="in-scene" id="in-s"></div>
-      <div class="in-foot"><span class="in-set" id="in-set"></span><button type="button" class="in-skip" id="in-skip">Skip</button></div>`;
+      <div class="in-foot"><span class="in-set" id="in-set"></span><span class="in-btns"><button type="button" class="in-skip" id="in-cz">Customize</button><button type="button" class="in-skip" id="in-skip">Skip</button></span></div>
+      <div class="in-panel" id="in-panel" hidden></div>`;
     document.body.appendChild(ov);
     document.documentElement.classList.add('intro-on');
     const $ = (id) => ov.querySelector('#' + id);
     const scene = $('in-s');
+    const L = Object.assign({ style: 'name', font: 'steel', color: 'chrome', myName: '', myQuote: '' }, D.look || {});
+    let customizing = false;
     let timers = [], closed = false;
     const later = (ms, f) => timers.push(setTimeout(f, ms));
     const clear = () => { timers.forEach(clearTimeout); timers = []; };
@@ -89,25 +92,26 @@
 
     function welcome(done) {
       tint = [255, 90, 31]; footWelcome();
+      const name = L.myName || D.name, quote = L.myQuote || D.quote;
       const chips = `${D.dayN ? `<span class="in-chip">Day <b>${D.dayN}</b> of your journey</span>` : ''}${D.streak ? `<span class="in-chip">Rules streak <b>${D.streak} day${D.streak === 1 ? '' : 's'}</b></span>` : ''}`;
-      if (style === 'boot') {
+      if (L.style === 'boot') {
         const lines = [
           '<span class="or">5ABI.FX</span> desk · student session',
           'licence ..................... <span class="ok">active</span>',
           `journal ..................... <span class="ok">${R ? `synced · ${R.n} trade${R.n === 1 ? '' : 's'} last session` : 'synced'}</span>`,
           `rules streak ................ <span class="ok">${D.streak} day${D.streak === 1 ? '' : 's'}</span>`,
           'live class .................. <span class="or">00:00 New York</span>',
-          `<div class="bigw">Welcome back,<br><b>${esc(D.name)}</b><span class="caret"></span></div>`];
+          `<div class="bigw">Welcome back,<br><b>${esc(name)}</b><span class="caret"></span></div>`];
         scene.innerHTML = `<div class="in-term">${lines.map((h) => `<div class="ln">${h}</div>`).join('')}</div>`;
         [...scene.querySelectorAll('.ln')].forEach((el, i) => later(150 + i * 420, () => el.classList.add('in')));
-        later(150 + lines.length * 420 + 2200, done);
+        if (done) later(150 + lines.length * 420 + 2200, done);
         return;
       }
       scene.innerHTML = `<div class="in-wel">
         <img class="in-logo" src="/logo.png" alt="">
         <div class="in-kick">WELCOME BACK, TRADER</div><div class="in-rule"></div>
-        <div class="in-name">${[...D.name].map((c) => (c === ' ' ? '<span class="sp"></span>' : `<span>${esc(c)}</span>`)).join('')}</div>
-        <div class="in-tag">${chips}</div><div class="in-quote">“${esc(D.quote)}”</div></div>`;
+        <div class="in-name f-${L.font} c-${L.color}">${[...name].map((c) => (c === ' ' ? '<span class="sp"></span>' : `<span>${esc(c)}</span>`)).join('')}</div>
+        <div class="in-tag">${chips}</div><div class="in-quote">“${esc(quote)}”</div></div>`;
       anim(scene.querySelector('.in-logo'), [{ opacity: 0, transform: 'translateY(10px) scale(.85)' }, { opacity: 1, transform: 'none' }], { duration: 900 });
       anim(scene.querySelector('.in-kick'), [{ opacity: 0, letterSpacing: '.9em' }, { opacity: 1, letterSpacing: '.42em' }], { duration: 1100 });
       later(500, () => anim(scene.querySelector('.in-rule'), [{ width: '0px' }, { width: 'min(420px,70vw)' }], { duration: 1200 }));
@@ -116,7 +120,7 @@
       const end = 800 + letters.length * 90 + 700;
       later(end, () => anim(scene.querySelector('.in-tag'), [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 700 }));
       later(end + 500, () => anim(scene.querySelector('.in-quote'), [{ opacity: 0 }, { opacity: 1 }], { duration: 900 }));
-      later(end + 3000, done);
+      if (done) later(end + 3000, done);
     }
 
     function reveal() {
@@ -165,10 +169,48 @@
     }
 
     ov.addEventListener('click', (e) => {
-      if (e.target.closest('a') || e.target.closest('#in-set')) return;
+      if (e.target.closest('a') || e.target.closest('#in-set') || e.target.closest('#in-panel') || customizing) return;
+      if (e.target.closest('#in-cz')) return openPanel();
       if (e.target.closest('#in-skip') || !R || scene.querySelector('.in-rev')) return close();
       clear(); reveal();   // tap during the welcome: go straight to the result
     });
+    $('in-skip').addEventListener('click', (e) => { e.stopPropagation(); close(); });
+
+    // Customize: the student's own welcome (style, font, colour, name, quote), previewed live
+    const FONTS = [['steel', 'Steel'], ['wide', 'Bold wide'], ['tech', 'Tech'], ['luxe', 'Luxury'], ['brush', 'Brush'], ['goth', 'Gothic'], ['serif', 'Classic']];
+    const COLORS = [['chrome', 'Chrome'], ['gold', 'Gold'], ['ember', 'Ember'], ['teal', 'Teal'], ['ice', 'Ice']];
+    function openPanel() {
+      customizing = true; clear();
+      const P = $('in-panel');
+      const seg = (k, opts, cls = '') => `<div class="in-seg ${cls}" data-k="${k}">${opts.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${L[k] === v}"${cls ? ` title="${l}"` : ''}>${cls ? `<i class="sw c-${v}"></i>` : ''}<span>${l}</span></button>`).join('')}</div>`;
+      P.innerHTML = `<div class="in-ph"><b>Customize your welcome</b><button type="button" class="in-link" id="in-x">Close</button></div>
+        <label class="in-f"><span>Style</span>${seg('style', [['name', 'Your name'], ['boot', 'Desk boot']])}</label>
+        <label class="in-f"><span>Font</span>${seg('font', FONTS)}</label>
+        <label class="in-f"><span>Colour</span>${seg('color', COLORS, 'sws')}</label>
+        <div class="in-two"><label class="in-f"><span>Name to show</span><input id="in-nm" maxlength="14" placeholder="${esc(D.name)}" value="${esc(L.myName)}"></label>
+        <label class="in-f"><span>Your quote</span><input id="in-qt" maxlength="90" placeholder="${esc(D.quote)}" value="${esc(L.myQuote)}"></label></div>
+        <div class="in-pa"><span class="in-msg" id="in-msg"></span><button type="button" class="in-save" id="in-sv">Save my welcome</button></div>`;
+      P.hidden = false; ov.classList.add('cz');
+      const replay = () => { clear(); welcome(null); };
+      P.onclick = (e) => {
+        e.stopPropagation();
+        const b = e.target.closest('.in-seg button');
+        if (b) { const sg = b.parentElement; L[sg.dataset.k] = b.dataset.v; sg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b)); if (sg.dataset.k !== 'style' && L.style === 'boot' && sg.dataset.k === 'font') { L.style = 'name'; P.querySelectorAll('[data-k="style"] button').forEach((x) => x.setAttribute('aria-pressed', x.dataset.v === 'name')); } replay(); }
+        if (e.target.id === 'in-x') { customizing = false; P.hidden = true; ov.classList.remove('cz'); replay(); later(4000, () => (R ? reveal() : close())); }
+        if (e.target.id === 'in-sv') {
+          fetch('/api/intro/pref', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ look: { style: L.style, font: L.font, color: L.color, name: L.myName, quote: L.myQuote } }) })
+            .then((r) => { $('in-msg').textContent = r.ok ? 'Saved. This is your welcome from now on.' : 'Could not save, try again.'; });
+        }
+      };
+      let tm;
+      P.oninput = (e) => {
+        if (e.target.id === 'in-nm') L.myName = e.target.value.trim();
+        if (e.target.id === 'in-qt') L.myQuote = e.target.value.trim();
+        clearTimeout(tm); tm = setTimeout(replay, 450);
+      };
+      replay();
+    }
     addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
     if (showW) welcome(() => (R ? reveal() : close())); else reveal();
   }
