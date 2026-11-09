@@ -165,7 +165,7 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
     const waiting = u && db.prepare("SELECT 1 FROM mentor_events WHERE user_id = ? AND event = 'waitlist' AND plan = 'selfstudy'").get(u.id);
     const navr = u
       ? '<a class="go hide-s" href="/dashboard">My EAs</a><a class="go" href="#price">See the plans</a>'
-      : '<a class="go hide-s" href="/">Home</a><a class="go hide-s" href="/login?next=mentorship">Sign in</a><a class="go" href="#price">See the plans</a>';
+      : '<a class="go hide-s" href="/">Home</a><a class="go" href="/login?next=mentorship">Sign in</a><a class="go" href="#price">See the plans</a>';
     res.send(cinePage(req, 'mentorship', { NAVR: navr, SEATS: seatsGauge(), PRICE: pricing(u, waiting, pr), SOCIALS: socials() },
       { title: `Mentorship · ${OG.title.split(' · ')[0]}`, og: OG }));
   });

@@ -283,7 +283,8 @@ nav .links a:hover{color:var(--fg)}
 nav .links a.go{color:var(--fg)}
 nav .links a.go.pri{background:var(--glow);border-color:var(--glow);color:#120700}
 nav .links a.go{white-space:nowrap}
-@media(max-width:760px){nav .links a:not(.pri){display:none}nav .links{gap:8px}}
+@media(max-width:760px){nav .links a:not(.go){display:none}nav .links{gap:6px}}
+@media(max-width:480px){nav .links a.go{padding:8px 11px;letter-spacing:.1em;font-size:10.5px}}
 /* KATANA panel */
 .kpx{position:relative;border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,var(--ink2),var(--ink));padding:clamp(18px,2.4vw,26px);font-variant-numeric:tabular-nums;overflow:hidden;box-shadow:0 40px 90px -40px rgba(var(--glowRGB),.35)}
 .kh{display:flex;justify-content:space-between;align-items:center}.kh b{font:400 15px var(--display)}.kh small{color:var(--dim);font:400 12px var(--body);margin-left:6px}
