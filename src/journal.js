@@ -5,6 +5,7 @@ const insightsView = require('./insights-view');
 const desk = require('./desk');
 const deskView = require('./desk-view');
 const terminal = require('./terminal');
+const news = require('./news');
 const terminalView = require('./terminal-view');
 const express = require('express');
 const { esc, fmtDate } = require('./views');
@@ -37,6 +38,20 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   };
 
   // ---------- API: the EA sends one closed trade ----------
+  // POST /api/journal/calendar  { key, account, events: [[event_id, utc_seconds, cur, name, imp, actual, forecast, previous, unit, move, dir]] }
+  // MT5's own economic calendar, sent by the Trade Journal EA; feeds the Desk's news catalysts for everyone
+  app.post('/api/journal/calendar', express.json({ limit: '2mb' }), (req, res) => {
+    const b = req.body || {};
+    const account = cleanAccount(b.account);
+    const u = b.key ? db.prepare('SELECT * FROM users WHERE journal_key = ?').get(String(b.key)) : null;
+    if (!u) return res.status(403).json({ ok: false, message: 'Wrong journal key' });
+    if (!hasJournal(u)) return res.status(403).json({ ok: false, message: 'Trade Journal license is not active' });
+    if (!account || !db.prepare('SELECT 1 FROM accounts WHERE user_id = ? AND account_number = ?').get(u.id, account)) {
+      return res.status(403).json({ ok: false, message: `Account ${account} is not registered on your dashboard` });
+    }
+    res.json({ ok: true, saved: news.save(db, b.events) });
+  });
+
   // POST /api/journal/trades  { key, ea, account, broker, currency, trade: {...} }
   app.post('/api/journal/trades', express.json({ limit: '3mb' }), (req, res) => {
     const b = req.body || {};
@@ -533,11 +548,12 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     }
     const T = terminal.build(prep(rows), { offset: off, todayNy: new Date(nyNow).toISOString().slice(0, 10), nowMin: (+p.hour % 24) * 60 + +p.minute,
       nowBroker: nyNow + off * 3600e3, prop, leaks: A.items, money: m });
+    const N = T.locked ? null : news.catalysts(db, prep(rows), { offset: off });
     page(req, res, 'Desk', `
     <div class="row between page-head"><h1>Desk</h1>
       <span class="head-btns"><button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers and your name, so you can screenshot this page">Hide private info</button></span></div>
     ${acctBar(req, '/journal/desk', qs, sc, cur)}
-    ${terminalView.html(T, { money: m, cur, acctNote: one ? (prop ? 'Prop firm rules included' : 'Add firm rules in Insights › Prop firm to include them') : 'All accounts' })}`);
+    ${terminalView.html(T, { news: N, money: m, cur, acctNote: one ? (prop ? 'Prop firm rules included' : 'Add firm rules in Insights › Prop firm to include them') : 'All accounts' })}`);
   });
 
   // prop firm rules of one account (percent of the start balance)

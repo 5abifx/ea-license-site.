@@ -60,7 +60,7 @@ function build(trades, { offset, todayNy, nowMin, nowBroker, prop, leaks, money 
 
   // ---------- forecast: what usually goes wrong on a day like today ----------
   const drivers = [];
-  const add = (tone, w, title, text) => drivers.push({ tone, w, title, text });
+  const add = (tone, w, title, text, stat) => drivers.push({ tone, w, title, text, stat: stat || '' });
   const last = past[past.length - 1];
   if (last && past.length >= 6) {
     const after = (pred) => past.slice(1).filter((d, i) => pred(past[i]));
@@ -69,11 +69,12 @@ function build(trades, { offset, todayNy, nowMin, nowBroker, prop, leaks, money 
     if (last.net < 0 && afterRed.length >= 3) {
       const dn = avg(afterRed, 'n') / (avg(afterGreen, 'n') || 1), du = avg(afterRed, 'u') - avg(afterGreen, 'u');
       if (du < 0 || dn > 1.2) add('bad', clamp(Math.round(10 + Math.max(0, -du) * 8 + Math.max(0, dn - 1) * 10), 8, 30), `Your last day was red (${fmtU(last.u)}).`,
-        `On days after a red day you take ${dn.toFixed(1)}× the trades${du < 0 ? ` and make ${fmtU(du).replace('+', '')} less on average` : ''}.`);
-      else add('good', -6, `Your last day was red (${fmtU(last.u)}).`, 'You usually bounce back well after a red day. Keep the same plan.');
+        `On days after a red day you take ${dn.toFixed(1)}× the trades${du < 0 ? ` and make ${fmtU(du).replace('+', '')} less on average` : ''}.`,
+        `${dn.toFixed(1)}× trades${du < 0 ? ' · ' + fmtU(du) : ''}`);
+      else add('good', -6, `Your last day was red (${fmtU(last.u)}).`, 'You usually bounce back well after a red day. Keep the same plan.', 'you bounce back');
     } else if (last.net > 0 && afterGreen.length >= 3) {
       const du = avg(afterGreen, 'u') - avg(afterRed, 'u');
-      if (du < -0.3) add('warn', clamp(Math.round(8 + -du * 6), 6, 18), `Your last day was green (${fmtU(last.u)}).`, `Days after a green day go ${fmtU(du).replace('+', '')} worse for you on average. Size stays the same today.`);
+      if (du < -0.3) add('warn', clamp(Math.round(8 + -du * 6), 6, 18), `Your last day was green (${fmtU(last.u)}).`, `Days after a green day go ${fmtU(du).replace('+', '')} worse for you on average. Size stays the same today.`, `${fmtU(du)} next day`);
     }
   }
   const dowToday = new Date(todayNy + 'T12:00:00Z').getUTCDay();
@@ -81,23 +82,24 @@ function build(trades, { offset, todayNy, nowMin, nowBroker, prop, leaks, money 
   const wd = trades.filter((t) => t.dow === dIdx);
   if (wd.length >= 5) {
     const wu = wd.reduce((s, t) => s + t.u, 0);
-    if (wu < 0) add('warn', clamp(Math.round(6 + -wu), 6, 16), `${DOW[dIdx]}.`, `Your weakest kind of day: ${wd.length} trades, ${winPct(wd)}% win rate, ${fmtU(wu)} in total.`);
-    else add('good', -6, `${DOW[dIdx]}.`, `A good day for you: ${winPct(wd)}% win rate, ${fmtU(wu)} in total.`);
+    if (wu < 0) add('warn', clamp(Math.round(6 + -wu), 6, 16), `${DOW[dIdx]}.`, `Your weakest kind of day: ${wd.length} trades, ${winPct(wd)}% win rate, ${fmtU(wu)} in total.`, `${winPct(wd)}% win · ${fmtU(wu)}`);
+    else add('good', -6, `${DOW[dIdx]}.`, `A good day for you: ${winPct(wd)}% win rate, ${fmtU(wu)} in total.`, `${winPct(wd)}% win · ${fmtU(wu)}`);
   }
   const rev = trades.filter((t) => t.afterLoss >= 0 && t.afterLoss <= REVENGE_MIN);
   if (rev.length >= 3 && rev.reduce((s, t) => s + t.u, 0) < 0) {
     const lostToday = today.list.some((t) => t.net < 0);
     add(lostToday ? 'bad' : 'warn', lostToday ? 18 : 8, lostToday ? 'You already have a loss today.' : 'If you take a loss today…',
-      `Trades you opened within ${REVENGE_MIN} min of a loss: ${rev.length}, ${winPct(rev)}% win rate, ${fmtU(rev.reduce((s, t) => s + t.u, 0))}.`);
+      `Trades you opened within ${REVENGE_MIN} min of a loss: ${rev.length}, ${winPct(rev)}% win rate, ${fmtU(rev.reduce((s, t) => s + t.u, 0))}.`,
+      `${rev.length} trades · ${winPct(rev)}% win · ${fmtU(rev.reduce((s, t) => s + t.u, 0))}`);
   }
-  if (today.n >= Math.max(2, Math.round(usualTrades) + 1)) add('bad', 14, `${today.n} trades already today.`, `You usually take ${Math.round(usualTrades)}. Extra trades rarely help you: see Today's rules.`);
+  if (today.n >= Math.max(2, Math.round(usualTrades) + 1)) add('bad', 14, `${today.n} trades already today.`, `You usually take ${Math.round(usualTrades)}. Extra trades rarely help you: see Today's rules.`, `${today.n} of usual ${Math.round(usualTrades)}`);
   if (prop && prop.daily && prop.daily.allow > 0) {
     const used = prop.daily.used / prop.daily.allow;
-    if (used >= 0.5) add(used >= 0.8 ? 'bad' : 'warn', used >= 0.8 ? 22 : 12, `Daily loss ${Math.round(used * 100)}% used.`, `${money(prop.daily.left).replace(/^[+−]/, '')} left before the firm's daily limit.`);
+    if (used >= 0.5) add(used >= 0.8 ? 'bad' : 'warn', used >= 0.8 ? 22 : 12, `Daily loss ${Math.round(used * 100)}% used.`, `${money(prop.daily.left).replace(/^[+−]/, '')} left before the firm's daily limit.`, `${money(prop.daily.left).replace(/^[+−]/, '')} left`);
   }
   if (prop && prop.consistency && prop.consistency.pct) {
     const s = prop.consistency.share, p = prop.consistency.pct;
-    if (s >= p * 0.85) add('warn', 12, `Consistency rule ${Math.round(s)}% of ${p}%.`, 'One big win today could push your best day over the line and delay the payout.');
+    if (s >= p * 0.85) add('warn', 12, `Consistency rule ${Math.round(s)}% of ${p}%.`, 'One big win today could push your best day over the line and delay the payout.', 'big win = payout delay');
   }
   const score = clamp(25 + drivers.reduce((s, d) => s + d.w, 0), 3, 97);
   drivers.sort((a, b) => b.w - a.w);
@@ -159,7 +161,9 @@ function build(trades, { offset, todayNy, nowMin, nowBroker, prop, leaks, money 
   return {
     locked: false, score, level: score >= 65 ? 'High' : score >= 40 ? 'Medium' : 'Low', drivers,
     rules, halves, maxAbs, avoid, best, todayTrades, sessions: SESS, sessNow: sessNow ? sessNow.name : 'Market quiet',
-    today: { n: today.n, u: today.u, net: today.net }, usualTrades,
+    today: { n: today.n, u: today.u, net: today.net, list: today.list.map((t) => t.u) }, usualTrades, nowMin,
+    recentDays: past.slice(-14).map((d) => [d.day, Math.round(d.u * 10) / 10, d.n]),
+    daily: prop && prop.daily && prop.daily.allow > 0 ? { used: prop.daily.used, allow: prop.daily.allow, left: prop.daily.left } : null,
     check, ghost: { curve, actual: a, rules: b, gap: b - a, kept, broke: brokeN, brokeU, types: brokenTypes, days: Math.min(30, days.length) },
     hhmm, fmtU,
   };
