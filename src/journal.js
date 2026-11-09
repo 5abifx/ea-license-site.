@@ -566,12 +566,12 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       let st;
       if (p.status === 'matched') {
         const c = TP.compare(p, { entry: p.t_entry, exit: p.t_exit, sl: p.t_sl, tp: p.t_tp, risk_pct: p.t_risk, risk_money: p.t_riskm, profit: p.t_profit, net: p.net });
-        st = `<a class="tp-st done" href="/journal/${p.trade_id}">Followed ${c.followed} of ${c.total} · <span class="${cls(p.net)}">${money(p.net, p.currency)}</span> ›</a>`;
+        st = `<a class="tp-st done" href="/journal/${p.trade_id}" title="Kept ${c.followed} of ${c.total} parts of the plan"><span class="pips">${c.rows.map((r) => `<i class="${r.ok ? 'ok' : ''}"></i>`).join('')}</span> <span class="${cls(p.net)}">${money(p.net, p.currency)}</span> ›</a>`;
       } else if (p.status === 'missed') st = '<span class="tp-st">No trade taken</span>';
       else {
         const age = (nowMs - Date.parse(p.plan_time.replace(' ', 'T') + 'Z')) / 60e3;
-        st = age <= TP.MATCH_AFTER ? `<span class="tp-st live"><i></i>Waiting for the trade · ${Math.max(0, Math.round(TP.MATCH_AFTER - age))} min left</span>`
-          : '<span class="tp-st">Trade not seen yet. It shows here when it closes.</span>';
+        st = age <= TP.MATCH_AFTER ? `<span class="tp-st live"><i></i>Waiting · ${Math.max(0, Math.round(TP.MATCH_AFTER - age))} min left</span>`
+          : '<span class="tp-st">Shows when the trade closes</span>';
       }
       return `<li class="tp-row">
         <div class="tp-main"><b>${esc(p.symbol)}</b> <span class="tp-side ${p.side === 'BUY' ? 'b' : 's'}">${p.side === 'BUY' ? 'Buy' : 'Sell'}</span>
@@ -583,7 +583,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const seg = (name, opts, val) => `<div class="tp-seg" role="radiogroup">${opts.map(([v, l]) => `<label><input type="radio" name="${name}" value="${esc(v)}"${v === val ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>`;
     page(req, res, 'Plan a trade', `
     <div class="row between page-head"><h1>Plan a trade</h1><a class="small" href="/journal">← Journal</a></div>
-    <p class="muted plan-lead">Write the plan before you click. Then open the trade on MT5 within 4 hours: the journal links it to this plan and shows what you did differently, and what each change cost.</p>
+    <ol class="plan-steps"><li><b>1</b>Plan it here</li><li><b>2</b>Open it on MT5 within 4 h</li><li><b>3</b>See plan vs result</li></ol>
     <div class="plan-split">
       <form method="post" action="/journal/plan" class="card plan-form" id="plan-form" autocomplete="off">
         ${accts.length > 1 ? `<label>Account<select name="account">${accts.map((a) => `<option value="${esc(a)}">${esc((last[a]?.broker ? last[a].broker + ' · ' : '') + a)}</option>`).join('')}</select></label>` : `<input type="hidden" name="account" value="${esc(accts[0] || '')}">`}
@@ -597,10 +597,13 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
           <label>Target<input name="tp" inputmode="decimal" required></label>
           <label>Risk %<input name="risk_pct" inputmode="decimal" value="${risk}" required></label>
         </div>
-        <div class="plan-calc" id="plan-calc" aria-live="polite">
-          <div><span>Reward : risk</span><b id="pc-rr">-</b></div>
-          <div><span>Risk</span><b id="pc-risk">-</b></div>
-          <div><span>Lot</span><b id="pc-lot">-</b></div>
+        <div class="plan-viz">
+          <svg id="pc-lad" viewBox="0 0 150 168" aria-label="Target, entry and stop drawn to scale"></svg>
+          <div class="plan-calc" id="plan-calc" aria-live="polite">
+            <div><span>Reward : risk</span><b id="pc-rr">-</b><span class="pc-blocks" id="pc-blocks"></span></div>
+            <div><span>Risk</span><b id="pc-risk">-</b></div>
+            <div><span>Lot</span><b id="pc-lot">-</b></div>
+          </div>
         </div>
         <p class="small muted plan-warn" id="pc-warn" hidden></p>
         <div class="lbl">Setup</div>${seg('setup', TP.SETUPS.map((x) => [x, x]), '')}
@@ -659,21 +662,21 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const partials = card.partials;
     TP.match(db, req.user);
     const plan = db.prepare("SELECT * FROM trade_plans WHERE trade_id = ? AND user_id = ? AND status = 'matched'").get(t.id, req.user.id);
-    let planHtml = '<p class="muted small plan-none"><span class="ptag no">No plan</span> This trade had no plan. <a href="/journal/plan">Plan your next trade</a> and the journal shows what you did differently.</p>';
+    let planHtml = '<p class="muted small plan-none"><span class="ptag no">No plan</span> <a href="/journal/plan">Plan your next trade</a></p>';
     if (plan) {
       const c = TP.compare(plan, t);
       const ck = JSON.parse(plan.checks || '[]');
       const cost = (r) => (r.cost && r.cost > 0 ? `<em class="${r.kind === 'left' ? 'left' : 'risk'}">${r.kind === 'left' ? `${money(r.cost, t.currency).replace(/^[+]/, '')} left` : `+${money(r.cost, t.currency).replace(/^[+]/, '')} risk`}</em>` : '');
       planHtml = `<section class="card pvr">
-        <div class="row between"><h2>Plan vs result</h2><span class="pvr-score"><b>${c.followed}</b> of ${c.total} kept</span></div>
+        <div class="row between"><h2>Plan vs result</h2><span class="pvr-score"><span class="pips">${c.rows.map((r) => `<i class="${r.ok ? 'ok' : ''}"></i>`).join('')}</span><b>${c.followed}/${c.total}</b> kept</span></div>
         <div class="pvr-split">
           <div class="pvr-chart">${TP.chartSvg(plan, t)}<p class="small muted"><i class="k-pl"></i>Plan <i class="k-ac"></i>What you did</p></div>
           <ul class="pvr-rows">${c.rows.map((r) => `<li class="${r.ok ? 'ok' : 'bad'}"><i>${r.ok ? '✓' : '!'}</i><span><b>${r.label}</b><small>${esc(r.detail)}</small></span>${cost(r)}</li>`).join('')}</ul>
         </div>
         <div class="pvr-foot">
           <span>Result <b class="${cls(t.net)}">${money(t.net, t.currency)}</b></span>
-          ${c.planPays ? `<span>The plan's target was worth <b>${money(c.planPays, t.currency)}</b></span>` : ''}
-          <span class="muted">Planned ${esc(plan.plan_time.slice(11, 16))}${plan.setup ? ' · ' + esc(plan.setup) : ''}${ck.length ? ' · ' + ck.map((k) => esc((TP.CHECKS.find((x) => x[0] === k) || [k, k])[1])).join(', ') : ''}</span>
+          ${c.planPays ? `<span>Plan target <b>${money(c.planPays, t.currency)}</b></span>` : ''}
+          <span class="muted">${plan.setup ? esc(plan.setup) + ' · ' : ''}${ck.length ? ck.map((k) => `✓ ${esc((TP.CHECKS.find((x) => x[0] === k) || [k, k])[1])}`).join('  ') : ''}</span>
         </div>
         ${plan.reason ? `<p class="pvr-why">“${esc(plan.reason)}”</p>` : ''}
       </section>`;

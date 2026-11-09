@@ -78,26 +78,26 @@ function compare(p, t) {
   const cost = (pts) => (k ? pts * k : null);
   const slip = (t.entry - p.entry) * dir;            // > 0: a worse price than planned
   rows.push(slip <= tol
-    ? { ok: true, label: 'Entry as planned', detail: `Plan ${p.entry} · got ${t.entry}` }
-    : { ok: false, label: 'Entry worse than planned', detail: `Plan ${p.entry} · got ${t.entry}`, cost: cost(slip), kind: 'risk' });
+    ? { ok: true, label: 'Entry on plan', detail: `${p.entry} → ${t.entry}` }
+    : { ok: false, label: 'Worse entry', detail: `${p.entry} → ${t.entry}`, cost: cost(slip), kind: 'risk' });
   if (fin(p.risk_pct) && fin(t.risk_pct)) {
     rows.push(t.risk_pct <= p.risk_pct * 1.1
-      ? { ok: true, label: 'Risk as planned', detail: `Plan ${(+p.risk_pct).toFixed(1)}% · took ${(+t.risk_pct).toFixed(1)}%` }
-      : { ok: false, label: 'Risked more than planned', detail: `Plan ${(+p.risk_pct).toFixed(1)}% · took ${(+t.risk_pct).toFixed(1)}%`,
+      ? { ok: true, label: 'Risk on plan', detail: `${(+p.risk_pct).toFixed(1)}% → ${(+t.risk_pct).toFixed(1)}%` }
+      : { ok: false, label: 'Risked more', detail: `${(+p.risk_pct).toFixed(1)}% → ${(+t.risk_pct).toFixed(1)}%`,
         cost: fin(t.risk_money) ? t.risk_money * (1 - p.risk_pct / t.risk_pct) : null, kind: 'risk' });
   }
-  if (!fin(t.sl)) rows.push({ ok: false, label: 'No stop on the trade', detail: `Plan stop ${p.sl}` });
+  if (!fin(t.sl)) rows.push({ ok: false, label: 'No stop', detail: `${p.sl} → none` });
   else {
     const wider = (p.sl - t.sl) * dir;               // > 0: the stop sat further away than planned
     rows.push(wider > tol
-      ? { ok: false, label: 'Stop moved further away', detail: `${p.sl} → ${t.sl}`, cost: cost(wider), kind: 'risk' }
-      : { ok: true, label: 'Stop kept', detail: `Plan ${p.sl} · trade ${t.sl}` });
+      ? { ok: false, label: 'Stop moved', detail: `${p.sl} → ${t.sl}`, cost: cost(wider), kind: 'risk' }
+      : { ok: true, label: 'Stop held', detail: `${p.sl} → ${t.sl}` });
   }
   const reach = (t.exit - p.tp) * dir, lossPlan = cost(dist);
-  if (reach >= -tol) rows.push({ ok: true, label: 'Target reached', detail: `Plan ${p.tp} · out at ${t.exit}` });
-  else if (t.net > 0) rows.push({ ok: false, label: 'Closed before target', detail: `Plan ${p.tp} · out at ${t.exit}`, cost: cost(-reach), kind: 'left' });
-  else if (lossPlan && -t.net > lossPlan * 1.15) rows.push({ ok: false, label: 'Lost more than the plan allowed', detail: `Plan stop ${p.sl} · out at ${t.exit}`, cost: -t.net - lossPlan, kind: 'risk' });
-  else rows.push({ ok: true, label: 'Loss kept to the plan', detail: `Plan stop ${p.sl} · out at ${t.exit}` });
+  if (reach >= -tol) rows.push({ ok: true, label: 'Target hit', detail: `${p.tp} → ${t.exit}` });
+  else if (t.net > 0) rows.push({ ok: false, label: 'Closed early', detail: `${p.tp} → ${t.exit}`, cost: cost(-reach), kind: 'left' });
+  else if (lossPlan && -t.net > lossPlan * 1.15) rows.push({ ok: false, label: 'Bigger loss', detail: `${p.sl} → ${t.exit}`, cost: -t.net - lossPlan, kind: 'risk' });
+  else rows.push({ ok: true, label: 'Loss as planned', detail: `${p.sl} → ${t.exit}` });
   return { rows, followed: rows.filter((r) => r.ok).length, total: rows.length, planPays: cost(Math.abs(p.tp - p.entry)), planLoss: lossPlan, k };
 }
 
@@ -110,6 +110,8 @@ function chartSvg(p, t, { W = 520, H = 190 } = {}) {
   const line = (v, txt) => `<line x1="${L}" x2="${R}" y1="${y(v)}" y2="${y(v)}" class="pv-pl"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" class="pv-plt">${txt}</text>`;
   const movedStop = fin(t.sl) && Math.abs(t.sl - p.sl) > Math.abs(p.entry - p.sl) * 0.1;
   return `<svg viewBox="0 0 ${W} ${H}" class="pvr-svg" role="img" aria-label="Plan lines in white, what the trade did in orange">
+    <rect x="${L}" y="${Math.min(y(p.entry), y(p.tp))}" width="${R - L}" height="${Math.abs(y(p.entry) - y(p.tp))}" class="pv-zr"/>
+    <rect x="${L}" y="${Math.min(y(p.entry), y(p.sl))}" width="${R - L}" height="${Math.abs(y(p.entry) - y(p.sl))}" class="pv-zk"/>
     ${line(p.tp, 'Target')}${line(p.entry, 'Entry')}${line(p.sl, 'Stop')}
     ${movedStop ? `<line x1="${L + 90}" x2="${R}" y1="${y(t.sl)}" y2="${y(t.sl)}" class="pv-ac pv-acd"/><text x="${R}" y="${y(t.sl) - 6}" text-anchor="end" class="pv-act">your stop</text>` : ''}
     <path d="M${L + 24} ${y(t.entry)} C ${L + 140} ${y(t.entry)}, ${ex - 120} ${y(t.exit)}, ${ex} ${y(t.exit)}" class="pv-ac"/>
@@ -124,6 +126,50 @@ const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const when = (t) => { const d = new Date(t.c); return `${DAY[d.getUTCDay()]} ${d.getUTCDate()} ${MON[d.getUTCMonth()]}`; };
 
+// small pictures for the answers: few words, the picture explains
+const V = {
+  // 24h clock (New York time): the 5 best trades as dots, the session most of them sit in as an arc
+  clock(mins, ses) {
+    const R = 30, c = 38, pt = (m, r = R) => { const a = (m / 1440) * Math.PI * 2 - Math.PI / 2; return [c + Math.cos(a) * r, c + Math.sin(a) * r]; };
+    const S = SESS.find((s) => s[0] === ses);
+    let arc = '';
+    if (S) { const [x1, y1] = pt(S[1]), [x2, y2] = pt(S[2]); const span = ((S[2] - S[1] + 1440) % 1440) / 1440; arc = `<path d="M${x1.toFixed(1)} ${y1.toFixed(1)} A${R} ${R} 0 ${span > 0.5 ? 1 : 0} 1 ${x2.toFixed(1)} ${y2.toFixed(1)}" class="v-arc"/>`; }
+    const ticks = [0, 360, 720, 1080].map((m) => { const [a, b] = pt(m, R - 4), [x, y] = pt(m, R + 4); return `<line x1="${a.toFixed(1)}" y1="${b.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" class="v-tick"/>`; }).join('');
+    const dots = mins.map((m) => { const [x, y] = pt(m); return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" class="v-dot"/>`; }).join('');
+    return `<svg viewBox="0 0 76 76" class="v-clock" aria-hidden="true"><circle cx="${c}" cy="${c}" r="${R}" class="v-ring"/>${ticks}${arc}${dots}<text x="${c}" y="${c + 4}" text-anchor="middle" class="v-lab">NY</text></svg>`;
+  },
+  // two bars: the usual loss and this one
+  vs(usual, big, lu, lb) {
+    const w = (v) => Math.max(4, Math.min(100, (v / Math.max(usual, big)) * 100)).toFixed(0);
+    return `<div class="v-vs"><div><span>${lu}</span><i style="width:${w(usual)}%"></i></div><div><span>${lb}</span><i class="neg" style="width:${w(big)}%"></i></div></div>`;
+  },
+  // one bar split in two: what was taken, what was left
+  split(a, b, la, lb) {
+    const p = Math.round((a / (a + b)) * 100);
+    return `<div class="v-split"><div class="v-sbar"><i style="width:${p}%"></i><b style="width:${100 - p}%"></b></div><div class="v-slab"><span>${la}</span><span class="o">${lb}</span></div></div>`;
+  },
+  // one dot per planned trade; a moved stop is an orange ring
+  dots(list) {
+    return `<div class="v-dots">${list.map((x) => `<i class="${x ? 'm' : ''}" title="${x ? 'Stop moved' : 'Stop kept'}"></i>`).join('')}</div>`;
+  },
+  // two rings side by side
+  rings(a, b, la, lb) {
+    const ring = (p, l, o) => { const C = 2 * Math.PI * 22; return `<figure><svg viewBox="0 0 56 56"><circle cx="28" cy="28" r="22" class="v-ring"/><circle cx="28" cy="28" r="22" class="v-fill${o ? ' o' : ''}" stroke-dasharray="${((p / 100) * C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 28 28)"/><text x="28" y="32" text-anchor="middle">${p}%</text></svg><figcaption>${l}</figcaption></figure>`; };
+    return `<div class="v-rings">${ring(a, la, true)}${ring(b, lb, false)}</div>`;
+  },
+  icon(kind) {
+    const clock = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
+    const P = {
+      time: clock, besttime: clock, weekday: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+      overtrade: '<rect x="4" y="4" width="16" height="4" rx="1"/><rect x="4" y="10" width="16" height="4" rx="1"/><rect x="4" y="16" width="16" height="4" rx="1"/>',
+      revenge: '<path d="M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-3 2-4 2-6 1 1 2 2 3 2 0-2-1-4 0-6z"/>', tilt: '<path d="M4 18l6-6 4 4 6-8"/><path d="M14 8h6v6"/>',
+      risk: '<path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.5"/>', hold: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+      nostop: '<circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/>', gaveback: '<path d="M4 16l5-8 4 5 3-3 4 6"/><path d="M4 20h16"/>',
+    };
+    return `<svg viewBox="0 0 24 24" class="v-icon" aria-hidden="true">${P[kind] || '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16v.5"/>'}</svg>`;
+  },
+};
+
 function found(rows, plansByTrade, { money, esc, off = NY_DEFAULT, planHref = '/journal/plan' }) {
   const T = prep(rows);
   if (T.length < 5) return null;
@@ -134,25 +180,23 @@ function found(rows, plansByTrade, { money, esc, off = NY_DEFAULT, planHref = '/
   const Q = [];
   const losses = T.filter((t) => t.net < 0), avgLoss = losses.length ? -sum(losses) / losses.length : 0;
 
-  // 1 best trade, and where the best trades come from
+  // 1 best trade, and when the best trades happen
   const wins = T.filter((t) => t.net > 0).sort((a, b) => b.net - a.net);
   if (wins.length) {
-    const best = wins[0], bySess = {};
-    wins.slice(0, 5).forEach((t) => { const s = sessOf(nyMin(t, off)); bySess[s] = (bySess[s] || 0) + 1; });
+    const best = wins[0], top = wins.slice(0, 5), bySess = {};
+    top.forEach((t) => { const s = sessOf(nyMin(t, off)); bySess[s] = (bySess[s] || 0) + 1; });
     const [ses, n] = Object.entries(bySess).sort((a, b) => b[1] - a[1])[0];
-    Q.push({ q: 'What was your best trade?', a: money(best.net), tone: 'pos',
-      sub: `${esc(best.symbol)} ${side(best)} · ${when(best)}${best.r !== null ? ` · ${best.r >= 0 ? '+' : '−'}${Math.abs(best.r).toFixed(1)}R` : ''}`,
-      fix: n >= 3 && wins.length >= 5 ? `${n} of your 5 best trades came in ${ses} (New York time). Trade more there.` : 'Open it and write down why it worked, so you can spot the next one.',
-      href: `/journal/${best.id}` });
+    Q.push({ q: 'Best trade', a: money(best.net), tone: 'pos', sub: `${esc(best.symbol)} ${side(best)} · ${when(best)}`,
+      viz: V.clock(top.map((t) => nyMin(t, off)), n >= 3 ? ses : ''),
+      fix: n >= 3 && top.length >= 5 ? `${n} of your 5 best: ${ses}. Trade there.` : 'Write down why it worked.', href: `/journal/${best.id}` });
   }
-  // 2 biggest loss, against the usual loss
+  // 2 biggest loss, next to the usual loss
   const worst = [...T].sort((a, b) => a.net - b.net)[0];
   if (worst && worst.net < 0) {
     const x = avgLoss ? -worst.net / avgLoss : 1;
-    Q.push({ q: 'What was your biggest loss?', a: money(worst.net), tone: 'neg',
-      sub: `${esc(worst.symbol)} ${side(worst)} · ${when(worst)} · ${x.toFixed(1)}× your usual loss`,
-      fix: x >= 2 ? `Keep every loss near your usual ${amt(avgLoss)}. Never widen the stop; let KATANA hold it.` : 'It stayed close to your usual loss. That was a controlled loss.',
-      href: `/journal/${worst.id}` });
+    Q.push({ q: 'Biggest loss', a: money(worst.net), tone: 'neg', sub: `${x.toFixed(1)}× your usual loss`,
+      viz: V.vs(avgLoss, -worst.net, 'Usual', 'This one'),
+      fix: x >= 2 ? 'Never widen the stop.' : 'A controlled loss. Keep it so.', href: `/journal/${worst.id}` });
   }
   // 3 real risk per trade
   const rk = T.filter((t) => fin(t.risk_pct)).slice(-60);
@@ -160,43 +204,47 @@ function found(rows, plansByTrade, { money, esc, off = NY_DEFAULT, planHref = '/
     const vals = rk.map((t) => Number(t.risk_pct)), mid = median(vals);
     const planned = median(rk.map((t) => plansByTrade[t.id]?.risk_pct).filter(fin));
     const base = planned || mid, over = rk.filter((t) => t.risk_pct > base * 1.3);
-    const lost = sum(over.filter((t) => t.net < 0));
     const mx = Math.max(...vals, base * 1.5), w = 300 / rk.length;
     const bars = rk.map((t, i) => { const h = Math.max(2, (t.risk_pct / mx) * 46); return `<rect x="${(i * w + 0.5).toFixed(1)}" y="${(50 - h).toFixed(1)}" width="${Math.max(1, w - 1.5).toFixed(1)}" height="${h.toFixed(1)}"${t.risk_pct > base * 1.3 ? ' class="o"' : ''}/>`; }).join('');
     const by = (50 - (base / mx) * 46).toFixed(1);
-    Q.push({ q: 'How much do you really risk per trade?', a: `${Math.min(...vals).toFixed(1)}–${Math.max(...vals).toFixed(1)}%`,
-      sub: `${over.length} of your last ${rk.length} trades went over ${base.toFixed(1)}%${lost ? ` · ${amt(lost)} lost on them` : ''}`,
-      chart: `<svg viewBox="0 0 300 52" class="fq-bars" preserveAspectRatio="none" aria-hidden="true">${bars}<line x1="0" x2="300" y1="${by}" y2="${by}"/></svg>`,
-      fix: over.length ? `Set KATANA to ${base.toFixed(1)}% and keep every trade there.` : `Your risk is steady around ${base.toFixed(1)}%. Keep it there.` });
+    Q.push({ q: 'Real risk per trade', a: `${Math.min(...vals).toFixed(1)}–${Math.max(...vals).toFixed(1)}%`,
+      sub: over.length ? `${over.length} trade${over.length > 1 ? 's' : ''} over ${base.toFixed(1)}%` : `Steady at ${base.toFixed(1)}%`,
+      viz: `<svg viewBox="0 0 300 52" class="fq-bars" preserveAspectRatio="none" aria-hidden="true">${bars}<line x1="0" x2="300" y1="${by}" y2="${by}"/></svg>`,
+      fix: over.length ? `Every trade at ${base.toFixed(1)}%.` : 'Keep it there.' });
   }
   // 4 the habit that costs the most (from Insights)
   const A = analyze(rows, { money, esc });
   const leak = !A.locked && [...A.items].filter((i) => i.tone === 'bad').sort((a, b) => (b.saved || 0) - (a.saved || 0))[0];
-  if (leak) Q.push({ q: 'Which habit costs you the most?', a: esc(leak.tag), tone: 'acc', sub: leak.saved ? `About ${amt(leak.saved)} in this period` : esc(leak.title), fix: leak.fix, href: '/journal/insights' });
+  if (leak) Q.push({ q: 'Costliest habit', a: esc(leak.tag), tone: 'acc', sub: leak.saved ? `−${amt(leak.saved)}` : '',
+    viz: V.icon(leak.kind), fix: esc(String(leak.rule || leak.fix).replace(/<[^>]+>/g, '').split('. ')[0].replace(/\.$/, '')) + '.', href: '/journal/insights' });
   // 5 left on the table: wins closed before their target (the plan's, else the trade's TP)
+  let taken = 0;
   const early = T.filter((t) => t.net > 0 && fin(t.exit)).map((t) => {
     const tp = fin(plansByTrade[t.id]?.tp) ? Number(plansByTrade[t.id].tp) : fin(t.tp) ? Number(t.tp) : null, k = moneyPerPoint(t);
     if (tp === null || !k) return null;
     const left = (tp - t.exit) * t.dir * k;
-    return left > Math.abs(t.net) * 0.1 ? left : null;
+    if (left > Math.abs(t.net) * 0.1) { taken += t.net; return left; }
+    return null;
   }).filter((v) => v !== null);
-  if (early.length) Q.push({ q: 'How much did you leave on the table?', a: amt(early.reduce((s, v) => s + v, 0)), tone: 'acc',
-    sub: `${early.length} winning trade${early.length > 1 ? 's' : ''} closed before the target`, fix: 'Take half at 1R and let the rest run to the target.' });
+  if (early.length) {
+    const left = early.reduce((s, v) => s + v, 0);
+    Q.push({ q: 'Left on the table', a: amt(left), tone: 'acc', sub: `${early.length} win${early.length > 1 ? 's' : ''} closed early`,
+      viz: V.split(taken, left, `Taken ${amt(taken)}`, `Left ${amt(left)}`), fix: 'Half at 1R, rest to target.' });
+  }
   // 6 stops moved (needs plans)
   const pl = T.filter((t) => plansByTrade[t.id]);
   if (pl.length) {
-    const moved = pl.filter((t) => { const p = plansByTrade[t.id]; return fin(t.sl) && (p.sl - t.sl) * t.dir > Math.abs(p.entry - p.sl) * 0.1; });
-    const bad = moved.filter((t) => t.net < 0);
-    Q.push({ q: 'How often do you move your stop?', a: `${moved.length} time${moved.length === 1 ? '' : 's'}`,
-      sub: moved.length ? `${bad.length} of them ended as losses${bad.length ? ` (${amt(sum(bad))})` : ''}` : `in ${pl.length} planned trade${pl.length > 1 ? 's' : ''}`,
-      fix: moved.length ? 'The stop in the plan is final. If the trade needs more room, it was the wrong trade.' : 'Your stops stayed where you planned them. Keep it that way.' });
-  } else Q.push({ q: 'How often do you move your stop?', a: '?', empty: true, sub: 'The journal needs your plan to know where the stop was meant to be.', fix: 'Plan your next trade before you take it.', href: planHref });
+    const mv = pl.map((t) => { const p = plansByTrade[t.id]; return fin(t.sl) && (p.sl - t.sl) * t.dir > Math.abs(p.entry - p.sl) * 0.1; });
+    const moved = pl.filter((t, i) => mv[i]), bad = moved.filter((t) => t.net < 0);
+    Q.push({ q: 'Stops moved', a: `${moved.length} of ${pl.length}`, sub: bad.length ? `${bad.length} became losses · ${amt(sum(bad))}` : 'planned trades',
+      viz: V.dots(mv.slice(-24)), fix: moved.length ? 'The plan\'s stop is final.' : 'Stops held. Keep it so.' });
+  } else Q.push({ q: 'Stops moved', a: '–', empty: true, sub: 'Needs your plans', viz: V.dots([0, 0, 0, 0, 0, 0]), fix: 'Plan your next trade.', href: planHref });
   // 7 planned vs not
   const un = T.filter((t) => !plansByTrade[t.id]);
-  if (pl.length >= 3 && un.length >= 3) Q.push({ q: 'Do your planned trades do better?', a: `${winPct(pl)}% vs ${winPct(un)}%`,
-    sub: `Win rate with a plan (${pl.length}) vs without one (${un.length})`,
-    fix: winPct(pl) >= winPct(un) ? 'Your plans work. Plan every trade before you take it.' : 'Your plans are not better yet. Check the plan vs result of each one.' });
-  else Q.push({ q: 'Do your planned trades do better?', a: '?', empty: true, sub: `${pl.length} planned trade${pl.length === 1 ? '' : 's'} so far. The answer shows after 3.`, fix: 'Plan your next trade before you take it.', href: planHref });
+  if (pl.length >= 3 && un.length >= 3) Q.push({ q: 'Plan vs no plan', a: '', sub: 'Win rate',
+    viz: V.rings(winPct(pl), winPct(un), `Planned · ${pl.length}`, `No plan · ${un.length}`),
+    fix: winPct(pl) >= winPct(un) ? 'Plan every trade.' : 'Check each plan vs result.' });
+  else Q.push({ q: 'Plan vs no plan', a: '', empty: true, sub: `${pl.length} of 3 planned trades needed`, viz: V.rings(0, winPct(un), 'Planned', 'No plan'), fix: 'Plan your next trade.', href: planHref });
   return { count: T.length, items: Q };
 }
 
@@ -205,10 +253,10 @@ function foundHtml(F) {
   return `<section class="found">
     <div class="row between"><h2>What we found</h2><span class="muted small">Last 90 days · ${F.count} trades</span></div>
     <div class="fq-grid">${F.items.map((x, i) => `<${x.href ? `a href="${x.href}"` : 'div'} class="fq${x.empty ? ' empty' : ''}">
-      <span class="fq-n">${String(i + 1).padStart(2, '0')}</span>
-      <span class="fq-q">${x.q}</span>
-      <b class="fq-a${x.tone ? ' ' + x.tone : ''}">${x.a}</b>
-      <span class="fq-s">${x.sub}</span>${x.chart || ''}
+      <span class="fq-q"><em>${String(i + 1).padStart(2, '0')}</em>${x.q}</span>
+      ${x.a ? `<b class="fq-a${x.tone ? ' ' + x.tone : ''}">${x.a}</b>` : ''}
+      <div class="fq-v">${x.viz || ''}</div>
+      ${x.sub ? `<span class="fq-s">${x.sub}</span>` : ''}
       <span class="fq-fix"><i>Fix</i>${x.fix}</span></${x.href ? 'a' : 'div'}>`).join('')}</div></section>`;
 }
 
