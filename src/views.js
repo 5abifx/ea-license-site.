@@ -24,6 +24,7 @@ function brandMark() {
 
 // small stroke icons for the members menu
 const ICONS = {
+  desk: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4M6 13l3-3 3 2 5-5"/>',
   eas: '<path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/>',
   journal: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   insights: '<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
@@ -121,7 +122,7 @@ function appShell(req, u, flashHtml, body, title) {
   </div>
   <nav class="side-nav" id="side-nav" aria-label="Members menu">
     ${group('Main menu', `${item('/dashboard', 'eas', 'My EAs')}
-      ${req.hasJournal ? item('/journal', 'journal', 'Journal', on('/journal') && !on('/journal/insights') && !on('/journal/mentor')) + item('/journal/insights', 'insights', 'Insights') : ''}
+      ${req.hasJournal ? item('/journal/desk', 'desk', 'Desk') + item('/journal', 'journal', 'Journal', on('/journal') && !on('/journal/insights') && !on('/journal/mentor') && !on('/journal/desk')) + item('/journal/insights', 'insights', 'Insights') : ''}
       ${req.mentorEligible && (req.hasJournal || u.mentor_share) ? item('/journal/mentor', 'chat', `Mentor review${req.mentorNew ? `<em class="count">${req.mentorNew}</em>` : ''}`, on('/journal/mentor')) : ''}`)}
     ${group('Account', `${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}
       ${u.google_sub ? '' : item('/password', 'lock', 'Password')}`)}

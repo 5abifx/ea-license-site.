@@ -4,6 +4,8 @@ const { analyze, propGuard, prep, numbers, score, MIN_TRADES } = require('./insi
 const insightsView = require('./insights-view');
 const desk = require('./desk');
 const deskView = require('./desk-view');
+const terminal = require('./terminal');
+const terminalView = require('./terminal-view');
 const express = require('express');
 const { esc, fmtDate } = require('./views');
 
@@ -502,6 +504,40 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <div class="periods" role="navigation" aria-label="Period">${Object.entries(PERIODS).map(([k, l]) => `<a href="/journal/insights${qs({ days: k })}"${k === period ? ' class="on" aria-current="true"' : ''}>${l}</a>`).join('')}
       <span class="muted small">${rows.length} trades${sel ? '' : liveAccts.length > 1 ? ' · all accounts' : ''}</span></div>
     ${body}`);
+  });
+
+  // the Desk: mistake forecast, today's rules, day map, next trade check, you vs your rules
+  app.get('/journal/desk', requireUser, requireJournal, (req, res) => {
+    const u = req.user;
+    const sc = scope(req);
+    const { liveAccts, sel, where, args } = sc;
+    const cur = (sel ? sel.cur : liveAccts[0]?.cur) || '';
+    const m = (v) => money(v, cur);
+    const qs = (o) => '?' + new URLSearchParams(Object.entries({ account: sel ? sel.account_number : '', ...o }).filter(([, v]) => v)).toString();
+    const off = u.ny_offset ?? desk.NY_DEFAULT;
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date()).map((x) => [x.type, x.value]));
+    const nyNow = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute);
+    const rows = db.prepare(`SELECT ${INS_COLS} FROM journal_trades WHERE ${where} ORDER BY close_time`).all(...args);
+    const A = rows.length >= MIN_TRADES ? analyze(rows, { money: m, esc }) : { items: [] };
+    // prop firm numbers when one live account is in view and it has rules
+    const one = sel && !sel.removed ? sel : !sel && liveAccts.length === 1 ? liveAccts[0] : null;
+    let prop = null;
+    if (one) {
+      const acc = db.prepare(`SELECT ${PROP_COLS} FROM accounts WHERE user_id = ? AND account_number = ?`).get(u.id, one.account_number);
+      if (acc) {
+        const dr = desk.prepRows(db.prepare(`SELECT ${DESK_COLS} FROM journal_trades WHERE user_id = ? AND account_number = ? ORDER BY close_time`).all(u.id, one.account_number));
+        const D = desk.desk(dr, limitsOf(acc), desk.serverToday(off));
+        if (D && !D.error) prop = D;
+      }
+    }
+    const T = terminal.build(prep(rows), { offset: off, todayNy: new Date(nyNow).toISOString().slice(0, 10), nowMin: (+p.hour % 24) * 60 + +p.minute,
+      nowBroker: nyNow + off * 3600e3, prop, leaks: A.items, money: m });
+    page(req, res, 'Desk', `
+    <div class="row between page-head"><h1>Desk</h1>
+      <span class="head-btns"><button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers and your name, so you can screenshot this page">Hide private info</button></span></div>
+    ${acctBar(req, '/journal/desk', qs, sc, cur)}
+    ${terminalView.html(T, { money: m, cur, acctNote: one ? (prop ? 'Prop firm rules included' : 'Add firm rules in Insights › Prop firm to include them') : 'All accounts' })}`);
   });
 
   // prop firm rules of one account (percent of the start balance)
