@@ -155,7 +155,7 @@ const draws=[];
 })();
 
 /* 5. edge score ring + number */
-(function(){const I=document.getElementById('ins');const b=I.querySelector('.ring b'),r=I.querySelector('.ra');let done=false;
+(function(){const I=document.getElementById('ins');if(!I)return;const b=I.querySelector('.ring b'),r=I.querySelector('.ra');let done=false;
  new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting||done)return;done=true;r.style.strokeDashoffset=327*(1-r.dataset.to);const s=performance.now();const f=n=>{const p=reduce?1:Math.min(1,(n-s-200)/1800);b.textContent=Math.max(0,Math.round(72*(1-Math.pow(1-Math.max(0,p),3))));if(p<1)requestAnimationFrame(f)};requestAnimationFrame(f)}),{threshold:.3}).observe(I);
 })();
 
@@ -169,6 +169,19 @@ const draws=[];
 /* 7. billing toggle */
 document.querySelectorAll('#price .view button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#price .view button').forEach(q=>q.setAttribute('aria-pressed',String(q===b)));
  document.querySelectorAll('#tiers .amt b').forEach(el=>{el.textContent=el.dataset[b.dataset.b]});document.querySelectorAll('#tiers .amt i').forEach(el=>{el.textContent=b.dataset.b==='y'?'/ month, billed yearly':'/ month'})}));
+
+/* 8. members-area windows: tabs swap the screenshot, auto-advance until the visitor picks one */
+(function(){const W=document.getElementById('wins');if(!W)return;const tabs=[...document.querySelectorAll('.win-tabs button')],imgs=[...W.querySelectorAll('.win:not(.phone) img')],ph=[...W.querySelectorAll('.phone img')],caps=[...document.querySelectorAll('.win-cap p')],path=document.getElementById('win-path');
+ const P=['journal','journal','journal/insights','journal/insights?tab=time','journal/insights','journal/insights?tab=habits','journal/insights?tab=prop'];let cur=0,auto=true,tm=null,seen=false;
+ const show=i=>{cur=(i+imgs.length)%imgs.length;tabs.forEach((t,k)=>t.setAttribute('aria-selected',String(k===cur)));imgs.forEach((m,k)=>{if(k===cur)m.loading='eager';m.classList.toggle('on',k===cur)});caps.forEach((c,k)=>c.hidden=k!==cur);
+  ph.forEach(m=>m.classList.toggle('on',m.dataset.for.split(' ').includes(String(cur))));path.textContent=P[cur];const a=tabs[cur];a.parentNode.scrollTo({left:a.offsetLeft-a.parentNode.offsetWidth/2+a.offsetWidth/2,behavior:reduce?'auto':'smooth'})};
+ const loop=()=>{clearTimeout(tm);if(auto&&seen&&!reduce)tm=setTimeout(()=>{show(cur+1);loop()},5200)};
+ tabs.forEach((t,k)=>t.addEventListener('click',()=>{auto=false;clearTimeout(tm);show(k)}));
+ document.querySelector('.win-tabs').addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();auto=false;show(cur+(e.key==='ArrowRight'?1:-1));tabs[cur].focus()}});
+ new IntersectionObserver(es=>es.forEach(e=>{seen=e.isIntersecting;if(seen)loop();else clearTimeout(tm)}),{threshold:.35}).observe(W);
+ W.addEventListener('pointermove',e=>{if(matchMedia('(hover:none)').matches)return;const r=W.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;W.style.setProperty('--rx',(-y*4).toFixed(2)+'deg');W.style.setProperty('--ry',(x*5).toFixed(2)+'deg')});
+ W.addEventListener('pointerleave',()=>{W.style.setProperty('--rx','0deg');W.style.setProperty('--ry','0deg')});
+})();
 
 addEventListener('resize',()=>draws.forEach(([c])=>fitc(c)));
 function gloop(t){for(const [c,fn] of draws)if(vis.get(c)||reduce)fn(t);if(!reduce)requestAnimationFrame(gloop)}
