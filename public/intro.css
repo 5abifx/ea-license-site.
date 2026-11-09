@@ -57,3 +57,7 @@ html.intro-on { overflow: hidden; }
 @keyframes inBreath { 0%, 100% { transform: scale(.84); } 50% { transform: scale(1.08); box-shadow: 0 0 40px 4px rgba(242,180,65,.14); } }
 .intro .fade { opacity: 0; transform: translateY(12px); transition: opacity .7s, transform .7s; }
 .intro .fade.in { opacity: 1; transform: none; }
+/* keep the site's global uppercase button style out of the overlay */
+.intro button { font-family: "Manrope", system-ui, sans-serif; text-transform: none; letter-spacing: 0; box-shadow: none; filter: none; font-weight: 500; }
+.in-foot .in-link { color: #6b7280; } .in-foot .in-link:hover { color: #eef0f3; }
+.intro .in-skip { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); border-radius: 99px; padding: 8px 18px; color: #c9ced6; font-size: 13px; }
