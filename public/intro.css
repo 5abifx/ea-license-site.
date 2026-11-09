@@ -61,3 +61,12 @@ html.intro-on { overflow: hidden; }
 .intro button { font-family: "Manrope", system-ui, sans-serif; text-transform: none; letter-spacing: 0; box-shadow: none; filter: none; font-weight: 500; }
 .in-foot .in-link { color: #6b7280; } .in-foot .in-link:hover { color: #eef0f3; }
 .intro .in-skip { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); border-radius: 99px; padding: 8px 18px; color: #c9ced6; font-size: 13px; }
+
+/* welcome A, live: the name lands over the moving background and keeps shining */
+.intro::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: -1; background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(0,0,0,.75)); }
+.in-name { will-change: transform; }
+.in-name span { background-image: linear-gradient(105deg, transparent 42%, rgba(255,255,255,.95) 50%, transparent 58%),
+  linear-gradient(180deg, #ffffff 0%, #e4e7ec 40%, #7d8591 50%, #c9ced6 62%, #ffffff 100%);
+  background-size: 400% 100%, 100% 100%; background-repeat: no-repeat; background-position: 150% 0, 0 0; }
+.in-name.live span { animation: inShine 3.2s cubic-bezier(.4,0,.2,1) infinite; }
+@keyframes inShine { 0% { background-position: 150% 0, 0 0; } 55%, 100% { background-position: -60% 0, 0 0; } }

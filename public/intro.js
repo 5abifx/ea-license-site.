@@ -40,24 +40,43 @@
     const clear = () => { timers.forEach(clearTimeout); timers = []; };
     const anim = (el, kf, o) => el && el.animate && el.animate(kf, Object.assign({ fill: 'forwards', easing: 'cubic-bezier(.2,.8,.2,1)' }, o));
 
-    // background embers, tinted by mood
+    // living background, tinted by mood: drifting light, flowing lines like a market tape, rising sparks, a soft glow lift when the name lands
     const cv = ov.querySelector('canvas'), cx = cv.getContext('2d');
-    let W = 0, H = 0, tint = [255, 90, 31];
-    const parts = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), r: Math.random() * 1.8 + 0.4, v: Math.random() * 0.0006 + 0.0002, a: Math.random() * 6 }));
-    const size = () => { const d = Math.min(2, devicePixelRatio || 1); W = cv.width = innerWidth * d; H = cv.height = innerHeight * d; };
+    let W = 0, H = 0, DPR = 1, tint = [255, 90, 31], energy = 0, mx = 0.5, my = 0.5, tmx = 0.5, tmy = 0.5;
+    const sparks = Array.from({ length: 90 }, () => ({ x: Math.random(), y: Math.random(), r: Math.random() * 1.7 + 0.3, v: Math.random() * 0.0009 + 0.0002, a: Math.random() * 6, w: Math.random() * 2 - 1 }));
+    const blobs = [[1, 0.22, 0.55, 0.00011, 0.00017, 0, 1], [1.3, 0.12, 0.42, 0.00016, 0.00009, 2, 0.5], [0.6, 0.22, 0.65, 0.00007, 0.00013, 4, 3], [-1, 0.07, 0.5, 0.00013, 0.00008, 1, 5]];
+    const size = () => { DPR = Math.min(2, devicePixelRatio || 1); W = cv.width = innerWidth * DPR; H = cv.height = innerHeight * DPR; };
     size(); addEventListener('resize', size);
-    (function loop() {
+    ov.addEventListener('pointermove', (e) => { tmx = e.clientX / innerWidth; tmy = e.clientY / innerHeight; });
+    const shade = (k) => (k < 0 ? [120, 135, 160] : tint.map((c) => Math.max(0, Math.min(255, Math.round(c * k)))));
+    (function loop(t) {
       if (closed) return;
-      cx.clearRect(0, 0, W, H);
-      const g = cx.createRadialGradient(W / 2, H * 0.55, 0, W / 2, H * 0.55, Math.max(W, H) * 0.6);
-      g.addColorStop(0, `rgba(${tint},.12)`); g.addColorStop(1, 'rgba(0,0,0,0)');
-      cx.fillStyle = g; cx.fillRect(0, 0, W, H);
-      parts.forEach((p) => {
-        p.y -= p.v; if (p.y < -0.02) { p.y = 1.02; p.x = Math.random(); } p.a += 0.01;
-        cx.fillStyle = `rgba(${tint},${0.25 + Math.sin(p.a) * 0.2})`; cx.beginPath(); cx.arc(p.x * W, p.y * H, p.r * Math.max(1, W / 900), 0, 7); cx.fill();
+      t = t || 0; mx += (tmx - mx) * 0.04; my += (tmy - my) * 0.04; energy *= 0.985;
+      cx.globalCompositeOperation = 'source-over'; cx.fillStyle = '#030405'; cx.fillRect(0, 0, W, H);
+      cx.globalCompositeOperation = 'lighter';
+      const m = Math.max(W, H);
+      blobs.forEach(([k, a, r, sx, sy, px, py]) => {
+        const x = W * (0.5 + 0.32 * Math.sin(t * sx + px) + (mx - 0.5) * 0.08), y = H * (0.6 + 0.22 * Math.cos(t * sy + py) + (my - 0.5) * 0.06);
+        const g = cx.createRadialGradient(x, y, 0, x, y, m * r);
+        g.addColorStop(0, `rgba(${shade(k)},${a * (1 + energy * 0.8)})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+        cx.fillStyle = g; cx.fillRect(0, 0, W, H);
+      });
+      cx.lineWidth = DPR;
+      for (let k = 0; k < 7; k++) {
+        cx.beginPath();
+        const base = H * (0.62 + k * 0.05), amp = H * (0.025 + k * 0.006), sp = t * (0.00025 + k * 0.00004);
+        for (let x = 0; x <= W; x += 8 * DPR) { const y = base + Math.sin((x / W) * 6 + sp + k) * amp + Math.sin((x / W) * 13 - sp * 1.6) * amp * 0.35; if (x) cx.lineTo(x, y); else cx.moveTo(x, y); }
+        cx.strokeStyle = `rgba(${shade(1 + k * 0.06)},${0.05 + 0.015 * (6 - k) + energy * 0.05})`; cx.stroke();
+      }
+      sparks.forEach((p) => {
+        p.y -= p.v * (1 + energy * 3); p.x += Math.sin(t * 0.001 + p.a) * 0.0002 * p.w; p.a += 0.015;
+        if (p.y < -0.02) { p.y = 1.02; p.x = Math.random(); }
+        cx.fillStyle = `rgba(${shade(1.15)},${0.35 + Math.sin(p.a) * 0.25})`;
+        cx.beginPath(); cx.arc(p.x * W + (mx - 0.5) * 30 * DPR * p.r, p.y * H, p.r * DPR * 1.2, 0, 7); cx.fill();
       });
       requestAnimationFrame(loop);
     })();
+    const pulse = () => { energy = 1; };
 
     function close() {
       if (closed) return; closed = true; clear();
@@ -89,6 +108,7 @@
 
     function welcome(done) {
       tint = [255, 90, 31]; footWelcome();
+      const name = D.name, quote = D.quote;
       const chips = `${D.dayN ? `<span class="in-chip">Day <b>${D.dayN}</b> of your journey</span>` : ''}${D.streak ? `<span class="in-chip">Rules streak <b>${D.streak} day${D.streak === 1 ? '' : 's'}</b></span>` : ''}`;
       if (style === 'boot') {
         const lines = [
@@ -106,17 +126,24 @@
       scene.innerHTML = `<div class="in-wel">
         <img class="in-logo" src="/logo.png" alt="">
         <div class="in-kick">WELCOME BACK, TRADER</div><div class="in-rule"></div>
-        <div class="in-name">${[...D.name].map((c) => (c === ' ' ? '<span class="sp"></span>' : `<span>${esc(c)}</span>`)).join('')}</div>
-        <div class="in-tag">${chips}</div><div class="in-quote">“${esc(D.quote)}”</div></div>`;
-      anim(scene.querySelector('.in-logo'), [{ opacity: 0, transform: 'translateY(10px) scale(.85)' }, { opacity: 1, transform: 'none' }], { duration: 900 });
-      anim(scene.querySelector('.in-kick'), [{ opacity: 0, letterSpacing: '.9em' }, { opacity: 1, letterSpacing: '.42em' }], { duration: 1100 });
-      later(500, () => anim(scene.querySelector('.in-rule'), [{ width: '0px' }, { width: 'min(420px,70vw)' }], { duration: 1200 }));
+        <div class="in-name">${[...name].map((c, k) => (c === ' ' ? '<span class="sp"></span>' : `<span style="animation-delay:${(k * 0.07).toFixed(2)}s">${esc(c)}</span>`)).join('')}</div>
+        <div class="in-tag">${chips}</div><div class="in-quote">“${esc(quote)}”</div></div>`;
+      const q = (sel) => scene.querySelector(sel);
+      // 3. the name
+      const T = 300;
+      later(T, () => {
+        anim(q('.in-logo'), [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 800 });
+        anim(q('.in-kick'), [{ opacity: 0, letterSpacing: '.9em' }, { opacity: 1, letterSpacing: '.42em' }], { duration: 1000 });
+      });
+      later(T + 200, () => anim(q('.in-rule'), [{ width: '0px' }, { width: 'min(420px,70vw)' }], { duration: 1000 }));
       const letters = [...scene.querySelectorAll('.in-name span')];
-      letters.forEach((s, i) => later(800 + i * 90, () => anim(s, [{ opacity: 0, transform: 'translateY(40%) rotate(4deg)', filter: 'blur(8px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 900 })));
-      const end = 800 + letters.length * 90 + 700;
-      later(end, () => anim(scene.querySelector('.in-tag'), [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 700 }));
-      later(end + 500, () => anim(scene.querySelector('.in-quote'), [{ opacity: 0 }, { opacity: 1 }], { duration: 900 }));
-      later(end + 3000, done);
+      letters.forEach((x, i) => later(T + 350 + i * 85, () => anim(x, [{ opacity: 0, transform: 'translateY(45%) rotate(4deg) scale(1.1)', filter: 'blur(10px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 900 })));
+      const land = T + 350 + letters.length * 85 + 450;
+      later(land, () => { pulse(); q('.in-name').classList.add('live');
+        q('.in-name').animate([{ transform: 'scale(1)' }, { transform: 'scale(1.012)' }, { transform: 'scale(1)' }], { duration: 4200, iterations: Infinity, easing: 'ease-in-out' }); });
+      later(land + 300, () => anim(q('.in-tag'), [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 700 }));
+      later(land + 700, () => anim(q('.in-quote'), [{ opacity: 0 }, { opacity: 1 }], { duration: 900 }));
+      later(land + 3600, done);
     }
 
     function reveal() {
