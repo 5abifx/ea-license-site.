@@ -23,7 +23,7 @@
   function start(D, showW, R) {
     if (!document.querySelector('link[data-intro]')) {
       const f = document.createElement('link'); f.rel = 'stylesheet'; f.dataset.intro = '1';
-      f.href = 'https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@900&family=Instrument+Serif:ital@0;1&display=swap';
+      f.href = 'https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@900&family=Great+Vibes&family=Sora:wght@300;400&family=Instrument+Serif:ital@0;1&display=swap';
       document.head.appendChild(f);
       const c = document.createElement('link'); c.rel = 'stylesheet'; c.href = '/intro.css'; c.dataset.intro = '1'; document.head.appendChild(c);
     }
@@ -40,9 +40,11 @@
     const clear = () => { timers.forEach(clearTimeout); timers = []; };
     const anim = (el, kf, o) => el && el.animate && el.animate(kf, Object.assign({ fill: 'forwards', easing: 'cubic-bezier(.2,.8,.2,1)' }, o));
 
-    // living background, tinted by mood: drifting light, flowing lines like a market tape, rising sparks, a soft glow lift when the name lands
+    // living background, kept dark (owner's choice) and tinted by mood: faint drifting light, flowing lines like a market tape, rising sparks,
+    // and a soft horizontal light streak across the name when it lands
     const cv = ov.querySelector('canvas'), cx = cv.getContext('2d');
-    let W = 0, H = 0, DPR = 1, tint = [255, 90, 31], energy = 0, mx = 0.5, my = 0.5, tmx = 0.5, tmy = 0.5;
+    let W = 0, H = 0, DPR = 1, tint = [255, 90, 31], energy = 0, mx = 0.5, my = 0.5, tmx = 0.5, tmy = 0.5, streaks = [], lineY = 0.5;
+    const DARK = 0.28;
     const sparks = Array.from({ length: 90 }, () => ({ x: Math.random(), y: Math.random(), r: Math.random() * 1.7 + 0.3, v: Math.random() * 0.0009 + 0.0002, a: Math.random() * 6, w: Math.random() * 2 - 1 }));
     const blobs = [[1, 0.22, 0.55, 0.00011, 0.00017, 0, 1], [1.3, 0.12, 0.42, 0.00016, 0.00009, 2, 0.5], [0.6, 0.22, 0.65, 0.00007, 0.00013, 4, 3], [-1, 0.07, 0.5, 0.00013, 0.00008, 1, 5]];
     const size = () => { DPR = Math.min(2, devicePixelRatio || 1); W = cv.width = innerWidth * DPR; H = cv.height = innerHeight * DPR; };
@@ -58,7 +60,7 @@
       blobs.forEach(([k, a, r, sx, sy, px, py]) => {
         const x = W * (0.5 + 0.32 * Math.sin(t * sx + px) + (mx - 0.5) * 0.08), y = H * (0.6 + 0.22 * Math.cos(t * sy + py) + (my - 0.5) * 0.06);
         const g = cx.createRadialGradient(x, y, 0, x, y, m * r);
-        g.addColorStop(0, `rgba(${shade(k)},${a * (1 + energy * 0.8)})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+        g.addColorStop(0, `rgba(${shade(k)},${a * DARK * (1 + energy * 0.8)})`); g.addColorStop(1, 'rgba(0,0,0,0)');
         cx.fillStyle = g; cx.fillRect(0, 0, W, H);
       });
       cx.lineWidth = DPR;
@@ -66,17 +68,29 @@
         cx.beginPath();
         const base = H * (0.62 + k * 0.05), amp = H * (0.025 + k * 0.006), sp = t * (0.00025 + k * 0.00004);
         for (let x = 0; x <= W; x += 8 * DPR) { const y = base + Math.sin((x / W) * 6 + sp + k) * amp + Math.sin((x / W) * 13 - sp * 1.6) * amp * 0.35; if (x) cx.lineTo(x, y); else cx.moveTo(x, y); }
-        cx.strokeStyle = `rgba(${shade(1 + k * 0.06)},${0.05 + 0.015 * (6 - k) + energy * 0.05})`; cx.stroke();
+        cx.strokeStyle = `rgba(${shade(1 + k * 0.06)},${(0.05 + 0.015 * (6 - k)) * 0.6 + energy * 0.03})`; cx.stroke();
       }
       sparks.forEach((p) => {
         p.y -= p.v * (1 + energy * 3); p.x += Math.sin(t * 0.001 + p.a) * 0.0002 * p.w; p.a += 0.015;
         if (p.y < -0.02) { p.y = 1.02; p.x = Math.random(); }
-        cx.fillStyle = `rgba(${shade(1.15)},${0.35 + Math.sin(p.a) * 0.25})`;
+        cx.fillStyle = `rgba(${shade(1.15)},${0.22 + Math.sin(p.a) * 0.16})`;
         cx.beginPath(); cx.arc(p.x * W + (mx - 0.5) * 30 * DPR * p.r, p.y * H, p.r * DPR * 1.2, 0, 7); cx.fill();
+      });
+      streaks = streaks.filter((s) => t - s.t < s.d);
+      streaks.forEach((s) => {
+        const k = (t - s.t) / s.d, e = 1 - Math.pow(1 - k, 3), x = W * (-0.25 + 1.5 * e), y = H * lineY, fade = Math.sin(Math.PI * k);
+        cx.save(); cx.translate(x, y); cx.scale(7, 0.55);
+        const g = cx.createRadialGradient(0, 0, 0, 0, 0, H * 0.16);
+        g.addColorStop(0, `rgba(255,236,214,${0.5 * fade})`); g.addColorStop(0.35, `rgba(255,150,90,${0.18 * fade})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+        cx.fillStyle = g; cx.beginPath(); cx.arc(0, 0, H * 0.16, 0, 7); cx.fill(); cx.restore();
+        const lg = cx.createLinearGradient(x - W * 0.45, 0, x + W * 0.45, 0);
+        lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(0.5, `rgba(255,244,230,${0.7 * fade})`); lg.addColorStop(1, 'rgba(255,255,255,0)');
+        cx.fillStyle = lg; cx.fillRect(x - W * 0.45, y - DPR * 0.75, W * 0.9, DPR * 1.5);
       });
       requestAnimationFrame(loop);
     })();
     const pulse = () => { energy = 1; };
+    const streak = (el, d) => { const r = el.getBoundingClientRect(); lineY = (r.top + r.height * 0.55) / innerHeight; streaks.push({ t: performance.now(), d }); };
 
     function close() {
       if (closed) return; closed = true; clear();
@@ -123,27 +137,68 @@
         later(150 + lines.length * 420 + 2200, done);
         return;
       }
-      scene.innerHTML = `<div class="in-wel">
+      // 1. from black, a gold hairline draws and the small 5ABI.FX mark rises with it
+      scene.innerHTML = `<div class="in-brand"><div class="in-blogo"><img src="/logo.png" alt="5ABI.FX"><span class="in-glint"></span></div><span class="in-bword">5ABI<b>.FX</b></span></div><i class="in-hair"></i>
+        <div class="in-wel">
         <img class="in-logo" src="/logo.png" alt="">
-        <div class="in-kick">WELCOME BACK, TRADER</div><div class="in-rule"></div>
+        <div class="in-script" role="img" aria-label="Welcome back,"></div>
         <div class="in-name">${[...name].map((c, k) => (c === ' ' ? '<span class="sp"></span>' : `<span style="animation-delay:${(k * 0.07).toFixed(2)}s">${esc(c)}</span>`)).join('')}</div>
-        <div class="in-tag">${chips}</div><div class="in-quote">“${esc(quote)}”</div></div>`;
+        <div class="in-tag">${chips}</div><div class="in-quote">“${esc(quote)}”</div></div><i class="in-pen"></i>`;
       const q = (sel) => scene.querySelector(sel);
-      // 3. the name
-      const T = 300;
-      later(T, () => {
-        anim(q('.in-logo'), [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 800 });
-        anim(q('.in-kick'), [{ opacity: 0, letterSpacing: '.9em' }, { opacity: 1, letterSpacing: '.42em' }], { duration: 1000 });
-      });
-      later(T + 200, () => anim(q('.in-rule'), [{ width: '0px' }, { width: 'min(420px,70vw)' }], { duration: 1000 }));
+      anim(q('.in-hair'), [{ width: '0px', opacity: 1 }, { width: 'min(460px,74vw)', opacity: 1 }], { duration: 800 });
+      anim(q('.in-blogo'), [{ opacity: 0, transform: 'translateY(-6px)' }, { opacity: 1, transform: 'none' }], { duration: 800, delay: 150 });
+      anim(q('.in-bword'), [{ opacity: 0, letterSpacing: '1em' }, { opacity: 1, letterSpacing: '.62em' }], { duration: 900, delay: 200 });
+      later(500, () => anim(q('.in-glint'), [{ backgroundPosition: '200% 0' }, { backgroundPosition: '-110% 0' }], { duration: 800, easing: 'ease-in-out' }));
+      later(1250, () => { anim(q('.in-brand'), [{ opacity: 1 }, { opacity: 0 }], { duration: 350 }); anim(q('.in-hair'), [{ opacity: 1 }, { opacity: 0 }], { duration: 400 }); });
+      // 2. a point of light handwrites "Welcome back," in gold, then the name rises in Steel
+      const fontReady = Promise.race([document.fonts ? document.fonts.load('64px "Great Vibes"') : Promise.resolve(), new Promise((ok) => setTimeout(ok, 1300))]);
+      const T = 1400;
+      later(T, () => fontReady.then(() => {
+        if (closed) return;
+        anim(q('.in-logo'), [{ opacity: 0 }, { opacity: 0.9 }], { duration: 600 });
+        const box = q('.in-script');
+        anim(box, [{ opacity: 0 }, { opacity: 1 }], { duration: 10 });
+        handwrite(box, 'Welcome back,', Math.min(innerWidth * 0.085, 64), 1250, q('.in-pen'));
+      }));
       const letters = [...scene.querySelectorAll('.in-name span')];
-      letters.forEach((x, i) => later(T + 350 + i * 85, () => anim(x, [{ opacity: 0, transform: 'translateY(45%) rotate(4deg) scale(1.1)', filter: 'blur(10px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 900 })));
-      const land = T + 350 + letters.length * 85 + 450;
-      later(land, () => { pulse(); q('.in-name').classList.add('live');
-        q('.in-name').animate([{ transform: 'scale(1)' }, { transform: 'scale(1.012)' }, { transform: 'scale(1)' }], { duration: 4200, iterations: Infinity, easing: 'ease-in-out' }); });
-      later(land + 300, () => anim(q('.in-tag'), [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 700 }));
-      later(land + 700, () => anim(q('.in-quote'), [{ opacity: 0 }, { opacity: 1 }], { duration: 900 }));
-      later(land + 3600, done);
+      later(T + 900, () => letters.forEach((x, k) => anim(x, [{ opacity: 0, transform: 'translateY(30%)', filter: 'blur(8px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 900, delay: k * 55 })));
+      const land = T + 1700;
+      later(land, () => { pulse(); streak(q('.in-name'), 1300); q('.in-name').classList.add('live'); });
+      later(land - 100, () => anim(q('.in-tag'), [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 600 }));
+      later(land + 200, () => anim(q('.in-quote'), [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 800 }));
+      later(land + 3300, done);
+    }
+
+    // calligraphy written in light: a thin gold outline traces the glyphs while a pen of light sweeps left to right
+    // and the gold fill follows behind it through a soft-edged mask
+    function handwrite(box, text, fs, dur, pen) {
+      const NS = 'http://www.w3.org/2000/svg', id = 'inw' + Date.now();
+      const svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.innerHTML = `<defs><linearGradient id="${id}m" gradientUnits="userSpaceOnUse" y1="0" y2="0"><stop offset="0" stop-color="#fff"/><stop class="a" offset="0" stop-color="#fff"/><stop class="b" offset="0" stop-color="#000"/><stop offset="1" stop-color="#000"/></linearGradient>
+        <mask id="${id}k" maskUnits="userSpaceOnUse"><rect fill="url(#${id}m)"/></mask></defs>
+        <text class="o" fill="none" stroke="#f3dcb6" stroke-width="${fs / 140}" opacity=".8" style="stroke-dasharray:900;stroke-dashoffset:900" font-family="'Great Vibes',cursive" font-size="${fs}">${esc(text)}</text>
+        <text fill="#e9cfa6" mask="url(#${id}k)" font-family="'Great Vibes',cursive" font-size="${fs}">${esc(text)}</text>`;
+      box.appendChild(svg);
+      // getBBox is the font box, not the ink: swashes reach past it, so pad it and pull the margins back in
+      const o = svg.querySelector('.o'), bb = o.getBBox(), px = bb.height * 0.35, py = bb.height * 0.45;
+      const x = bb.x - px, y = bb.y - py, w = bb.width + 2 * px, h = bb.height + 2 * py;
+      svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`); svg.setAttribute('width', w); svg.setAttribute('height', h);
+      svg.style.margin = `${-py * 0.75}px ${-px * 0.8}px`;
+      const mg = svg.querySelector('linearGradient'); mg.setAttribute('x1', x); mg.setAttribute('x2', x + w);
+      [svg.querySelector('rect'), svg.querySelector('mask')].forEach((el) => Object.entries({ x, y, width: w, height: h }).forEach(([k, v]) => el.setAttribute(k, v)));
+      anim(o, [{ strokeDashoffset: 900, opacity: 0.9 }, { strokeDashoffset: 0, opacity: 0.9, offset: 0.85 }, { strokeDashoffset: 0, opacity: 0.25 }], { duration: dur * 1.15, easing: 'cubic-bezier(.5,0,.3,1)' });
+      const a = svg.querySelector('.a'), b = svg.querySelector('.b'), t0 = performance.now();
+      (function step() {
+        if (closed) return;
+        const k = Math.min(1, (performance.now() - t0) / dur), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2, f = 0.06;
+        a.setAttribute('offset', Math.max(0, e * (1 + f) - f)); b.setAttribute('offset', Math.min(1, e * (1 + f)));
+        const r = svg.getBoundingClientRect(), px2 = (bb.x - x + bb.width * e) / w;
+        pen.style.left = r.left + r.width * px2 + 'px';
+        pen.style.top = r.top + r.height * (0.55 + Math.sin(e * Math.PI * 9) * 0.17) + 'px';
+        pen.style.opacity = k < 0.04 ? k / 0.04 : k > 0.94 ? (1 - k) / 0.06 : 1;
+        if (k < 1) requestAnimationFrame(step); else pen.style.opacity = 0;
+      })();
     }
 
     function reveal() {

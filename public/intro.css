@@ -70,3 +70,21 @@ html.intro-on { overflow: hidden; }
   background-size: 400% 100%, 100% 100%; background-repeat: no-repeat; background-position: 150% 0, 0 0; }
 .in-name.live span { animation: inShine 3.2s cubic-bezier(.4,0,.2,1) infinite; }
 @keyframes inShine { 0% { background-position: 150% 0, 0 0; } 55%, 100% { background-position: -60% 0, 0 0; } }
+
+/* welcome opening: gold hairline + small 5ABI.FX, then "Welcome back," handwritten in light, then the name in Steel */
+.intro { background: #020304; }
+.in-brand { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 14px; pointer-events: none; }
+.in-blogo { position: relative; width: 44px; opacity: 0; }
+.in-blogo img { width: 100%; height: auto; display: block; filter: drop-shadow(0 6px 16px rgba(0,0,0,.8)); }
+.in-glint { position: absolute; inset: 0; -webkit-mask: url(/logo.png) center/contain no-repeat; mask: url(/logo.png) center/contain no-repeat;
+  background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.95) 50%, transparent 65%) 200% 0/250% 100% no-repeat; mix-blend-mode: screen; }
+.in-bword { font: 300 clamp(13px, 1.5vw, 16px)/1 "Sora", system-ui, sans-serif; letter-spacing: .62em; padding-left: .62em; color: #d9dde3; white-space: nowrap; opacity: 0; }
+.in-bword b { font-weight: 400; color: #ff5a1f; }
+.in-hair { position: absolute; left: 50%; top: 50%; height: 1px; width: 0; transform: translate(-50%, -50%); pointer-events: none;
+  background: linear-gradient(90deg, transparent, #e9cfa6 30%, #fff 50%, #e9cfa6 70%, transparent); box-shadow: 0 0 12px rgba(233,207,166,.45); }
+.in-wel .in-logo { width: 34px; }
+.in-script { line-height: 0; opacity: 0; min-height: 40px; }
+.in-script svg { display: block; overflow: visible; }
+.in-pen { position: absolute; left: 0; top: 0; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: #fff; opacity: 0; z-index: 3; pointer-events: none;
+  box-shadow: 0 0 10px 3px rgba(255,226,190,.95), 0 0 36px 10px rgba(255,120,50,.5), 0 0 90px 20px rgba(255,90,31,.2); }
+.in-wel .in-tag { margin-top: 4px; }
