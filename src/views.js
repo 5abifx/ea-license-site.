@@ -135,6 +135,8 @@ function appShell(req, u, flashHtml, body, title) {
 <div class="app-main">
   <div class="app-top"><span class="crumb"><a href="/dashboard">Home</a><i>›</i><b>${esc(title)}</b></span>${u.name ? `<span class="who priv-hide">${esc(u.name)}</span>` : ''}</div>
   <main class="app-body">${flashHtml}${body}</main>
+  ${(u.student || u.mentor_plan || u.is_admin) && (u.intro_welcome !== 0 || (req.path === '/journal' && req.hasJournal && u.intro_reveal !== 'never'))
+    ? `<script src="/intro.js" defer data-w="${u.intro_welcome === 0 ? 0 : 1}" data-ws="${process.env.WELCOME_STYLE === 'boot' ? 'boot' : 'name'}" data-r="${req.path === '/journal' && req.hasJournal ? esc(u.intro_reveal || 'always') : ''}"></script>` : ''}
   <footer class="app-foot"><span class="foot-links"><a href="/faq">FAQ</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></span><span class="muted">${RISK}</span></footer>
 </div>
 </div>

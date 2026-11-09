@@ -66,6 +66,10 @@ function client(base, ip) {
     const bob2 = client(base);
     await bob2.post('/login', { email: 'bob@test.com', password: 'bobpass123' });
     assert.match((await bob2.get('/dashboard')).text, /Gold Scalper/);
+    // student intro: not for regular members, on for admins
+    assert.equal(JSON.parse((await bob2.get('/api/intro')).text).ok, false);
+    assert.doesNotMatch((await bob2.get('/dashboard')).text, /intro\.js/);
+    assert.equal(JSON.parse((await admin.get('/api/intro?reveal=1')).text).ok, true);
     r = await bob.post('/password', { current: 'bobpass123', password: 'bobnewpass1' });
     assert.match(r.text, /Other devices are signed out/);
     assert.doesNotMatch((await bob2.get('/dashboard')).text, /Gold Scalper/);
