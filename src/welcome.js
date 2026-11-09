@@ -16,20 +16,6 @@ const QUOTES = {
 };
 const pick = (l, seed) => l[Math.abs(seed) % l.length];
 
-// the student's own look for the welcome (picked in the overlay's Customize panel)
-const LOOK = { style: ['name', 'boot'], font: ['steel', 'wide', 'tech', 'luxe', 'brush', 'goth', 'serif'], color: ['chrome', 'gold', 'ember', 'teal', 'ice'] };
-function cleanLook(v) {
-  let o = {};
-  try { o = typeof v === 'string' ? JSON.parse(v || '{}') : v || {}; } catch (e) { o = {}; }
-  const out = {};
-  Object.keys(LOOK).forEach((k) => { if (LOOK[k].includes(o[k])) out[k] = o[k]; });
-  const name = String(o.name || '').replace(/[^\p{L}\p{N} .'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 14);
-  if (name) out.name = name;
-  const quote = String(o.quote || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 90);
-  if (quote) out.quote = quote;
-  return out;
-}
-
 const isStudent = (u) => !!(u && (u.student || u.mentor_plan || u.is_admin));
 const median = (l) => { const s = [...l].sort((a, b) => a - b); const m = s.length >> 1; return s.length ? (s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) : 0; };
 const fmtU = (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}R`;
@@ -134,7 +120,6 @@ function build(db, u, { withReveal }) {
 module.exports = function welcome(app, { db, requireUser }) {
   const cols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   if (!cols.includes('intro_welcome')) db.exec('ALTER TABLE users ADD COLUMN intro_welcome INTEGER NOT NULL DEFAULT 1');          // 0 = no welcome after sign-in
-  if (!cols.includes('intro_look')) db.exec("ALTER TABLE users ADD COLUMN intro_look TEXT NOT NULL DEFAULT ''");            // JSON: style, font, color, name, quote
   if (!cols.includes('intro_reveal')) db.exec("ALTER TABLE users ADD COLUMN intro_reveal TEXT NOT NULL DEFAULT 'always'");      // always | green | never
 
   // GET /api/intro?reveal=1  data for the overlay (only fetched when something is due today)
@@ -144,16 +129,13 @@ module.exports = function welcome(app, { db, requireUser }) {
     const want = req.query.reveal === '1' && req.hasJournal && u.intro_reveal !== 'never';
     const d = build(db, u, { withReveal: want });
     if (d.reveal && u.intro_reveal === 'green' && d.reveal.mood !== 'green') d.reveal = null;
-    const look = cleanLook(u.intro_look);
-    res.json({ ok: true, ...d, welcome: !!u.intro_welcome, pref: u.intro_reveal,
-      look: { style: process.env.WELCOME_STYLE === 'boot' ? 'boot' : 'name', font: 'steel', color: 'chrome', ...look, myName: look.name || '', myQuote: look.quote || '' } });
+    res.json({ ok: true, ...d, welcome: !!u.intro_welcome, pref: u.intro_reveal });
   });
 
-  // POST /api/intro/pref { welcome: 0|1 } or { reveal: always|green|never } or { look: { style, font, color, name, quote } }
+  // POST /api/intro/pref { welcome: 0|1 } or { reveal: always|green|never }
   app.post('/api/intro/pref', requireUser, require('express').json(), (req, res) => {
     const b = req.body || {};
     if ('welcome' in b) db.prepare('UPDATE users SET intro_welcome = ? WHERE id = ?').run(b.welcome ? 1 : 0, req.user.id);
-    if (b.look && typeof b.look === 'object') db.prepare('UPDATE users SET intro_look = ? WHERE id = ?').run(JSON.stringify(cleanLook(b.look)), req.user.id);
     if (['always', 'green', 'never'].includes(b.reveal)) db.prepare('UPDATE users SET intro_reveal = ? WHERE id = ?').run(b.reveal, req.user.id);
     res.json({ ok: true });
   });
@@ -161,4 +143,3 @@ module.exports = function welcome(app, { db, requireUser }) {
   return { isStudent };
 };
 module.exports.build = build;
-module.exports.cleanLook = cleanLook;
