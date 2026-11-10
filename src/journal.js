@@ -7,6 +7,7 @@ const deskView = require('./desk-view');
 const terminal = require('./terminal');
 const news = require('./news');
 const terminalView = require('./terminal-view');
+const TP = require('./tradeplans');
 const express = require('express');
 const { esc, fmtDate } = require('./views');
 
@@ -16,6 +17,7 @@ const EMOTIONS = ['', 'Calm', 'Confident', 'Patient', 'Anxious', 'Greedy', 'Fear
 const KEEP_IF_EDITED = ['sl', 'r', 'risk_money', 'risk_pct'];   // columns the trader can correct
 
 module.exports = function registerJournal(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox }) {
+  TP.init(db);
   const hasJournal = (u) => !!u && (u.is_admin || (u.status === 'active' && !isExpired(u) && !!db.prepare(`
     SELECT 1 FROM user_eas ue JOIN eas e ON e.id = ue.ea_id
     WHERE ue.user_id = ? AND e.code = ? AND e.active = 1`).get(u.id, JOURNAL_CODE)));
@@ -169,6 +171,10 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   const PROP_COLS = 'prop_daily, prop_max, prop_target, prop_start, prop_consistency, prop_firm';
   const limitsOf = (a) => ({ daily: a.prop_daily, max: a.prop_max, target: a.prop_target, start: a.prop_start, consistency: a.prop_consistency, firm: a.prop_firm });
   const maskNum = (n) => `Account ••${esc(String(n).slice(-2))}`;
+
+  // trade plans: { trade id: plan } for the matched ones, and the small tag shown next to a trade
+  const plansByTrade = (uid) => Object.fromEntries(db.prepare("SELECT * FROM trade_plans WHERE user_id = ? AND status = 'matched'").all(uid).map((p) => [p.trade_id, p]));
+  const planTag = (p) => (p ? '<br><span class="ptag">Planned</span>' : '<br><span class="ptag no">No plan</span>');
   // prop firm desk cards for these accounts (all their trades)
   const deskCards = (u, accounts, cur, linkTo) => accounts.map((a) => {
     const L = limitsOf(db.prepare(`SELECT ${PROP_COLS} FROM accounts WHERE user_id = ? AND account_number = ?`).get(u.id, a.account_number) || {});
@@ -190,6 +196,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       : (latest || new Date().toISOString()).slice(0, 7);
     const trades = db.prepare(`SELECT id, account_number, symbol, side, lots, net, r, open_time, close_time, balance_after, setup, currency, broker
         FROM journal_trades WHERE ${where} AND substr(close_time, 1, 7) = ? ORDER BY close_time`).all(...args, month);
+    TP.match(db, u);
+    const plans = plansByTrade(u.id);
     const cur = (sel ? sel.cur : liveAccts[0]?.cur) || '';
     const days = {};
     trades.forEach((t) => { (days[t.close_time.slice(0, 10)] ||= []).push(t); });
@@ -245,11 +253,11 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       return `<div class="dayp" data-day="${d}"${d === pickDay ? '' : ' hidden'}>
         <h3>${wd} ${Number(d.slice(8))} ${esc(monthName.split(' ')[0])}</h3>
         <p class="muted">${l.length} trade${l.length > 1 ? 's' : ''} · <strong class="${cls(s)}">${money(s, cur)}</strong></p>
-        <table><tbody>${l.map((t) => `<tr>
+        <div class="dayp-scroll"><table><tbody>${l.map((t) => `<tr>
           <td class="muted">${esc(t.close_time.slice(11, 16))}</td>
-          <td><strong>${esc(t.symbol)}</strong> ${esc(t.side)} ${t.lots ?? ''}${!sel && liveAccts.length > 1 ? `<br><span class="muted small">${priv(`${esc(t.broker || 'Account')} · ${esc(t.account_number)}`, `Account ••${esc(String(t.account_number).slice(-2))}`)}</span>` : ''}${t.setup ? `<br><span class="muted small">${esc(t.setup)}</span>` : ''}</td>
+          <td><strong>${esc(t.symbol)}</strong> ${esc(t.side)} ${t.lots ?? ''}${!sel && liveAccts.length > 1 ? `<br><span class="muted small">${priv(`${esc(t.broker || 'Account')} · ${esc(t.account_number)}`, `Account ••${esc(String(t.account_number).slice(-2))}`)}</span>` : ''}${t.setup ? `<br><span class="muted small">${esc(t.setup)}</span>` : ''}${planTag(plans[t.id])}</td>
           <td class="right"><span class="${cls(t.net)}">${money(t.net)}</span><br><a class="small" href="/journal/${t.id}">Open ›</a></td></tr>`).join('')}
-        </tbody></table></div>`;
+        </tbody></table></div></div>`;
     }).join('');
 
     // insights strip: last 90 days of the shown accounts; the full page is /journal/insights
@@ -263,6 +271,10 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     </section>`;
 
     const site = req.protocol + '://' + req.get('host');
+
+    // What we found: questions most traders can't answer about their own trading, last 90 days
+    const foundRows = latest ? db.prepare(`SELECT ${INS_COLS}, profit, risk_money FROM journal_trades WHERE ${where} AND close_time >= ? ORDER BY close_time`).all(...args, since) : [];
+    const foundHtml = TP.foundHtml(TP.found(foundRows, plans, { money: (v) => money(v, cur), esc, off: u.ny_offset ?? desk.NY_DEFAULT }));
 
     // hero: the month's P&L big, with four tiles under it
     const N = numbers(prep(trades));
@@ -284,7 +296,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
     page(req, res, 'Trade Journal', `
     <div class="row between page-head"><h1>Trade Journal</h1>
-      <span class="head-btns">${accts.length ? `<a class="btn small" href="/journal/report${qs({})}" title="A picture of this month's results to share, like the trade cards">Share report</a>` : ''}
+      <span class="head-btns"><a class="btn small" href="/journal/plan">Plan a trade</a>${accts.length ? `<a class="btn small" href="/journal/report${qs({})}" title="A picture of this month's results to share, like the trade cards">Share report</a>` : ''}
       <button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers, your name and the journal key, so you can screenshot this page">Hide private info</button></span></div>
     ${acctBar(req, '/journal', qs, sc, cur)}
 
@@ -296,6 +308,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
     ${heroHtml}
     ${recapHtml}
+    ${foundHtml}
     ${deskHtml}
     <div class="cal-split" id="cal">
       <section class="card">
@@ -577,6 +590,115 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     res.redirect(back.startsWith('/journal/insights') ? back : '/journal/insights?tab=time');
   });
 
+  // ---------- trade plans: written before the trade, matched to it when it opens on MT5 ----------
+  const num = (v) => { const n = Number(String(v ?? '').replace(',', '.').trim()); return Number.isFinite(n) ? n : NaN; };
+  app.get('/journal/plan', requireUser, requireJournal, (req, res) => {
+    const u = req.user;
+    TP.match(db, u);
+    const accts = db.prepare('SELECT account_number FROM accounts WHERE user_id = ? ORDER BY id').all(u.id).map((a) => a.account_number);
+    const last = {};
+    db.prepare(`SELECT account_number, balance_after, broker, currency FROM journal_trades WHERE user_id = ? AND balance_after IS NOT NULL ORDER BY close_time`).all(u.id)
+      .forEach((t) => { last[t.account_number] = t; });
+    // money per 1.0 price move per lot, per symbol, from the trader's own trades (for the lot size)
+    const vpl = {}, symCount = {};
+    db.prepare("SELECT symbol, entry, exit, lots, profit FROM journal_trades WHERE user_id = ? AND lots > 0 AND exit IS NOT NULL AND entry IS NOT NULL AND exit != entry AND partials = '[]' ORDER BY close_time DESC LIMIT 3000").all(u.id)
+      .forEach((t) => { if (!t.profit) return; (vpl[t.symbol] ||= []).push(Math.abs(t.profit / ((t.exit - t.entry) * t.lots))); symCount[t.symbol] = (symCount[t.symbol] || 0) + 1; });
+    Object.keys(vpl).forEach((k) => { const l = vpl[k].sort((a, b) => a - b); vpl[k] = l[l.length >> 1]; });
+    const syms = Object.keys(symCount).sort((a, b) => symCount[b] - symCount[a]);
+    const quick = (syms.length ? syms : ['XAUUSD', 'NAS100', 'EURUSD', 'GBPUSD']).slice(0, 4);
+    const lastPlan = db.prepare('SELECT risk_pct FROM trade_plans WHERE user_id = ? ORDER BY id DESC LIMIT 1').get(u.id);
+    const medRisk = (() => { const l = db.prepare('SELECT risk_pct FROM journal_trades WHERE user_id = ? AND risk_pct > 0 ORDER BY close_time DESC LIMIT 40').all(u.id).map((r) => r.risk_pct).sort((a, b) => a - b); return l.length ? l[l.length >> 1] : null; })();
+    const risk = lastPlan?.risk_pct || (medRisk ? Math.round(medRisk * 10) / 10 : 1);
+    const data = JSON.stringify({ vpl, bal: Object.fromEntries(Object.entries(last).map(([k, t]) => [k, { b: t.balance_after, c: t.currency }])) }).replace(/</g, '\\u003c');
+
+    const plans = db.prepare('SELECT p.*, t.net, t.entry AS t_entry, t.exit AS t_exit, t.sl AS t_sl, t.tp AS t_tp, t.risk_pct AS t_risk, t.risk_money AS t_riskm, t.profit AS t_profit, t.currency FROM trade_plans p LEFT JOIN journal_trades t ON t.id = p.trade_id WHERE p.user_id = ? ORDER BY p.status = \'open\' DESC, p.plan_time DESC, p.id DESC LIMIT 60').all(u.id);
+    const nowMs = Date.parse(TP.brokerNow(u.ny_offset ?? desk.NY_DEFAULT).replace(' ', 'T') + 'Z');
+    const counts = { wait: plans.filter((p) => p.status === 'open').length, done: plans.filter((p) => p.status === 'matched').length };
+    const rr = (p) => (Math.abs(p.tp - p.entry) / Math.abs(p.entry - p.sl)).toFixed(1);
+    const list = plans.map((p) => {
+      let st;
+      if (p.status === 'matched') {
+        const c = TP.compare(p, { entry: p.t_entry, exit: p.t_exit, sl: p.t_sl, tp: p.t_tp, risk_pct: p.t_risk, risk_money: p.t_riskm, profit: p.t_profit, net: p.net });
+        st = `<a class="tp-st done" href="/journal/${p.trade_id}" title="Kept ${c.followed} of ${c.total} parts of the plan"><span class="pips">${c.rows.map((r) => `<i class="${r.ok ? 'ok' : ''}"></i>`).join('')}</span> <span class="${cls(p.net)}">${money(p.net, p.currency)}</span> ›</a>`;
+      } else if (p.status === 'missed') st = '<span class="tp-st">No trade taken</span>';
+      else {
+        const age = (nowMs - Date.parse(p.plan_time.replace(' ', 'T') + 'Z')) / 60e3;
+        st = age <= TP.MATCH_AFTER ? `<span class="tp-st live"><i></i>Waiting · ${Math.max(0, Math.round(TP.MATCH_AFTER - age))} min left</span>`
+          : '<span class="tp-st">No trade yet</span>';
+      }
+      const kind = p.status === 'matched' ? 'done' : p.status === 'open' ? 'wait' : 'miss';
+      return `<li class="tp-row" data-k="${kind}">
+        <div class="tp-main"><b>${esc(p.symbol)}</b><span class="tp-side ${p.side === 'BUY' ? 'b' : 's'}">${p.side === 'BUY' ? 'Buy' : 'Sell'}</span>
+          <small>${esc(p.plan_time.slice(5, 16).replace('-', '/'))}${p.setup ? ' · ' + esc(p.setup) : ''}</small></div>
+        <div class="tp-nums" title="Entry ${p.entry} · Stop ${p.sl} · Target ${p.tp}"><b>${p.entry}</b><i>›</i>${p.tp}<span>${rr(p)}R${p.risk_pct ? ` · ${(+p.risk_pct).toFixed(1)}%` : ''}</span></div>
+        <div class="tp-foot">${st}${p.status === 'open' ? `<form method="post" action="/journal/plan/${p.id}/delete" onsubmit="return confirm('Delete this plan?')"><button class="link small" aria-label="Delete plan" title="Delete plan">✕</button></form>` : ''}</div></li>`;
+    }).join('');
+
+    const seg = (name, opts, val) => `<div class="tp-seg" role="radiogroup">${opts.map(([v, l]) => `<label><input type="radio" name="${name}" value="${esc(v)}"${v === val ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>`;
+    page(req, res, 'Plan a trade', `
+    <div class="row between page-head"><h1>Plan a trade</h1><a class="small" href="/journal">← Journal</a></div>
+    <ol class="plan-steps"><li><b>1</b>Plan it here</li><li><b>2</b>Open it on MT5 within 4 h</li><li><b>3</b>See plan vs result</li></ol>
+    <div class="plan-split">
+      <form method="post" action="/journal/plan" class="card plan-form" id="plan-form" autocomplete="off">
+        ${accts.length > 1 ? `<label>Account<select name="account">${accts.map((a) => `<option value="${esc(a)}">${esc((last[a]?.broker ? last[a].broker + ' · ' : '') + a)}</option>`).join('')}</select></label>` : `<input type="hidden" name="account" value="${esc(accts[0] || '')}">`}
+        <label>Pair<input name="symbol" list="plan-syms" required maxlength="20" value="${esc(quick[0])}" class="up"></label>
+        <datalist id="plan-syms">${syms.map((x) => `<option value="${esc(x)}">`).join('')}</datalist>
+        <div class="tp-chips" data-for="symbol">${quick.map((x) => `<button type="button" class="tp-chip" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+        <div class="lbl">Direction</div>${seg('side', [['BUY', 'Buy'], ['SELL', 'Sell']], 'BUY')}
+        <div class="plan-prices">
+          <label>Entry<input name="entry" inputmode="decimal" required></label>
+          <label>Stop-loss<input name="sl" inputmode="decimal" required></label>
+          <label>Target<input name="tp" inputmode="decimal" required></label>
+          <label>Risk %<input name="risk_pct" inputmode="decimal" value="${risk}" required></label>
+        </div>
+        <div class="plan-viz">
+          <svg id="pc-lad" viewBox="0 0 150 168" aria-label="Target, entry and stop drawn to scale"></svg>
+          <div class="plan-calc" id="plan-calc" aria-live="polite">
+            <div><span>Reward : risk</span><b id="pc-rr">-</b><span class="pc-blocks" id="pc-blocks"></span></div>
+            <div><span>Risk</span><b id="pc-risk">-</b></div>
+            <div><span>Lot</span><b id="pc-lot">-</b></div>
+          </div>
+        </div>
+        <p class="small muted plan-warn" id="pc-warn" hidden></p>
+        <div class="lbl">Setup</div>${seg('setup', TP.SETUPS.map((x) => [x, x]), '')}
+        <div class="lbl">Before I enter</div>
+        <div class="tp-checks">${TP.CHECKS.map(([k, l]) => `<label class="check"><input type="checkbox" name="checks" value="${k}"> ${l}</label>`).join('')}</div>
+        <label>Why this trade?<textarea name="reason" rows="3" maxlength="600" placeholder="e.g. London high taken, price back inside value. Long back to the high."></textarea></label>
+        <button>Save plan</button>
+      </form>
+      <section class="card plan-list"><div class="row between"><h2>Your plans</h2>${list ? `<div class="tp-filter" role="tablist">${[['all', 'All', plans.length], ['wait', 'Waiting', counts.wait], ['done', 'Done', counts.done]].map(([k, l, n], i) => `<button type="button" data-f="${k}" aria-pressed="${i === 0}">${l} <span>${n}</span></button>`).join('')}</div>` : ''}</div>
+        ${list ? `<ul class="tp-scroll">${list}</ul>` : '<p class="muted">No plans yet. Your first one shows here, then links to its trade when it closes.</p>'}</section>
+    </div>
+    <script id="plan-data" type="application/json">${data}</script>
+    <script src="/plan.js"></script>`);
+  });
+
+  app.post('/journal/plan', requireUser, requireJournal, (req, res) => {
+    const u = req.user, b = req.body || {};
+    const side = b.side === 'SELL' ? 'SELL' : 'BUY', dir = side === 'SELL' ? -1 : 1;
+    const entry = num(b.entry), sl = num(b.sl), tp = num(b.tp), risk = num(b.risk_pct);
+    const symbol = String(b.symbol || '').trim().toUpperCase().replace(/[^A-Z0-9._#-]/g, '').slice(0, 20);
+    const bad = !symbol ? 'Type the pair.' : !(entry > 0 && sl > 0 && tp > 0) ? 'Type the entry, stop-loss and target prices.'
+      : (entry - sl) * dir <= 0 ? `The stop-loss must be ${side === 'BUY' ? 'below' : 'above'} the entry for a ${side === 'BUY' ? 'buy' : 'sell'}.`
+        : (tp - entry) * dir <= 0 ? `The target must be ${side === 'BUY' ? 'above' : 'below'} the entry for a ${side === 'BUY' ? 'buy' : 'sell'}.`
+          : !(risk > 0 && risk <= 10) ? 'Risk % must be between 0.01 and 10.' : '';
+    if (bad) { flash(req, 'error', bad); return res.redirect('/journal/plan'); }
+    const acct = db.prepare('SELECT account_number FROM accounts WHERE user_id = ? AND account_number = ?').get(u.id, String(b.account || ''));
+    const bal = acct ? db.prepare('SELECT balance_after FROM journal_trades WHERE user_id = ? AND account_number = ? AND balance_after IS NOT NULL ORDER BY close_time DESC LIMIT 1').get(u.id, acct.account_number)?.balance_after ?? null : null;
+    const checks = [].concat(b.checks || []).filter((c) => TP.CHECKS.some(([k]) => k === c));
+    db.prepare(`INSERT INTO trade_plans (user_id, account_number, symbol, side, entry, sl, tp, risk_pct, risk_money, balance, setup, checks, reason, plan_time)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(u.id, acct ? acct.account_number : '', symbol, side, entry, sl, tp, risk,
+      bal ? Math.round(bal * risk) / 100 : null, bal, TP.SETUPS.includes(b.setup) ? b.setup : '', JSON.stringify(checks),
+      String(b.reason || '').trim().slice(0, 600), TP.brokerNow(u.ny_offset ?? desk.NY_DEFAULT));
+    flash(req, 'ok', `Plan saved. Open the ${symbol} ${side === 'BUY' ? 'buy' : 'sell'} on MT5 within 4 hours and the journal links it to this plan.`);
+    res.redirect('/journal/plan');
+  });
+
+  app.post('/journal/plan/:id/delete', requireUser, requireJournal, (req, res) => {
+    db.prepare("DELETE FROM trade_plans WHERE id = ? AND user_id = ? AND status = 'open'").run(req.params.id, req.user.id);
+    res.redirect('/journal/plan');
+  });
+
   const getTrade = (req) => db.prepare('SELECT * FROM journal_trades WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
 
   app.get('/journal/:id', requireUser, requireJournal, (req, res) => {
@@ -593,11 +715,34 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     };
     const json = JSON.stringify(card).replace(/</g, '\\u003c');
     const partials = card.partials;
+    TP.match(db, req.user);
+    const plan = db.prepare("SELECT * FROM trade_plans WHERE trade_id = ? AND user_id = ? AND status = 'matched'").get(t.id, req.user.id);
+    let planHtml = '<p class="muted small plan-none"><span class="ptag no">No plan</span> <a href="/journal/plan">Plan your next trade</a></p>';
+    if (plan) {
+      const c = TP.compare(plan, t);
+      const ck = JSON.parse(plan.checks || '[]');
+      const cost = (r) => (r.cost && r.cost > 0 ? `<em class="${r.kind === 'left' ? 'left' : 'risk'}">${r.kind === 'left' ? `${money(r.cost, t.currency).replace(/^[+]/, '')} left` : `+${money(r.cost, t.currency).replace(/^[+]/, '')} risk`}</em>` : '');
+      planHtml = `<section class="card pvr">
+        <div class="row between"><h2>Plan vs result</h2><span class="pvr-score"><span class="pips">${c.rows.map((r) => `<i class="${r.ok ? 'ok' : ''}"></i>`).join('')}</span><b>${c.followed}/${c.total}</b> kept</span></div>
+        <div class="pvr-split">
+          <div class="pvr-chart">${TP.chartSvg(plan, t)}<p class="small muted"><i class="k-pl"></i>Plan <i class="k-ac"></i>What you did</p></div>
+          <ul class="pvr-rows">${c.rows.map((r) => `<li class="${r.ok ? 'ok' : 'bad'}"><i>${r.ok ? '✓' : '!'}</i><span><b>${r.label}</b><small>${esc(r.detail)}</small></span>${cost(r)}</li>`).join('')}</ul>
+        </div>
+        <div class="pvr-foot">
+          <span>Result <b class="${cls(t.net)}">${money(t.net, t.currency)}</b></span>
+          ${c.planPays ? `<span>Plan target <b>${money(c.planPays, t.currency)}</b></span>` : ''}
+          <span class="muted">${plan.setup ? esc(plan.setup) + ' · ' : ''}${ck.length ? ck.map((k) => `✓ ${esc((TP.CHECKS.find((x) => x[0] === k) || [k, k])[1])}`).join('  ') : ''}</span>
+        </div>
+        ${plan.reason ? `<p class="pvr-why">“${esc(plan.reason)}”</p>` : ''}
+      </section>`;
+    }
 
     page(req, res, `${t.symbol} ${t.side}`, `
     <p><a href="/journal">← All trades</a></p>
     <h1>${esc(t.symbol)} ${esc(t.side)} <span class="${cls(t.net)}">${money(t.net, t.currency)}</span></h1>
     <p class="muted"><span class="priv"><span class="priv-real">Account ${esc(t.account_number)} · position ${esc(t.position_id)}</span><span class="priv-mask">Account ••${esc(String(t.account_number).slice(-2))}</span></span> · ${fmtDate(t.open_time)} → ${fmtDate(t.close_time)} (broker time)</p>
+
+    ${planHtml}
 
     <section class="card">
       <h2>Share cards <span class="tag">5ABI.FX story · 9:16</span></h2>
