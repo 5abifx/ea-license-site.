@@ -102,6 +102,7 @@ ${opts.wide
 <span class="muted">${RISK}</span>
 </div></footer>`}
 <script src="/menu.js"></script>
+${u && !opts.wide ? '<script src="/ignite.js"></script>' : ''}
 ${require('./support').supportWidget(req)}
 </body></html>`;
 }

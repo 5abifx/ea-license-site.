@@ -1711,3 +1711,5 @@ a.tp-st.done { color: var(--text); display: inline-flex; align-items: center; ga
 .tp-edit { margin-right: 8px; }
 .tp-tagcard { max-width: 640px; }
 @media (max-width: 560px) { .tp-tg { grid-template-columns: 1fr; gap: 4px; } }
+/* ignition sweep (ignite.js) drives the bars itself */
+.ig .tm-kpis .tm-bar i, .ig .tm-dw i, .ig .tm-cost i { animation: none; }
