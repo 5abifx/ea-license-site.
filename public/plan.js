@@ -53,3 +53,12 @@
   f.querySelectorAll('.tp-chips .tp-chip').forEach((b) => b.addEventListener('click', () => { f.elements.symbol.value = b.dataset.v; calc(); }));
   calc();
 })();
+
+// "Your plans" filter: All / Waiting / Done
+(function () {
+  const btns = document.querySelectorAll('.tp-filter button');
+  btns.forEach((b) => b.addEventListener('click', () => {
+    btns.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    document.querySelectorAll('.tp-scroll .tp-row').forEach((r) => { r.hidden = b.dataset.f !== 'all' && r.dataset.k !== b.dataset.f; });
+  }));
+})();

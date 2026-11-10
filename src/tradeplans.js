@@ -251,7 +251,7 @@ function found(rows, plansByTrade, { money, esc, off = NY_DEFAULT, planHref = '/
 function foundHtml(F) {
   if (!F) return '';
   return `<section class="found">
-    <div class="row between"><h2>What we found</h2><span class="muted small">Last 90 days · ${F.count} trades</span></div>
+    <div class="row between"><h2>What we found</h2><span class="fq-nav"><span class="muted small">Last 90 days · ${F.count} trades</span><button type="button" class="fq-btn" data-d="-1" aria-label="Previous">‹</button><button type="button" class="fq-btn" data-d="1" aria-label="Next">›</button></span></div>
     <div class="fq-grid">${F.items.map((x, i) => `<${x.href ? `a href="${x.href}"` : 'div'} class="fq${x.empty ? ' empty' : ''}">
       <span class="fq-q"><em>${String(i + 1).padStart(2, '0')}</em>${x.q}</span>
       ${x.a ? `<b class="fq-a${x.tone ? ' ' + x.tone : ''}">${x.a}</b>` : ''}

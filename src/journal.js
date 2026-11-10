@@ -236,11 +236,11 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       return `<div class="dayp" data-day="${d}"${d === pickDay ? '' : ' hidden'}>
         <h3>${wd} ${Number(d.slice(8))} ${esc(monthName.split(' ')[0])}</h3>
         <p class="muted">${l.length} trade${l.length > 1 ? 's' : ''} · <strong class="${cls(s)}">${money(s, cur)}</strong></p>
-        <table><tbody>${l.map((t) => `<tr>
+        <div class="dayp-scroll"><table><tbody>${l.map((t) => `<tr>
           <td class="muted">${esc(t.close_time.slice(11, 16))}</td>
           <td><strong>${esc(t.symbol)}</strong> ${esc(t.side)} ${t.lots ?? ''}${!sel && liveAccts.length > 1 ? `<br><span class="muted small">${priv(`${esc(t.broker || 'Account')} · ${esc(t.account_number)}`, `Account ••${esc(String(t.account_number).slice(-2))}`)}</span>` : ''}${t.setup ? `<br><span class="muted small">${esc(t.setup)}</span>` : ''}${planTag(plans[t.id])}</td>
           <td class="right"><span class="${cls(t.net)}">${money(t.net)}</span><br><a class="small" href="/journal/${t.id}">Open ›</a></td></tr>`).join('')}
-        </tbody></table></div>`;
+        </tbody></table></div></div>`;
     }).join('');
 
     // insights strip: last 90 days of the shown accounts; the full page is /journal/insights
@@ -559,8 +559,9 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const risk = lastPlan?.risk_pct || (medRisk ? Math.round(medRisk * 10) / 10 : 1);
     const data = JSON.stringify({ vpl, bal: Object.fromEntries(Object.entries(last).map(([k, t]) => [k, { b: t.balance_after, c: t.currency }])) }).replace(/</g, '\\u003c');
 
-    const plans = db.prepare('SELECT p.*, t.net, t.entry AS t_entry, t.exit AS t_exit, t.sl AS t_sl, t.tp AS t_tp, t.risk_pct AS t_risk, t.risk_money AS t_riskm, t.profit AS t_profit, t.currency FROM trade_plans p LEFT JOIN journal_trades t ON t.id = p.trade_id WHERE p.user_id = ? ORDER BY p.id DESC LIMIT 40').all(u.id);
+    const plans = db.prepare('SELECT p.*, t.net, t.entry AS t_entry, t.exit AS t_exit, t.sl AS t_sl, t.tp AS t_tp, t.risk_pct AS t_risk, t.risk_money AS t_riskm, t.profit AS t_profit, t.currency FROM trade_plans p LEFT JOIN journal_trades t ON t.id = p.trade_id WHERE p.user_id = ? ORDER BY p.status = \'open\' DESC, p.plan_time DESC, p.id DESC LIMIT 60').all(u.id);
     const nowMs = Date.parse(TP.brokerNow(u.ny_offset ?? desk.NY_DEFAULT).replace(' ', 'T') + 'Z');
+    const counts = { wait: plans.filter((p) => p.status === 'open').length, done: plans.filter((p) => p.status === 'matched').length };
     const rr = (p) => (Math.abs(p.tp - p.entry) / Math.abs(p.entry - p.sl)).toFixed(1);
     const list = plans.map((p) => {
       let st;
@@ -571,13 +572,14 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       else {
         const age = (nowMs - Date.parse(p.plan_time.replace(' ', 'T') + 'Z')) / 60e3;
         st = age <= TP.MATCH_AFTER ? `<span class="tp-st live"><i></i>Waiting · ${Math.max(0, Math.round(TP.MATCH_AFTER - age))} min left</span>`
-          : '<span class="tp-st">Shows when the trade closes</span>';
+          : '<span class="tp-st">No trade yet</span>';
       }
-      return `<li class="tp-row">
-        <div class="tp-main"><b>${esc(p.symbol)}</b> <span class="tp-side ${p.side === 'BUY' ? 'b' : 's'}">${p.side === 'BUY' ? 'Buy' : 'Sell'}</span>
-          <span class="muted small">${esc(p.plan_time.slice(5, 16).replace('-', '/'))}${p.setup ? ' · ' + esc(p.setup) : ''}</span></div>
-        <div class="tp-nums"><span>Entry <b>${p.entry}</b></span><span>Stop <b>${p.sl}</b></span><span>Target <b>${p.tp}</b></span><span>${rr(p)}R${p.risk_pct ? ` · ${(+p.risk_pct).toFixed(1)}%` : ''}</span></div>
-        <div class="tp-foot">${st}${p.status === 'open' ? `<form method="post" action="/journal/plan/${p.id}/delete" onsubmit="return confirm('Delete this plan?')"><button class="link small">Delete</button></form>` : ''}</div></li>`;
+      const kind = p.status === 'matched' ? 'done' : p.status === 'open' ? 'wait' : 'miss';
+      return `<li class="tp-row" data-k="${kind}">
+        <div class="tp-main"><b>${esc(p.symbol)}</b><span class="tp-side ${p.side === 'BUY' ? 'b' : 's'}">${p.side === 'BUY' ? 'Buy' : 'Sell'}</span>
+          <small>${esc(p.plan_time.slice(5, 16).replace('-', '/'))}${p.setup ? ' · ' + esc(p.setup) : ''}</small></div>
+        <div class="tp-nums" title="Entry ${p.entry} · Stop ${p.sl} · Target ${p.tp}"><b>${p.entry}</b><i>›</i>${p.tp}<span>${rr(p)}R${p.risk_pct ? ` · ${(+p.risk_pct).toFixed(1)}%` : ''}</span></div>
+        <div class="tp-foot">${st}${p.status === 'open' ? `<form method="post" action="/journal/plan/${p.id}/delete" onsubmit="return confirm('Delete this plan?')"><button class="link small" aria-label="Delete plan" title="Delete plan">✕</button></form>` : ''}</div></li>`;
     }).join('');
 
     const seg = (name, opts, val) => `<div class="tp-seg" role="radiogroup">${opts.map(([v, l]) => `<label><input type="radio" name="${name}" value="${esc(v)}"${v === val ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>`;
@@ -612,7 +614,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         <label>Why this trade?<textarea name="reason" rows="3" maxlength="600" placeholder="e.g. London high taken, price back inside value. Long back to the high."></textarea></label>
         <button>Save plan</button>
       </form>
-      <section class="card plan-list"><h2>Your plans</h2>${list ? `<ul>${list}</ul>` : '<p class="muted">No plans yet. Your first one shows here, then links to its trade when it closes.</p>'}</section>
+      <section class="card plan-list"><div class="row between"><h2>Your plans</h2>${list ? `<div class="tp-filter" role="tablist">${[['all', 'All', plans.length], ['wait', 'Waiting', counts.wait], ['done', 'Done', counts.done]].map(([k, l, n], i) => `<button type="button" data-f="${k}" aria-pressed="${i === 0}">${l} <span>${n}</span></button>`).join('')}</div>` : ''}</div>
+        ${list ? `<ul class="tp-scroll">${list}</ul>` : '<p class="muted">No plans yet. Your first one shows here, then links to its trade when it closes.</p>'}</section>
     </div>
     <script id="plan-data" type="application/json">${data}</script>
     <script src="/plan.js"></script>`);

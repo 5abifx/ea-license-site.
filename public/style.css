@@ -1377,18 +1377,41 @@ a.fq:hover { border-color: rgba(255,90,31,.45); transform: translateY(-2px); }
 .plan-warn { color: var(--accent); margin: -4px 0 12px; }
 .tp-checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 12px; margin-bottom: 8px; }
 .tp-checks .check { margin-bottom: 6px; color: var(--text); }
-.plan-list ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.tp-row { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; background: var(--card); }
-.tp-main { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.plan-list .row { gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.plan-list h2 { margin: 0; }
+.tp-filter { display: inline-flex; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 99px; }
+.tp-filter button { font: 500 12.5px var(--body); text-transform: none; letter-spacing: 0; padding: 4px 11px; border-radius: 99px; border: 0; background: transparent; color: var(--muted); box-shadow: none; min-height: 0; }
+.tp-filter button span { opacity: .6; margin-left: 2px; }
+.tp-filter button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+/* the list scrolls inside the card so the page stays short */
+.tp-scroll { list-style: none; margin: 0 -6px 0 0; padding: 0 6px 0 0; display: flex; flex-direction: column; gap: 0;
+  max-height: min(560px, calc(100vh - 220px)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent;
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(180deg, #000 calc(100% - 28px), transparent); padding-bottom: 22px; }
+.tp-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 4px 14px; align-items: center; padding: 8px 2px; border-bottom: 1px solid var(--line); }
+.tp-row[hidden] { display: none; }
+.tp-main { display: flex; gap: 2px 8px; align-items: baseline; flex-wrap: wrap; min-width: 0; }
+.tp-main small { width: 100%; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tp-side { font: 600 11px var(--body); padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--text); }
 .tp-side.b { border-color: rgba(255,255,255,.35); } .tp-side.s { border-color: rgba(255,90,31,.5); color: var(--accent); }
-.tp-nums { display: flex; gap: 6px 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
-.tp-nums b { font: 500 12.5px var(--body); color: var(--text); }
-.tp-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.tp-nums { display: flex; flex-wrap: wrap; gap: 0 6px; align-items: baseline; font-size: 13px; color: var(--muted); min-width: 0; }
+.tp-nums b { font-weight: 500; color: var(--text); }
+.tp-nums i { font-style: normal; color: var(--accent); }
+.tp-nums span { width: 100%; font-size: 12px; }
+.tp-foot { display: flex; justify-content: flex-end; align-items: center; gap: 8px; white-space: nowrap; }
 .tp-foot form { margin: 0; }
-.tp-foot button.link { color: var(--muted); font-size: 12.5px; text-transform: none; letter-spacing: 0; box-shadow: none; }
+.tp-foot button.link { color: var(--muted); font-size: 12px; text-transform: none; letter-spacing: 0; box-shadow: none; padding: 2px 4px; min-height: 0; }
+.tp-foot button.link:hover { color: var(--accent); }
+@media (max-width: 640px) {
+  .tp-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .tp-main { grid-column: 1; grid-row: 1; }
+  .tp-foot { grid-column: 2; grid-row: 1; gap: 10px; align-self: start; }
+  .tp-nums { grid-column: 1 / -1; grid-row: 2; }
+  .tp-nums span { width: auto; margin-left: 8px; }
+  .tp-st { font-size: 12px; } .tp-st.live i { margin-right: 5px; }
+  .tp-scroll { max-height: 380px; }
+}
 .tp-st { font-size: 12.5px; color: var(--muted); text-decoration: none; }
-a.tp-st.done { color: var(--text); }
+a.tp-st.done { color: var(--text); display: inline-flex; align-items: center; gap: 8px; }
 .tp-st.live { color: var(--accent); }
 .tp-st.live i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-right: 7px; animation: tpPulse 1.6s ease-in-out infinite; }
 @keyframes tpPulse { 50% { opacity: .25; } }
@@ -1415,10 +1438,25 @@ a.tp-st.done { color: var(--text); }
 .pvr-foot { display: flex; gap: 8px 22px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--muted); }
 .pvr-foot b { font-family: var(--body); color: var(--text); }
 .pvr-why { margin: 12px 0 0; font: italic 16px "Instrument Serif", Georgia, serif; color: var(--muted); }
-@media (max-width: 640px) {   /* phones: the questions swipe sideways instead of making the page very long */
-  .fq-grid { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 84%; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; scrollbar-width: none; }
-  .fq-grid::-webkit-scrollbar { display: none; }
-  .fq { scroll-snap-align: start; }
+/* What we found: one row on every screen, swipe or ‹ › to see more (keeps the journal short) */
+.fq-grid { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: calc((100% - 36px) / 4); overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; scrollbar-width: none; overscroll-behavior-x: contain; }
+.fq-grid::-webkit-scrollbar { display: none; }
+.fq { scroll-snap-align: start; }
+.fq-nav { display: inline-flex; align-items: center; gap: 6px; }
+.fq-nav .muted { margin-right: 6px; }
+.fq-btn { width: 30px; height: 30px; min-height: 0; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--text); font: 400 18px/1 var(--body); box-shadow: none; text-transform: none; letter-spacing: 0; }
+.fq-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.fq-btn:disabled { opacity: .3; cursor: default; }
+@media (max-width: 1200px) { .fq-grid { grid-auto-columns: calc((100% - 24px) / 3); } }
+@media (max-width: 860px) { .fq-grid { grid-auto-columns: calc((100% - 12px) / 2); } }
+@media (max-width: 640px) { .fq-grid { grid-auto-columns: 84%; } .fq-btn { display: none; } }
+
+/* journal day list + phone month list scroll inside their cards */
+.dayp-scroll { max-height: 440px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
+@media (max-width: 640px) {
+  .cal-list { max-height: 420px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+  .cal-list .wkhead { position: sticky; top: 0; background: var(--card); z-index: 1; }
+  .dayp-scroll { max-height: 360px; }
 }
 
 /* answers as pictures */
