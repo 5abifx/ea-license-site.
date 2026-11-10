@@ -46,6 +46,8 @@ if (!db.prepare('SELECT 1 FROM users WHERE is_admin = 1').get()) {
 const app = express();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
+const rate = require('./ratelimit');
+app.use(rate.realIp);   // the visitor's own address, also behind Cloudflare
 
 // Main domain: send people who open the old address (or www) to it. EA licence
 // calls (/api/...) are never redirected, so EAs built with the old address keep working.
@@ -72,6 +74,7 @@ app.use((req, res, next) => {
 app.use(express.urlencoded({ extended: false }));
 app.use((req, res, next) => { req.body = req.body || {}; next(); });
 app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(rate.limiter);   // after the files: pictures and styles never count
 app.use(cookieSession({
   name: 'eals',
   secret: SESSION_SECRET,
@@ -194,6 +197,7 @@ require('./security')(app, { db, page, flash, requireAdmin, rateLimit, finishSig
 
 const { studentBox: mentorBox } = require('./mentor')(app, { db, page, flash, requireUser, requireAdmin });
 require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox });
+require('./welcome')(app, { db, requireUser });   // student welcome + journal result reveal
 
 // ---------- auth ----------
 // Signed-out home: the cinematic page (src/cine-pages/home.html + public/cine/home.*). Signed in: the dashboard.

@@ -155,4 +155,21 @@ db.exec(`CREATE TABLE IF NOT EXISTS visits (
 )`);
 if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'source')) db.exec("ALTER TABLE users ADD COLUMN source TEXT NOT NULL DEFAULT ''");   // where the sign-up came from (instagram, discord, referral...)
 
+// Economic calendar, sent by the Trade Journal EA from MT5's own calendar (shared by everyone; times in UTC ms)
+db.exec(`CREATE TABLE IF NOT EXISTS news_events (
+  id        TEXT PRIMARY KEY,           -- event_id:utc
+  event_id  TEXT NOT NULL,
+  t         INTEGER NOT NULL,           -- release time, UTC milliseconds
+  cur       TEXT NOT NULL,
+  name      TEXT NOT NULL,
+  imp       INTEGER NOT NULL,           -- 1 low, 2 medium, 3 high
+  actual    REAL, forecast REAL, previous REAL,
+  unit      TEXT NOT NULL DEFAULT '',
+  move      REAL,                       -- gold: high-low in the 15 minutes after the release (price)
+  dir       INTEGER,                    -- gold: +1 up, -1 down over those 15 minutes
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_news_t ON news_events(t)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_news_ev ON news_events(event_id, t)');
+
 module.exports = { db, DATA_DIR, logSale, FILES_DIR: path.join(DATA_DIR, 'ea-files') };

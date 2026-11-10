@@ -24,9 +24,11 @@ function brandMark() {
 
 // small stroke icons for the members menu
 const ICONS = {
+  desk: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4M6 13l3-3 3 2 5-5"/>',
   eas: '<path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/>',
   journal: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   insights: '<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
+  plan: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/>',
   plans: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
   gift: '<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7C10 3 7 3 7 5s5 2 5 2 5 0 5-2-3-2-5 2"/>',
   lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
@@ -121,7 +123,7 @@ function appShell(req, u, flashHtml, body, title) {
   </div>
   <nav class="side-nav" id="side-nav" aria-label="Members menu">
     ${group('Main menu', `${item('/dashboard', 'eas', 'My EAs')}
-      ${req.hasJournal ? item('/journal', 'journal', 'Journal', on('/journal') && !on('/journal/insights') && !on('/journal/mentor')) + item('/journal/insights', 'insights', 'Insights') : ''}
+      ${req.hasJournal ? item('/journal/desk', 'desk', 'Desk') + item('/journal', 'journal', 'Journal', on('/journal') && !on('/journal/insights') && !on('/journal/mentor') && !on('/journal/desk') && !on('/journal/plan')) + item('/journal/plan', 'plan', 'Plan a trade') + item('/journal/insights', 'insights', 'Insights') : ''}
       ${req.mentorEligible && (req.hasJournal || u.mentor_share) ? item('/journal/mentor', 'chat', `Mentor review${req.mentorNew ? `<em class="count">${req.mentorNew}</em>` : ''}`, on('/journal/mentor')) : ''}`)}
     ${group('Account', `${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}
       ${u.google_sub ? '' : item('/password', 'lock', 'Password')}`)}
@@ -135,6 +137,8 @@ function appShell(req, u, flashHtml, body, title) {
 <div class="app-main">
   <div class="app-top"><span class="crumb"><a href="/dashboard">Home</a><i>›</i><b>${esc(title)}</b></span>${u.name ? `<span class="who priv-hide">${esc(u.name)}</span>` : ''}</div>
   <main class="app-body">${flashHtml}${body}</main>
+  ${(u.student || u.mentor_plan || u.is_admin) && (u.intro_welcome !== 0 || (req.path === '/journal' && req.hasJournal && u.intro_reveal !== 'never'))
+    ? `<script src="/intro.js" defer data-w="${u.intro_welcome === 0 ? 0 : 1}" data-ws="${process.env.WELCOME_STYLE === 'boot' ? 'boot' : 'name'}" data-r="${req.path === '/journal' && req.hasJournal ? esc(u.intro_reveal || 'always') : ''}"></script>` : ''}
   <footer class="app-foot"><span class="foot-links"><a href="/faq">FAQ</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></span><span class="muted">${RISK}</span></footer>
 </div>
 </div>

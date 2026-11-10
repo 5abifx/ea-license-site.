@@ -8,8 +8,9 @@
 //| symbols and all EAs on that account.                             |
 //+------------------------------------------------------------------+
 #property copyright "5ABI.FX"
-#property version   "1.21"
-#property description "Trade Journal: logs closed trades, partials and candles to your journal."
+#property version   "1.30"
+#property description "Trade Journal: logs closed trades, partials and candles to your journal,"
+#property description "and sends MT5's economic calendar for the Desk's news catalysts."
 
 #define EA_CODE        "JOURNAL"                  // must match the license code in Admin > EAs
 #define LICENSE_SERVER "https://5abifx.com"  // your website address, no trailing slash
@@ -24,6 +25,7 @@ input int             BarsAfter      = 20;          // Candles after exit
 input int             CatchUpDays    = 7;           // On start, also send trades closed in the last N days
 input double          PipSize        = 0;           // Pip size (0 = automatic)
 input bool            ShowPanel      = true;        // Show the journal panel on the chart
+input bool            SendNews       = true;        // Send the MT5 economic calendar (news on your Desk)
 
 #define JOURNAL_DIR    "TradeJournal\\"
 #define MAX_CANDLES    400
@@ -314,14 +316,16 @@ void LogLocally(const string json, const ulong id)
 
 //--- send to the website ---------------------------------------------------
 // 1 = stored, 0 = rejected (do not retry), -1 = network problem (retry later)
-int Send(const string json, string &msg)
+int Send(const string json, string &msg) { return PostJson("/api/journal/trades", json, msg); }
+
+int PostJson(const string path, const string json, string &msg)
   {
    char data[], result[];
    string resHeaders;
    int len = StringToCharArray(json, data, 0, WHOLE_ARRAY, CP_UTF8);
    ArrayResize(data, MathMax(0, len - 1));                    // drop the trailing zero
    ResetLastError();
-   int http = WebRequest("POST", LICENSE_SERVER + "/api/journal/trades", "Content-Type: application/json\r\n",
+   int http = WebRequest("POST", LICENSE_SERVER + path, "Content-Type: application/json\r\n",
                          15000, data, result, resHeaders);
    if(http == -1)
      {
@@ -403,6 +407,130 @@ void CatchUp()
       if(!IsPositionOpen(ids[k]) && !WasSent(ids[k])) Enqueue(ids[k], now);
   }
 
+
+//--- news for the Desk: MT5's built-in economic calendar ----------------------
+// Sends releases (actual / forecast / previous) and, for past ones, how far gold moved in the 15 minutes after.
+// Times go out in UTC. Runs every 30 minutes; the first run on an account also sends ~13 months of high-impact history.
+datetime g_calNext = 0;
+string   g_calStatus = "not sent yet";
+
+string CalNum(const long v, const double div)
+  {
+   if(v == LONG_MIN) return "null";
+   return DoubleToString((double)v / 1000000.0 / div, 4);
+  }
+
+string CalGoldSymbol()
+  {
+   static string found = "-";
+   if(found != "-") return found;
+   found = "";
+   for(int i = 0; i < SymbolsTotal(false); i++)
+     {
+      string s = SymbolName(i, false);
+      if(StringFind(s, "XAUUSD") == 0 || (found == "" && StringFind(s, "XAU") >= 0 && StringFind(s, "USD") >= 0)) found = s;
+      if(found == "XAUUSD") break;
+     }
+   if(found != "") SymbolSelect(found, true);
+   return found;
+  }
+
+// gold's range and direction in the 15 one-minute bars after a release (server time)
+void CalGoldMove(const datetime t, string &move, string &dir)
+  {
+   move = "null"; dir = "0";
+   string g = CalGoldSymbol();
+   if(g == "") return;
+   MqlRates r[];
+   int n = CopyRates(g, PERIOD_M1, t, t + 15 * 60 - 1, r);
+   if(n < 5) return;
+   double hi = r[0].high, lo = r[0].low;
+   for(int i = 1; i < n; i++) { hi = MathMax(hi, r[i].high); lo = MathMin(lo, r[i].low); }
+   move = DoubleToString(hi - lo, 2);
+   double d = r[n - 1].close - r[0].open;
+   dir = d > 0 ? "1" : d < 0 ? "-1" : "0";
+  }
+
+// returns events sent, or -1 on a network problem
+int CalSend(const datetime from, const datetime to, const int minImportance, const datetime movesFrom)
+  {
+   MqlCalendarValue v[];
+   int n = CalendarValueHistory(v, from, to);
+   if(n <= 0) return 0;
+   long gmtShift = (long)(TimeTradeServer() - TimeGMT());
+   gmtShift = (long)MathRound(gmtShift / 900.0) * 900;           // whole quarter hours
+   datetime now = TimeTradeServer();
+   string batch = "";
+   int inBatch = 0, sent = 0;
+   for(int i = 0; i < n; i++)
+     {
+      MqlCalendarEvent e;
+      if(!CalendarEventById(v[i].event_id, e)) continue;
+      int imp = e.importance == CALENDAR_IMPORTANCE_HIGH ? 3 : e.importance == CALENDAR_IMPORTANCE_MODERATE ? 2 : 1;
+      if(imp < minImportance) continue;
+      MqlCalendarCountry c;
+      if(!CalendarCountryById(e.country_id, c)) continue;
+      string cur = c.currency;
+      if(StringFind("USD EUR GBP JPY CAD AUD NZD CHF CNY", cur) < 0 || StringLen(cur) != 3) continue;
+      double div = 1;
+      string unit = "";
+      if(e.unit == CALENDAR_UNIT_PERCENT) unit = "%";
+      else
+        {
+         if(e.multiplier == CALENDAR_MULTIPLIER_THOUSANDS) { unit = "K"; }
+         else if(e.multiplier == CALENDAR_MULTIPLIER_MILLIONS) { unit = "M"; }
+         else if(e.multiplier == CALENDAR_MULTIPLIER_BILLIONS) { unit = "B"; }
+         else if(e.multiplier == CALENDAR_MULTIPLIER_TRILLIONS) { unit = "T"; }
+        }
+      string move = "null", dir = "0";
+      if(imp == 3 && v[i].actual_value != LONG_MIN && v[i].time >= movesFrom && v[i].time + 15 * 60 <= now)
+         CalGoldMove(v[i].time, move, dir);
+      long prev = v[i].revised_prev_value != LONG_MIN ? v[i].revised_prev_value : v[i].prev_value;
+      string row = "[\"" + IntegerToString((long)e.id) + "\"," + IntegerToString((long)v[i].time - gmtShift) + ",\"" + cur + "\",\""
+                   + JsonEscape(e.name) + "\"," + IntegerToString(imp) + "," + CalNum(v[i].actual_value, div) + ","
+                   + CalNum(v[i].forecast_value, div) + "," + CalNum(prev, div) + ",\"" + unit + "\"," + move + "," + dir + "]";
+      batch += (inBatch ? "," : "") + row;
+      inBatch++;
+      if(inBatch >= 400 || i == n - 1)
+        {
+         string msg;
+         string json = "{" + J("key", JournalKey) + "," + J("account", Login()) + ",\"events\":[" + batch + "]}";
+         int r = PostJson("/api/journal/calendar", json, msg);
+         if(r == -1) { g_calStatus = "waiting: " + msg; return -1; }
+         if(r == 0) { g_calStatus = "rejected: " + msg; return sent; }
+         sent += inBatch;
+         batch = ""; inBatch = 0;
+        }
+     }
+   if(inBatch > 0)
+     {
+      string msg;
+      string json = "{" + J("key", JournalKey) + "," + J("account", Login()) + ",\"events\":[" + batch + "]}";
+      int r = PostJson("/api/journal/calendar", json, msg);
+      if(r == -1) { g_calStatus = "waiting: " + msg; return -1; }
+      if(r == 1) sent += inBatch;
+     }
+   return sent;
+  }
+
+void CalendarOnTimer()
+  {
+   if(!SendNews || MQLInfoInteger(MQL_TESTER)) return;
+   if(!LicenseIsValid() || JournalKey == "") return;
+   datetime now = TimeTradeServer();
+   if(now < g_calNext) return;
+   g_calNext = now + 30 * 60;
+   int sent = CalSend(now - 3 * 86400, now + 7 * 86400, 2, now - 3 * 86400);
+   if(sent < 0) { g_calNext = now + 5 * 60; return; }
+   string gv = "TJ_NEWS_HIST_" + Login();
+   if(!GlobalVariableCheck(gv))
+     {
+      int h = CalSend(now - 400 * 86400, now - 3 * 86400, 3, now - 120 * 86400);
+      if(h >= 0) GlobalVariableSet(gv, (double)TimeLocal());
+     }
+   g_calStatus = TimeToString(TimeLocal(), TIME_MINUTES) + " sent " + IntegerToString(sent) + " releases";
+  }
+
 //--- on-chart panel --------------------------------------------------------
 void UpdatePanel()
   {
@@ -428,7 +556,8 @@ void UpdatePanel()
            "Today: ", trades, " closes, ", DoubleToString(pnl, 2), " ", AccountInfoString(ACCOUNT_CURRENCY), "\n",
            "Waiting to send: ", ArraySize(g_queue), "\n",
            "Last sync: ", g_lastSync, "\n",
-           "Indicators: ", g_relayStatus);
+           "Indicators: ", g_relayStatus, "\n",
+           "News: ", SendNews ? g_calStatus : "off");
   }
 
 //--- events ----------------------------------------------------------------
@@ -440,6 +569,7 @@ int OnInit()
    if(JournalKey == "")
       Alert("Trade Journal: paste your Journal key (from your dashboard on ", LICENSE_SERVER, ") into the EA inputs.");
    EventSetTimer(10);
+   g_calNext = TimeTradeServer() + 20;      // news a little after start, trades first
    RememberLevels();
    CatchUp();
    ProcessQueue();
@@ -458,6 +588,7 @@ void OnTimer()
    RelayOnTimer();
    RememberLevels();
    ProcessQueue();
+   CalendarOnTimer();
    UpdatePanel();
   }
 
