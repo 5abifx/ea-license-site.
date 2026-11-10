@@ -112,10 +112,11 @@ const RISK = 'Trading forex and CFDs carries a high level of risk and may not be
 // signed-in pages: side menu on the left (a top bar on phones), the page fills the rest of the screen
 function appShell(req, u, flashHtml, body, title) {
   const on = (href) => req.path === href || req.path.startsWith(href + '/');
-  const item = (href, ic, text, active = on(href)) => `<a href="${href}"${active ? ' class="on" aria-current="page"' : ''}>${icon(ic)}<span>${text}</span></a>`;
+  const item = (href, ic, text, active = on(href)) => `<a href="${href}" title="${text.replace(/<[^>]*>.*$/, '')}"${active ? ' class="on" aria-current="page"' : ''}>${icon(ic)}<span>${text}</span></a>`;
   const group = (label, items) => (items.trim() ? `<div class="side-group"><div class="side-label">${label}</div>${items}</div>` : '');
   const adminPage = req.path.startsWith('/admin');
-  return `<div class="app">
+  return `<script>try{if(localStorage.getItem('sideFold')==='1')document.documentElement.classList.add('side-fold')}catch(e){}</script>
+<div class="app">
 <aside class="side">
   <div class="side-top">
     <a class="brand" href="/dashboard">${brandMark()}</a>
@@ -131,12 +132,12 @@ function appShell(req, u, flashHtml, body, title) {
     ${u.is_admin ? group('Owner', `${item('/admin/sales', 'insights', 'Sales')}${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas') && !on('/admin/sales'))}${item('/admin/eas', 'upload', 'EAs')}${item('/mentor', 'cap', `Mentor${req.mentorWaiting ? `<em class="count">${req.mentorWaiting}</em>` : ''}`)}`) : ''}
     <div class="side-group side-end">
       ${item('/faq', 'help', 'Help &amp; FAQ')}
-      <form method="post" action="/logout"><button class="link">${icon('out')}<span>Sign out</span></button></form>
+      <form method="post" action="/logout"><button class="link" title="Sign out">${icon('out')}<span>Sign out</span></button></form>
     </div>
   </nav>
 </aside>
 <div class="app-main">
-  <div class="app-top"><span class="crumb"><a href="/dashboard">Home</a><i>›</i><b>${esc(title)}</b></span>${u.name ? `<span class="who priv-hide">${esc(u.name)}</span>` : ''}</div>
+  <div class="app-top"><button type="button" class="fold-btn" data-fold aria-label="Hide the menu" title="Hide the menu (full screen)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/><path d="M15.5 10l-2 2 2 2"/></svg></button><span class="crumb"><a href="/dashboard">Home</a><i>›</i><b>${esc(title)}</b></span>${u.name ? `<span class="who priv-hide">${esc(u.name)}</span>` : ''}</div>
   <main class="app-body">${flashHtml}${body}</main>
   ${(u.student || u.mentor_plan || u.is_admin) && (u.intro_welcome !== 0 || (req.path === '/journal' && req.hasJournal && u.intro_reveal !== 'never'))
     ? `<script src="/intro.js" defer data-w="${u.intro_welcome === 0 ? 0 : 1}" data-ws="${process.env.WELCOME_STYLE === 'boot' ? 'boot' : 'name'}" data-r="${req.path === '/journal' && req.hasJournal ? esc(u.intro_reveal || 'always') : ''}"></script>` : ''}

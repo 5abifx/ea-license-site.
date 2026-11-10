@@ -16,3 +16,18 @@
     location.reload();
   });
 })();
+
+// PC: fold the side menu into a slim icon rail for a full-screen page (remembered on this browser)
+(function () {
+  var btn = document.querySelector('[data-fold]');
+  if (!btn) return;
+  var root = document.documentElement;
+  var sync = function () { var f = root.classList.contains('side-fold'); btn.setAttribute('aria-label', f ? 'Show the menu' : 'Hide the menu'); btn.title = f ? 'Show the menu' : 'Hide the menu (full screen)'; };
+  btn.addEventListener('click', function () {
+    root.classList.toggle('side-fold');
+    try { localStorage.setItem('sideFold', root.classList.contains('side-fold') ? '1' : '0'); } catch (e) { /* private mode */ }
+    sync();
+    setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 320);   // charts redraw at the new width
+  });
+  sync();
+})();
