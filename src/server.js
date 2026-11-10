@@ -197,6 +197,7 @@ require('./security')(app, { db, page, flash, requireAdmin, rateLimit, finishSig
 
 const { studentBox: mentorBox } = require('./mentor')(app, { db, page, flash, requireUser, requireAdmin });
 require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox });
+require('./welcome')(app, { db, requireUser });   // student welcome + journal result reveal
 
 // ---------- auth ----------
 // Signed-out home: the cinematic page (src/cine-pages/home.html + public/cine/home.*). Signed in: the dashboard.
