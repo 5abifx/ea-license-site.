@@ -7,7 +7,7 @@
 //|  MT5 (indicators cannot reach the website themselves).          |
 //+------------------------------------------------------------------+
 #property copyright   "5ABI FX"
-#property version     "1.21"
+#property version     "1.22"
 #property description "5ABI FX · Auction Compass"
 #property indicator_chart_window
 #property indicator_buffers 0
@@ -382,6 +382,51 @@ int RowOf(CProf &p, double px)
    return IMax(0, IMin(p.n - 1, k));
   }
 
+// Double distribution (B): two volume peaks with a thin valley between them
+bool DoubleDist(CProf &p)
+  {
+   if(p.n < 12)
+      return false;
+   double s[];
+   ArrayResize(s, p.n);
+   for(int k = 0; k < p.n; k++)
+      s[k] = (p.vol[IMax(0, k - 1)] + p.vol[k] + p.vol[IMin(p.n - 1, k + 1)]) / 3.0;
+   int a = 0;
+   for(int k = 1; k < p.n; k++)
+      if(s[k] > s[a])
+         a = k;
+   int gap = IMax(3, p.n / 4);
+   for(int k = 1; k < p.n - 1; k++)
+     {
+      if(MathAbs(k - a) < gap || s[k] < s[k - 1] || s[k] < s[k + 1] || s[k] < 0.5 * s[a])
+         continue;
+      double lo = DBL_MAX;
+      for(int j = IMin(a, k) + 1; j < IMax(a, k); j++)
+         lo = MathMin(lo, s[j]);
+      if(lo < 0.45 * s[k])
+         return true;
+     }
+   return false;
+  }
+
+// Shares today's profile with KATANA (PLAN button): shape and the levels, as terminal global variables
+double ShapeCode(string sh) { return sh == "P" ? 1 : sh == "b" ? 2 : sh == "D" ? 3 : sh == "T" ? 4 : sh == "B" ? 5 : 0; }
+void PublishLevels()
+  {
+   string b = "5ABI.CMP." + _Symbol + ".";
+   bool dv = g_dev.ok, pv = g_hn > 0 && g_h[0].ok;
+   GlobalVariableSet(b + "SHP", ShapeCode(dv ? g_dev.shape : pv ? g_h[0].shape : ""));
+   GlobalVariableSet(b + "DPOC", dv ? g_dev.poc : 0);
+   GlobalVariableSet(b + "DVAH", dv ? g_dev.vah : 0);
+   GlobalVariableSet(b + "DVAL", dv ? g_dev.val : 0);
+   GlobalVariableSet(b + "PPOC", pv ? g_h[0].poc : 0);
+   GlobalVariableSet(b + "PVAH", pv ? g_h[0].vah : 0);
+   GlobalVariableSet(b + "PVAL", pv ? g_h[0].val : 0);
+   GlobalVariableSet(b + "PHI", pv && g_h[0].poorHi ? g_h[0].hi : 0);   // 0 = not a poor high
+   GlobalVariableSet(b + "PLO", pv && g_h[0].poorLo ? g_h[0].lo : 0);
+   GlobalVariableSet(b + "T", (double)TimeCurrent());
+  }
+
 bool BuildFrom(CProf &p, const MqlRates &r[], int c, datetime t0)
   {
    p.ok = false;
@@ -488,7 +533,7 @@ bool BuildFrom(CProf &p, const MqlRates &r[], int c, datetime t0)
             sing++;
         }
    double pos = (p.pocI + 0.5) / p.n;
-   p.shape  = (span > 0 && (double)sing / span >= 0.20) ? "T" : pos >= 0.62 ? "P" : pos <= 0.38 ? "b" : "D";
+   p.shape  = DoubleDist(p) ? "B" : (span > 0 && (double)sing / span >= 0.20) ? "T" : pos >= 0.62 ? "P" : pos <= 0.38 ? "b" : "D";
    p.poorHi = p.tpo[p.n - 1] >= 2;
    p.poorLo = p.tpo[0] >= 2;
 
@@ -902,6 +947,7 @@ void LiveUpdate()
       DrawProfile(g_dev, "d_", true);
       DrawMarks(g_dev, "d_", -DBL_MAX, DBL_MAX);
      }
+   PublishLevels();
 
    // this week's profile + trail of this week's daily shapes
    datetime w0 = iTime(_Symbol, PERIOD_W1, 0);
