@@ -247,7 +247,7 @@ app.get('/', (req, res) => {
     KICKER: `MT5 risk manager · trade journal${trial ? ` · ${trial}-day free trial` : ''}`,
     JOINBTN: signup ? `<a class="go pri" href="/signup">${join}</a>` : '',
     PRICE: price,
-    CTA: signup ? `<a class="cta" href="/signup">${join}</a>` : '<a class="cta" href="/login">Sign in</a>',
+    CTA: signup ? `<a class="cta" href="/signup">${join}</a><a class="cta2" href="/login">Already a member? <b>Sign in</b></a>` : '<a class="cta" href="/login">Sign in</a>',
   }, { title: `${SITE_NAME} · Risk manager & trade journal for MT5` }));
 });
 
