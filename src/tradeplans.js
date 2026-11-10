@@ -4,7 +4,26 @@
 // "What we found" answers questions most traders can't answer about their own trading, each with one Fix line.
 const { prep, analyze } = require('./insights');
 
-const SETUPS = ['Breakout', 'Pullback', 'Reversal', 'Range'];
+// setup tags, members-only (never shown on public pages). One shape and one target; any number of locations and confluences.
+const TAGS = [
+  ['shape', 'Shape', ['p shape', 'b shape', 'D shape', 'B shape', 'Thin / trending'], true],
+  ['loc', 'At', ['VAL', 'VAH', 'POC'], false],
+  ['target', 'Targeting', ['Poor high', 'Poor low'], true],
+  ['conf', 'With', ['VWAP', 'Delta divergence', 'Heatmap level'], false],
+];
+const SETUPS = TAGS.flatMap((g) => g[2]);
+// tags from a form or from KATANA -> one "p shape · VAL · Poor high · VWAP" line
+function setupText(b) {
+  const out = [];
+  TAGS.forEach(([k, , opts, one]) => {
+    const got = [].concat(b[k] ?? []).flatMap((v) => String(v).split(',')).map((v) => v.trim()).filter(Boolean)
+      .map((v) => opts.find((o) => o === v) || opts.find((o) => o.split(' ')[0] === v) || (k === 'shape' ? null : opts.find((o) => o.toLowerCase() === v.toLowerCase())) || null).filter(Boolean);
+    const uniq = [...new Set(got)];
+    out.push(...(one ? uniq.slice(0, 1) : uniq));
+  });
+  return out.join(' · ');
+}
+const setupTags = (s) => String(s || '').split(' · ').filter(Boolean);
 const CHECKS = [['bias', 'Bias agrees'], ['news', 'No news in 30 min'], ['aplus', 'A+ setup'], ['session', 'Inside my session']];
 const MATCH_BEFORE = 30;     // minutes: a trade opened a little before the plan was saved still counts
 const MATCH_AFTER = 240;     // minutes: about 4 hours
@@ -58,7 +77,10 @@ function match(db, u) {
       return !taken.has(t.id) && t.side === p.side && o >= at - MATCH_BEFORE * 60e3 && o <= at + MATCH_AFTER * 60e3
         && sameSym(t.symbol, p.symbol) && (!p.account_number || p.account_number === t.account_number);
     }).sort((a, b) => Math.abs(ts(a.open_time) - at) - Math.abs(ts(b.open_time) - at))[0];
-    if (hit) { taken.add(hit.id); set.run('matched', hit.id, p.id); } else if (nowMs - at > MISSED_AFTER * 60e3) set.run('missed', null, p.id);
+    if (hit) {
+      taken.add(hit.id); set.run('matched', hit.id, p.id);
+      if (p.setup) db.prepare("UPDATE journal_trades SET setup = ? WHERE id = ? AND (setup IS NULL OR setup = '')").run(p.setup.slice(0, 120), hit.id);
+    } else if (nowMs - at > MISSED_AFTER * 60e3) set.run('missed', null, p.id);
   });
 }
 
@@ -260,4 +282,4 @@ function foundHtml(F) {
       <span class="fq-fix"><i>Fix</i>${x.fix}</span></${x.href ? 'a' : 'div'}>`).join('')}</div></section>`;
 }
 
-module.exports = { init, brokerNow, match, compare, chartSvg, found, foundHtml, moneyPerPoint, sameSym, SETUPS, CHECKS, MATCH_AFTER };
+module.exports = { init, brokerNow, match, compare, chartSvg, found, foundHtml, moneyPerPoint, sameSym, SETUPS, TAGS, setupText, setupTags, CHECKS, MATCH_AFTER };

@@ -10,6 +10,8 @@ const terminalView = require('./terminal-view');
 const TP = require('./tradeplans');
 const express = require('express');
 const { esc, fmtDate } = require('./views');
+// setup tag chips (members-only): one shape and one target, any number of levels and confluences
+const tagForm = (cur) => { const have = new Set(TP.setupTags(cur)); return `<div class="tp-tags">${TP.TAGS.map(([k, l, opts, one]) => `<div class="tp-tg"><span>${l}</span><div class="tp-seg"${one ? ' data-one' : ''}>${opts.map((o) => `<label><input type="${one ? 'radio' : 'checkbox'}" name="${k}" value="${esc(o)}"${have.has(o) ? ' checked' : ''}><span>${esc(o)}</span></label>`).join('')}</div></div>`).join('')}</div>`; };
 
 const JOURNAL_CODE = process.env.JOURNAL_EA_CODE || 'JOURNAL';
 const EMOTIONS = ['', 'Calm', 'Confident', 'Patient', 'Anxious', 'Greedy', 'Fearful', 'Revenge', 'Bored', 'FOMO'];
@@ -53,6 +55,33 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       return res.status(403).json({ ok: false, message: `Account ${account} is not registered on your dashboard` });
     }
     res.json({ ok: true, saved: news.save(db, b.events) });
+  });
+
+  // POST /api/journal/plan  { key, account, plan: { symbol, side, entry, sl, tp, risk_pct, risk_money, lots, balance, time, shape, loc, target, conf } }
+  // KATANA's PLAN button: the trade set up on the chart becomes a plan, with the profile shape and level Compass saw
+  app.post('/api/journal/plan', express.json({ limit: '32kb' }), (req, res) => {
+    const b = req.body || {}, p = b.plan;
+    const fail = (status, message) => res.status(status).json({ ok: false, message });
+    const account = cleanAccount(b.account);
+    if (!account || !p || typeof p !== 'object') return fail(400, 'Missing account or plan');
+    const u = b.key ? db.prepare('SELECT * FROM users WHERE journal_key = ?').get(String(b.key)) : null;
+    if (!u) return fail(403, 'Wrong journal key');
+    if (!hasJournal(u)) return fail(403, 'Trade Journal license is not active');
+    if (!db.prepare('SELECT 1 FROM accounts WHERE user_id = ? AND account_number = ?').get(u.id, account)) return fail(403, `Account ${account} is not on your dashboard`);
+    const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+    const side = String(p.side || '').toUpperCase() === 'SELL' ? 'SELL' : 'BUY', dir = side === 'SELL' ? -1 : 1;
+    const entry = n(p.entry), sl = n(p.sl), tp = n(p.tp), risk = n(p.risk_pct);
+    const symbol = String(p.symbol || '').trim().toUpperCase().replace(/[^A-Z0-9._#-]/g, '').slice(0, 20);
+    if (!symbol || !(entry > 0 && sl > 0)) return fail(400, 'Set entry and stop first');
+    if (!(tp > 0) || (tp - entry) * dir <= 0) return fail(400, 'Pick a target first');
+    if ((entry - sl) * dir <= 0) return fail(400, 'Stop is on the wrong side');
+    const t = /^\d{4}[.-]\d\d[.-]\d\d \d\d:\d\d(:\d\d)?$/.test(String(p.time || '')) ? String(p.time).replace(/\./g, '-').slice(0, 19).padEnd(19, ':00').slice(0, 19) : TP.brokerNow(u.ny_offset ?? desk.NY_DEFAULT);
+    const dup = db.prepare("SELECT id FROM trade_plans WHERE user_id = ? AND symbol = ? AND side = ? AND entry = ? AND sl = ? AND tp = ? AND status = 'open' AND created_at > datetime('now', '-10 minutes')").get(u.id, symbol, side, entry, sl, tp);
+    if (dup) return res.json({ ok: true, id: dup.id, message: 'Already saved' });
+    const r = db.prepare(`INSERT INTO trade_plans (user_id, account_number, symbol, side, entry, sl, tp, risk_pct, risk_money, lots, balance, setup, checks, reason, source, plan_time)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', '', 'katana', ?)`).run(u.id, account, symbol, side, entry, sl, tp,
+      risk > 0 && risk <= 10 ? risk : null, n(p.risk_money), n(p.lots), n(p.balance), TP.setupText(p), t);
+    res.json({ ok: true, id: Number(r.lastInsertRowid), message: 'Plan saved' });
   });
 
   // POST /api/journal/trades  { key, ea, account, broker, currency, trade: {...} }
@@ -630,9 +659,9 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       const kind = p.status === 'matched' ? 'done' : p.status === 'open' ? 'wait' : 'miss';
       return `<li class="tp-row" data-k="${kind}">
         <div class="tp-main"><b>${esc(p.symbol)}</b><span class="tp-side ${p.side === 'BUY' ? 'b' : 's'}">${p.side === 'BUY' ? 'Buy' : 'Sell'}</span>
-          <small>${esc(p.plan_time.slice(5, 16).replace('-', '/'))}${p.setup ? ' · ' + esc(p.setup) : ''}</small></div>
+          <small>${esc(p.plan_time.slice(5, 16).replace('-', '/'))}${p.source === 'katana' ? ' · from KATANA' : ''}${p.setup ? ' · ' + esc(p.setup) : ''}</small></div>
         <div class="tp-nums" title="Entry ${p.entry} · Stop ${p.sl} · Target ${p.tp}"><b>${p.entry}</b><i>›</i>${p.tp}<span>${rr(p)}R${p.risk_pct ? ` · ${(+p.risk_pct).toFixed(1)}%` : ''}</span></div>
-        <div class="tp-foot">${st}${p.status === 'open' ? `<form method="post" action="/journal/plan/${p.id}/delete" onsubmit="return confirm('Delete this plan?')"><button class="link small" aria-label="Delete plan" title="Delete plan">✕</button></form>` : ''}</div></li>`;
+        <div class="tp-foot">${st}${p.status === 'open' ? `<a class="small tp-edit" href="/journal/plan/${p.id}/tags" title="Setup tags">${p.setup ? 'Tags' : '+ Tags'}</a>` : ''}${p.status === 'open' ? `<form method="post" action="/journal/plan/${p.id}/delete" onsubmit="return confirm('Delete this plan?')"><button class="link small" aria-label="Delete plan" title="Delete plan">✕</button></form>` : ''}</div></li>`;
     }).join('');
 
     const seg = (name, opts, val) => `<div class="tp-seg" role="radiogroup">${opts.map(([v, l]) => `<label><input type="radio" name="${name}" value="${esc(v)}"${v === val ? ' checked' : ''}><span>${l}</span></label>`).join('')}</div>`;
@@ -661,7 +690,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
           </div>
         </div>
         <p class="small muted plan-warn" id="pc-warn" hidden></p>
-        <div class="lbl">Setup</div>${seg('setup', TP.SETUPS.map((x) => [x, x]), '')}
+        <div class="lbl">Setup <span class="muted small">(optional, tap again to clear)</span></div>${tagForm('')}
         <div class="lbl">Before I enter</div>
         <div class="tp-checks">${TP.CHECKS.map(([k, l]) => `<label class="check"><input type="checkbox" name="checks" value="${k}"> ${l}</label>`).join('')}</div>
         <label>Why this trade?<textarea name="reason" rows="3" maxlength="600" placeholder="e.g. London high taken, price back inside value. Long back to the high."></textarea></label>
@@ -689,9 +718,32 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const checks = [].concat(b.checks || []).filter((c) => TP.CHECKS.some(([k]) => k === c));
     db.prepare(`INSERT INTO trade_plans (user_id, account_number, symbol, side, entry, sl, tp, risk_pct, risk_money, balance, setup, checks, reason, plan_time)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(u.id, acct ? acct.account_number : '', symbol, side, entry, sl, tp, risk,
-      bal ? Math.round(bal * risk) / 100 : null, bal, TP.SETUPS.includes(b.setup) ? b.setup : '', JSON.stringify(checks),
+      bal ? Math.round(bal * risk) / 100 : null, bal, TP.setupText(b), JSON.stringify(checks),
       String(b.reason || '').trim().slice(0, 600), TP.brokerNow(u.ny_offset ?? desk.NY_DEFAULT));
     flash(req, 'ok', `Plan saved. Open the ${symbol} ${side === 'BUY' ? 'buy' : 'sell'} on MT5 within 4 hours and the journal links it to this plan.`);
+    res.redirect('/journal/plan');
+  });
+
+  // setup tags on a saved plan (KATANA plans arrive with the shape and level Compass saw; add the rest here)
+  app.get('/journal/plan/:id/tags', requireUser, requireJournal, (req, res) => {
+    const p = db.prepare('SELECT * FROM trade_plans WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+    if (!p) return res.redirect('/journal/plan');
+    page(req, res, 'Setup tags', `
+    <div class="row between page-head"><h1>Setup tags</h1><a class="small" href="/journal/plan">← Plans</a></div>
+    <form method="post" action="/journal/plan/${p.id}/tags" class="card plan-form tp-tagcard">
+      <p class="muted small">${esc(p.symbol)} ${p.side === 'BUY' ? 'buy' : 'sell'} · entry ${p.entry} · stop ${p.sl} · target ${p.tp}${p.source === 'katana' ? ' · from KATANA' : ''}</p>
+      ${tagForm(p.setup)}
+      <button>Save tags</button>
+    </form>
+    <script src="/plan.js"></script>`);
+  });
+  app.post('/journal/plan/:id/tags', requireUser, requireJournal, (req, res) => {
+    const p = db.prepare('SELECT id, trade_id FROM trade_plans WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+    if (p) {
+      const st = TP.setupText(req.body || {});
+      db.prepare('UPDATE trade_plans SET setup = ? WHERE id = ?').run(st, p.id);
+      flash(req, 'ok', 'Tags saved.');
+    }
     res.redirect('/journal/plan');
   });
 
@@ -806,7 +858,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <section class="card">
       <h2>Your notes</h2>
       <form method="post" action="/journal/${t.id}" class="grid">
-        <label>Setup<input name="setup" value="${esc(t.setup)}" maxlength="60" placeholder="e.g. London breakout"></label>
+        <label>Setup<input name="setup" value="${esc(t.setup)}" maxlength="120" placeholder="e.g. London breakout"></label>
         <label>Emotion<select name="emotion">${EMOTIONS.map((e) => `<option ${e === t.emotion ? 'selected' : ''}>${esc(e)}</option>`).join('')}</select></label>
         <label>Rating<select name="rating">${['', 1, 2, 3, 4, 5].map((r) => `<option value="${r}" ${String(r) === String(t.rating ?? '') ? 'selected' : ''}>${r ? '★'.repeat(r) : '-'}</option>`).join('')}</select></label>
         <label>Mistakes<input name="mistakes" value="${esc(t.mistakes)}" maxlength="200" placeholder="e.g. moved stop, entered early"></label>
@@ -863,7 +915,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     if (!t) return res.status(404).send('Not found');
     const rating = Number(req.body.rating);
     db.prepare(`UPDATE journal_trades SET setup = ?, emotion = ?, mistakes = ?, notes = ?, rating = ?, updated_at = datetime('now') WHERE id = ?`)
-      .run(String(req.body.setup || '').trim().slice(0, 60), EMOTIONS.includes(req.body.emotion) ? req.body.emotion : '',
+      .run(String(req.body.setup || '').trim().slice(0, 120), EMOTIONS.includes(req.body.emotion) ? req.body.emotion : '',
         String(req.body.mistakes || '').trim().slice(0, 200), String(req.body.notes || '').slice(0, 4000),
         rating >= 1 && rating <= 5 ? rating : null, t.id);
     flash(req, 'ok', 'Notes saved.');

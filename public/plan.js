@@ -62,3 +62,15 @@
     document.querySelectorAll('.tp-scroll .tp-row').forEach((r) => { r.hidden = b.dataset.f !== 'all' && r.dataset.k !== b.dataset.f; });
   }));
 })();
+
+// setup tags: a single-choice group (shape, target) clears when its chip is tapped again
+(function () {
+  document.querySelectorAll('.tp-seg[data-one]').forEach((g) => {
+    const ins = [...g.querySelectorAll('input')];
+    ins.forEach((i) => { i.dataset.was = i.checked ? '1' : ''; });
+    ins.forEach((i) => i.addEventListener('click', () => {
+      if (i.dataset.was) { i.checked = false; i.dataset.was = ''; } else { ins.forEach((x) => { x.dataset.was = ''; }); i.dataset.was = '1'; }
+      i.dispatchEvent(new Event('change', { bubbles: true }));
+    }));
+  });
+})();
