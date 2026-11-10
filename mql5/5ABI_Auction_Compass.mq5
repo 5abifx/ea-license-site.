@@ -1,13 +1,14 @@
 ﻿//+------------------------------------------------------------------+
 //|  5ABI FX · Auction Compass (MetaTrader 5)                         |
 //|  Sierra-style session profiles, naked POCs, poor highs/lows,     |
-//|  business zones, docked weekly profile, auto bias + alerts.      |
+//|  business zones, docked weekly profile, auto bias + alerts,     |
+//|  1H / 4H candles over the weekly profile, candle close timers.   |
 //|  Private build: distribute the compiled .ex5 only.               |
 //|  Licence: unlocks while the Trade Journal EA runs in the same    |
 //|  MT5 (indicators cannot reach the website themselves).          |
 //+------------------------------------------------------------------+
 #property copyright   "5ABI FX"
-#property version     "1.22"
+#property version     "1.23"
 #property description "5ABI FX · Auction Compass"
 #property indicator_chart_window
 #property indicator_buffers 0
@@ -59,6 +60,14 @@ input int     InpWeekMarginPx      = 60;         // Gap from price scale (pixels
 input int     InpWeekTopPx         = 90;         // Keep weekly label below this many pixels from the top
 input bool    InpAutoShift         = true;       // Turn on chart shift for the right-side space
 input double  InpShiftPct          = 35.0;       // Chart shift size (%)
+
+input group "Higher-timeframe candles + timers"
+input bool    InpShowHTF           = true;       // Show higher-timeframe candles over the weekly profile
+input ENUM_TIMEFRAMES InpHTF1      = PERIOD_H1;  // HTF candles: first timeframe
+input ENUM_TIMEFRAMES InpHTF2      = PERIOD_H4;  // HTF candles: second timeframe
+input int     InpHTFCount          = 3;          // HTF candles: how many of each (1-6)
+input bool    InpShowTimers        = true;       // Candle close timers, bottom-right (this timeframe + the next two)
+input int     InpTimerBottomPx     = 26;         // Timers: distance from the bottom (pixels)
 
 input group "Plan & strip"
 input bool    InpShowTags          = true;       // Show price tags
@@ -1125,6 +1134,136 @@ int YOf(double price)
    return y;
   }
 
+//+------------------------------------------------------------------+
+//| Higher-timeframe candles (drawn over the weekly profile)          |
+//| up = solid, down = hollow, TF name above, dashed line at the      |
+//| open of the forming candle. Returns the group's width in pixels.  |
+//+------------------------------------------------------------------+
+int HTFGroup(int gi, ENUM_TIMEFRAMES tf, int xRight, int cw, int gap, int H)
+  {
+   MqlRates r[];
+   int n = CopyRates(_Symbol, tf, 0, IMax(1, IMin(6, InpHTFCount)), r);
+   if(n <= 0)
+      return 0;
+   int gw = n * (cw + gap) - gap;
+   int x0 = xRight - gw;
+   color cUp = Mix(TC(), 0.85), cDn = Mix(TC(), 0.55);
+   double top = 0;
+   string p = PFX + "pxH" + IntegerToString(gi) + "_";
+   for(int i = 0; i < n; i++)
+     {
+      int X = x0 + i * (cw + gap);
+      bool up = r[i].close >= r[i].open;
+      color c = up ? cUp : cDn;
+      int yh = YOf(r[i].high), yl = YOf(r[i].low);
+      int yo = YOf(r[i].open), yc = YOf(r[i].close);
+      int bt = IMin(yo, yc), bb = IMax(bt + 1, IMax(yo, yc));
+      string q = p + IntegerToString(i);
+      int xm = X + cw / 2;
+      PxRect(q + "w1", xm, yh, 1, IMax(1, bt - yh), c);         // upper wick
+      PxRect(q + "w2", xm, bb, 1, IMax(1, yl - bb), c);         // lower wick
+      if(up)
+         PxRect(q + "b", X, bt, cw, bb - bt, c);                // solid body
+      else
+        {
+         PxRect(q + "t", X, bt, cw, 1, c);                      // hollow body
+         PxRect(q + "u", X, bb - 1, cw, 1, c);
+         PxRect(q + "l", X, bt, 1, bb - bt, c);
+         PxRect(q + "r", X + cw - 1, bt, 1, bb - bt, c);
+        }
+      top = MathMax(top, r[i].high);
+     }
+   int yTop = YOf(top);
+   if(yTop > 14 && yTop < H)
+      PxText(p + "lb", x0 + gw / 2, yTop - 4, TfStr(tf), Mix(TC(), 0.55), ANCHOR_LOWER, InpFont + " Semibold",
+             TfStr(tf) + " candles (last " + IntegerToString(n) + ")");
+   // dashed line at the open of the forming candle
+   int yOp = YOf(r[n - 1].open);
+   if(yOp > 0 && yOp < H)
+     {
+      int k = 0;
+      for(int x = x0 - 6; x < xRight + 4; x += 6)
+         PxRect(p + "d" + IntegerToString(k++), x, yOp, 3, 1, Mix(TC(), 0.35));
+     }
+   return gw;
+  }
+
+string TfStr(ENUM_TIMEFRAMES tf)
+  {
+   switch(tf)
+     {
+      case PERIOD_M1:  return "1M";
+      case PERIOD_M5:  return "5M";
+      case PERIOD_M15: return "15M";
+      case PERIOD_M30: return "30M";
+      case PERIOD_H1:  return "1H";
+      case PERIOD_H2:  return "2H";
+      case PERIOD_H4:  return "4H";
+      case PERIOD_H8:  return "8H";
+      case PERIOD_H12: return "12H";
+      case PERIOD_D1:  return "D";
+      case PERIOD_W1:  return "W";
+      case PERIOD_MN1: return "MN";
+     }
+   return IntegerToString(PeriodSeconds(tf) / 60) + "m";
+  }
+
+//+------------------------------------------------------------------+
+//| Candle close timers, bottom-right, no background                  |
+//| e.g. on M30:  30M 28:30 / 1H 58:30 / 4H 3:58:30                  |
+//+------------------------------------------------------------------+
+void TimerLabel(string nm, int x, int y, string s, color c)
+  {
+   if(ObjectFind(0, nm) < 0)
+     {
+      ObjectCreate(0, nm, OBJ_LABEL, 0, 0, 0);
+      Common(nm, false);
+      ObjectSetInteger(0, nm, OBJPROP_CORNER, CORNER_RIGHT_LOWER);
+      ObjectSetInteger(0, nm, OBJPROP_ANCHOR, ANCHOR_RIGHT_LOWER);
+      ObjectSetString(0, nm, OBJPROP_FONT, InpFont + " Semibold");
+      ObjectSetInteger(0, nm, OBJPROP_FONTSIZE, InpFontSize + 2);
+      ObjectSetString(0, nm, OBJPROP_TOOLTIP, "Time left until this candle closes");
+     }
+   ObjectSetInteger(0, nm, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(0, nm, OBJPROP_YDISTANCE, y);
+   ObjectSetString(0, nm, OBJPROP_TEXT, s);
+   ObjectSetInteger(0, nm, OBJPROP_COLOR, c);
+  }
+
+void DrawTimers()
+  {
+   if(!InpShowTimers || !g_lic)
+     {
+      ObjectsDeleteAll(0, PFX + "pxCT");
+      return;
+     }
+   ENUM_TIMEFRAMES all[8] = {PERIOD_M1, PERIOD_M5, PERIOD_M15, PERIOD_M30, PERIOD_H1, PERIOD_H4, PERIOD_D1, PERIOD_W1};
+   int k = 0;
+   while(k < 7 && PeriodSeconds(all[k]) < PeriodSeconds(_Period))
+      k++;
+   long now = (long)TimeTradeServer();
+   int lh = (InpFontSize + 2) * 2 + 2;
+   int row = 0;
+   for(int i = IMin(k + 2, 7); i >= k; i--)      // biggest timeframe at the bottom
+     {
+      ENUM_TIMEFRAMES tf = all[i];
+      long open = (long)iTime(_Symbol, tf, 0);
+      if(open == 0)
+         continue;
+      long left = open + PeriodSeconds(tf) - now;
+      if(left < 0)
+         left = 0;
+      long h = left / 3600, m = (left % 3600) / 60, sec = left % 60;
+      string t = h > 0 ? StringFormat("%d:%02d:%02d", h, m, sec) : StringFormat("%02d:%02d", m, sec);
+      if(h >= 24)
+         t = StringFormat("%dd %d:%02d", h / 24, h % 24, m);
+      int y = InpTimerBottomPx + row * lh;
+      TimerLabel(PFX + "pxCTv" + IntegerToString(row), 12, y, t, left < 60 ? InpAccent : TC());
+      TimerLabel(PFX + "pxCTl" + IntegerToString(row), 12 + 86, y, TfStr(tf), InpBear);
+      row++;
+     }
+  }
+
 void DrawPixels()
   {
    int W = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
@@ -1178,6 +1317,16 @@ void DrawPixels()
      }
    else
       ObjectsDeleteAll(0, PFX + "pxW");
+
+   // Higher-timeframe candles over the weekly profile (2nd TF on the right)
+   ObjectsDeleteAll(0, PFX + "pxH");
+   if(InpShowHTF)
+     {
+      int w2 = HTFGroup(2, InpHTF2, xR - 8, 12, 5, H);
+      int w1 = HTFGroup(1, InpHTF1, xR - 8 - w2 - (w2 > 0 ? 16 : 0), 8, 4, H);
+      xL = IMin(xL, xR - 8 - w2 - (w2 > 0 ? 16 : 0) - w1);
+     }
+   DrawTimers();
 
    // Price tags in a column just left of the weekly
    ObjectsDeleteAll(0, PFX + "pxT");
@@ -1270,7 +1419,7 @@ int OnInit()
       ChartSetInteger(0, CHART_SHIFT, true);
       ChartSetDouble(0, CHART_SHIFT_SIZE, fmax(10.0, fmin(50.0, InpShiftPct)));
      }
-   EventSetTimer(2);
+   EventSetTimer(1);
    return INIT_SUCCEEDED;
   }
 
@@ -1281,9 +1430,17 @@ void OnDeinit(const int reason)
    ChartRedraw();
   }
 
+uint g_tmTick = 0;
 void OnTimer()
   {
-   Refresh();
+   // timers tick every second; the heavier refresh stays at every 2 seconds
+   if((++g_tmTick & 1) == 0)
+      Refresh();
+   else if(g_lic)
+     {
+      DrawTimers();
+      ChartRedraw();
+     }
   }
 
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
