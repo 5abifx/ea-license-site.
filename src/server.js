@@ -73,7 +73,24 @@ app.use((req, res, next) => {
 });
 app.use(express.urlencoded({ extended: false }));
 app.use((req, res, next) => { req.body = req.body || {}; next(); });
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// Every deploy gets a new version tag on our CSS/JS links, so browsers and Cloudflare
+// never mix a new page with an old cached style.css (that left the Desk unstyled).
+const BUILD = (process.env.RENDER_GIT_COMMIT || '').slice(0, 8) || Date.now().toString(36);
+app.use((req, res, next) => {
+  const send = res.send.bind(res);
+  res.send = (body) => {
+    if (typeof body === 'string' && body.includes('</')) body = body.replace(/((?:src|href)="\/[\w/.-]+\.(?:css|js))(?:\?v=[\w.]+)?"/g, `$1?v=${BUILD}"`);
+    return send(body);
+  };
+  next();
+});
+app.use(express.static(path.join(__dirname, '..', 'public'), {
+  setHeaders: (res, file) => {
+    if (!/\.(css|js)$/.test(file)) return;
+    // versioned links can be kept for a year; plain ones must always be checked again
+    res.setHeader('Cache-Control', res.req.query.v ? 'public, max-age=31536000, immutable' : 'no-cache');
+  },
+}));
 app.use(rate.limiter);   // after the files: pictures and styles never count
 app.use(cookieSession({
   name: 'eals',
