@@ -73,5 +73,6 @@
     let tries = 0;
     (function wait() { if (busy() && tries++ < 60) return setTimeout(wait, 100); setTimeout(run, 150); })();
   }
+  window.igniteReplay = run;   // the Desk's Replay plays this again without reloading
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

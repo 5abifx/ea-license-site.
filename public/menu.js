@@ -11,8 +11,20 @@
 // "Replay" on the journal and desk: forget that the opening animations were seen today, then reload
 (function () {
   document.addEventListener('click', function (e) {
-    if (!e.target.closest('[data-replay]')) return;
-    try { sessionStorage.removeItem('plx'); localStorage.removeItem('intro:w'); localStorage.removeItem('intro:r'); sessionStorage.setItem('replay', '1'); } catch (err) { /* private mode */ }
+    const btn = e.target.closest('[data-replay]');
+    if (!btn) return;
+    // Desk: replay its own animation in place (panels rise in, bars grow, numbers sweep), no reload
+    if (btn.dataset.replay === 'desk') {
+      const ig = document.body.classList.contains('ig');   // the number sweep already moves the bars
+      const els = document.querySelectorAll('.app-body > *, main.wrap > *, .app-body main > *' + (ig ? '' : ', .tm-kpis .tm-bar i, .tm-dw i, .tm-cost i'));
+      els.forEach((el) => { el.style.animation = 'none'; });
+      void document.body.offsetWidth;
+      els.forEach((el) => { el.style.animation = ''; });
+      if (window.igniteReplay) setTimeout(window.igniteReplay, 900);
+      return;
+    }
+    // Journal: the profit loading screen and the result reveal, then the number sweep (the daily welcome is left alone)
+    try { sessionStorage.removeItem('plx'); localStorage.removeItem('intro:r'); sessionStorage.setItem('replay', '1'); } catch (err) { /* private mode */ }
     location.reload();
   });
 })();
