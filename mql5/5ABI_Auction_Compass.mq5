@@ -22,6 +22,14 @@ enum EStripPos
    STRIP_BOTTOM_CENTER = 3  // Bottom center
   };
 
+enum E5abiTheme
+  {
+   TH_AUTO   = 0, // Auto (follows the 5ABI.FX chart template)
+   TH_EMBER  = 1, // Ember (colours below)
+   TH_PAPER  = 2, // Paper (light)
+   TH_COBALT = 3  // Cobalt (blue)
+  };
+
 enum EExtend
   {
    EXT_WEEK = 0, // This week only
@@ -79,6 +87,7 @@ input bool    InpAlerts            = true;       // Alert when bias changes
 input bool    InpPush              = false;      // Push notification when bias changes
 
 input group "Style"
+input E5abiTheme InpTheme          = TH_AUTO;          // Theme (Ember / Paper / Cobalt; Auto follows the chart template)
 input string  InpBrand             = "5ABI.FX";        // Brand name
 input color   InpProf              = C'139,139,146';   // Profile
 input color   InpPoc               = C'245,165,36';    // POC
@@ -87,6 +96,10 @@ input color   InpText              = C'236,236,238';   // Text (dark chart)
 input color   InpTextLight         = C'20,20,22';      // Text (light chart)
 input color   InpBull              = C'38,198,160';    // Bull (teal)
 input color   InpBear              = C'240,70,75';     // Bear
+
+// colours in use (set by the theme)
+color g_cAcc, g_cPoc, g_cBull, g_cBear, g_cProf, g_cTf;
+color g_thBg = clrNONE, g_thBull = clrNONE;
 input int     InpFontSize          = 9;                // Font size
 input string  InpFont              = "Segoe UI";       // Font
 
@@ -149,9 +162,9 @@ void LicLockScreen()
    ObjectSetInteger(0, bg, OBJPROP_YDISTANCE, H / 2 - ch / 2);
    ObjectSetInteger(0, bg, OBJPROP_XSIZE, cw);
    ObjectSetInteger(0, bg, OBJPROP_YSIZE, ch);
-   ObjectSetInteger(0, bg, OBJPROP_BGCOLOR, Mix(InpAccent, 0.10));
+   ObjectSetInteger(0, bg, OBJPROP_BGCOLOR, Mix(g_cAcc, 0.10));
    ObjectSetInteger(0, bg, OBJPROP_BORDER_TYPE, BORDER_FLAT);
-   ObjectSetInteger(0, bg, OBJPROP_COLOR, InpAccent);
+   ObjectSetInteger(0, bg, OBJPROP_COLOR, g_cAcc);
    ObjectSetInteger(0, bg, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, bg, OBJPROP_HIDDEN, true);
    for(int i = 0; i < 4; i++)
@@ -165,7 +178,7 @@ void LicLockScreen()
       ObjectSetString(0, nm, OBJPROP_TEXT, t[i]);
       ObjectSetString(0, nm, OBJPROP_FONT, i == 0 ? InpFont + " Semibold" : InpFont);
       ObjectSetInteger(0, nm, OBJPROP_FONTSIZE, i == 0 ? fs + 2 : fs);
-      ObjectSetInteger(0, nm, OBJPROP_COLOR, i == 0 ? InpAccent : TC());   // TC(): dark text on light charts
+      ObjectSetInteger(0, nm, OBJPROP_COLOR, i == 0 ? g_cAcc : TC());   // TC(): dark text on light charts
       ObjectSetInteger(0, nm, OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, nm, OBJPROP_HIDDEN, true);
       ObjectSetInteger(0, nm, OBJPROP_ZORDER, 101);
@@ -603,7 +616,7 @@ void DrawProfile(CProf &p, string tag, bool dev)
       return;
    double span = (double)(p.tEnd - p.t0);
    span = dev ? fmax(span, 6 * 3600.0) : fmin(span, 86400.0);
-   color cIn = Mix(InpProf, 0.42), cOut = Mix(InpProf, 0.22);
+   color cIn = Mix(g_cProf, 0.42), cOut = Mix(g_cProf, 0.22);
    for(int k = 0; k < p.n; k++)
      {
       string nm = PFX + tag + "r" + IntegerToString(k);
@@ -619,7 +632,7 @@ void DrawProfile(CProf &p, string tag, bool dev)
    datetime t2 = (datetime)(p.t0 + (long)(span * InpWidthPct / 100.0));
    if(dev)   // today's POC / VAH / VAL follow the live candle instead of stopping mid-day
       t2 = (datetime)MathMax((double)t2, (double)(TimeCurrent() + 3 * PeriodSeconds(_Period)));
-   Seg(PFX + tag + "poc", p.t0, t2, p.poc, InpPoc, STYLE_SOLID, dev ? 2 : 1, false);
+   Seg(PFX + tag + "poc", p.t0, t2, p.poc, g_cPoc, STYLE_SOLID, dev ? 2 : 1, false);
    if(InpShowVA)
      {
       color cv = Mix(TC(), 0.45);
@@ -627,7 +640,7 @@ void DrawProfile(CProf &p, string tag, bool dev)
       Seg(PFX + tag + "val", p.t0, t2, p.val, cv, STYLE_DOT, 1, false);
      }
    if(InpShowShape)
-      Txt(PFX + tag + "shp", p.t0, p.hi, p.shape, Mix(InpAccent, 0.85), ANCHOR_LEFT_LOWER);
+      Txt(PFX + tag + "shp", p.t0, p.hi, p.shape, Mix(g_cAcc, 0.85), ANCHOR_LEFT_LOWER);
   }
 
 // Market profile marks beside a profile: single prints, tails, TPO POC.
@@ -658,7 +671,7 @@ void DrawMarks(CProf &p, string tag, double hs, double ls)
          double pLo = p.lo + a * p.step, pHi = p.lo + (b + 1) * p.step;
          bool filled = hs >= pHi && ls <= pLo;     // traded through the whole run since
          if(b - a + 1 >= run && !filled)
-            VBar(PFX + tag + "ms" + IntegerToString(j++), tOut, pLo, pHi, InpAccent, 3,
+            VBar(PFX + tag + "ms" + IntegerToString(j++), tOut, pLo, pHi, g_cAcc, 3,
                  "Single prints " + Px(pLo) + " - " + Px(pHi));
         }
      }
@@ -669,24 +682,24 @@ void DrawMarks(CProf &p, string tag, double hs, double ls)
         {
          double a = p.hi - p.tailHi * p.step, d = (p.hi - a) / 3.0;
          string tip = "Selling tail " + Px(a) + " - " + Px(p.hi);
-         VBar(PFX + tag + "mth0", tEdge, a, a + d, InpBear, 3, tip);
-         VBar(PFX + tag + "mth1", tEdge, a + d, a + 2 * d, Mix(InpBear, 0.6), 3, tip);
-         VBar(PFX + tag + "mth2", tEdge, a + 2 * d, p.hi, Mix(InpBear, 0.3), 3, tip);
+         VBar(PFX + tag + "mth0", tEdge, a, a + d, g_cBear, 3, tip);
+         VBar(PFX + tag + "mth1", tEdge, a + d, a + 2 * d, Mix(g_cBear, 0.6), 3, tip);
+         VBar(PFX + tag + "mth2", tEdge, a + 2 * d, p.hi, Mix(g_cBear, 0.3), 3, tip);
         }
       if(p.tailLo >= run && ls >= p.lo)
         {
          double a = p.lo + p.tailLo * p.step, d = (a - p.lo) / 3.0;
          string tip = "Buying tail " + Px(p.lo) + " - " + Px(a);
-         VBar(PFX + tag + "mtl0", tEdge, a - d, a, InpBull, 3, tip);
-         VBar(PFX + tag + "mtl1", tEdge, a - 2 * d, a - d, Mix(InpBull, 0.6), 3, tip);
-         VBar(PFX + tag + "mtl2", tEdge, p.lo, a - 2 * d, Mix(InpBull, 0.3), 3, tip);
+         VBar(PFX + tag + "mtl0", tEdge, a - d, a, g_cBull, 3, tip);
+         VBar(PFX + tag + "mtl1", tEdge, a - 2 * d, a - d, Mix(g_cBull, 0.6), 3, tip);
+         VBar(PFX + tag + "mtl2", tEdge, p.lo, a - 2 * d, Mix(g_cBull, 0.3), 3, tip);
         }
      }
    if(InpShowTpoPoc && MathAbs(p.tPocI - p.pocI) > 1)
      {
       double tp = p.lo + (p.tPocI + 0.5) * p.step;
       string nm = PFX + tag + "mtp";
-      Txt(nm, tEdge, tp, ShortToString(0x25C6), InpPoc, ANCHOR_CENTER);
+      Txt(nm, tEdge, tp, ShortToString(0x25C6), g_cPoc, ANCHOR_CENTER);
       Tip(nm, "TPO POC " + Px(tp) + " (volume POC " + Px(p.poc) + ")");
      }
   }
@@ -728,7 +741,7 @@ void DrawZones()
         }
       lv[j + 1] = x;
      }
-   color cz = Mix(InpProf, 0.14);
+   color cz = Mix(g_cProf, 0.14);
    int a = 0;
    while(a < m)
      {
@@ -774,7 +787,7 @@ void DrawNaked()
   {
    ObjectsDeleteAll(0, PFX + "n");
    ArrayResize(g_nk, 0);
-   color cn = Mix(InpPoc, 0.65), cp = Mix(InpBear, 0.32), cv = Mix(TC(), 0.35);
+   color cn = Mix(g_cPoc, 0.65), cp = Mix(g_cBear, 0.32), cv = Mix(TC(), 0.35);
    datetime tLive = (datetime)(TimeCurrent() + 3 * PeriodSeconds(_Period));
    for(int i = 0; i < g_hn; i++)
      {
@@ -1063,7 +1076,7 @@ void LiveUpdate()
    g_tip2 = why + (bDir == 1 ? "Flips if price closes back below pVAH " + Px(pVAH) :
                    bDir == -1 ? "Flips if price closes back above pVAL " + Px(pVAL) :
                    "Waits for price to leave value and hold " + IntegerToString(InpAcceptMins) + " min");
-   g_c2 = bDir == 1 ? InpBull : bDir == -1 ? InpBear : TC();
+   g_c2 = bDir == 1 ? g_cBull : bDir == -1 ? g_cBear : TC();
 
    // Context line
    string accTx = variant == 2 ? (pocHit ? "pPOC ✓" : "→ pPOC") : variant == 4 ? "ACCEPTED ✓" : gapHeld ? "GAP HELD ✓" :
@@ -1084,11 +1097,11 @@ void LiveUpdate()
      {
       color cl = Mix(TC(), 0.65);
       AddTag(pVAH, "pVAH " + Px(pVAH), cl);
-      AddTag(pPOC, "pPOC " + Px(pPOC), InpPoc);
+      AddTag(pPOC, "pPOC " + Px(pPOC), g_cPoc);
       AddTag(pVAL, "pVAL " + Px(pVAL), cl);
       for(int i = 0; i < ArraySize(g_nk); i++)
          if(g_nk[i] != pPOC)
-            AddTag(g_nk[i], "nPOC " + Px(g_nk[i]), Mix(InpPoc, 0.7));
+            AddTag(g_nk[i], "nPOC " + Px(g_nk[i]), Mix(g_cPoc, 0.7));
       if(InpShowPlan)
         {
          double lE = EMPTY_VALUE, lT = EMPTY_VALUE, sE = EMPTY_VALUE, sT = EMPTY_VALUE;
@@ -1111,13 +1124,13 @@ void LiveUpdate()
          double tol = (pVAH - pVAL) * 0.03;
          if(lE != EMPTY_VALUE)
            {
-            PlanTag(lE, "▲ LONG", InpBull, tol);
-            PlanTag(lT, "▲ TP", InpBull, tol);
+            PlanTag(lE, "▲ LONG", g_cBull, tol);
+            PlanTag(lT, "▲ TP", g_cBull, tol);
            }
          if(sE != EMPTY_VALUE)
            {
-            PlanTag(sE, "▼ SHORT", InpBear, tol);
-            PlanTag(sT, "▼ TP", InpBear, tol);
+            PlanTag(sE, "▼ SHORT", g_cBear, tol);
+            PlanTag(sT, "▼ TP", g_cBear, tol);
            }
         }
      }
@@ -1258,8 +1271,8 @@ void DrawTimers()
       if(h >= 24)
          t = StringFormat("%dd %d:%02d", h / 24, h % 24, m);
       int y = InpTimerBottomPx + row * lh;
-      TimerLabel(PFX + "pxCTv" + IntegerToString(row), 12, y, t, left < 60 ? InpAccent : TC());
-      TimerLabel(PFX + "pxCTl" + IntegerToString(row), 12 + 86, y, TfStr(tf), InpBear);
+      TimerLabel(PFX + "pxCTv" + IntegerToString(row), 12, y, t, left < 60 ? g_cAcc : TC());
+      TimerLabel(PFX + "pxCTl" + IntegerToString(row), 12 + 86, y, TfStr(tf), g_cTf);
       row++;
      }
   }
@@ -1290,7 +1303,7 @@ void DrawPixels()
    if(InpShowWeek && g_wk.ok)
      {
       xL = xR - InpWeekWidthPx;
-      color cIn = Mix(InpProf, 0.42), cOut = Mix(InpProf, 0.22);
+      color cIn = Mix(g_cProf, 0.42), cOut = Mix(g_cProf, 0.22);
       for(int k = 0; k < g_wk.n; k++)
         {
          string nm = PFX + "pxW" + IntegerToString(k);
@@ -1303,7 +1316,7 @@ void DrawPixels()
          int w = IMax(1, (int)MathRound(g_wk.vol[k] / g_wk.mx * InpWeekWidthPx));
          PxRect(nm, xR - w, y1, w, IMax(1, y2 - y1), (k >= g_wk.dnI && k <= g_wk.upI) ? cIn : cOut);
         }
-      PxRect(PFX + "pxWpoc", xL, YOf(g_wk.poc), InpWeekWidthPx, 1, InpPoc);
+      PxRect(PFX + "pxWpoc", xL, YOf(g_wk.poc), InpWeekWidthPx, 1, g_cPoc);
       if(InpShowVA)
         {
          color cv = Mix(TC(), 0.4);
@@ -1312,7 +1325,7 @@ void DrawPixels()
         }
       // label sits right above the weekly profile, left-aligned with it, never in the top corner
       int yT = IMin(H - 4, IMax(InpWeekTopPx + lh, YOf(g_wk.hi) - 4));
-      PxText(PFX + "pxWl1", xL, yT - lh, g_wkTx, InpAccent, ANCHOR_LEFT_LOWER, InpFont + " Semibold", "This week's profile shape");
+      PxText(PFX + "pxWl1", xL, yT - lh, g_wkTx, g_cAcc, ANCHOR_LEFT_LOWER, InpFont + " Semibold", "This week's profile shape");
       PxText(PFX + "pxWl2", xL, yT, g_wkTrail, Mix(TC(), 0.8), ANCHOR_LEFT_LOWER, InpFont, "How the week developed, day by day");
      }
    else
@@ -1372,7 +1385,7 @@ void DrawPixels()
       int x = center ? W / 2 : 10;
       ENUM_ANCHOR_POINT a = center ? (top ? ANCHOR_UPPER : ANCHOR_LOWER) : (top ? ANCHOR_LEFT_UPPER : ANCHOR_LEFT_LOWER);
       int y0 = top ? (center ? 6 : 24) : H - 8 - 2 * lh;
-      PxText(PFX + "pxS1", x, y0, g_s1, InpAccent, a, InpFont + " Semibold", "");
+      PxText(PFX + "pxS1", x, y0, g_s1, g_cAcc, a, InpFont + " Semibold", "");
       PxText(PFX + "pxS2", x, y0 + lh, g_s2, g_c2, a, InpFont + " Semibold", g_tip2);
       PxText(PFX + "pxS3", x, y0 + 2 * lh, g_s3, Mix(TC(), 0.8), a, InpFont, g_tip3);
      }
@@ -1380,11 +1393,42 @@ void DrawPixels()
       ObjectsDeleteAll(0, PFX + "pxS");
   }
 
+void PickTheme()
+  {
+   color bg = (color)ChartGetInteger(0, CHART_COLOR_BACKGROUND);
+   color bu = (color)ChartGetInteger(0, CHART_COLOR_CANDLE_BULL);
+   if(bg == g_thBg && bu == g_thBull)
+      return;
+   g_thBg = bg;
+   g_thBull = bu;
+   int th = InpTheme;
+   if(th == TH_AUTO)
+     {
+      double lum = 0.299 * (bg & 0xFF) + 0.587 * ((bg >> 8) & 0xFF) + 0.114 * ((bg >> 16) & 0xFF);
+      int ur = bu & 0xFF, ug = (bu >> 8) & 0xFF, ub = (bu >> 16) & 0xFF;
+      th = lum > 140 ? TH_PAPER : (ub > ur + 60 && ub > ug + 40 ? TH_COBALT : TH_EMBER);
+     }
+   g_cAcc = InpAccent; g_cPoc = InpPoc; g_cBull = InpBull; g_cBear = InpBear; g_cProf = InpProf;
+   if(th == TH_PAPER)
+     {
+      g_cAcc = C'226,72,14'; g_cPoc = C'226,72,14'; g_cProf = C'90,90,96';
+      g_cBull = C'14,150,118'; g_cBear = C'214,48,52';
+     }
+   else if(th == TH_COBALT)
+     {
+      g_cAcc = C'47,123,255'; g_cPoc = C'90,162,255'; g_cProf = C'130,145,175';
+      g_cBull = C'61,139,255'; g_cBear = C'240,70,75';
+     }
+   g_cTf = th == TH_COBALT ? g_cAcc : th == TH_PAPER ? C'210,59,43' : g_cBear;   // timer labels
+   g_needFull = true;                  // redraw everything in the new colours
+  }
+
 //+------------------------------------------------------------------+
 void Refresh()
   {
    if(!LicOk())
       return;
+   PickTheme();
    if(g_licFresh)
      {
       g_licFresh = false;
@@ -1414,6 +1458,7 @@ void Refresh()
 int OnInit()
   {
    IndicatorSetString(INDICATOR_SHORTNAME, "5ABI Auction Compass");
+   PickTheme();
    if(InpAutoShift)
      {
       ChartSetInteger(0, CHART_SHIFT, true);

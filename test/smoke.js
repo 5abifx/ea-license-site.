@@ -438,7 +438,7 @@ function client(base, ip) {
     assert.match((await admin.get('/admin')).text, /student<\/span>/);
     r = await tia.get('/dashboard');
     assert.match(r.text, /Auction Compass/);
-    assert.match(r.text, /5ABI\.FX%20Compass\.tpl/);
+    assert.match(r.text, /5ABI\.FX%20Ember%20Compass\.tpl/);
     assert.strictEqual((await tia.get(`/download/${compassId}`)).status, 200);
     // switching it off locks it again
     await admin.post(`/admin/users/${tiaId}`, tiaForm);

@@ -548,7 +548,7 @@ app.get('/dashboard', requireUser, (req, res) => {
     <h2>3. Allow the license check in MT5</h2>
     <p>In MetaTrader 5 go to <strong>Tools → Options → Expert Advisors</strong>, tick <strong>Allow WebRequest for listed URL</strong> and add:</p>
     <code class="block">${esc(req.protocol + '://' + req.get('host'))}</code>
-    <p class="muted">Want the 5ABI.FX look on your charts? Download the chart template <a href="/templates/5ABI.FX.tpl" download>5ABI.FX.tpl</a> ${student ? '(or <a href="/templates/5ABI.FX%20Compass.tpl" download>with Auction Compass</a>)' : ''}, put it in <strong>File → Open Data Folder → MQL5 → Profiles → Templates</strong>, then right-click a chart → <strong>Templates</strong>.</p>
+    <p class="muted">Want the 5ABI.FX look on your charts? Pick a chart theme: ${['Ember', 'Paper', 'Cobalt'].map(t => `<a href="/templates/5ABI.FX%20${t}.tpl" download>${t}</a>${student ? ` (<a href="/templates/5ABI.FX%20${t}%20Compass.tpl" download>with Auction Compass</a>)` : ''}`).join(' · ')}. Put it in <strong>File → Open Data Folder → MQL5 → Profiles → Templates</strong>, then right-click a chart → <strong>Templates</strong>. KATANA and Compass switch to the same colours by themselves.</p>
     <p class="muted">Prop firm account says <strong>"AutoTrading disabled by server"</strong>? <a href="/help/ea-blocked">Get a ready-to-send email for their support</a>.</p>
   </section>
   </div>
