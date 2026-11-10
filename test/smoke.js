@@ -275,6 +275,9 @@ function client(base, ip) {
     assert.strictEqual(new Set(r.text.match(/href="\/journal\/\d+"/g) || []).size, 1);   // one trade (links to it appear in the calendar and the recap)
     const tid = r.text.match(/href="\/journal\/(\d+)"/)[1];
     assert.match(r.text, /Share report/);
+    r = await bob.get('/journal/desk');
+    assert.strictEqual(r.status, 200);
+    assert.match(r.text, /The Desk starts after 10 closed trades/);
     r = await bob.get('/journal/report');
     assert.match(r.text, /id="report-data"/);
     assert.doesNotMatch(r.text.split('report-data')[1], /\d{6,}/);   // no full account number in the card data
