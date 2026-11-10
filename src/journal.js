@@ -659,7 +659,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       const kind = p.status === 'matched' ? 'done' : p.status === 'open' ? 'wait' : 'miss';
       return `<li class="tp-row" data-k="${kind}">
         <div class="tp-main"><b>${esc(p.symbol)}</b><span class="tp-side ${p.side === 'BUY' ? 'b' : 's'}">${p.side === 'BUY' ? 'Buy' : 'Sell'}</span>
-          <small>${esc(p.plan_time.slice(5, 16).replace('-', '/'))}${p.source === 'katana' ? ' · from KATANA' : ''}${p.setup ? ' · ' + esc(p.setup) : ''}</small></div>
+          <small>${esc(p.plan_time.slice(5, 16).replace('-', '/'))}${p.source === 'katana' ? ' · KATANA' : ''}${p.setup ? ' · ' + esc(p.setup) : ''}</small></div>
         <div class="tp-nums" title="Entry ${p.entry} · Stop ${p.sl} · Target ${p.tp}"><b>${p.entry}</b><i>›</i>${p.tp}<span>${rr(p)}R${p.risk_pct ? ` · ${(+p.risk_pct).toFixed(1)}%` : ''}</span></div>
         <div class="tp-foot">${st}${p.status === 'open' ? `<a class="small tp-edit" href="/journal/plan/${p.id}/tags" title="Setup tags">${p.setup ? 'Tags' : '+ Tags'}</a>` : ''}${p.status === 'open' ? `<form method="post" action="/journal/plan/${p.id}/delete" onsubmit="return confirm('Delete this plan?')"><button class="link small" aria-label="Delete plan" title="Delete plan">✕</button></form>` : ''}</div></li>`;
     }).join('');

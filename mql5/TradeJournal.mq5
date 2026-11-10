@@ -8,7 +8,7 @@
 //| symbols and all EAs on that account.                             |
 //+------------------------------------------------------------------+
 #property copyright "5ABI.FX"
-#property version   "1.30"
+#property version   "1.31"
 #property description "Trade Journal: logs closed trades, partials and candles to your journal,"
 #property description "and sends MT5's economic calendar for the Desk's news catalysts."
 
@@ -566,6 +566,13 @@ int OnInit()
    int lic = LicenseOnInit();
    if(lic != INIT_SUCCEEDED) return lic;
    if(MQLInfoInteger(MQL_TESTER)) return INIT_SUCCEEDED;
+   if(JournalKey != "")
+     {
+      //--- share the key with KATANA's PLAN button (Common\\Files\\5ABIFX\\journal_key.txt)
+      FolderCreate("5ABIFX", FILE_COMMON);
+      int fh = FileOpen("5ABIFX\\journal_key.txt", FILE_WRITE | FILE_TXT | FILE_ANSI | FILE_COMMON);
+      if(fh != INVALID_HANDLE) { FileWriteString(fh, JournalKey); FileClose(fh); }
+     }
    if(JournalKey == "")
       Alert("Trade Journal: paste your Journal key (from your dashboard on ", LICENSE_SERVER, ") into the EA inputs.");
    EventSetTimer(10);
