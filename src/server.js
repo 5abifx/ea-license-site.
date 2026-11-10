@@ -212,8 +212,12 @@ function finishSignIn(req, res, u, codeDone = false) {
 const backup = require('./backup')(db, DATA_DIR);
 require('./security')(app, { db, page, flash, requireAdmin, rateLimit, finishSignIn, backup, SITE_NAME });
 
+// The side menu needs req.hasJournal on every members page, including the mentor pages
+// that are registered before the journal module (it fills in the check below).
+let journalAccess = () => false;
+app.use((req, res, next) => { req.hasJournal = journalAccess(req.user); next(); });
 const { studentBox: mentorBox } = require('./mentor')(app, { db, page, flash, requireUser, requireAdmin });
-require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox });
+require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, setJournalAccess: (f) => { journalAccess = f; } });
 require('./welcome')(app, { db, requireUser });   // student welcome + journal result reveal
 
 // ---------- auth ----------
