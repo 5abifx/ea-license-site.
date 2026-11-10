@@ -172,7 +172,7 @@ document.querySelectorAll('#price .view button').forEach(b=>b.addEventListener('
 
 /* 8. members-area windows: tabs swap the screenshot, auto-advance until the visitor picks one */
 (function(){const W=document.getElementById('wins');if(!W)return;const tabs=[...document.querySelectorAll('.win-tabs button')],imgs=[...W.querySelectorAll('.win:not(.phone) img')],ph=[...W.querySelectorAll('.phone img')],caps=[...document.querySelectorAll('.win-cap p')],path=document.getElementById('win-path');
- const P=['journal','journal','journal/insights','journal/insights?tab=time','journal/insights','journal/insights?tab=habits','journal/insights?tab=prop'];let cur=0,auto=true,tm=null,seen=false;
+ const P=['journal/desk', 'journal/plan', 'journal/trade', 'journal', 'journal', 'journal/insights', 'journal/insights?tab=time', 'journal/insights', 'journal/insights?tab=prop'];let cur=0,auto=true,tm=null,seen=false;
  const show=i=>{cur=(i+imgs.length)%imgs.length;tabs.forEach((t,k)=>t.setAttribute('aria-selected',String(k===cur)));imgs.forEach((m,k)=>{if(k===cur)m.loading='eager';m.classList.toggle('on',k===cur)});caps.forEach((c,k)=>c.hidden=k!==cur);
   ph.forEach(m=>m.classList.toggle('on',m.dataset.for.split(' ').includes(String(cur))));path.textContent=P[cur];const a=tabs[cur];a.parentNode.scrollTo({left:a.offsetLeft-a.parentNode.offsetWidth/2+a.offsetWidth/2,behavior:reduce?'auto':'smooth'})};
  const loop=()=>{clearTimeout(tm);if(auto&&seen&&!reduce)tm=setTimeout(()=>{show(cur+1);loop()},5200)};
