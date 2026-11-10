@@ -16,7 +16,7 @@ const EMOTIONS = ['', 'Calm', 'Confident', 'Patient', 'Anxious', 'Greedy', 'Fear
 
 const KEEP_IF_EDITED = ['sl', 'r', 'risk_money', 'risk_pct'];   // columns the trader can correct
 
-module.exports = function registerJournal(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox }) {
+module.exports = function registerJournal(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, setJournalAccess }) {
   TP.init(db);
   const hasJournal = (u) => !!u && (u.is_admin || (u.status === 'active' && !isExpired(u) && !!db.prepare(`
     SELECT 1 FROM user_eas ue JOIN eas e ON e.id = ue.ea_id
@@ -31,6 +31,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   };
 
   // tell the layout whether to show the Journal link
+  if (setJournalAccess) setJournalAccess(hasJournal);
   app.use((req, res, next) => { req.hasJournal = hasJournal(req.user); next(); });
   const requireJournal = (req, res, next) => {
     if (req.hasJournal) return next();
