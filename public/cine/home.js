@@ -73,11 +73,12 @@ function tag(x,d,X,Y,text,dx,dy,col){col=col||'#ffffff';const LX=X+dx*d,LY=Y+dy*
  x.fillStyle='rgba(5,5,7,.88)';x.strokeStyle='rgba(255,255,255,.22)';x.beginPath();x.roundRect(bx,by,pw,ph,ph/2);x.fill();x.stroke();
  x.fillStyle='#f2f2f4';x.textAlign='left';x.textBaseline='middle';x.fillText(text,bx+8*d,LY+.5*d);x.restore()}
 const draws=[];
+const RPL=window.RPL={};document.addEventListener('click',e=>{const b=e.target.closest('[data-rp]');if(b&&RPL[b.dataset.rp])RPL[b.dataset.rp]()});
 /* ===== home page live graphics ===== */
 /* 1. one bad day: without limits vs with KATANA */
 (function(){const [C,X]=canv('bd');const note=document.getElementById('bd-now');
  const W=[0,-.5,-1.1,-.7,-1.6,-2.4,-3.3,-4.4,-5.1,-6.6,-7.8,-9.1];const LIM=-3,FIRM=-5,N=W.length;
- const K=W.map(v=>Math.max(v,LIM));let f=0,last=0;C._enter=()=>{f=0};
+ const K=W.map(v=>Math.max(v,LIM));let f=0,last=0;C._enter=()=>{f=0};RPL.bd=()=>{f=0};
  const notes=[[0,'Same trader, same bad day. Two different endings.'],[3,'Two losses in a row. Frustration starts.'],[5,'Revenge trade, bigger lot. The stop gets moved.'],[6.2,'KATANA hits the daily limit and locks trading. Day over at −3%.'],[8,'Without limits the losses keep stacking.'],[10,'−5%: the prop firm\'s line is gone. Challenge failed.']];
  draws.push([C,t=>{const w=C.width,h=C.height,d=C._d,dt=last?Math.min(60,t-last):16;last=t;if(!reduce){f+=dt/480;if(f>N+6)f=0}else f=N;
   const s=Math.min(N-1,f);X.fillStyle='#050507';X.fillRect(0,0,w,h);
@@ -110,7 +111,7 @@ const draws=[];
  function step(){if(!on)return;if(used>=LIMIT){log('<span>12:15 XAUUSD buy</span><span>Blocked by KATANA</span>','blk');P.classList.add('locked');$('kp-st').className='st lock';$('kp-st').innerHTML='<i></i>Locked';timer=setTimeout(()=>{reset();timer=setTimeout(step,900)},4200);return}
   const d=day[i++];$('kp-sl').textContent=d.sl.toFixed(1);$('kp-lot').textContent=d.lot.toFixed(2);
   timer=setTimeout(()=>{bal+=d.v;if(d.v<0)used+=-d.v;else used=Math.max(0,used-d.v*0);paint();log(`<span>${d.t} · ${d.lot.toFixed(2)} lots</span><span class="${d.v>0?'up':'dn'}">${d.v>0?'+':'−'}${money(d.v)}</span>`);timer=setTimeout(step,1100)},700)}
- reset();new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting&&!on){on=true;reset();step()}else if(!e.isIntersecting&&on){on=false;clearTimeout(timer)}}),{threshold:.3}).observe(P);
+ RPL.kp=()=>{clearTimeout(timer);on=true;reset();step()};reset();new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting&&!on){on=true;reset();step()}else if(!e.isIntersecting&&on){on=false;clearTimeout(timer)}}),{threshold:.3}).observe(P);
  if(reduce){used=3000;paint();P.classList.add('locked')}
 })();
 
@@ -151,7 +152,8 @@ const draws=[];
 /* 4. journal calendar fills in */
 (function(){const G=document.getElementById('jc-g'),T=document.getElementById('jc-tot');const v=[312,-140,488,0,226,-95,640,175,-210,390,128,0,-60,515,244,402,-180,96,310,-45];
  const cells=v.map((n,i)=>{const el=document.createElement('i');el.innerHTML=`<span>${i+1+Math.floor(i/5)*2}</span><b>${n?(n>0?'+':'−')+Math.abs(n):'·'}</b>`;G.appendChild(el);return el});
- let done=false;new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting||done)return;done=true;let tot=0;v.forEach((n,i)=>setTimeout(()=>{if(n)cells[i].className=n>0?'w':'l';tot+=n;T.textContent='+$'+tot.toLocaleString('en-US')},reduce?0:300+i*110))}),{threshold:.35}).observe(G);
+ let done=false,tms=[];const run=()=>{tms.forEach(clearTimeout);cells.forEach(c=>c.className='');T.textContent='+$0';let tot=0;tms=v.map((n,i)=>setTimeout(()=>{if(n)cells[i].className=n>0?'w':'l';tot+=n;T.textContent='+$'+tot.toLocaleString('en-US')},reduce?0:300+i*110))};RPL.jc=run;
+ new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting||done)return;done=true;run()}),{threshold:.35}).observe(G);
 })();
 
 /* 5. edge score ring + number */
@@ -172,7 +174,7 @@ document.querySelectorAll('#price .view button').forEach(b=>b.addEventListener('
 
 /* 8. members-area windows: tabs swap the screenshot, auto-advance until the visitor picks one */
 (function(){const W=document.getElementById('wins');if(!W)return;const tabs=[...document.querySelectorAll('.win-tabs button')],imgs=[...W.querySelectorAll('.win:not(.phone) img')],ph=[...W.querySelectorAll('.phone img')],caps=[...document.querySelectorAll('.win-cap p')],path=document.getElementById('win-path');
- const P=['journal/desk', 'journal/plan', 'journal/trade', 'journal', 'journal', 'journal/insights', 'journal/insights?tab=time', 'journal/insights', 'journal/insights?tab=prop'];let cur=0,auto=true,tm=null,seen=false;
+ const P=['journal/desk', 'journal', 'journal/insights', 'journal/insights?tab=time', 'journal/insights', 'journal/insights?tab=prop'];let cur=0,auto=true,tm=null,seen=false;
  const show=i=>{cur=(i+imgs.length)%imgs.length;tabs.forEach((t,k)=>t.setAttribute('aria-selected',String(k===cur)));imgs.forEach((m,k)=>{if(k===cur)m.loading='eager';m.classList.toggle('on',k===cur)});caps.forEach((c,k)=>c.hidden=k!==cur);
   ph.forEach(m=>m.classList.toggle('on',m.dataset.for.split(' ').includes(String(cur))));path.textContent=P[cur];const a=tabs[cur];a.parentNode.scrollTo({left:a.offsetLeft-a.parentNode.offsetWidth/2+a.offsetWidth/2,behavior:reduce?'auto':'smooth'})};
  const loop=()=>{clearTimeout(tm);if(auto&&seen&&!reduce)tm=setTimeout(()=>{show(cur+1);loop()},5200)};
@@ -190,3 +192,22 @@ requestAnimationFrame(t=>{draws.forEach(([c,fn])=>fn(t));gloop(t)});
 })();
 
 (function(){const n=document.querySelector('nav');const f=()=>n.classList.toggle('sc',scrollY>40);addEventListener('scroll',f,{passive:true});f()})();
+
+/* replay for CSS-driven pieces: drop the played state without transitions, then play again */
+window.RPL.pvx=()=>{const el=document.getElementById('pvx');if(!el)return;el.classList.add('rs');el.classList.remove('in-view');void el.offsetWidth;el.classList.remove('rs');void el.offsetWidth;el.classList.add('in-view')};
+
+/* 6. consistency rule: past days stay small, today grows until KATANA stops new trades */
+(function(){const F=document.getElementById('cx');if(!F)return;const reduce=false;const G=document.getElementById('cx-bars'),$=id=>document.getElementById(id);
+ const past=[180,240,120,310,200],P=.4,tot=past.reduce((a,b)=>a+b,0),cap=Math.round(P*tot/(1-P)),mx=800,X0=40,BW=52,GAP=26,Y=v=>220-v/mx*200;
+ const NS='http://www.w3.org/2000/svg',mk=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e};
+ past.forEach((v,i)=>{const x=X0+i*(BW+GAP);G.appendChild(mk('rect',{x,y:Y(v),width:BW,height:220-Y(v),class:'cx-p'}));const t=mk('text',{x:x+BW/2,y:238,class:'cx-d','text-anchor':'middle'});t.textContent='Day '+(i+1);G.appendChild(t)});
+ const tx=X0+past.length*(BW+GAP),tb=mk('rect',{x:tx,y:220,width:BW,height:0,class:'cx-t'});G.appendChild(tb);const tl=mk('text',{x:tx+BW/2,y:238,class:'cx-d cx-dt','text-anchor':'middle'});tl.textContent='Today';G.appendChild(tl);
+ const vl=mk('text',{x:tx+BW/2,y:212,class:'cx-v','text-anchor':'middle'});G.appendChild(vl);
+ const capL=$('cx-cap'),capT=$('cx-capt');capL.setAttribute('y1',Y(cap));capL.setAttribute('y2',Y(cap));capT.setAttribute('y',Y(cap)-8);capT.textContent="Today's cap $"+cap;
+ const steps=[0,140,90,180,-60,160,120,150,999];let tm=[],today=0;
+ const paint=()=>{const v=Math.min(today,cap);tb.setAttribute('y',Y(v));tb.setAttribute('height',220-Y(v));vl.setAttribute('y',Y(v)-8);vl.textContent=v?'+$'+v:'';
+  const share=v/(tot+v);$('cx-fill').style.width=(share*100).toFixed(1)+'%';$('cx-pct').textContent=Math.round(share*100)+'%';$('cx-room').textContent='$'+Math.max(0,cap-v);
+  F.classList.toggle('warn',share>=.3&&v<cap);F.classList.toggle('done',v>=cap)};
+ const run=()=>{tm.forEach(clearTimeout);today=0;F.classList.remove('done','warn');paint();let t=reduce?0:600;steps.forEach(s=>{tm.push(setTimeout(()=>{today=Math.max(0,s===999?cap:today+s);if(today>cap)today=cap;paint()},t));t+=reduce?0:750})};
+ window.RPL.cx=run;paint();let done=false;new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting||done)return;done=true;run()}),{threshold:.35}).observe(F);
+})();

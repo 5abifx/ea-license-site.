@@ -24,7 +24,21 @@
       <p class="lede rv">A loss turns into a revenge trade, the stop gets moved "just this once", and a 2% day becomes a 9% day. KATANA takes those decisions out of the moment.</p>
       <p class="note rv" id="bd-now" aria-live="polite">Same trader, same bad day. Two different endings.</p>
     </div>
-    <div class="viz rv"><canvas id="bd" aria-label="Two equity lines through a bad day: without limits it falls to minus 9 percent, with KATANA it stops at the minus 3 percent daily limit"></canvas></div>
+    <div class="viz rv"><button type="button" class="rp" data-rp="bd" aria-label="Replay the animation">↻ Replay</button><canvas id="bd" aria-label="Two equity lines through a bad day: without limits it falls to minus 9 percent, with KATANA it stops at the minus 3 percent daily limit"></canvas></div>
+  </div>
+</section>
+
+<section class="band g" id="real">
+  <div class="in">
+    <p class="k rv">From public reviews</p>
+    <h2 class="rv">Passed the challenge.<br><span class="m">Payout refused.</span></h2>
+    <div class="rvw rv">
+      <article><span class="st">Payout denied</span><h3>Six payout requests. All refused.</h3><q>denied for consistency, risk management etc</q><p class="who">Alex · Oct 2024 · <a href="https://ca.trustpilot.com/review/quantectrading.com?page=2" target="_blank" rel="noopener nofollow">Read the review ↗</a></p><p class="fx"><i>KATANA</i>Consistency score live on the chart</p></article>
+      <article><span class="st">Payout denied</span><h3>Second payout, same answer.</h3><q>told me on 2nd time consistency breach</q><p class="who">Ian · Oct 2024 · <a href="https://ca.trustpilot.com/review/quantectrading.com?page=2" target="_blank" rel="noopener nofollow">Read the review ↗</a></p><p class="fx"><i>KATANA</i>Room left today, before you trade</p></article>
+      <article><span class="st">Payout denied</span><h3>Refused over lot size.</h3><q>lot consistency, average day profit consistemcy</q><p class="who">Sahil · Sep 2024 · <a href="https://ca.trustpilot.com/review/quantectrading.com?page=2" target="_blank" rel="noopener nofollow">Read the review ↗</a></p><p class="fx"><i>KATANA</i>Same risk, lot sized for you</p></article>
+      <article><span class="st cut">Payout cut 50%</span><h3>Half the payout gone over open losses.</h3><q>reduced to 50% payout due to a 2% floating violation</q><p class="who">Abdul · Oct 2026 · <a href="https://www.trustpilot.com/review/aquafunded.com" target="_blank" rel="noopener nofollow">Read the review ↗</a></p><p class="fx"><i>KATANA</i>Closes before the floating loss line</p></article>
+    </div>
+    <p class="rvw-n rv">Public Trustpilot reviews, quoted as written. Firm names left out. KATANA can't promise a payout: it keeps you inside the rules you set.</p>
   </div>
 </section>
 
@@ -33,11 +47,10 @@
     <div class="stack">
       <p class="k">KATANA risk manager</p>
       <h2 class="rv">It sits between you<br><span class="m">and the oversized trade.</span></h2>
-      <p class="lede rv">Every lot is sized from your risk %, every trade gets a stop, and the moment your daily loss limit is hit KATANA closes every trade and locks trading until tomorrow. Watch a day play out on the panel.</p>
-      <ul class="ticks rv"><li>Lot size worked out from your risk, not your mood</li><li>Stop loss placed on every trade</li><li>Daily limit hit: all trades closed, trading locked</li><li>Drawdown watched against your prop firm's rules</li></ul>
+      <ul class="ticks rv"><li>Lot size from your risk, not your mood</li><li>A stop on every trade</li><li>Limit hit: everything closed, trading locked</li></ul>
     </div>
     <div class="kpx rv" id="kp" aria-label="Example of the KATANA panel during a trading day">
-      <div class="kh"><b>KATANA <small>Risk manager</small></b><span class="st" id="kp-st"><i></i>Armed</span></div>
+      <button type="button" class="rp" data-rp="kp" aria-label="Replay the animation">↻ Replay</button><div class="kh"><b>KATANA <small>Risk manager</small></b><span class="st" id="kp-st"><i></i>Armed</span></div>
       <div class="ka"><span>Funded 100K · Phase 1</span><b id="kp-bal">$100,000.00</b></div>
       <div class="km"><div><span>Daily loss used</span><b><em id="kp-used">$0</em> / $3,000</b></div><div class="kb"><i id="kp-bar"></i></div></div>
       <div class="kc"><div><span>Risk / trade</span><b>0.5%</b><small>$500</small></div><div><span>Stop loss</span><b id="kp-sl">18.0</b><small>pips</small></div><div class="hi"><span>Lot size</span><b id="kp-lot">2.77</b><small>auto</small></div></div>
@@ -49,34 +62,32 @@
 
 <section class="band g" id="shield">
   <div class="in">
-    <p class="k rv">New in KATANA · Shield</p>
-    <h2 class="rv">Most challenges fail in one session.<br><span class="m">Shield makes sure yours doesn't.</span></h2>
-    <p class="lede rv">Open losses count against the firm's limit before you close them. Shield watches the whole account and acts before the firm does.</p>
-    <div class="sh6 rv">
-      <article><span class="k">01 · Close all + lock</span><h3>Stops the bad day for you</h3><p>Daily loss or max drawdown hit, open trades included: every trade on the account closes, pending orders go, trading locks. Even after an MT5 restart.</p></article>
-      <article><span class="k">02 · Safety buffer</span><h3>Stops before the firm does</h3><p>KATANA stops you a little before the firm's line, so spread and slippage never break the rule for you.</p></article>
-      <article><span class="k">03 · Firm presets</span><h3>Pick your firm, done</h3><p>FundedNext, FTMO, FundingPips and The5ers rules fill in with one tap. Static, trailing or end-of-day drawdown.</p></article>
-      <article><span class="k">04 · News lock</span><h3>No trades into red news</h3><p>Reads MT5's own calendar and pauses new trades minutes before and after high-impact news for your pair. A countdown shows on the chart.</p></article>
-      <article><span class="k">05 · Tilt guard</span><h3>No revenge trades</h3><p>Done for the day after losses in a row, a short break after a loss, a cap on trades per day, and no bigger lot after a loss.</p></article>
-      <article><span class="k">06 · Phone alerts</span><h3>Know without watching</h3><p>Push alerts at 50% and 80% of your limits, before news, on a lock, and when a stop or target is hit.</p></article>
-    </div>
+    <p class="k rv">KATANA Shield</p>
+    <h2 class="rv">Most challenges fail in one session.<br><span class="m">Shield stops that session.</span></h2>
+    <div class="shx rv"><article><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><h3>Close all + lock</h3><p>Limit hit: every trade closes.</p></article><article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h7M14 12h7"/><path d="M10 7v10M14 7v10"/></svg><h3>Safety buffer</h3><p>Stops you before the firm does.</p></article><article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><h3>Firm presets</h3><p>Pick your firm. Rules filled in.</p></article><article><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/><path d="M12 13v3"/></svg><h3>News lock</h3><p>No new trades into red news.</p></article><article><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M10 9v6M14 9v6"/></svg><h3>Tilt guard</h3><p>No revenge trades after a loss.</p></article><article><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><h3>Phone alerts</h3><p>Warned at 50% and 80%.</p></article></div>
   </div>
 </section>
 
-<section class="band g" id="payout">
-  <div class="in">
-    <p class="k rv">New in KATANA 12.10 · Payout rules</p>
-    <h2 class="rv">Pass the challenge.<br><span class="m">Then get paid.</span></h2>
-    <p class="lede rv">Most firms won't pay out if one day made too much of your profit. KATANA reads your history, shows how much today can still make, and stops new trades before a big day costs you the payout.</p>
-    <div class="sh6 rv">
-      <article><span class="k">01 · Consistency</span><h3>A fourth bar: CONSIST.</h3><p>Next to daily loss and drawdown, KATANA shows your score and the room left today. It turns amber, then red, as today fills up.</p></article>
-      <article><span class="k">02 · Consistency</span><h3>Target too big? It shrinks to fit.</h3><p>Before the trade goes in, KATANA checks the target. If a win would break the rule, press Yes and the target moves to what today can still make.</p></article>
-      <article><span class="k">03 · Consistency</span><h3>Limit reached. Done for today.</h3><p>New trades stop for the day. Trades already open keep running to their stop or target. Your phone gets an alert before you get there.</p></article>
-      <article><span class="k">04 · R:R lock</span><h3>Your plan stays your plan</h3><p>Stop and target stay where KATANA placed them. Drag either line in the heat of the moment and it goes straight back.</p></article>
-      <article><span class="k">05 · Floating loss limit</span><h3>Open losses have a ceiling</h3><p>Some firms limit how deep open trades can go before you close them. KATANA closes everything before the firm's line.</p></article>
-      <article><span class="k">06 · Prop or live</span><h3>Knows which account you're on</h3><p>Prop tools switch on for your challenges and stay out of the way on your own live account. Nothing to set.</p></article>
+<section class="band g slide" id="payout">
+  <div class="in duo">
+    <div class="stack">
+      <p class="k">Consistency rule · New in 12.10</p>
+      <h2 class="rv">One big day<br><span class="m">can cost the payout.</span></h2>
+      <p class="lede rv">KATANA watches the rule live and stops new trades before today gets too big.</p>
+      <ul class="cxchips rv"><li>Target shrinks to fit</li><li>R:R lock</li><li>Floating loss limit</li><li>Prop or live, set by itself</li></ul>
     </div>
-    <p class="lede rv">New presets: FundedNext On-Demand, FundingPips On-Demand and FTMO 1-Step. For any other firm, type its % once.</p>
+    <figure class="cx rv" id="cx" aria-label="Example: a 40% consistency rule. Past days stay small, today grows until KATANA stops new trades.">
+      <button type="button" class="rp" data-rp="cx" aria-label="Replay the animation">↻ Replay</button>
+      <div class="cx-h"><span>Consistency rule <b>40%</b></span><span class="cx-st" id="cx-st"><i></i>Room left today <b id="cx-room">$700</b></span></div>
+      <svg viewBox="0 0 560 260" class="cx-svg" aria-hidden="true">
+        <line class="cx-base" x1="20" x2="540" y1="220" y2="220"/>
+        <g id="cx-bars"></g>
+        <line class="cx-cap" x1="20" x2="540" y1="0" y2="0" id="cx-cap"/><text class="cx-capt" x="24" y="0" id="cx-capt" text-anchor="start">Today's cap</text>
+      </svg>
+      <div class="cx-m"><span>Best day share</span><div class="cx-bar"><i id="cx-fill"></i><em style="left:40%"></em></div><b id="cx-pct">0%</b></div>
+      <div class="cx-lock" id="cx-lock"><b>Done for today</b><span>New trades stop. Open trades run to their stop or target.</span></div>
+      <figcaption class="cx-f">Example numbers</figcaption>
+    </figure>
   </div>
 </section>
 
@@ -101,10 +112,9 @@
     <div class="stack">
       <p class="k">Trade Journal</p>
       <h2 class="rv">See your month<br><span class="m">at a glance.</span></h2>
-      <p class="lede rv">The Trade Journal EA sends every closed trade to your calendar: green and red days, weekly totals and win rate, split by account. Tap a day to see its trades, with the entry, stop and target from the real chart.</p>
-      <ul class="ticks rv"><li>One tab per MT5 account</li><li>Entry, stop and target taken from the chart</li><li>Hide private info before you screenshot it</li></ul>
+      <ul class="ticks rv"><li>Every closed trade, by day and account</li><li>Entry, stop and target from the real chart</li><li>Hide private info in one tap</li></ul>
     </div>
-    <div class="jcx rv" id="jc">
+    <div class="jcx rv" id="jc"><button type="button" class="rp" data-rp="jc" aria-label="Replay the animation">↻ Replay</button>
       <div class="jh"><span>October 2026</span><b id="jc-tot">+$0</b></div>
       <div class="jst"><div><span>Trades</span><b>41</b></div><div><span>Win rate</span><b>61%</b></div><div><span>Green days</span><b>12 / 18</b></div></div>
       <div class="jg" id="jc-g"><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span></div>
@@ -117,11 +127,10 @@
     <div class="stack">
       <p class="k">Plan a trade <span class="kn">New</span></p>
       <h2 class="rv">Plan it before you click.<br><span class="m">See what every slip cost.</span></h2>
-      <p class="lede rv">Draw your entry, stop and target on the site, then take the trade on MT5. The journal matches the two and shows what you kept, and what each change cost you in money.</p>
-      <ol class="psteps rv"><li><b>1</b>Plan it</li><li><b>2</b>Trade it on MT5</li><li><b>3</b>See plan vs result</li></ol>
+            <ol class="psteps rv"><li><b>1</b>Plan it</li><li><b>2</b>Trade it on MT5</li><li><b>3</b>See plan vs result</li></ol>
     </div>
-    <figure class="pvx rv" aria-label="Example: a planned buy against what the trader really did">
-      <div class="pvx-h"><span>Plan vs result</span><span class="pvx-s"><i class="k1"></i><i></i><i></i><i></i> <b>1 of 4</b> kept</span></div>
+    <figure class="pvx rv" id="pvx" aria-label="Example: a planned buy against what the trader really did">
+      <button type="button" class="rp" data-rp="pvx" aria-label="Replay the animation">↻ Replay</button><div class="pvx-h"><span>Plan vs result</span><span class="pvx-s"><i class="k1"></i><i></i><i></i><i></i> <b>1 of 4</b> kept</span></div>
       <svg viewBox="0 0 640 330" class="pvx-svg" role="img" aria-label="Plan lines for target, entry and stop, with the real trade path drawn over them">
         <rect class="z-r" x="96" y="60" width="520" height="150"/><rect class="z-k" x="96" y="210" width="520" height="75"/>
         <g class="pl"><line x1="96" x2="616" y1="60" y2="60"/><line x1="96" x2="616" y1="210" y2="210"/><line class="st0" x1="96" x2="616" y1="285" y2="285"/></g>
@@ -149,8 +158,7 @@
   <div class="in">
     <p class="k rv">What we found <span class="kn">New</span></p>
     <h2 class="rv">Seven questions<br><span class="m">most traders can't answer.</span></h2>
-    <p class="lede rv" style="max-width:52ch">Your journal answers them from your own trades, with a picture and one fix for each.</p>
-    <div class="fqx rv">
+        <div class="fqx rv">
       <div class="fc"><span class="q"><em>01</em>Best trade</span><b>NY morning</b><p>4 of your 5 best trades opened here.</p><span class="fx"><i>Fix</i>Trade there.</span></div>
       <div class="fc"><span class="q"><em>02</em>Biggest loss</span><b class="neg">3× usual</b><p>One loss the size of three normal ones.</p><span class="fx"><i>Fix</i>Never widen the stop.</span></div>
       <div class="fc"><span class="q"><em>03</em>Real risk per trade</span><b>0.5–1.6%</b><p>You think it's 1%. It isn't.</p><span class="fx"><i>Fix</i>Every trade at 1%.</span></div>
@@ -167,29 +175,15 @@
   <div class="in">
     <p class="k rv">The members area</p>
     <h2 class="rv">This is what you<br><span class="m">log in to.</span></h2>
-    <p class="lede rv">Real screens, filled by the Trade Journal EA. Account numbers are hidden with one switch before you share.</p>
-    <div class="win-tabs rv" role="tablist" aria-label="Pages of the members area"><button type="button" role="tab" aria-selected="true" data-i="0">Desk<em>New</em></button><button type="button" role="tab" aria-selected="false" data-i="1">Plan a trade<em>New</em></button><button type="button" role="tab" aria-selected="false" data-i="2">Plan vs result<em>New</em></button><button type="button" role="tab" aria-selected="false" data-i="3">What we found<em>New</em></button><button type="button" role="tab" aria-selected="false" data-i="4">Journal</button><button type="button" role="tab" aria-selected="false" data-i="5">Insights</button><button type="button" role="tab" aria-selected="false" data-i="6">Session clock</button><button type="button" role="tab" aria-selected="false" data-i="7">What if</button><button type="button" role="tab" aria-selected="false" data-i="8">Prop firm desk</button></div>
+        <div class="win-tabs rv" role="tablist" aria-label="Pages of the members area"><button type="button" role="tab" aria-selected="true" data-i="0">Desk<em>New</em></button><button type="button" role="tab" aria-selected="false" data-i="1">Journal</button><button type="button" role="tab" aria-selected="false" data-i="2">Insights</button><button type="button" role="tab" aria-selected="false" data-i="3">Session clock</button><button type="button" role="tab" aria-selected="false" data-i="4">What if</button><button type="button" role="tab" aria-selected="false" data-i="5">Prop firm desk</button></div>
     <div class="wins rv" id="wins">
       <div class="win">
         <div class="win-bar"><i></i><i></i><i></i><span class="win-url">5abifx.com/<b id="win-path">journal/desk</b></span></div>
-        <div class="win-body"><img src="/shots/desk.webp?v=2" alt="Your trading day on one screen: the real 5ABI.FX desk page" width="1600" height="1000" class="on"><img src="/shots/plan.webp?v=2" alt="Plan a trade: the real 5ABI.FX plan page" width="1600" height="1000" loading="lazy" class=""><img src="/shots/pvr.webp?v=2" alt="Plan vs result: the real 5ABI.FX trade page" width="1600" height="1000" loading="lazy" class=""><img src="/shots/found.webp?v=2" alt="What we found: the real 5ABI.FX journal page" width="1600" height="1000" loading="lazy" class=""><img src="/shots/journal.webp?v=2" alt="Your month at a glance: the real 5ABI.FX journal page" width="1600" height="1000" loading="lazy" class=""><img src="/shots/insights.webp?v=2" alt="Edge score and leaks: the real 5ABI.FX insights page" width="1600" height="1000" loading="lazy" class=""><img src="/shots/time.webp?v=2" alt="When you make money: the real 5ABI.FX session clock page" width="1600" height="1000" loading="lazy" class=""><img src="/shots/whatif.webp?v=2" alt="Replay your period: the real 5ABI.FX what if page" width="1600" height="1000" loading="lazy" class=""><img src="/shots/prop.webp?v=2" alt="Room left today: the real 5ABI.FX prop firm desk page" width="1600" height="1000" loading="lazy" class=""></div>
+        <div class="win-body"><img src="/shots/desk.webp?v=2" alt="Your trading day on one screen: the real 5ABI.FX desk page" width="1600" height="1000" class="on"><img src="/shots/journal.webp?v=2" alt="Your month at a glance: the real 5ABI.FX journal page" width="1600" height="1000" loading="lazy" class=""><img src="/shots/insights.webp?v=2" alt="Edge score and leaks: the real 5ABI.FX insights page" width="1600" height="1000" loading="lazy" class=""><img src="/shots/time.webp?v=2" alt="When you make money: the real 5ABI.FX session clock page" width="1600" height="1000" loading="lazy" class=""><img src="/shots/whatif.webp?v=2" alt="Replay your period: the real 5ABI.FX what if page" width="1600" height="1000" loading="lazy" class=""><img src="/shots/prop.webp?v=2" alt="Room left today: the real 5ABI.FX prop firm desk page" width="1600" height="1000" loading="lazy" class=""></div>
       </div>
-      <div class="win phone" aria-hidden="true"><div class="win-body"><img src="/shots/phone-journal.webp?v=1" alt="" width="540" height="1170" loading="lazy" class="on" data-for="0 3 4 5 7 8"><img src="/shots/phone-plan.webp?v=1" alt="" width="540" height="1168" loading="lazy" data-for="1 2"><img src="/shots/phone-time.webp?v=1" alt="" width="540" height="1170" loading="lazy" data-for="6"></div></div>
+      <div class="win phone" aria-hidden="true"><div class="win-body"><img src="/shots/phone-journal.webp?v=1" alt="" width="540" height="1170" loading="lazy" class="on" data-for="0 1 2 4 5"><img src="/shots/phone-time.webp?v=1" alt="" width="540" height="1170" loading="lazy" data-for="3"></div></div>
     </div>
-    <div class="win-cap rv" aria-live="polite"><p data-i="0"><b>Your trading day on one screen.</b> The session you are in, today in R, your mistake risk, the room left on the daily loss and the next news, with your best hours marked.</p><p data-i="1" hidden><b>Plan it before you click.</b> Entry, stop and target drawn to scale, your risk in money and the lot size. Open it on MT5 and it links to the trade by itself.</p><p data-i="2" hidden><b>Plan vs result.</b> What you planned against what you did. Every slip shows what it cost you in money.</p><p data-i="3" hidden><b>What we found.</b> Questions most traders can't answer about their own trading, each with a picture and one fix.</p><p data-i="4" hidden><b>Your month at a glance.</b> The month's P&amp;L counts up on a short loading screen, then this week, your last session and recent trades sit under it.</p><p data-i="5" hidden><b>Edge score and leaks.</b> A score out of 100, your most expensive habit this week and the rule to fix it.</p><p data-i="6" hidden><b>When you make money.</b> A heat ring of every half hour in New York time, your sessions ranked, and an hour-by-day map.</p><p data-i="7" hidden><b>Replay your period.</b> Switch off a session, a day, a symbol or a side, or cap trades a day, and see what you would have made.</p><p data-i="8" hidden><b>Room left today.</b> Pick FundedNext, FTMO, FundingPips or The5ers and see the room left today, the floor and your target, live.</p></div>
-  </div>
-</section>
-
-<section class="band g slide" id="numbers">
-  <div class="in">
-    <p class="k rv">Prop firm guard</p>
-    <h2 class="rv">Know how close you are<br><span class="m">to the firm's line.</span></h2>
-    <div class="gauges rv">
-      <div class="gauge"><svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="1" stroke-dasharray="1 5"/><circle class="arc" cx="100" cy="100" r="92" fill="none" stroke="var(--glow)" stroke-width="1.4" stroke-dasharray="578" stroke-dashoffset="578" transform="rotate(-90 100 100)" data-to=".42"/></svg><b data-count="42">42</b><p>% of the daily loss used<br>worst day −2.1% of 5%</p></div>
-      <div class="gauge"><svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="1" stroke-dasharray="1 5"/><circle class="arc" cx="100" cy="100" r="92" fill="none" stroke="var(--glow)" stroke-width="1.4" stroke-dasharray="578" stroke-dashoffset="578" transform="rotate(-90 100 100)" data-to=".31"/></svg><b data-count="31">31</b><p>% of the max loss used<br>lowest point −3.1% of 10%</p></div>
-      <div class="gauge"><svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="1" stroke-dasharray="1 5"/><circle class="arc" cx="100" cy="100" r="92" fill="none" stroke="#26c6a0" stroke-width="1.4" stroke-dasharray="578" stroke-dashoffset="578" transform="rotate(-90 100 100)" data-to=".68"/></svg><b data-count="68">68</b><p>% of the profit target done<br>+5.4% of 8%</p></div>
-    </div>
-    <p class="pfix rv"><b>Fix</b> Set KATANA's daily loss limit to 3%, so it stops you before the firm's 5%.</p>
+    <div class="win-cap rv" aria-live="polite"><p data-i="0"><b>Your trading day on one screen.</b> Session, today in R, mistake risk, room left and the next news.</p><p data-i="1" hidden><b>Your month at a glance.</b> The month's P&amp;L, this week, your last session and recent trades.</p><p data-i="2" hidden><b>Edge score and leaks.</b> A score out of 100 and the habit costing you most.</p><p data-i="3" hidden><b>When you make money.</b> Every half hour in New York time, ranked.</p><p data-i="4" hidden><b>Replay your period.</b> Switch off a session, day or pair and see the difference.</p><p data-i="5" hidden><b>Room left today.</b> Your firm's floor and target, live.</p></div>
   </div>
 </section>
 

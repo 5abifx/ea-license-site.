@@ -7,3 +7,12 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') set(false); });
   document.addEventListener('click', function (e) { if (e.target.closest('#site-nav a, #side-nav a')) set(false); });
 })();
+
+// "Replay" on the journal and desk: forget that the opening animations were seen today, then reload
+(function () {
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('[data-replay]')) return;
+    try { sessionStorage.removeItem('plx'); localStorage.removeItem('intro:w'); localStorage.removeItem('intro:r'); sessionStorage.setItem('replay', '1'); } catch (err) { /* private mode */ }
+    location.reload();
+  });
+})();
