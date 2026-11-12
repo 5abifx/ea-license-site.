@@ -1736,8 +1736,7 @@ a.tp-st.done { color: var(--text); display: inline-flex; align-items: center; ga
 }
 @media (max-width: 900px) { .fold-btn { display: none; } }
 
-/* ---------- Fix pass 2026-11-12: full width, Today count bar, journal tiles and recap ---------- */
-.app-body { max-width: none; }
+/* ---------- Fix pass 2026-11-12: Today count bar, journal tiles and recap ---------- */
 .tm-count { position: relative; overflow: visible; }
 .tm-count b { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 2px; background: var(--text); opacity: .8; }
 .tm-dots { overflow: hidden; }
@@ -1833,11 +1832,11 @@ a.tp-st.done { color: var(--text); display: inline-flex; align-items: center; ga
 .ea-how summary::after { content: "+"; color: var(--muted); } .ea-how[open] summary::after { content: "−"; }
 .ea-how ol { margin: 0; padding: 0 14px 12px 32px; display: grid; gap: 6px; font-size: 12.5px; color: #d9d9de; }
 .ea-foot { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.ea-themes .th-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 12px 0 10px; }
+.ea-themes .th-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 230px)); gap: 10px; margin: 10px 0 8px; }
 .th { border-radius: 12px; overflow: hidden; background: var(--card-2); }
-.th-pic svg { display: block; width: 100%; height: 92px; }
-.th-row { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 9px 12px; font-size: 13px; flex-wrap: wrap; }
-.th-row a { font-weight: 600; font-size: 12.5px; }
+.th-pic svg { display: block; width: 100%; height: 52px; }
+.th-row { display: flex; justify-content: space-between; gap: 6px; align-items: center; padding: 6px 10px; font-size: 12px; flex-wrap: wrap; }
+.th-row a { font-weight: 600; font-size: 11.5px; }
 .ea-lower { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px; margin-top: 16px; align-items: start; }
 .ea-lower > .card { margin: 0; }
 .acc-list { display: grid; margin: 8px 0 12px; }
