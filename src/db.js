@@ -153,6 +153,10 @@ db.exec(`CREATE TABLE IF NOT EXISTS visits (
   src  TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (day, path, vid)
 )`);
+// visitor details for the sales dashboard filters (src/visitors.js): device, country (from time zone), campaign
+const visCols = db.prepare('PRAGMA table_info(visits)').all().map((c) => c.name);
+for (const c of ['dev', 'ctry', 'cmp']) if (!visCols.includes(c)) db.exec(`ALTER TABLE visits ADD COLUMN ${c} TEXT NOT NULL DEFAULT ''`);
+if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'campaign')) db.exec("ALTER TABLE users ADD COLUMN campaign TEXT NOT NULL DEFAULT ''");
 if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'source')) db.exec("ALTER TABLE users ADD COLUMN source TEXT NOT NULL DEFAULT ''");   // where the sign-up came from (instagram, discord, referral...)
 
 // Economic calendar, sent by the Trade Journal EA from MT5's own calendar (shared by everyone; times in UTC ms)

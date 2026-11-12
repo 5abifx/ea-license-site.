@@ -51,7 +51,7 @@ function numsRow(N, money, cur) {
   </div>`;
 }
 
-const itemCard = (i) => `<div class="ins ${i.tone}"><span class="ins-tag"><i></i>${esc(i.tag)}</span><p>${i.html}</p>${i.fix ? `<div class="fix">${i.fix}</div>` : ''}</div>`;
+const itemCard = (i) => `<div class="ins ${i.tone}" id="leak-${esc(i.kind || '')}"><span class="ins-tag"><i></i>${esc(i.tag)}</span><p>${i.html}</p>${i.fix ? `<div class="fix">${i.fix}</div>` : ''}</div>`;
 
 // ---------- charts ----------
 function equityChart(eq, money) {

@@ -273,6 +273,12 @@ function render(resultCanvas, chartCanvas, trade, opts) {
   Object.assign(state, opts || {});
   if (!DRAW[state.tpl]) state.tpl = 'a';
   state.candles = (trade.candles || []).map(k => ({ t: k[0] * 1000, o: k[1], h: k[2], l: k[3], c: k[4] }));
+  // 1-minute candles (Journal EA 1.32+): merge them so the card shows about 120 candles at most
+  if (state.candles.length > 160) {
+    const k = Math.ceil(state.candles.length / 120), m = [];
+    for (let i = 0; i < state.candles.length; i += k) { const g = state.candles.slice(i, i + k); m.push({ t: g[0].t, o: g[0].o, h: Math.max(...g.map(x => x.h)), l: Math.min(...g.map(x => x.l)), c: g[g.length - 1].c }); }
+    state.candles = m;
+  }
   for (const cv of [resultCanvas, chartCanvas]) { cv.width = W; cv.height = H; }
   DRAW[state.tpl](resultCanvas.getContext('2d'), trade);
   cardChart(chartCanvas.getContext('2d'), trade);

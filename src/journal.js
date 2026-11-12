@@ -109,7 +109,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       .map((p) => ({ time: s(p.time, 25), price: n(p.price), lots: n(p.lots), profit: n(p.profit) }))
       .filter((p) => p.price !== null);
     const partials = outs.slice(0, -1);
-    const candles = (Array.isArray(t.candles) ? t.candles : []).slice(-600)
+    const candles = (Array.isArray(t.candles) ? t.candles : []).slice(-1500)
       .filter((k) => Array.isArray(k) && k.length >= 5 && k.slice(0, 5).every((v) => Number.isFinite(Number(v))))
       .map((k) => k.slice(0, 5).map(Number));
 
@@ -304,7 +304,14 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
     // What we found: questions most traders can't answer about their own trading, last 90 days
     const foundRows = latest ? db.prepare(`SELECT ${INS_COLS}, profit, risk_money FROM journal_trades WHERE ${where} AND close_time >= ? ORDER BY close_time`).all(...args, since) : [];
-    const foundHtml = TP.foundHtml(TP.found(foundRows, plans, { money: (v) => money(v, cur), esc, off: u.ny_offset ?? desk.NY_DEFAULT }));
+    const F = TP.found(foundRows, plans, { money: (v) => money(v, cur), esc, off: u.ny_offset ?? desk.NY_DEFAULT });
+    // trade cards show that trade's own candles and open it straight into the replay
+    if (F) {
+      const one = db.prepare('SELECT side, entry, exit, net, open_time, close_time, candles FROM journal_trades WHERE id = ? AND user_id = ?');
+      F.items.forEach((x) => { if (!x.tid) return; const t = one.get(x.tid, u.id); const th = t && TP.thumb(t);
+        if (th) { x.thumb = th; x.viz = ''; x.href = `/journal/${x.tid}?replay=1#tv`; } });
+    }
+    const foundHtml = TP.foundHtml(F);
 
     // hero: the month's P&L big, with four tiles under it
     const N = numbers(prep(trades));
@@ -312,7 +319,12 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const dayNets = dayKeys.map((d) => sum(days[d]));
     const heroHtml = deskView.heroHtml({ label: monthName, n: trades.length, net, wins, losses: trades.filter((t) => t.net < 0).length,
       winRate: N.winRate, pf: N.pf, avgW: N.avgW, avgL: N.avgL, avgR: rT.length ? rT.reduce((a, t) => a + Number(t.r), 0) / rT.length : null,
-      pct: N.start ? (net / N.start) * 100 : null, days: dayKeys.length, greenDays, bestDay, worstDay: dayNets.length ? Math.min(...dayNets) : null },
+      pct: N.start ? (net / N.start) * 100 : null, days: dayKeys.length, greenDays, bestDay, worstDay: dayNets.length ? Math.min(...dayNets) : null , spark: (() => {
+      // running win rate, profit factor and win/loss size day by day through the month, plus each day's result
+      const sp = { win: [], pf: [], ratio: [], days: dayNets }; let w = 0, n = 0, gw = 0, gl = 0, nl = 0;
+      dayKeys.forEach((d) => { days[d].forEach((t) => { n++; if (t.net > 0) { w++; gw += t.net; } else if (t.net < 0) { nl++; gl -= t.net; } });
+        sp.win.push(n ? (w / n) * 100 : 0); if (gl) sp.pf.push(gw / gl); if (w && nl) sp.ratio.push((gw / w) / (gl / nl)); });
+      return sp; })() },
     { cur, shareHref: accts.length ? `/journal/report${qs({})}` : '' });
     // recap: the week of the latest trade, the last session, recent trades
     const recent = latest ? desk.prepRows(db.prepare(`SELECT ${DESK_COLS} FROM journal_trades WHERE ${where} ORDER BY close_time DESC LIMIT 300`).all(...args).reverse()) : [];
@@ -592,11 +604,16 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const T = terminal.build(prep(rows), { offset: off, todayNy: new Date(nyNow).toISOString().slice(0, 10), nowMin: (+p.hour % 24) * 60 + +p.minute,
       nowBroker: nyNow + off * 3600e3, prop, leaks: A.items, money: m });
     const N = T.locked ? null : news.catalysts(db, prep(rows), { offset: off });
+    // most traded instruments of the last 90 days, for the live chart
+    const cnt = {}; const since90 = rows.length ? rows[rows.length - 1].close_time.slice(0, 10) : '';
+    const cut = since90 ? new Date(Date.parse(since90 + 'T00:00:00Z') - 89 * 864e5).toISOString().slice(0, 10) : '';
+    rows.forEach((t) => { if (t.close_time >= cut) cnt[t.symbol] = (cnt[t.symbol] || 0) + 1; });
+    const topSyms = Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([sym, n]) => ({ sym, n }));
     page(req, res, 'Desk', `
     <div class="row between page-head"><h1>Desk</h1>
       <span class="head-btns"><button type="button" class="small secondary replay-btn" data-replay title="Play the opening animation again">↻ Replay</button><button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers and your name, so you can screenshot this page">Hide private info</button></span></div>
     ${acctBar(req, '/journal/desk', qs, sc, cur)}
-    ${terminalView.html(T, { news: N, money: m, cur, acctNote: one ? (prop ? 'Prop firm rules included' : 'Add firm rules in Insights › Prop firm to include them') : 'All accounts' })}`);
+    ${terminalView.html(T, { news: N, money: m, cur, market: topSyms, acctNote: one ? (prop ? 'Prop firm rules included' : 'Add firm rules in Insights › Prop firm to include them') : 'All accounts' })}`);
   });
 
   // prop firm rules of one account (percent of the start balance)
@@ -794,6 +811,32 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <p><a href="/journal">← All trades</a></p>
     <h1>${esc(t.symbol)} ${esc(t.side)} <span class="${cls(t.net)}">${money(t.net, t.currency)}</span></h1>
     <p class="muted"><span class="priv"><span class="priv-real">Account ${esc(t.account_number)} · position ${esc(t.position_id)}</span><span class="priv-mask">Account ••${esc(String(t.account_number).slice(-2))}</span></span> · ${fmtDate(t.open_time)} → ${fmtDate(t.close_time)} (broker time)</p>
+
+    <section class="card tv-card" id="tv">
+      <div class="row between"><h2>Trade replay</h2><span class="muted small">${esc(t.tf || '')} candles saved by the Journal EA</span></div>
+      <div class="tv-grid">
+        <div class="tv-main">
+          <div class="tv-chart" id="tv-chart"></div>
+          <div class="tv-ctrl" id="tv-ctrl"><button type="button" class="small" id="tv-play" aria-pressed="false">▶ Replay</button>
+            <input type="range" id="tv-pos" min="1" max="2" value="2" aria-label="Replay position">
+            <span class="seg tv-spd" id="tv-spd"><button type="button" data-s="1" aria-pressed="false">1×</button><button type="button" data-s="4" aria-pressed="true">4×</button><button type="button" data-s="10" aria-pressed="false">10×</button></span></div>
+          <p class="tv-story" id="tv-story" aria-live="polite"></p>
+          <a class="small muted tv-credit" href="https://www.tradingview.com/" target="_blank" rel="noopener">Charting by TradingView</a>
+        </div>
+        <dl class="tv-kv">
+          <div><dt>Entry</dt><dd>${fx(t.entry) || '-'}</dd></div>
+          <div><dt>Stop loss</dt><dd class="neg">${fx(t.sl) || '-'}</dd></div>
+          <div><dt>Take profit</dt><dd class="pos">${fx(t.tp) || '-'}</dd></div>
+          <div><dt>Exit</dt><dd>${fx(t.exit) || '-'}</dd></div>
+          <div><dt>Result</dt><dd class="${cls(t.net)}">${money(t.net, t.currency)}${t.r !== null && t.r !== undefined ? ` · ${t.r >= 0 ? '+' : '−'}${Math.abs(t.r).toFixed(2)}R` : ''}</dd></div>
+          <div><dt>Held</dt><dd>${(() => { const m = Math.round((Date.parse(String(t.close_time).replace(' ', 'T') + 'Z') - Date.parse(String(t.open_time).replace(' ', 'T') + 'Z')) / 60000); return Number.isFinite(m) ? (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`) : '-'; })()}</dd></div>
+          <div><dt>Lots</dt><dd>${t.lots ?? '-'}</dd></div>
+        </dl>
+      </div>
+      <script type="application/json" id="tv-data">${JSON.stringify({ candles: card.candles, entry: t.entry, exit: t.exit, sl: t.sl, tp: t.tp, side: t.side, open: t.open_time, close: t.close_time, digits: d, partials: card.partials }).replace(/</g, '\\u003c')}</script>
+      <script src="/vendor/lightweight-charts.js"></script>
+      <script src="/replay.js"></script>
+    </section>
 
     ${planHtml}
 

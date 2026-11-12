@@ -53,7 +53,7 @@ function save(db, events) {
   return saved;
 }
 
-// catalysts for one trader: today and the next 2 days for the currencies they trade, each with its history and their record
+// catalysts for one trader: today and the rest of the week (7 days) for the currencies they trade, each with its history and their record
 function catalysts(db, trades, { offset, nowUtc = Date.now() }) {
   const syms = [...new Set(trades.map((t) => t.symbol))];
   const curs = [...new Set(syms.flatMap(currenciesOf))];
@@ -64,11 +64,11 @@ function catalysts(db, trades, { offset, nowUtc = Date.now() }) {
   const nyNow = utcToNyMin(nowUtc);
   const dayStart = nowUtc - nyNow * 60000 - 60000;            // NY midnight, roughly
   const rows = db.prepare(`SELECT * FROM news_events WHERE t >= ? AND t < ? AND imp >= 2 AND cur IN (${q}) ORDER BY t, imp DESC`)
-    .all(dayStart, dayStart + 3 * 864e5, ...curs);
+    .all(dayStart, dayStart + 7 * 864e5, ...curs);
   const hist = db.prepare('SELECT t, actual, forecast, move, dir FROM news_events WHERE event_id = ? AND t < ? AND actual IS NOT NULL ORDER BY t DESC LIMIT 8');
   // the trader's trades in UTC
   const tUtc = trades.map((t) => ({ t, at: nyToUtc((Number.isFinite(t.o) ? t.o : t.c) - offset * 3600e3) }));
-  const events = rows.slice(0, 14).map((e) => {
+  const events = rows.slice(0, 40).map((e) => {
     const h = hist.all(e.event_id, Math.min(e.t, nowUtc) + (e.actual !== null ? 1 : 0)).reverse();
     const past = db.prepare('SELECT t FROM news_events WHERE event_id = ? AND t < ?').all(e.event_id, nowUtc).map((x) => x.t);
     const near = tUtc.filter((x) => past.some((pt) => Math.abs(x.at - pt) <= 15 * 60000)).map((x) => x.t);

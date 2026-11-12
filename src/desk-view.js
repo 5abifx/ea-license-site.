@@ -13,20 +13,35 @@ const dayName = (iso) => `${DOW[(new Date(iso + 'T00:00:00Z').getUTCDay() + 6) %
 const unit = (cur) => (cur && cur !== 'USD' ? `<small class="u">${esc(cur)}</small>` : '');
 const dol = (cur) => (cur === 'USD' ? '$' : '');
 
+// small trend line (or bars) that fills the empty half of a tile; vals in time order
+function tileSpark(vals, { bars = false } = {}) {
+  const v = vals.filter((x) => Number.isFinite(x));
+  if (v.length < 2) return '';
+  const W = 120, H = 44, mn = Math.min(...v, bars ? 0 : Infinity), mx = Math.max(...v, bars ? 0 : -Infinity), span = mx - mn || 1;
+  const y = (x) => +(H - 3 - ((x - mn) / span) * (H - 8)).toFixed(1);
+  if (bars) {
+    const bw = W / v.length, z = y(0);
+    return `<svg class="tl-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${v.map((x, i) => `<rect x="${(i * bw + bw * 0.18).toFixed(1)}" width="${(bw * 0.64).toFixed(1)}" y="${Math.min(y(x), z)}" height="${Math.max(1, Math.abs(z - y(x))).toFixed(1)}" class="${x < 0 ? 'dn' : 'up'}"/>`).join('')}</svg>`;
+  }
+  const pts = v.map((x, i) => `${((i * W) / (v.length - 1)).toFixed(1)},${y(x)}`);
+  return `<svg class="tl-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polygon points="0,${H} ${pts.join(' ')} ${W},${H}" class="ar"/><polyline points="${pts.join(' ')}" class="ln"/></svg>`;
+}
+
 // ---------- hero: the month's P&L, big, counting up on load ----------
 function heroHtml(h, { cur, shareHref }) {
   const pf = h.pf === null ? '-' : h.pf === Infinity ? '∞' : h.pf.toFixed(2);
   const ratio = h.avgL ? (h.avgW / h.avgL).toFixed(2) : '-';
+  const sp = h.spark || {};
   return `<section class="pl-hero" data-net="${h.n ? h.net : 0}" data-label="${esc(h.label)}">
     <span class="kicker">${esc(h.label)} · Net P&amp;L</span>
     <div class="pl-big ${cls(h.net)}"><span class="pl-num" data-count="${h.n ? h.net : 0}" data-pre="${dol(cur)}">${h.n ? sgn(h.net) + dol(cur) + f2(h.net) : dol(cur) + '0.00'}</span>${unit(cur)}</div>
     <p class="pl-sub">${h.pct !== null && h.n ? `<b class="${cls(h.pct)}">${h.pct >= 0 ? '↗' : '↘'} ${sgn(h.pct)}${Math.abs(h.pct).toFixed(2)}%</b> · ` : ''}${h.wins}W / ${h.losses}L · ${h.n} trade${h.n === 1 ? '' : 's'}${h.n && shareHref ? ` · <a href="${shareHref}">Share report ›</a>` : ''}</p>
   </section>
   <div class="pl-tiles">
-    <div class="pl-tile"><span>Win rate</span><strong>${h.n ? Math.round(h.winRate * 100) + '%' : '-'}</strong><small>${h.days ? `${h.greenDays} of ${h.days} days green` : 'No trades yet'}</small></div>
-    <div class="pl-tile"><span>Profit factor</span><strong>${pf}</strong><small>${h.avgR !== null ? `Avg ${rTxt(h.avgR)} a trade` : 'Needs a stop-loss for R'}</small></div>
-    <div class="pl-tile"><span>Avg win / avg loss</span><strong>${ratio}${ratio !== '-' ? '×' : ''}</strong><small>${h.n ? `Win ${dol(cur)}${f2(h.avgW)} · Loss ${dol(cur)}${f2(h.avgL)}` : '-'}</small></div>
-    <div class="pl-tile"><span>Best day</span><strong class="${cls(h.bestDay)}">${h.bestDay === null ? '-' : sgn(h.bestDay) + dol(cur) + f2(h.bestDay)}</strong><small>${h.worstDay === null ? '-' : `Worst ${sgn(h.worstDay)}${dol(cur)}${f2(h.worstDay)}`}</small></div>
+    <div class="pl-tile"><span>Win rate</span><strong>${h.n ? Math.round(h.winRate * 100) + '%' : '-'}</strong><small>${h.days ? `${h.greenDays} of ${h.days} days green` : 'No trades yet'}</small>${tileSpark(sp.win || [])}</div>
+    <div class="pl-tile"><span>Profit factor</span><strong>${pf}</strong><small>${h.avgR !== null ? `Avg ${rTxt(h.avgR)} a trade` : 'Needs a stop-loss for R'}</small>${tileSpark(sp.pf || [])}</div>
+    <div class="pl-tile"><span>Avg win / avg loss</span><strong>${ratio}${ratio !== '-' ? '×' : ''}</strong><small>${h.n ? `Win ${dol(cur)}${f2(h.avgW)} · Loss ${dol(cur)}${f2(h.avgL)}` : '-'}</small>${tileSpark(sp.ratio || [])}</div>
+    <div class="pl-tile"><span>Best day</span><strong class="${cls(h.bestDay)}">${h.bestDay === null ? '-' : sgn(h.bestDay) + dol(cur) + f2(h.bestDay)}</strong><small>${h.worstDay === null ? '-' : `Worst ${sgn(h.worstDay)}${dol(cur)}${f2(h.worstDay)}`}</small>${tileSpark(sp.days || [], { bars: true })}</div>
   </div>`;
 }
 
@@ -36,17 +51,49 @@ function recapHtml(R, { money, mask }) {
   const W = R.week, S = R.session;
   const mx = Math.max(1, ...W.days.map((d) => Math.abs(d.net)));
   const days = W.days.filter((d, i) => i < 5 || d.n);
+  // week equity: running total trade by trade; session: each trade's result in order
+  const curve = (vals, cls2) => {
+    if (vals.length < 2) return '<p class="muted small rc-none">Not enough trades for a line yet.</p>';
+    const pts = [0, ...vals], mn = Math.min(...pts), mxv = Math.max(...pts), span = mxv - mn || 1, Wd = 200, H = 90;
+    const xy = pts.map((v, i) => [+((i * Wd) / (pts.length - 1)).toFixed(1), +(H - 4 - ((v - mn) / span) * (H - 10)).toFixed(1)]);
+    const z = +(H - 4 - ((0 - mn) / span) * (H - 10)).toFixed(1);
+    return `<svg class="rc-curve ${cls2}" viewBox="0 0 ${Wd} ${H}" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="${Wd}" y1="${z}" y2="${z}" class="z"/>
+      <polygon points="0,${H} ${xy.map((p) => p.join(',')).join(' ')} ${Wd},${H}" class="ar"/><polyline points="${xy.map((p) => p.join(',')).join(' ')}" class="ln"/></svg>`;
+  };
+  let run = 0; const wk = W.list.map((t) => (run += t.net));
+  const seq = S.list.map((t) => t.net);
+  const dots = () => {
+    if (!seq.length) return '';
+    const Wd = 200, H = 70, mxs = Math.max(...seq.map(Math.abs), 1), step = Wd / Math.max(1, seq.length);
+    let r = 0; const pts = seq.map((v, i) => [+(step * i + step / 2).toFixed(1), (r += v)]);
+    const lo = Math.min(0, ...pts.map((p) => p[1])), hi = Math.max(0, ...pts.map((p) => p[1])), sp = hi - lo || mxs;
+    const yy = (v) => +(H - 6 - ((v - lo) / sp) * (H - 12)).toFixed(1);
+    return `<svg class="rc-seq" viewBox="0 0 ${Wd} ${H}" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="${Wd}" y1="${yy(0)}" y2="${yy(0)}" class="z"/>
+      <polyline points="0,${yy(0)} ${pts.map((p) => `${p[0]},${yy(p[1])}`).join(' ')}" class="ln"/>${pts.map((p, i) => `<circle cx="${p[0]}" cy="${yy(p[1])}" r="3.2" class="${seq[i] >= 0 ? 'up' : 'dn'}"/>`).join('')}</svg>`;
+  };
   return `<div class="recap">
+    <div class="rc-left">
     <section class="card rc-week"><div class="row between"><span class="kicker">This week</span><span class="muted small">${dayName(W.from).slice(4)} – ${dayName(W.to).slice(4)}</span></div>
-      <strong class="rc-big ${cls(W.net)}">${W.n ? money(W.net) : '-'}</strong>
-      <dl class="rc-kv"><div><dt>Trades</dt><dd>${W.n}</dd></div><div><dt>Win rate</dt><dd>${W.n ? W.win + '%' : '-'}</dd></div><div><dt>W / L</dt><dd>${W.wins} / ${W.losses}</dd></div></dl>
-      <div class="rc-bars">${days.map((d) => `<div title="${dayName(d.d)}: ${d.n} trades"><i class="${d.net >= 0 ? 'up' : 'down'}" style="height:${d.n ? Math.max(4, Math.round((Math.abs(d.net) / mx) * 56)) : 2}px"></i><span>${DOW[(new Date(d.d + 'T00:00:00Z').getUTCDay() + 6) % 7].slice(0, 1)}</span></div>`).join('')}</div>
+      <div class="rc-split">
+        <div class="rc-main">
+          <strong class="rc-big ${cls(W.net)}">${W.n ? money(W.net) : '-'}</strong>
+          <dl class="rc-kv"><div><dt>Trades</dt><dd>${W.n}</dd></div><div><dt>Win rate</dt><dd>${W.n ? W.win + '%' : '-'}</dd></div><div><dt>W / L</dt><dd>${W.wins} / ${W.losses}</dd></div></dl>
+          <div class="rc-bars">${days.map((d) => `<div title="${dayName(d.d)}: ${d.n} trades"><i class="${d.net >= 0 ? 'up' : 'down'}" style="height:${d.n ? Math.max(4, Math.round((Math.abs(d.net) / mx) * 56)) : 2}px"></i><span>${DOW[(new Date(d.d + 'T00:00:00Z').getUTCDay() + 6) % 7].slice(0, 1)}</span></div>`).join('')}</div>
+        </div>
+        <div class="rc-side"><span class="muted small">Week equity</span>${curve(wk, W.net >= 0 ? 'up' : 'dn')}</div>
+      </div>
     </section>
     <section class="card rc-session"><div class="row between"><span class="kicker">Last session</span><span class="muted small">${dayName(S.d)}</span></div>
-      <strong class="rc-big ${cls(S.net)}">${money(S.net)}</strong>
-      <dl class="rc-kv"><div><dt>Trades</dt><dd>${S.n}</dd></div><div><dt>W / L</dt><dd>${S.wins} / ${S.losses}</dd></div><div><dt>Avg R</dt><dd>${S.avgR === null ? '-' : rTxt(S.avgR)}</dd></div></dl>
-      <p class="small rc-line">Best <a href="/journal/${S.best.id}">${esc(S.best.symbol)} ${esc(S.best.side)}</a> <b class="${cls(S.best.net)}">${money(S.best.net)}</b>${S.n > 1 ? ` · Worst <a href="/journal/${S.worst.id}">${esc(S.worst.symbol)}</a> <b class="${cls(S.worst.net)}">${money(S.worst.net)}</b>` : ''}</p>
+      <div class="rc-split">
+        <div class="rc-main">
+          <strong class="rc-big ${cls(S.net)}">${money(S.net)}</strong>
+          <dl class="rc-kv"><div><dt>Trades</dt><dd>${S.n}</dd></div><div><dt>W / L</dt><dd>${S.wins} / ${S.losses}</dd></div><div><dt>Avg R</dt><dd>${S.avgR === null ? '-' : rTxt(S.avgR)}</dd></div></dl>
+          <p class="small rc-line">Best <a href="/journal/${S.best.id}">${esc(S.best.symbol)} ${esc(S.best.side)}</a> <b class="${cls(S.best.net)}">${money(S.best.net)}</b>${S.n > 1 ? ` · Worst <a href="/journal/${S.worst.id}">${esc(S.worst.symbol)}</a> <b class="${cls(S.worst.net)}">${money(S.worst.net)}</b>` : ''}</p>
+        </div>
+        <div class="rc-side"><span class="muted small">Trade by trade</span>${dots()}</div>
+      </div>
     </section>
+    </div>
     <section class="card rc-recent"><div class="row between"><span class="kicker">Recent trades</span><a class="small" href="#cal">Calendar ›</a></div>
       <ul>${R.recent.map((t) => `<li><a href="/journal/${t.id}"><span class="rc-sym"><i class="${t.side === 'SELL' ? 'down' : 'up'}">${t.side === 'SELL' ? '↘' : '↗'}</i><b>${esc(t.symbol)}</b><small>${t.setup ? esc(t.setup) : mask(t)}${t.r !== null ? ` · ${rTxt(t.r)}` : ''}</small></span>
         <span class="rc-val"><b class="${cls(t.net)}">${money(t.net)}</b><small>${esc(t.close_time.slice(5, 10).replace('-', '/'))} ${esc(t.close_time.slice(11, 16))}</small></span></a></li>`).join('')}</ul>
