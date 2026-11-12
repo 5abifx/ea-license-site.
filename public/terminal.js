@@ -38,6 +38,24 @@
   }
   tick(); setInterval(tick, 20000);
 
+  // ---------- live market: TradingView's free chart widget for the trader's most traded instruments ----------
+  const tv = $('tm-tv');
+  if (tv) {
+    const load = (sym) => {
+      tv.innerHTML = '<div class="tradingview-widget-container" style="height:100%;width:100%"><div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
+      const sc = document.createElement('script');
+      sc.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js'; sc.async = true;
+      sc.textContent = JSON.stringify({ autosize: true, symbol: sym, interval: '5', timezone: 'America/New_York', theme: 'dark', style: '1', locale: 'en',
+        backgroundColor: 'rgba(14,14,16,1)', gridColor: 'rgba(255,255,255,0.04)', hide_side_toolbar: false, allow_symbol_change: true, save_image: false, calendar: false,
+        withdateranges: true, details: false, hide_volume: true, support_host: 'https://www.tradingview.com' });
+      tv.firstChild.appendChild(sc);
+    };
+    load(tv.dataset.tv);
+    const chips = $('tm-mkts');
+    if (chips) chips.addEventListener('click', (ev) => { const b = ev.target.closest('button'); if (!b || b.getAttribute('aria-pressed') === 'true') return;
+      chips.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); load(b.dataset.tv); });
+  }
+
   // ---------- news catalysts ----------
   const nb = $('tm-news'), nd = $('tm-ndata');
   if (nb && nd) {
@@ -88,11 +106,20 @@
           <div><b>News switches on with Trade Journal EA 1.30</b><p class="muted small">It reads MT5's own economic calendar: actual, forecast, previous and how gold reacted. Update the EA once and the Desk fills in.</p></div></div>`;
         return;
       }
-      const list = N.events.filter((e) => e.day === day);
-      if (!list.length) { nb.innerHTML = `<div class="tm-empty"><i class="ok"></i>No medium or high impact news for ${esc(N.curs.join(', '))} on this day.</div>`; return; }
+      // a quiet today shows the rest of the week right away, so the trader can plan around it
+      let list = day === 'w' ? N.events.filter((e) => e.day >= 0) : N.events.filter((e) => e.day === day), note = '';
+      if (!list.length && day !== 'w') {
+        const wk = N.events.filter((e) => e.day > (day || 0));
+        const quiet = `No medium or high impact news for ${esc(N.curs.join(', '))} ${day === 0 ? 'today' : 'on this day'}.`;
+        if (!wk.length) { nb.innerHTML = `<div class="tm-empty"><i class="ok"></i>${quiet} The rest of the week is quiet too.</div>`; return; }
+        note = `<div class="tm-empty tm-wnote"><i class="ok"></i>${quiet} Here is the rest of the week so you can plan around it.</div>`;
+        list = wk;
+      }
+      const multi = new Set(list.map((e) => e.day)).size > 1;
+      const dayLbl = (t) => new Date(t).toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'short', day: 'numeric', month: 'short' });
       if (!sel || !list.some((e) => e.id === sel)) sel = (list.find((e) => !e.released && e.imp === 3) || list.find((e) => !e.released) || list[list.length - 1]).id;
       const e = list.find((x) => x.id === sel);
-      nb.innerHTML = `<div class="tm-nwrap"><div class="tm-nl" role="listbox" aria-label="News">${list.map((x) => `
+      nb.innerHTML = `${note}<div class="tm-nwrap"><div class="tm-nl" role="listbox" aria-label="News">${list.map((x, i) => `${multi && (!i || list[i - 1].day !== x.day) ? `<div class="tm-nday">${esc(dayLbl(x.t))}</div>` : ''}
         <button type="button" role="option" class="tm-nr ${x.released ? 'past' : ''}" data-id="${esc(x.id)}" aria-selected="${x.id === sel}">
           <span class="t">${hhmm(x.nyMin)}</span><span class="c">${esc(x.cur)}</span>${imp(x.imp)}<span class="n">${esc(x.name)}</span>
           <span class="v ${x.released ? beatCls(x) : ''}">${x.released ? num(x.actual, x.unit) : `<em data-cd="${x.t}">--</em>`}</span>
@@ -107,7 +134,7 @@
     const days = $('tm-days');
     if (days) days.addEventListener('click', (ev) => {
       const b = ev.target.closest('button'); if (!b) return;
-      day = +b.dataset.d; days.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b)); render();
+      day = b.dataset.d === 'w' ? 'w' : +b.dataset.d; days.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b)); render();
     });
     render();
   }

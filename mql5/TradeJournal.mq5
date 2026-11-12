@@ -8,7 +8,7 @@
 //| symbols and all EAs on that account.                             |
 //+------------------------------------------------------------------+
 #property copyright "5ABI.FX"
-#property version   "1.31"
+#property version   "1.32"
 #property description "Trade Journal: logs closed trades, partials and candles to your journal,"
 #property description "and sends MT5's economic calendar for the Desk's news catalysts."
 
@@ -19,16 +19,16 @@
 #include "LicenseRelay.mqh"     // also unlocks 5ABI.FX indicators (they cannot reach the site)
 
 input string          JournalKey     = "";          // Journal key (from your dashboard)
-input ENUM_TIMEFRAMES ChartTimeframe = PERIOD_M5;   // Candles saved with each trade
-input int             BarsBefore     = 40;          // Candles before entry
-input int             BarsAfter      = 20;          // Candles after exit
+input ENUM_TIMEFRAMES ChartTimeframe = PERIOD_M1;   // Candles saved with each trade (M1 = smooth replay)
+input int             BarsBefore     = 90;          // Candles before entry
+input int             BarsAfter      = 45;          // Candles after exit
 input int             CatchUpDays    = 7;           // On start, also send trades closed in the last N days
 input double          PipSize        = 0;           // Pip size (0 = automatic)
 input bool            ShowPanel      = true;        // Show the journal panel on the chart
 input bool            SendNews       = true;        // Send the MT5 economic calendar (news on your Desk)
 
 #define JOURNAL_DIR    "TradeJournal\\"
-#define MAX_CANDLES    400
+#define MAX_CANDLES    1500
 
 struct QueueItem
   {
@@ -268,7 +268,15 @@ bool BuildTrade(const ulong id, string &json, datetime &closeTime)
      }
 
    // candles around the trade for the chart card
+   // long trades step up to a bigger timeframe so the whole trade fits (entry is never cut off)
    ENUM_TIMEFRAMES tf = ChartTimeframe == PERIOD_CURRENT ? (ENUM_TIMEFRAMES)Period() : ChartTimeframe;
+   ENUM_TIMEFRAMES steps[] = {PERIOD_M1, PERIOD_M5, PERIOD_M15, PERIOD_H1, PERIOD_H4, PERIOD_D1};
+   for(int k = 0; k < ArraySize(steps); k++)
+     {
+      if(PeriodSeconds(steps[k]) < PeriodSeconds(tf)) continue;
+      tf = steps[k];
+      if((closeTime - openTime) / PeriodSeconds(tf) + BarsBefore + BarsAfter <= MAX_CANDLES) break;
+     }
    int    sec  = PeriodSeconds(tf);
    datetime from = openTime - BarsBefore * sec;
    datetime to   = closeTime + BarsAfter * sec;

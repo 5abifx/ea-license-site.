@@ -116,10 +116,10 @@ function recap(trades) {
   const wdays = [0, 1, 2, 3, 4, 5, 6].map((i) => { const d = new Date(mon + i * 864e5).toISOString().slice(0, 10); const l = week.filter((t) => t.close_time.slice(0, 10) === d); return { d, n: l.length, net: sum(l) }; });
   const day = trades.filter((t) => t.close_time.slice(0, 10) === lastDay);
   return {
-    week: { from: monIso, to: sunIso, ...group(week), wins: week.filter((t) => t.net > 0).length, losses: week.filter((t) => t.net < 0).length, days: wdays },
-    session: { d: lastDay, ...group(day), wins: day.filter((t) => t.net > 0).length, losses: day.filter((t) => t.net < 0).length,
+    week: { from: monIso, to: sunIso, ...group(week), list: week, wins: week.filter((t) => t.net > 0).length, losses: week.filter((t) => t.net < 0).length, days: wdays },
+    session: { d: lastDay, ...group(day), list: day, wins: day.filter((t) => t.net > 0).length, losses: day.filter((t) => t.net < 0).length,
       best: day.reduce((a, b) => (b.net > a.net ? b : a)), worst: day.reduce((a, b) => (b.net < a.net ? b : a)) },
-    recent: trades.slice(-6).reverse(),
+    recent: trades.slice(-8).reverse(),
   };
 }
 

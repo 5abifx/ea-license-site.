@@ -7,6 +7,7 @@
 const crypto = require('crypto');
 const { esc, fmtDate, trialDays } = require('./views');
 const { getPlan } = require('./plans');
+const V = require('./visitors');
 
 const TRACKED = { '/': 'Home', '/mentorship': 'Mentorship', '/pricing': 'Pricing', '/signup': 'Sign up', '/login': 'Sign in' };
 const BOT = /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|discord|telegram|curl|wget|python|headless|lighthouse|monitor|uptime/i;
@@ -20,21 +21,28 @@ function sourceOf(req) {
   const tag = req.query.utm_source || req.query.src || req.query.source;
   if (tag) { const t = cleanSrc(tag); return (SOURCES.find(([re]) => re.test(t)) || [0, t])[1]; }
   let host = '';
-  try { host = new URL(req.get('referer') || '').hostname.replace(/^www\./, ''); } catch { return ''; }
-  if (!host || host === String(req.get('host') || '').replace(/:\d+$/, '').replace(/^www\./, '')) return '';
+  const app = V.appOf(req.get('user-agent') || '');
+  try { host = new URL(req.get('referer') || '').hostname.replace(/^www\./, ''); } catch { return app; }
+  if (!host || host === String(req.get('host') || '').replace(/:\d+$/, '').replace(/^www\./, '')) return app;
   return (SOURCES.find(([re]) => re.test(host)) || [0, cleanSrc(host)])[1];
 }
 
 // counts signed-out visitors on the public pages, remembers where they first came from
 function trackVisits(db) {
-  const ins = db.prepare('INSERT OR IGNORE INTO visits (day, path, vid, src) VALUES (date(\'now\'), ?, ?, ?)');
+  const ins = db.prepare('INSERT OR IGNORE INTO visits (day, path, vid, src, dev, ctry, cmp) VALUES (date(\'now\'), ?, ?, ?, ?, ?, ?)');
   return (req, res, next) => {
     try {
       if (req.method === 'GET' && TRACKED[req.path] && !req.user && req.session && !BOT.test(req.get('user-agent') || '')) {
         if (!req.session.vid) req.session.vid = crypto.randomBytes(8).toString('hex');
         if (req.session.src === undefined) req.session.src = sourceOf(req) || '';
         else if (!req.session.src) { const s = sourceOf(req); if (s) req.session.src = s; }
-        ins.run(req.path, req.session.vid, req.session.src || '');
+        if (!req.session.cmp) { const c = V.cleanCmp(req.query.utm_campaign); if (c) req.session.cmp = c; }
+        ins.run(req.path, req.session.vid, req.session.src || '', V.deviceOf(req.get('user-agent') || ''), req.session.ctry || '', req.session.cmp || '');
+        // ask the browser for its time zone once, for the country column
+        if (!req.session.ctry) {
+          const send = res.send.bind(res);
+          res.send = (body) => send(typeof body === 'string' && body.includes('</body>') ? body.replace('</body>', V.TZ_BEACON + '</body>') : body);
+        }
       }
     } catch (e) { console.error('visits:', e.message); }
     next();
@@ -289,18 +297,8 @@ function routes(app, { db, page, requireAdmin, stripe, mentorPlans, backup }) {
     <p><a href="/admin/mentorship">See names on the Mentorship page →</a></p>
   </section>
 
-  <section class="card" id="sources">
-    <h2>Where people come from</h2>
-    <div class="sd-two">
-      <div class="sd-scroll"><table><thead><tr><th>Source</th><th>Visitors</th><th>Sign-ups</th><th>Paid</th></tr></thead><tbody>
-        ${srcRows.map((r) => `<tr><td>${esc(srcLabel(r.s))}</td><td>${r.vis || '-'}</td><td>${r.sign}</td><td>${r.paid || '-'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">No data yet.</td></tr>'}
-      </tbody></table></div>
-      <div class="sd-scroll"><table><thead><tr><th>Page</th><th>Visitors</th></tr></thead><tbody>
-        ${pageRows.map((r) => `<tr><td>${esc(TRACKED[r.path] || r.path)}</td><td>${r.n}</td></tr>`).join('') || '<tr><td colspan="2" class="muted">No visits counted yet.</td></tr>'}
-      </tbody></table></div>
-    </div>
-    <p class="muted small">Tag your links so you can see which post sells: <code>5abifx.com/?utm_source=instagram</code>, <code>?utm_source=youtube</code>, <code>?utm_source=discord</code>, <code>/mentorship?utm_source=tiktok</code>. Links from Instagram, YouTube, Discord and Google are also picked up by themselves when the app passes them on.</p>
-  </section>`);
+  <span id="sources"></span>
+  ${V.section(db, { q: { ...req.query, p }, from, days, srcLabel, TRACKED })}`);
   });
 }
 
@@ -311,6 +309,8 @@ function attachSource(req, userId) {
     const u = db.prepare('SELECT referred_by FROM users WHERE id = ?').get(userId);
     const src = u && u.referred_by ? 'referral' : cleanSrc(req.session && req.session.src);
     if (src) db.prepare('UPDATE users SET source = ? WHERE id = ?').run(src, userId);
+    const cmp = V.cleanCmp(req.session && req.session.cmp);
+    if (cmp) db.prepare('UPDATE users SET campaign = ? WHERE id = ?').run(cmp, userId);
   } catch (e) { console.error('source:', e.message); }
 }
 

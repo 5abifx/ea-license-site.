@@ -279,6 +279,11 @@ function client(base, ip) {
     assert.strictEqual(new Set(r.text.match(/href="\/journal\/\d+"/g) || []).size, 1);   // one trade (links to it appear in the calendar and the recap)
     const tid = r.text.match(/href="\/journal\/(\d+)"/)[1];
     assert.match(r.text, /Share report/);
+    // trade page: TradingView chart + replay, served from our own copy of the library
+    assert.match((await bob.get(`/journal/${tid}`)).text, /id="tv-chart"/);
+    const lw = await fetch(base + '/vendor/lightweight-charts.js');
+    assert.strictEqual(lw.status, 200);
+    assert.match(lw.headers.get('content-type'), /javascript/);
     r = await bob.get('/journal/desk');
     assert.strictEqual(r.status, 200);
     assert.match(r.text, /The Desk starts after 10 closed trades/);
@@ -424,8 +429,11 @@ function client(base, ip) {
     assert.strictEqual(tc.valid, false);
     assert.match(tc.message, /Only for 5ABI\.FX students/);
     r = await tia.get('/dashboard');
-    assert.doesNotMatch(r.text, /Auction Compass/);
     const compassId = db.prepare("SELECT id FROM eas WHERE code = 'COMPASS'").get().id;
+    // members who are not students see it locked, with where to unlock it, and no download
+    assert.match(r.text, /Unlock with mentorship/);
+    assert.doesNotMatch(r.text, new RegExp(`/download/${compassId}"`));
+    assert.doesNotMatch(r.text, /Compass\.tpl/);
     assert.strictEqual((await tia.get(`/download/${compassId}`)).status, 404);
     assert.doesNotMatch((await client(base).get('/pricing')).text, /Compass/);
     // the admin marks Tia as a student: Compass unlocks on her account and shows on her dashboard
@@ -453,7 +461,7 @@ function client(base, ip) {
     assert.strictEqual(tc.valid, false);
     assert.strictEqual((await check('GOLD_SCALPER', '8888')).valid, true);
     r = await tess.get('/dashboard');
-    assert.doesNotMatch(r.text, /Auction Compass/);
+    assert.doesNotMatch(r.text, new RegExp(`/download/${compassId}"`));
     assert.strictEqual((await tess.get(`/download/${compassId}`)).status, 404);
 
     // bulk tools: early members (no expiry, no trial, no plan) become students in one click
@@ -679,6 +687,18 @@ function client(base, ip) {
       const vc = client(base, '10.8.0.1');
       await vc.get('/?utm_source=Instagram'); await vc.get('/'); await vc.get('/pricing');
       assert.strictEqual(db.prepare("SELECT COUNT(*) AS n FROM visits WHERE src = 'instagram'").get().n, 2);
+      // device, campaign and the time-zone beacon (country) for the visitor filters
+      const vc2 = client(base, '10.8.0.2');
+      r = await vc2.get('/mentorship?utm_source=youtube&utm_campaign=CPI-Recap');
+      assert.match(r.text, /\/api\/vtz/);
+      assert.ok(db.prepare("SELECT 1 FROM visits WHERE src = 'youtube' AND cmp = 'cpi-recap' AND dev = 'pc'").get());
+      const V = require('../src/visitors');
+      assert.strictEqual(V.countryOf('America/Toronto'), 'Canada');
+      assert.strictEqual(V.countryOf('Asia/Kolkata'), 'India');
+      assert.strictEqual(V.appOf('Mozilla/5.0 (iPhone) Instagram 300.0'), 'instagram');
+      assert.strictEqual(V.deviceOf('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148'), 'phone');
+      r = await admin.get('/admin/sales?p=30&vs=youtube&vd=pc&vn=new');
+      assert.match(r.text, /cpi-recap/);
 
       process.env.TRIAL_DAYS = '0';
       fake.close();

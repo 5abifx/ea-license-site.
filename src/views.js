@@ -140,7 +140,7 @@ function appShell(req, u, flashHtml, body, title) {
   <div class="app-top"><button type="button" class="fold-btn" data-fold aria-label="Hide the menu" title="Hide the menu (full screen)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/><path d="M15.5 10l-2 2 2 2"/></svg></button><span class="crumb"><a href="/dashboard">Home</a><i>›</i><b>${esc(title)}</b></span>${u.name ? `<span class="who priv-hide">${esc(u.name)}</span>` : ''}</div>
   <main class="app-body">${flashHtml}${body}</main>
   ${(u.student || u.mentor_plan || u.is_admin) && (u.intro_welcome !== 0 || (req.path === '/journal' && req.hasJournal && u.intro_reveal !== 'never'))
-    ? `<script src="/intro.js" defer data-w="${u.intro_welcome === 0 ? 0 : 1}" data-ws="${process.env.WELCOME_STYLE === 'boot' ? 'boot' : 'name'}" data-r="${req.path === '/journal' && req.hasJournal ? esc(u.intro_reveal || 'always') : ''}"></script>` : ''}
+    ? `<script src="/intro.js" defer data-w="${u.intro_welcome === 0 || req.path === '/journal' ? 0 : 1}" data-ws="${process.env.WELCOME_STYLE === 'boot' ? 'boot' : 'name'}" data-r="${req.path === '/journal' && req.hasJournal ? esc(u.intro_reveal || 'always') : ''}"></script>` : ''}
   <footer class="app-foot"><span class="foot-links"><a href="/faq">FAQ</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></span><span class="muted">${RISK}</span></footer>
 </div>
 </div>

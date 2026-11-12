@@ -91,6 +91,12 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
     res.setHeader('Cache-Control', res.req.query.v ? 'public, max-age=31536000, immutable' : 'no-cache');
   },
 }));
+// TradingView Lightweight Charts (Apache-2.0, npm package) for the trade replay and charts; credit link shown under each chart
+const LWC_FILE = path.join(path.dirname(require.resolve('lightweight-charts/package.json')), 'dist', 'lightweight-charts.standalone.production.js');
+app.get('/vendor/lightweight-charts.js', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.sendFile(LWC_FILE);
+});
 app.use(rate.limiter);   // after the files: pictures and styles never count
 app.use(cookieSession({
   name: 'eals',
@@ -130,10 +136,12 @@ app.use((req, res, next) => {
 
 // first-party visitor counter for the Admin sales dashboard (src/sales.js)
 app.use(sales.trackVisits(db));
+require('./visitors').routes(app, { db, express });
 
 function pwTag(u) { return crypto.createHash('sha256').update(String(u.password_hash || '')).digest('hex').slice(0, 12); }
 const flash = (req, type, msg) => { req.session.flash = { type, msg }; };
 const page = (req, res, title, body, opts) => res.send(layout(req, title, body, opts));
+const myeas = require('./myeas');
 const refs = referrals.setup(app, { db, page });
 const requireUser = (req, res, next) => (req.user ? next() : res.redirect('/login'));
 const requireAdmin = (req, res, next) =>
@@ -504,62 +512,18 @@ app.get('/dashboard', requireUser, (req, res) => {
   const needsCard = stripe.needsCardTrial(u);
   const expired = isExpired(u) && !needsCard;
 
-  page(req, res, 'My EAs', `
-  <h1>Welcome${u.name ? ', ' + esc(u.name) : ''}</h1>
-  ${needsCard ? cardStepHtml({ trial: trialDays() }) : ''}
+  const notices = `${needsCard ? cardStepHtml({ trial: trialDays() }) : ''}
   ${expired ? `<div class="notice error"><div><strong>${u.trial ? 'Your free trial has ended.' : 'Your license has expired.'}</strong>
     Your EAs will stop working until you pick a plan. Plans start at $${PLANS[0].monthly}/month.</div><a class="btn" href="/pricing">See plans</a></div>` : ''}
   ${u.trial && !expired ? `<div class="notice"><div><strong>Free trial: ${daysLeft(u)} day${daysLeft(u) === 1 ? '' : 's'} left</strong>
     (until ${fmtDate(u.expires_at)} UTC). Pick a plan to keep trading after that.</div><a class="btn" href="/pricing">See plans</a></div>` : ''}
   ${u.expires_at && !expired && !u.trial && !needsCard ? `<p class="muted">${getPlan(u.plan) ? `${esc(getPlan(u.plan).name)} plan (${esc(BILLING[cleanBilling(u.billing)].label.toLowerCase())}) · ` : ''}License valid until ${fmtDate(u.expires_at)} (UTC) · <a href="/pricing">Plans</a></p>` : ''}
-
   ${req.query.paid && u.plan_request ? '<div class="notice"><div><strong>Thanks for your payment!</strong> Your plan switches on in a moment. Refresh this page if it does not show yet.</div></div>' : ''}
-  ${u.stripe_customer ? `<form method="post" action="/billing" class="row"><span class="muted">${u.stripe_sub ? 'Card subscription active.' : 'Card subscription ended.'}</span><button class="small secondary">Manage billing</button></form>` : ''}
-  <section class="card dash-eas">
-    <h2>1. Download your EA</h2>
-    ${eas.length ? `<div class="ea-list">${eas.map((e) => `
-      <div class="ea">
-        <div><strong>${esc(e.name)}</strong> <span class="tag">v${esc(e.version)}</span>
-        ${e.description ? `<p class="muted">${esc(e.description)}</p>` : ''}</div>
-        ${e.file_path ? `<a class="btn" href="/download/${e.id}">Download</a>` : '<span class="muted">Coming soon</span>'}
-      </div>`).join('')}</div>`
-    : '<p class="muted">No EAs are assigned to your account yet.</p>'}
-  </section>
-
-  <div class="dash-split">
-  <section class="card">
-    <h2>2. Add your MT5 account numbers <span class="tag">${accounts.length} / ${u.max_accounts}</span></h2>
-    <p class="muted">The EA only runs on the account numbers listed here. Find the number in MT5 under File → Login to Trade Account, or at the top of the Navigator window.</p>
-    ${full ? '<p class="muted">You have reached the maximum number of accounts. Remove one to add another.</p>' : `
-    <form method="post" action="/accounts" class="row">
-      <input name="account_number" placeholder="MT5 account number, e.g. 51234567" inputmode="numeric" pattern="[0-9]{1,20}" required>
-      <input name="label" placeholder="Note (optional), e.g. IC Markets live" maxlength="60">
-      <button>Add account</button>
-    </form>`}
-    ${accounts.length ? `<table><thead><tr><th>Account</th><th>Note</th><th>Last EA check</th><th></th></tr></thead><tbody>
-      ${accounts.map((a) => `<tr><td><strong>${esc(a.account_number)}</strong></td><td>${esc(a.label)}</td>
-        <td>${a.last_check_at ? fmtDate(a.last_check_at) : '<span class="muted">never</span>'}</td>
-        <td><form method="post" action="/accounts/${a.id}/delete" onsubmit="return confirm('Remove account ${esc(a.account_number)}? The EA will stop on it.')">
-        <button class="small danger">Remove</button></form></td></tr>`).join('')}
-    </tbody></table>` : ''}
-  </section>
-
-  <section class="card">
-    <h2>3. Allow the license check in MT5</h2>
-    <p>In MetaTrader 5 go to <strong>Tools → Options → Expert Advisors</strong>, tick <strong>Allow WebRequest for listed URL</strong> and add:</p>
-    <code class="block">${esc(req.protocol + '://' + req.get('host'))}</code>
-    <p class="muted">Want the 5ABI.FX look on your charts? Pick a chart theme: ${['Ember', 'Paper', 'Cobalt'].map(t => `<a href="/templates/5ABI.FX%20${t}.tpl" download>${t}</a>${student ? ` (<a href="/templates/5ABI.FX%20${t}%20Compass.tpl" download>with Auction Compass</a>)` : ''}`).join(' · ')}. Put it in <strong>File → Open Data Folder → MQL5 → Profiles → Templates</strong>, then right-click a chart → <strong>Templates</strong>. KATANA and Compass switch to the same colours by themselves.</p>
-    <p class="muted">Prop firm account says <strong>"AutoTrading disabled by server"</strong>? <a href="/help/ea-blocked">Get a ready-to-send email for their support</a>.</p>
-  </section>
-  </div>
-  <div class="dash-split">
-  ${req.hasJournal ? `<section class="card">
-    <h2>4. Trade Journal</h2>
-    <p>Every trade you close is logged automatically and turned into share cards. <a href="/journal">Open your journal</a> to get your journal key and set up the Trade Journal EA.</p>
-    ${student && eas.some(isStudentOnly) ? '<p class="muted">Indicators like Auction Compass unlock by themselves while the Trade Journal EA runs on any chart in the same MT5. Put indicators in <strong>MQL5 → Indicators</strong>.</p>' : ''}
-  </section>` : ''}
-  ${u.is_admin ? '' : refs.card(req, u)}
-  </div>`);
+  ${u.stripe_customer ? `<form method="post" action="/billing" class="row"><span class="muted">${u.stripe_sub ? 'Card subscription active.' : 'Card subscription ended.'}</span><button class="small secondary">Manage billing</button></form>` : ''}`;
+  // every known tool, so the ones this member does not have show as locked
+  const allEas = db.prepare('SELECT * FROM eas WHERE active = 1 ORDER BY name').all();
+  page(req, res, 'My EAs', myeas.html({ u, eas, allEas, accounts, full, student, hasJournal: req.hasJournal, notices, isStudentOnly,
+    site: req.protocol + '://' + req.get('host'), refCard: u.is_admin ? '' : refs.card(req, u) }));
 });
 
 app.post('/accounts', requireUser, (req, res) => {

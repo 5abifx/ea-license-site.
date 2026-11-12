@@ -210,7 +210,7 @@ function found(rows, plansByTrade, { money, esc, off = NY_DEFAULT, planHref = '/
     const [ses, n] = Object.entries(bySess).sort((a, b) => b[1] - a[1])[0];
     Q.push({ q: 'Best trade', a: money(best.net), tone: 'pos', sub: `${esc(best.symbol)} ${side(best)} · ${when(best)}`,
       viz: V.clock(top.map((t) => nyMin(t, off)), n >= 3 ? ses : ''),
-      fix: n >= 3 && top.length >= 5 ? `${n} of your 5 best: ${ses}. Trade there.` : 'Write down why it worked.', href: `/journal/${best.id}` });
+      fix: n >= 3 && top.length >= 5 ? `${n} of your 5 best: ${ses}. Trade there.` : 'Write down why it worked.', href: `/journal/${best.id}`, tid: best.id });
   }
   // 2 biggest loss, next to the usual loss
   const worst = [...T].sort((a, b) => a.net - b.net)[0];
@@ -218,7 +218,7 @@ function found(rows, plansByTrade, { money, esc, off = NY_DEFAULT, planHref = '/
     const x = avgLoss ? -worst.net / avgLoss : 1;
     Q.push({ q: 'Biggest loss', a: money(worst.net), tone: 'neg', sub: `${x.toFixed(1)}× your usual loss`,
       viz: V.vs(avgLoss, -worst.net, 'Usual', 'This one'),
-      fix: x >= 2 ? 'Never widen the stop.' : 'A controlled loss. Keep it so.', href: `/journal/${worst.id}` });
+      fix: x >= 2 ? 'Never widen the stop.' : 'A controlled loss. Keep it so.', href: `/journal/${worst.id}`, tid: worst.id });
   }
   // 3 real risk per trade
   const rk = T.filter((t) => fin(t.risk_pct)).slice(-60);
@@ -238,20 +238,20 @@ function found(rows, plansByTrade, { money, esc, off = NY_DEFAULT, planHref = '/
   const A = analyze(rows, { money, esc });
   const leak = !A.locked && [...A.items].filter((i) => i.tone === 'bad').sort((a, b) => (b.saved || 0) - (a.saved || 0))[0];
   if (leak) Q.push({ q: 'Costliest habit', a: esc(leak.tag), tone: 'acc', sub: leak.saved ? `−${amt(leak.saved)}` : '',
-    viz: V.icon(leak.kind), fix: esc(String(leak.rule || leak.fix).replace(/<[^>]+>/g, '').split('. ')[0].replace(/\.$/, '')) + '.', href: '/journal/insights' });
+    viz: V.icon(leak.kind), fix: esc(String(leak.rule || leak.fix).replace(/<[^>]+>/g, '').split('. ')[0].replace(/\.$/, '')) + '.', href: `/journal/insights#leak-${leak.kind}`, go: 'See the details' });
   // 5 left on the table: wins closed before their target (the plan's, else the trade's TP)
-  let taken = 0;
+  let taken = 0, most = null;
   const early = T.filter((t) => t.net > 0 && fin(t.exit)).map((t) => {
     const tp = fin(plansByTrade[t.id]?.tp) ? Number(plansByTrade[t.id].tp) : fin(t.tp) ? Number(t.tp) : null, k = moneyPerPoint(t);
     if (tp === null || !k) return null;
     const left = (tp - t.exit) * t.dir * k;
-    if (left > Math.abs(t.net) * 0.1) { taken += t.net; return left; }
+    if (left > Math.abs(t.net) * 0.1) { taken += t.net; if (!most || left > most.left) most = { id: t.id, left }; return left; }
     return null;
   }).filter((v) => v !== null);
   if (early.length) {
     const left = early.reduce((s, v) => s + v, 0);
     Q.push({ q: 'Left on the table', a: amt(left), tone: 'acc', sub: `${early.length} win${early.length > 1 ? 's' : ''} closed early`,
-      viz: V.split(taken, left, `Taken ${amt(taken)}`, `Left ${amt(left)}`), fix: 'Half at 1R, rest to target.' });
+      viz: V.split(taken, left, `Taken ${amt(taken)}`, `Left ${amt(left)}`), fix: 'Half at 1R, rest to target.', ...(most ? { href: `/journal/${most.id}`, tid: most.id, tsub: `Biggest one: ${amt(most.left)} left` } : {}) });
   }
   // 6 stops moved (needs plans)
   const pl = T.filter((t) => plansByTrade[t.id]);
@@ -270,6 +270,29 @@ function found(rows, plansByTrade, { money, esc, off = NY_DEFAULT, planHref = '/
   return { count: T.length, items: Q };
 }
 
+// a small candle picture of one trade for the What we found cards: the saved candles, entry and exit marked
+function thumb(t) {
+  let cs = [];
+  try { cs = JSON.parse(t.candles || '[]'); } catch { return ''; }
+  if (cs.length < 8) return '';
+  const toS = (iso) => Date.parse(String(iso).replace(' ', 'T') + 'Z') / 1000;
+  const o = toS(t.open_time), c = toS(t.close_time);
+  // keep it readable: at most 70 bars, merged when there are more
+  const k = Math.ceil(cs.length / 70), bars = [];
+  for (let i = 0; i < cs.length; i += k) { const g = cs.slice(i, i + k); bars.push([g[0][0], g[0][1], Math.max(...g.map((x) => x[2])), Math.min(...g.map((x) => x[3])), g[g.length - 1][4]]); }
+  const lv = [t.entry, t.exit].filter(fin).map(Number);
+  const hi = Math.max(...bars.map((b) => b[2]), ...lv), lo = Math.min(...bars.map((b) => b[3]), ...lv), sp = hi - lo || 1;
+  const W = 300, H = 92, bw = W / bars.length, y = (v) => +(4 + (1 - (v - lo) / sp) * (H - 8)).toFixed(1);
+  const idx = (ts) => { let j = bars.findIndex((b) => b[0] > ts); j = j < 0 ? bars.length : j; return Math.max(0, j - 1); };
+  const ei = idx(o), xi = idx(c), x = (i) => +(i * bw + bw / 2).toFixed(1);
+  let out = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">`;
+  if (fin(t.entry)) out += `<rect x="${x(ei)}" width="${Math.max(2, x(xi) - x(ei)).toFixed(1)}" y="${Math.min(y(t.entry), y(t.exit))}" height="${Math.max(1, Math.abs(y(t.entry) - y(t.exit))).toFixed(1)}" class="${t.net >= 0 ? 'zw' : 'zl'}"/>`;
+  bars.forEach((b, i) => { const up = b[4] >= b[1]; out += `<line x1="${x(i)}" x2="${x(i)}" y1="${y(b[2])}" y2="${y(b[3])}" class="${up ? 'u' : 'd'}"/><rect x="${(x(i) - bw * 0.32).toFixed(1)}" width="${(bw * 0.64).toFixed(1)}" y="${Math.min(y(b[1]), y(b[4]))}" height="${Math.max(0.8, Math.abs(y(b[1]) - y(b[4]))).toFixed(1)}" class="${up ? 'u' : 'd'}"/>`; });
+  if (fin(t.entry)) out += `<circle cx="${x(ei)}" cy="${y(t.entry)}" r="3.4" class="en"/>`;
+  if (fin(t.exit)) out += `<circle cx="${x(xi)}" cy="${y(t.exit)}" r="3.4" class="ex"/>`;
+  return out + '</svg>';
+}
+
 function foundHtml(F) {
   if (!F) return '';
   return `<section class="found">
@@ -277,9 +300,9 @@ function foundHtml(F) {
     <div class="fq-grid">${F.items.map((x, i) => `<${x.href ? `a href="${x.href}"` : 'div'} class="fq${x.empty ? ' empty' : ''}">
       <span class="fq-q"><em>${String(i + 1).padStart(2, '0')}</em>${x.q}</span>
       ${x.a ? `<b class="fq-a${x.tone ? ' ' + x.tone : ''}">${x.a}</b>` : ''}
-      <div class="fq-v">${x.viz || ''}</div>
-      ${x.sub ? `<span class="fq-s">${x.sub}</span>` : ''}
-      <span class="fq-fix"><i>Fix</i>${x.fix}</span></${x.href ? 'a' : 'div'}>`).join('')}</div></section>`;
+      <div class="fq-v">${x.viz || ''}</div>${x.thumb ? `<div class="fq-thumb">${x.thumb}</div>` : ''}
+      ${x.sub ? `<span class="fq-s">${x.sub}${x.thumb && x.tsub ? ` · ${x.tsub}` : ''}</span>` : ''}
+      <span class="fq-fix"><span><i>Fix</i>${x.fix}</span>${x.href ? `<b class="fq-go">${x.thumb ? 'Replay' : x.go || 'Open'} ›</b>` : ''}</span></${x.href ? 'a' : 'div'}>`).join('')}</div></section>`;
 }
 
-module.exports = { init, brokerNow, match, compare, chartSvg, found, foundHtml, moneyPerPoint, sameSym, SETUPS, TAGS, setupText, setupTags, CHECKS, MATCH_AFTER };
+module.exports = { init, brokerNow, match, compare, chartSvg, found, foundHtml, thumb, moneyPerPoint, sameSym, SETUPS, TAGS, setupText, setupTags, CHECKS, MATCH_AFTER };

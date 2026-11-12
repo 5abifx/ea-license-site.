@@ -34,12 +34,14 @@ function kpis(T, N, money) {
   const G = T.ghost, sp = G.curve.length > 1 ? spark(G.curve.map((p) => p[1] - p[0])) : '';
   return `<div class="tm-kpis">
     ${tile('sess', 'Session · NY', `<b class="tm-kv" id="tm-sess">${esc(T.sessNow)}</b><div class="tm-bar"><i id="tm-sessbar" style="width:0%"></i></div><small id="tm-sessnext">&nbsp;</small>`)}
-    ${tile('today', 'Today', `<b class="tm-kv ${u > 0 ? 'pos' : u < 0 ? 'neg' : ''}">${T.fmtU(u)}</b><div class="tm-dots" title="${T.today.n} trades today, you usually take ${usual}">${dots}</div><small>${T.today.n} of usual ${usual} trades</small>`)}
+    ${tile('today', 'Today', `<b class="tm-kv ${u > 0 ? 'pos' : u < 0 ? 'neg' : ''}">${T.fmtU(u)}</b>${usual <= 12 && T.today.n <= 16
+      ? `<div class="tm-dots" title="${T.today.n} trades today, you usually take ${usual}">${dots}</div>`
+      : `<div class="tm-bar tm-count${T.today.n > usual ? ' warn' : ''}" title="${T.today.n} trades today, you usually take ${usual}"><i style="width:${Math.min(100, (T.today.n / Math.max(usual, T.today.n)) * 100).toFixed(0)}%"></i><b style="left:${Math.min(100, (usual / Math.max(usual, T.today.n)) * 100).toFixed(0)}%"></b></div>`}<small>${T.today.n} of usual ${usual} trades${T.today.n ? ` · ${T.today.list.filter((v) => v >= 0).length} won` : ''}</small>`)}
     ${tile('risk', 'Mistake risk', `<b class="tm-kv">${T.score}<em>/100</em></b><div class="tm-segs">${segs}</div><small>${T.level} today</small>`)}
     ${tile('room', 'Daily loss used', d ? `<b class="tm-kv ${used >= 0.8 ? 'neg' : ''}">${Math.round(used * 100)}%</b><div class="tm-bar ${used >= 0.8 ? 'bad' : used >= 0.5 ? 'warn' : ''}"><i style="width:${(used * 100).toFixed(0)}%"></i></div><small>${money(d.left).replace(/^[+−]/, '')} left today</small>`
       : `<b class="tm-kv muted">--</b><div class="tm-bar"><i style="width:0"></i></div><small>Add firm rules in Insights</small>`)}
     ${tile('news', 'Next news', nx ? `<b class="tm-kv" data-cd="${nx.t}">--</b><div class="tm-imp i${nx.imp}"><i></i><i></i><i></i><span>${esc(nx.cur)} ${esc(nx.name)}</span></div><small>${nx.move !== null ? `gold moves ±$${nx.move.toFixed(1)}` : `${T.hhmm(nx.nyMin)} NY`}</small>`
-      : `<b class="tm-kv muted">--</b><div class="tm-imp"><i></i><i></i><i></i><span>${N && N.has ? 'Quiet for your symbols' : 'Waiting for news'}</span></div><small>${N && N.has ? 'next 3 days' : 'Journal EA 1.30 sends it'}</small>`)}
+      : `<b class="tm-kv muted">--</b><div class="tm-imp"><i></i><i></i><i></i><span>${N && N.has ? 'Quiet for your symbols' : 'Waiting for news'}</span></div><small>${N && N.has ? 'next 7 days' : 'Journal EA 1.30 sends it'}</small>`)}
     ${tile('gap', 'Rules would add', `<b class="tm-kv ${G.gap > 0 ? 'pos' : ''}">${T.fmtU(G.gap)}</b>${sp}<small>last ${G.days} trading days</small>`)}
   </div>`;
 }
@@ -112,7 +114,7 @@ function recent(T) {
 
 const panel = (cls, label, title, body, right = '') => `<section class="card tp ${cls}"><div class="tp-h"><span class="tp-l">${label}</span>${right}</div>${title ? `<h2 class="tp-t">${title}</h2>` : ''}${body}</section>`;
 
-function html(T, { news: N, money, cur, acctNote }) {
+function html(T, { news: N, money, cur, acctNote, market }) {
   if (T.locked) {
     const pct = Math.round((T.have / T.need) * 100);
     return `<section class="card tp tm-lock"><span class="tp-l">Desk locked</span><b class="tm-kv">${T.have}<em>/${T.need}</em></b>
@@ -139,11 +141,12 @@ function html(T, { news: N, money, cur, acctNote }) {
   ${kpis(T, N, money)}
   ${panel('tm-wide', '<span class="tm-live"></span>Your day · New York time', '', `<div class="tm-scroll">${dayMap(T, N)}</div>`,
     leg([['up', 'you win'], ['dn', 'you lose'], ['bl', 'red hour'], ['wn', 'your window'], ['nw', 'news']]))}
+  ${marketPanel(market || [])}
   ${panel('tm-fc', 'Mistake forecast', T.level === 'High' ? 'Today looks like your bad days' : T.level === 'Medium' ? 'Today needs some care' : 'Today looks like your good days',
     `<div class="tm-fcb">${gauge(T.score, T.level)}<div class="tm-drvs">${drivers}</div></div>${recent(T)}`, `<span class="tp-r">${esc(acctNote)}</span>`)}
   ${panel('tm-rules', "Today's rules", 'From your own leaks', `<div class="tm-rl">${rules}</div>`, '<span class="tp-r" title="KATANA can enforce these after its next update">reminders</span>')}
   ${panel('tm-wide tm-news', 'News catalysts', '', `<div id="tm-news"></div><script id="tm-ndata" type="application/json">${ndata}</script>`,
-    `<div class="seg tm-days" id="tm-days"><button type="button" data-d="0" aria-pressed="true">Today</button><button type="button" data-d="1" aria-pressed="false">Tomorrow</button><button type="button" data-d="2" aria-pressed="false">Next day</button></div>`)}
+    `<div class="seg tm-days" id="tm-days"><button type="button" data-d="0" aria-pressed="true">Today</button><button type="button" data-d="1" aria-pressed="false">Tomorrow</button><button type="button" data-d="w" aria-pressed="false">This week</button></div>`)}
   ${panel('tm-ckp', 'Next trade check', '', `<div class="tm-ck" id="tm-ck"><noscript><p class="muted">Turn on JavaScript to use the trade check.</p></noscript></div>
     <script id="tm-data" type="application/json">${data}</script>`)}
   ${panel('tm-gh', 'You vs your rules', '', `${ghost(G)}
@@ -156,4 +159,30 @@ function html(T, { news: N, money, cur, acctNote }) {
 <script src="/terminal.js"></script>`;
 }
 
-module.exports = { html };
+// MT5 symbol -> TradingView symbol for the free live chart widget (broker suffixes like .sc, .m, -pro, # are dropped)
+const TV_MAP = { XAUUSD: 'OANDA:XAUUSD', GOLD: 'OANDA:XAUUSD', XAGUSD: 'OANDA:XAGUSD', SILVER: 'OANDA:XAGUSD',
+  US30: 'OANDA:US30USD', DJ30: 'OANDA:US30USD', WS30: 'OANDA:US30USD', NAS100: 'OANDA:NAS100USD', US100: 'OANDA:NAS100USD', USTEC: 'OANDA:NAS100USD', NDX100: 'OANDA:NAS100USD',
+  SPX500: 'OANDA:SPX500USD', US500: 'OANDA:SPX500USD', SP500: 'OANDA:SPX500USD', GER40: 'OANDA:DE30EUR', DE40: 'OANDA:DE30EUR', GER30: 'OANDA:DE30EUR', UK100: 'OANDA:UK100GBP',
+  JP225: 'OANDA:JP225USD', USOIL: 'TVC:USOIL', WTI: 'TVC:USOIL', XTIUSD: 'TVC:USOIL', UKOIL: 'TVC:UKOIL', BRENT: 'TVC:UKOIL', XBRUSD: 'TVC:UKOIL',
+  BTCUSD: 'BITSTAMP:BTCUSD', ETHUSD: 'BITSTAMP:ETHUSD', DXY: 'TVC:DXY', USDX: 'TVC:DXY' };
+function tvSymbol(sym) {
+  const s = String(sym || '').toUpperCase().replace(/[^A-Z0-9]/g, ' ').trim().split(' ')[0];
+  if (TV_MAP[s]) return TV_MAP[s];
+  for (const k of Object.keys(TV_MAP)) if (s.startsWith(k)) return TV_MAP[k];
+  if (/^[A-Z]{6}/.test(s)) return 'FX:' + s.slice(0, 6);
+  return '';
+}
+
+// live chart of the trader's most traded instruments: TradingView's free Advanced Chart widget (live prices, no cost)
+function marketPanel(syms) {
+  const list = syms.map((x) => ({ ...x, tv: tvSymbol(x.sym) })).filter((x) => x.tv).filter((x, i, l) => l.findIndex((y) => y.tv === x.tv) === i).slice(0, 4);
+  if (!list.length) return '';
+  const chips = list.map((x, i) => `<button type="button" data-tv="${esc(x.tv)}" aria-pressed="${i === 0}">${esc(x.sym)}<small>${x.n} trades</small></button>`).join('');
+  return `<section class="card tp tm-wide tm-mkt">
+    <div class="tp-h"><span class="tp-l">Live market · your most traded</span><span class="seg tm-mkts" id="tm-mkts">${chips}</span></div>
+    <div class="tm-tv" id="tm-tv" data-tv="${esc(list[0].tv)}"></div>
+    <p class="small muted tm-tvnote">Live prices from TradingView. Your broker's price can differ slightly.</p>
+  </section>`;
+}
+
+module.exports = { html, tvSymbol };
