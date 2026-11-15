@@ -224,6 +224,8 @@ require('./security')(app, { db, page, flash, requireAdmin, rateLimit, finishSig
 // that are registered before the journal module (it fills in the check below).
 let journalAccess = () => false;
 app.use((req, res, next) => { req.hasJournal = journalAccess(req.user); next(); });
+// feature usage tracking + Admin > Feature usage (src/features.js); before the members routes so it sees them
+require('./features').setup(app, { db, express, requireAdmin, page });
 const { studentBox: mentorBox } = require('./mentor')(app, { db, page, flash, requireUser, requireAdmin });
 require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, setJournalAccess: (f) => { journalAccess = f; } });
 require('./welcome')(app, { db, requireUser });   // student welcome + journal result reveal

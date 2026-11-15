@@ -60,6 +60,16 @@ function client(base, ip) {
     assert.match(r.text, /Gold Scalper/);
     r = await bob.get('/download/1');
     assert.strictEqual(r.text, 'FAKE-EX5');
+    // feature usage: members' page views are counted, admins are left out unless asked
+    await new Promise((ok) => setTimeout(ok, 50));
+    r = await admin.get('/admin/usage');
+    assert.match(r.text, /Feature usage/);
+    assert.match(r.text, /id="f-my-eas"[\s\S]*?<td class="right">1<\/td>/);
+    assert.match(r.text, /id="f-ea-download"[\s\S]*?<td class="right">1<\/td>/);
+    assert.match(r.text, /Too new to judge/);
+    r = await admin.post('/admin/usage/support?p=30', { status: 'remove', note: 'test note' });
+    assert.match(r.text, /Your decisions[\s\S]*test note/);
+    assert.match((await bob.get('/dashboard')).text, /window.__FT=/);
     // security headers, and a password change signs out other devices
     const hr = await fetch(base + '/login');
     assert.strictEqual(hr.headers.get('x-frame-options'), 'DENY');
