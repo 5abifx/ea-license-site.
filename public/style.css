@@ -1925,3 +1925,6 @@ tr:target { background: var(--accent-soft); }
 .fu .vz-filters .check { display: inline-flex; gap: 6px; align-items: center; margin: 0; white-space: nowrap; }
 .fu .vz-filters .check input { width: auto; margin: 0; }
 .fu-table td.right { white-space: nowrap; }
+/* Insights: the trader's goal from the sign-up answers (src/onboard.js) */
+.ins-goal { margin-bottom: 14px; display: grid; gap: 6px; }
+.ins-goal p { margin: 0; }

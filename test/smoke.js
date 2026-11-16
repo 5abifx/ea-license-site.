@@ -126,7 +126,14 @@ function client(base, ip) {
     assert.match((await client(base).get('/')).text, /15-day free trial/);
     const tia = client(base);
     r = await tia.post('/signup', { name: 'Tia', email: 'tia@test.com', password: 'tiapass123' });
+    // new sign-ups get the guided set-up first; answers save to the profile
+    assert.match(r.text, /Set up your desk/);
+    r = await tia.post('/start', { name: 'Tia', style: 'day', market: 'gold', acct: 'eval', firm: 'ftmo', goal: 'pass', pain: 'bogus', done: '1', reset: '1' });
     assert.match(r.text, /Free trial: 15 days left/);
+    r = await tia.get('/profile');
+    assert.match(r.text, /value="ftmo" checked/);
+    assert.match(r.text, /value="day" checked/);
+    assert.doesNotMatch(r.text, /value="bogus"/);
     await tia.post('/accounts', { account_number: '7777' });
     assert.strictEqual((await check('GOLD_SCALPER', '7777')).valid, true);
     r = await tia.post('/accounts', { account_number: '7778' });
@@ -234,6 +241,9 @@ function client(base, ip) {
     claims = { iss: 'https://accounts.google.com', aud: 'cid.apps.googleusercontent.com', sub: 'g-123', email: 'gina@gmail.com', email_verified: true, name: 'Gina', exp: Date.now() / 1000 + 600 };
     const st2 = new URL((await gUser.get('/auth/google')).location).searchParams.get('state');
     r = await gUser.get(`/auth/google/callback?state=${st2}&code=abc`);
+    assert.match(r.text, /Set up your desk/);
+    assert.match(r.text, /"name":"Gina"/);
+    r = await gUser.post('/start', { done: '1' });   // Skip keeps the Google name
     assert.match(r.text, /Free trial: 15 days left/);
     assert.match(r.text, /Welcome, Gina/);
     // signing in again with the same Google account reuses the account, no new trial
@@ -582,6 +592,9 @@ function client(base, ip) {
         body: new URLSearchParams({ name: 'Cara', email: 'cara@test.com', password: 'carapass123' }).toString() });
       assert.strictEqual(su.status, 302);
       r = await ct.post('/login', { email: 'cara@test.com', password: 'carapass123' });
+      assert.match(r.text, /Set up your desk/);   // guided set-up first, ending on the card step
+      assert.match(r.text, /"card":15/);
+      r = await ct.get('/dashboard');
       assert.match(r.text, /Your 15-day free trial is ready/);
       const caraId = db.prepare("SELECT id FROM users WHERE email = 'cara@test.com'").get().id;
       await ct.post('/accounts', { account_number: '4242' });
