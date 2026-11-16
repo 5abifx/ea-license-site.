@@ -18,7 +18,7 @@ const EMOTIONS = ['', 'Calm', 'Confident', 'Patient', 'Anxious', 'Greedy', 'Fear
 
 const KEEP_IF_EDITED = ['sl', 'r', 'risk_money', 'risk_pct'];   // columns the trader can correct
 
-module.exports = function registerJournal(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, setJournalAccess }) {
+module.exports = function registerJournal(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, setJournalAccess, onboard }) {
   TP.init(db);
   const hasJournal = (u) => !!u && (u.is_admin || (u.status === 'active' && !isExpired(u) && !!db.prepare(`
     SELECT 1 FROM user_eas ue JOIN eas e ON e.id = ue.ea_id
@@ -539,7 +539,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         <p class="muted small">Switch off a session, a day, a symbol or a side, or cap your trades a day, and see what this period would have looked like. Your journal does not change.</p>
         <div class="wi-body"><div class="wi-ctl"></div><div class="wi-res"></div></div></section>
         <script id="wi-data" type="application/json">${wiData}</script><script src="/whatif.js"></script>`;
-      body = insightsView.fullHtml(analyze(rows, { money: m, esc }), { money: m, cur, prop: '', whatif });
+      body = (onboard ? onboard.goalHtml(u) : '') + insightsView.fullHtml(analyze(rows, { money: m, esc }), { money: m, cur, prop: '', whatif });
     }
     else if (tab === 'time' || tab === 'habits') {
       const dr = desk.prepRows(db.prepare(`SELECT ${DESK_COLS} FROM journal_trades WHERE ${where}${since ? ' AND close_time >= ?' : ''} ORDER BY close_time`).all(...args, ...(since ? [since] : [])));

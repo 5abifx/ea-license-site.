@@ -1878,3 +1878,7 @@ a.tp-st.done { color: var(--text); display: inline-flex; align-items: center; ga
 @media (max-width: 900px) { .vz-three { grid-template-columns: 1fr; } }
 @media (max-width: 1280px) and (min-width: 761px) { .pl-tile { grid-template-columns: 1fr; } .pl-tile .tl-spark { grid-column: 1; grid-row: auto; height: 34px; margin-top: 6px; } }
 @media (max-width: 760px) { .pl-tile { grid-template-columns: 1fr; } .pl-tile .tl-spark { grid-column: 1; grid-row: auto; height: 30px; margin-top: 6px; } }
+
+/* Insights: the trader's goal from the sign-up answers (src/onboard.js) */
+.ins-goal { margin-bottom: 14px; display: grid; gap: 6px; }
+.ins-goal p { margin: 0; }

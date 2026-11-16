@@ -225,7 +225,10 @@ require('./security')(app, { db, page, flash, requireAdmin, rateLimit, finishSig
 let journalAccess = () => false;
 app.use((req, res, next) => { req.hasJournal = journalAccess(req.user); next(); });
 const { studentBox: mentorBox } = require('./mentor')(app, { db, page, flash, requireUser, requireAdmin });
-require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, setJournalAccess: (f) => { journalAccess = f; } });
+// guided first run after sign-up + Profile settings (src/onboard.js); stripe is set up further down, so it is looked up at request time
+const onboard = require('./onboard')(app, { db, page, flash, requireUser, trialDays,
+  stripe: { on: () => stripe.on(), needsCardTrial: (u) => stripe.needsCardTrial(u) } });
+require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, onboard, setJournalAccess: (f) => { journalAccess = f; } });
 require('./welcome')(app, { db, requireUser });   // student welcome + journal result reveal
 
 // ---------- auth ----------
@@ -372,6 +375,7 @@ function createCustomer(req, { name, email, passwordHash, googleSub = null }) {
       .run(email, name, passwordHash, status, MAX_ACCOUNTS_DEFAULT, googleSub);
     if (status === 'active') grantAllActiveEas(info.lastInsertRowid);
   }
+  db.prepare('UPDATE users SET onboard = 0 WHERE id = ?').run(info.lastInsertRowid);   // guided set-up on first visit
   refs.attach(req, Number(info.lastInsertRowid));
   sales.attachSource(req, Number(info.lastInsertRowid));
   return Number(info.lastInsertRowid);
@@ -542,6 +546,7 @@ app.post('/accounts', requireUser, (req, res) => {
   }
   const r = db.prepare('INSERT OR IGNORE INTO accounts (user_id, account_number, label) VALUES (?, ?, ?)')
     .run(u.id, num, String(req.body.label || '').trim().slice(0, 60));
+  if (r.changes) onboard.prefillProp(u, r.lastInsertRowid);   // prop firm guard from the sign-up answers
   if (u.trial && r.changes) db.prepare('INSERT OR IGNORE INTO trial_accounts (account_number, user_id) VALUES (?, ?)').run(num, u.id);
   flash(req, r.changes ? 'ok' : 'error', r.changes ? `Account ${num} added.` : `Account ${num} is already on your list.`);
   res.redirect('/dashboard');
