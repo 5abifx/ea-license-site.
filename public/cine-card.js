@@ -33,8 +33,9 @@ function fmt(v, unit, short) {
   if (unit === 'pips') return sg(v) + (a >= 1000 ? Math.round(a).toLocaleString('en-US') : a.toFixed(a >= 100 || short ? 0 : 1)) + (short ? 'p' : ' pips');
   if (unit === 'r') return sg(v) + a.toFixed(a >= 10 || short ? 1 : 2) + 'R';
   if (unit === 'pct') return sg(v) + a.toFixed(2) + '%';
-  if (short && a >= 10000) return sg(v) + '$' + (a / 1000).toFixed(1) + 'k';
-  return sg(v) + '$' + a.toLocaleString('en-US', { minimumFractionDigits: short ? 0 : 2, maximumFractionDigits: short ? 0 : 2 });
+  const cs = (typeof window !== 'undefined' && window.CineCardCur) || '$';
+  if (short && a >= 10000) return sg(v) + cs + (a / 1000).toFixed(1) + 'k';
+  return sg(v) + cs + a.toLocaleString('en-US', { minimumFractionDigits: short ? 0 : 2, maximumFractionDigits: short ? 0 : 2 });
 }
 const val = (o, u) => (o ? o[u] : null);
 
@@ -156,8 +157,8 @@ function create(canvas, data, opts) {
     // top: what this is
     let top = wide ? 150 : post ? 170 : 250;
     c.globalAlpha = A(tm, 0.1, 0.7);
-    // 5ABIFX: always on, top centre, cannot be hidden
-    text(c, '5ABIFX', cx, wide ? 56 : post ? 64 : 112, { fam: BIG, size: 30, w: 700, ls: 8, color: 'rgba(255,255,255,.75)' });
+    // 5ABIFX: always on, small and faint in the top-left corner, cannot be hidden
+    text(c, '5ABIFX', wide ? 56 : 60, wide ? 64 : 76, { fam: BIG, size: 24, w: 700, ls: 6, color: 'rgba(255,255,255,.4)', align: 'left' });
     if (S.title) {
       if (o.kind === 'trade') {
         const sub = [data.side, S.date ? data.dateTxt : ''].filter(Boolean).join(' · ').toUpperCase();
