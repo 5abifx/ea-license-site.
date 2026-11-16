@@ -191,7 +191,7 @@ function spark(pts) {
   const d = pts.map((v, i) => `${i ? 'L' : 'M'}${pt(v, i)}`).join(' '), col = pts.at(-1) >= 0 ? 'var(--ok)' : 'var(--danger)';
   return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${d} L${W} ${H} L0 ${H} Z" fill="${col}" fill-opacity=".1"/><path d="${d}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
 }
-function timeHtml(T, { money, offsetForm, tzName, shift = 0, data = '' }) {
+function timeHtml(T, { money, offsetForm, tzName, shift = 0, data = '', candle = null, nyOff = 7 }) {
   if (!T.ranked.length) return '<section class="card"><p class="muted">No trades in this period.</p></section>';
   const mx = Math.max(1, ...T.rows.flatMap((r) => r.cells.map((c) => Math.abs(c.net))));
   const rows = T.rows.filter((r, i) => i < 5 || r.n);
@@ -217,10 +217,71 @@ function timeHtml(T, { money, offsetForm, tzName, shift = 0, data = '' }) {
         <span class="dial-btns"><button type="button" class="small secondary" data-d="-1" aria-label="Previous">▲</button><button type="button" class="small secondary" data-d="1" aria-label="Next">▼</button></span>
       </div>
     </section></div>
+  ${candle ? candleClockHtml(candle, { money, nyOff }) : ''}
   <section class="card"><div class="row between"><h2>Hour by weekday</h2>${offsetForm}</div>
     <p class="muted small">Open time of each trade, ${esc(tzName)}. Brighter = more money made (green) or lost (red). Tap a square to see those trades.</p>${heat}</section>
   ${data ? `<script id="drill-data" type="application/json">${data}</script><script src="/drill.js"></script>` : ''}
   <script src="/clock.js"></script>`;
+}
+
+// ---------- candle clock ----------
+// same heat-ring look as the session clock, zoomed into one candle: a tile per minute (1H) or per 5 minutes (4H),
+// the open at the top, the parts of the candle on the rim, the worst part glowing orange. public/candleclock.js runs the hand.
+function candleWheel(D, money) {
+  const C = 200, RR = 124, RW = 40, tf = D.tf, mx = Math.max(1, ...D.cells.map((h) => Math.abs(h.net)));
+  const ang = (m) => (m / tf) * Math.PI * 2 - Math.PI / 2;
+  const P = (m, r) => [+(C + Math.cos(ang(m)) * r).toFixed(1), +(C + Math.sin(ang(m)) * r).toFixed(1)];
+  const arc = (a, b, r) => { const [x1, y1] = P(a, r), [x2, y2] = P(b, r); return `M${x1} ${y1} A${r} ${r} 0 ${b - a > tf / 2 ? 1 : 0} 1 ${x2} ${y2}`; };
+  const partOf = (m) => D.parts.find((p) => m >= p.from && m < p.to).key;
+  const RIM = RR + RW / 2 + 14, id = `cc${tf}`, pad = D.step * 0.12;
+  const mm = (m) => (tf === 60 ? `:${String(m % 60).padStart(2, '0')}` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`);
+  let s = `<defs>
+    <radialGradient id="${id}bg"><stop offset="0" stop-color="#fff" stop-opacity=".05"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="${id}hot" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb35c"/><stop offset="1" stop-color="#ff5a1f"/></linearGradient>
+    <filter id="${id}g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="${id}g2" filterUnits="userSpaceOnUse" x="-20" y="-20" width="440" height="440"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <circle cx="${C}" cy="${C}" r="${RR - RW / 2 - 4}" fill="url(#${id}bg)"/>`;
+  D.cells.forEach((h) => {
+    const k = Math.abs(h.net) / mx, col = !h.n ? 'rgba(255,255,255,.045)'
+      : h.net >= 0 ? `rgba(38,198,160,${(0.2 + 0.8 * k).toFixed(2)})` : `rgba(240,70,75,${(0.28 + 0.72 * k).toFixed(2)})`;
+    s += `<path class="ck-t" data-z="${partOf(h.from)}" d="${arc(h.from + pad, h.from + D.step - pad, RR)}" stroke="${col}" stroke-width="${RW}" fill="none"${h.n && k > 0.6 && h.net > 0 ? ` filter="url(#${id}g2)"` : ''}><title>${mm(h.from)}${D.step > 1 ? '–' + mm(h.from + D.step) : ''} · ${h.n} trade${h.n === 1 ? '' : 's'}${h.n ? ' · ' + money(h.net) : ''}</title></path>`;
+  });
+  for (let i = 0; i < 60; i++) { const m = (i * tf) / 60, big = i % 15 === 0, [x1, y1] = P(m, RR + RW / 2 + 3), [x2, y2] = P(m, RR + RW / 2 + (big ? 9 : i % 5 ? 5 : 7));
+    s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(255,255,255,${big ? 0.45 : 0.16})" stroke-width="1"/>`; }
+  (tf === 60 ? [[15, ':15'], [30, ':30'], [45, ':45']] : [[60, '1h'], [120, '2h'], [180, '3h']]).forEach(([m, l]) => { const [x, y] = P(m, RR - RW / 2 - 13); s += `<text x="${x}" y="${y + 4}" text-anchor="middle" class="ck-h">${l}</text>`; });
+  s += `<text x="${C}" y="${C - RR + RW / 2 + 17}" text-anchor="middle" class="ck-h cc-open">OPEN</text>
+    <line x1="${C}" y1="${C - RR - RW / 2 - 2}" x2="${C}" y2="${C - RR + RW / 2 + 2}" stroke="#ff5a1f" stroke-width="1.5" stroke-dasharray="3 3" filter="url(#${id}g)"/>`;
+  D.parts.forEach((p) => {
+    const on = p.key === D.worst, a = p.from, b = p.to, mid = (a + b) / 2 / tf, bottom = mid > 0.25 && mid < 0.75, large = b - a > tf / 2 ? 1 : 0;
+    const [t1x, t1y] = P(a, RIM + 16), [t2x, t2y] = P(b, RIM + 16), short = (b - a) / tf < 0.1;
+    s += `<path data-z="${p.key}" d="${arc(a + tf * 0.006, b - tf * 0.006, RIM)}" fill="none" stroke="${on ? `url(#${id}hot)` : 'rgba(255,255,255,.28)'}" stroke-width="${on ? 4 : 2}" stroke-linecap="round"${on ? ` filter="url(#${id}g)"` : ''}/>`;
+    s += `<path id="${id}t-${p.key}" d="${bottom ? `M${t2x} ${t2y} A${RIM + 16} ${RIM + 16} 0 ${large} 0 ${t1x} ${t1y}` : `M${t1x} ${t1y} A${RIM + 16} ${RIM + 16} 0 ${large} 1 ${t2x} ${t2y}`}" fill="none"/>
+      <text data-z="${p.key}" class="ck-s${on ? ' on' : ''}" dy="${bottom ? 9 : 0}"><textPath href="#${id}t-${p.key}" startOffset="50%" text-anchor="middle">${short ? (p.key === 'pre' ? '−10' : '+10') : esc(p.name.toUpperCase())}</textPath></text>`;
+  });
+  s += `<g class="ck-hand"><line x1="${C}" y1="${C - RR + RW / 2 + 4}" x2="${C}" y2="${C - RIM - 4}" stroke="#fff" stroke-width="2.5" stroke-linecap="round" filter="url(#${id}g2)"/>
+      <circle cx="${C}" cy="${C - RIM - 4}" r="3.5" fill="#fff"/></g>
+    <text x="${C}" y="${C - 30}" text-anchor="middle" class="ck-c3" data-c="z"></text>
+    <text x="${C}" y="${C + 8}" text-anchor="middle" class="ck-c2" data-c="net"></text>
+    <text x="${C}" y="${C + 28}" text-anchor="middle" class="ck-c1" data-c="sub"></text>
+    <text x="${C}" y="${C + 48}" text-anchor="middle" class="ck-c1 ck-now" data-c="now"></text>`;
+  const parts = D.parts.map((p) => ({ k: p.key, n: p.name, f: p.from, t: p.to, net: p.n ? short(p.net) : '-', pos: p.net >= 0,
+    sub: p.n ? `${p.win}% win · ${p.n} trade${p.n === 1 ? '' : 's'}${p.avgR !== null ? ' · ' + rTxt(p.avgR) : ''}` : 'No trades yet' }));
+  return `<svg class="ck cc" data-tf="${tf}" viewBox="-14 -14 ${C * 2 + 28} ${C * 2 + 28}" role="img" aria-label="Profit by minute of the ${tf === 60 ? '1 hour' : '4 hour'} candle" data-parts='${esc(JSON.stringify(parts))}'${tf === 60 ? '' : ' hidden'}>${s}</svg>`;
+}
+function candleClockHtml(CS, { money, nyOff }) {
+  const side = (D) => {
+    const mm = (m) => (D.tf === 60 ? `:${String(m % 60).padStart(2, '0')}` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`);
+    const w = D.parts.find((p) => p.key === D.worst), b = D.parts.find((p) => p.key === D.best);
+    return `<div class="ck-side cc-side" data-tf="${D.tf}"${D.tf === 60 ? '' : ' hidden'}>${D.parts.map((p) => `<div class="ck-l${p.key === D.worst ? ' on' : ''}" data-z="${p.key}" tabindex="0"><i></i><span>${esc(p.name)}<small class="muted">${mm(p.from)}–${mm(p.to)} · ${p.n} trade${p.n === 1 ? '' : 's'}</small></span><b class="${cls(p.net)}">${p.n ? short(p.net) : '-'}</b></div>`).join('')}
+      ${w || b ? `<hr><p class="small">${w ? `<span class="muted">Costs you most</span><br><b class="cc-hot">${esc(w.name)}</b> <b class="neg">${money(w.net)}</b> <span class="muted">· ${w.n} trades${w.avgR !== null ? ' · ' + rTxt(w.avgR) + ' avg' : ''}</span>` : ''}</p>
+      ${b ? `<p class="small"><span class="muted">Works best</span><br><b>${esc(b.name)}</b> <b class="pos">${money(b.net)}</b> <span class="muted">· ${b.n} trades${b.avgR !== null ? ' · ' + rTxt(b.avgR) + ' avg' : ''}</span></p>` : ''}` : ''}</div>`;
+  };
+  return `<section class="card tm-clock cc-card" data-off="${Number(nyOff) || 0}"><div class="row between"><h2>Candle clock</h2>
+      <div class="tz-pick cc-tf"><a href="#" data-tf="60" class="on">1H candle</a><a href="#" data-tf="240">4H candle</a></div></div>
+    <p class="muted small">Where inside the candle you opened your trades, MT5 time. The new candle opens at the top. Brighter teal made more money, red lost it. The parts of the candle sit on the rim, the one that costs you most glows orange, and the white tick is now. Hover a part to light it up.</p>
+    <div class="ck-wrap">${candleWheel(CS[60], money)}${candleWheel(CS[240], money)}${side(CS[60])}${side(CS[240])}</div>
+  </section>
+  <script src="/candleclock.js"></script>`;
 }
 
 // ---------- habits ----------

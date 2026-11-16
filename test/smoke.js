@@ -14,6 +14,7 @@ process.env.RATE_LIMIT_PER_MIN = '100000';   // the tests send many requests fro
 const app = require('../src/server');
 const { db } = require('../src/db');
 
+const anonGet = async (base, u) => { const r = await fetch(base + u, { redirect: 'manual' }); return { status: r.status, text: await r.text() }; };
 function client(base, ip) {
   let cookies = {};
   const go = async (method, url, body) => {
@@ -60,6 +61,16 @@ function client(base, ip) {
     assert.match(r.text, /Gold Scalper/);
     r = await bob.get('/download/1');
     assert.strictEqual(r.text, 'FAKE-EX5');
+    // feature usage: members' page views are counted, admins are left out unless asked
+    await new Promise((ok) => setTimeout(ok, 50));
+    r = await admin.get('/admin/usage');
+    assert.match(r.text, /Feature usage/);
+    assert.match(r.text, /id="f-my-eas"[\s\S]*?<td class="right">1<\/td>/);
+    assert.match(r.text, /id="f-ea-download"[\s\S]*?<td class="right">1<\/td>/);
+    assert.match(r.text, /Too new to judge/);
+    r = await admin.post('/admin/usage/support?p=30', { status: 'remove', note: 'test note' });
+    assert.match(r.text, /Your decisions[\s\S]*test note/);
+    assert.match((await bob.get('/dashboard')).text, /window.__FT=/);
     // security headers, and a password change signs out other devices
     const hr = await fetch(base + '/login');
     assert.strictEqual(hr.headers.get('x-frame-options'), 'DENY');
@@ -67,6 +78,9 @@ function client(base, ip) {
     const bob2 = client(base);
     await bob2.post('/login', { email: 'bob@test.com', password: 'bobpass123' });
     assert.match((await bob2.get('/dashboard')).text, /Gold Scalper/);
+    // My EAs: setup steps with the next step open, own stylesheet
+    { const d = (await bob2.get('/dashboard')).text;
+      assert.match(d, /data-setup/); assert.match(d, /Add your MT5 account/); assert.match(d, /myeas\.css/); }
     // student intro: not for regular members, on for admins
     assert.equal(JSON.parse((await bob2.get('/api/intro')).text).ok, false);
     assert.doesNotMatch((await bob2.get('/dashboard')).text, /intro\.js/);
@@ -116,7 +130,14 @@ function client(base, ip) {
     assert.match((await client(base).get('/')).text, /15-day free trial/);
     const tia = client(base);
     r = await tia.post('/signup', { name: 'Tia', email: 'tia@test.com', password: 'tiapass123' });
+    // new sign-ups get the guided set-up first; answers save to the profile
+    assert.match(r.text, /Set up your desk/);
+    r = await tia.post('/start', { name: 'Tia', style: 'day', market: 'gold', acct: 'eval', firm: 'ftmo', goal: 'pass', pain: 'bogus', done: '1', reset: '1' });
     assert.match(r.text, /Free trial: 15 days left/);
+    r = await tia.get('/settings');
+    assert.match(r.text, /value="ftmo" checked/);
+    assert.match(r.text, /value="day" checked/);
+    assert.doesNotMatch(r.text, /value="bogus"/);
     await tia.post('/accounts', { account_number: '7777' });
     assert.strictEqual((await check('GOLD_SCALPER', '7777')).valid, true);
     r = await tia.post('/accounts', { account_number: '7778' });
@@ -171,13 +192,45 @@ function client(base, ip) {
     assert.match((await admin.get(`/admin/users/${riaId}`)).text, /Referred by .*tia/);
     const tiaExp = db.prepare('SELECT expires_at FROM users WHERE id = ?').get(tiaId).expires_at;
     r = await admin.post(`/admin/users/${riaId}/paid`, { plan: 'katana', billing: 'monthly' });
-    assert.match(r.text, /got 30 free days/);
+    assert.match(r.text, /Affiliate tia@test.com earns \$3\.20/);                     // 20% of the $16 she paid
     const tiaExp2 = db.prepare('SELECT expires_at FROM users WHERE id = ?').get(tiaId).expires_at;
-    assert.strictEqual(Math.round((Date.parse(tiaExp2 + 'Z') - Date.parse(tiaExp + 'Z')) / 864e5), 30);
-    r = await admin.post(`/admin/users/${riaId}/paid`, { plan: 'katana', billing: 'monthly' });   // second payment: no new reward
-    assert.doesNotMatch(r.text, /free days/);
+    assert.strictEqual(tiaExp2, tiaExp);                                                // no free days any more
+    r = await admin.post(`/admin/users/${riaId}/paid`, { plan: 'katana', billing: 'monthly' });   // every payment earns
+    assert.match(r.text, /earns \$4\.00/);
     assert.doesNotMatch((await ria.get('/subscribe?plan=katana')).text, /off first payment/);
     assert.match((await tia.get('/dashboard')).text, /1 joined · 1 paid/);
+    // affiliate page: commissions wait for the hold days, then the admin pays them
+    r = await tia.get('/affiliate');
+    assert.match(r.text, /Get paid every month/);
+    assert.match(r.text, /Ri•+/);                                                       // name cut short
+    assert.doesNotMatch(r.text, /ria@test\.com/);
+    assert.match(r.text, /\$7\.20 counting soon/);
+    assert.doesNotMatch((await admin.get('/admin/affiliates')).text, /Mark \$/);
+    db.prepare("UPDATE commissions SET ready_at = datetime('now', '-1 minute')").run();
+    await tia.post('/affiliate/payout', { payout_method: 'Interac · tia@test.com' });
+    r = await admin.get('/admin/affiliates');
+    assert.match(r.text, /Interac · tia@test.com/);
+    r = await admin.post(`/admin/affiliates/${tiaId}/paid`);
+    assert.match(r.text, /\$7\.20 marked as paid to tia@test.com/);
+    assert.match((await tia.get('/affiliate')).text, /Interac · tia@test.com/);       // in her payout history
+    r = await admin.post('/admin/affiliates/settings', { aff_ea_pct: '25', aff_mentor_flat: '200', aff_friend_pct: '10', aff_min_payout: '50', aff_hold_days: '14', aff_cookie_days: '60' });
+    assert.match(r.text, /Affiliate settings saved/);
+    assert.match((await tia.get('/dashboard')).text, /<b>10% off<\/b>.*<b>25%<\/b>/s);
+    db.prepare("DELETE FROM settings WHERE key LIKE 'aff_%'").run();
+    // public page: off by default, then on with a username; the referral link sits behind it
+    assert.strictEqual((await anonGet(base, '/@tiatrades')).status, 404);
+    r = await tia.post('/profile', { on: '1', handle: '@TiaTrades', name: 'Tia K', bio: 'Gold scalper <b>', ig: 'https://instagram.com/tia.fx/', stats: '1', join: '1' });
+    assert.match(r.text, /live at 5abifx.com\/@tiatrades/);
+    r = await anonGet(base, '/@tiatrades');
+    assert.strictEqual(r.status, 200);
+    assert.match(r.text, /Tia K/);
+    assert.match(r.text, /Gold scalper &lt;b&gt;/);
+    assert.match(r.text, /instagram.com\/tia.fx"/);
+    assert.match(r.text, /href="\/r\/[A-Z0-9]+\?to=signup"/);
+    assert.doesNotMatch(r.text, /tia@test\.com/);
+    assert.strictEqual(db.prepare('SELECT SUM(n) AS n FROM ref_clicks WHERE user_id = ?').get(tiaId).n, 2);   // Ria's /r/ visit + this one
+    r = await ria.post('/profile', { on: '1', handle: 'tiatrades' });
+    assert.match(r.text, /@tiatrades is taken/);
     process.env.TRIAL_DAYS = '0';
 
     // public info pages, 404 and link preview tags
@@ -195,10 +248,25 @@ function client(base, ip) {
     assert.match(r.text, /doesn&#39;t exist|doesn't exist/);
     assert.match((await anon.get('/')).text, /property="og:image" content="http:\/\/127\.0\.0\.1:\d+\/og\.png\?v=3"/);
     assert.match((await anon.get('/mentorship')).text, /property="og:image" content="[^"]+\/og-mentorship\.png\?v=3"/);
+    r = await anon.get('/why');                                                   // with vs without showcase
+    assert.strictEqual(r.status, 200);
+    assert.match(r.text, /Smaller damage/);
+    assert.match(r.text, /esma\.europa\.eu/);                                    // facts carry their source
+    assert.match((await tia.get('/why')).text, /href="\/pricing">See plans/);
+    assert.match((await anon.get('/')).text, /href="\/why"/);
     assert.match((await fetch(base + '/robots.txt').then((x) => x.text())), /Disallow: \//);
     const robots = await fetch(base + '/robots.txt').then((x) => x.text());
     assert.match(robots, /User-agent: GPTBot\nDisallow: \//);                     // AI training bots stay out
-    assert.match(robots, /User-agent: \*\nAllow: \/\$\nAllow: \/mentorship/);     // search and AI search bots read public pages
+    assert.match(robots, /User-agent: \*\nAllow: \/\$\nAllow: \/katana\n[\s\S]*Allow: \/pricing\n/);     // search and AI search bots read public pages
+    assert.match(robots, /Sitemap: https:\/\/5abifx\.com\/sitemap\.xml/);
+    const sm = await fetch(base + '/sitemap.xml').then((x) => x.text());
+    assert.match(sm, /<loc>https:\/\/5abifx\.com\/katana<\/loc>/);
+    for (const p of ['/', '/katana', '/trade-journal', '/faq']) {
+      const h = await fetch(base + p).then((x) => x.text());
+      assert.match(h, /<link rel="canonical" href="https:\/\/5abifx\.com\//, p);
+      assert.match(h, /application\/ld\+json/, p);
+      assert.doesNotMatch(h, /Compass/i, p);                                       // indicator stays private
+    }
     assert.doesNotMatch(robots, /OAI-SearchBot|PerplexityBot/);
 
     // Sign in with Google: fake token endpoint returns an ID token for a verified Gmail address
@@ -224,6 +292,9 @@ function client(base, ip) {
     claims = { iss: 'https://accounts.google.com', aud: 'cid.apps.googleusercontent.com', sub: 'g-123', email: 'gina@gmail.com', email_verified: true, name: 'Gina', exp: Date.now() / 1000 + 600 };
     const st2 = new URL((await gUser.get('/auth/google')).location).searchParams.get('state');
     r = await gUser.get(`/auth/google/callback?state=${st2}&code=abc`);
+    assert.match(r.text, /Set up your desk/);
+    assert.match(r.text, /"name":"Gina"/);
+    r = await gUser.post('/start', { done: '1' });   // Skip keeps the Google name
     assert.match(r.text, /Free trial: 15 days left/);
     assert.match(r.text, /Welcome, Gina/);
     // signing in again with the same Google account reuses the account, no new trial
@@ -295,6 +366,29 @@ function client(base, ip) {
     assert.match(r.text, /Notes saved/);
     assert.match(r.text, /Clean &lt;b&gt;setup&lt;\/b&gt;/);
     assert.match(r.text, /"partials":\[\{"time":"2026-10-28T15:12:00"/);          // final close is not a partial
+    // Log trade: chips + grade on an EA trade, a hand-logged trade, a no-trade day, quick tagging
+    assert.match(r.text, /Review this trade/);
+    assert.match(r.text, /value="A\+" checked/);                                   // 5 stars became A+
+    r = await bob.post(`/journal/${tid}`, [['feel', 'Patient'], ['feel', 'FOMO'], ['feel_own', 'Tired'], ['mist', 'Entered early'], ['mist_own', ''], ['grade', 'B'], ['followed', 'Partly'], ['notes', 'ok']]);
+    assert.match(r.text, /value="Tired" checked/);
+    assert.match(r.text, /value="B" checked/);
+    assert.strictEqual(db.prepare('SELECT emotion, grade, followed, mistakes FROM journal_trades WHERE id = ?').get(tid).emotion, 'Patient, FOMO, Tired');
+    r = await bob.get('/journal/log');
+    assert.match(r.text, /Continue your draft\?/);
+    r = await bob.post('/journal/log', { kind: 'trade', account: '0', symbol: 'eurusd', side: 'SELL', entry: '1.0850', sl: '1.0870', exit: '1.0810', net: '200', open_time: '2026-10-29T09:00', close_time: '2026-10-29T10:00', feel: 'Calm', grade: 'A' });
+    assert.match(r.text, /Trade saved/);
+    assert.match(r.text, /Logged by hand/);
+    assert.match(r.text, /\+2\.00R/);
+    assert.match((await bob.post('/journal/log', { kind: 'trade', symbol: 'X' })).text, /Type the result/);
+    assert.match((await bob.post('/journal/log', { kind: 'trade', account: '999999', symbol: 'X', net: '1' })).text, /Pick one of your accounts/);
+    r = await bob.post('/journal/log', { kind: 'none', day: '2026-10-30', why: 'News day', feel: 'Calm' });
+    assert.match(r.text, /No-trade day saved/);
+    assert.match(r.text, /No trade<\/span>/);
+    assert.match(r.text, /Manual trades/);
+    r = await bob.get('/journal/tag');
+    assert.strictEqual(r.status, 200);
+    assert.match((await bob.get('/journal/insights')).text, /Feelings and grades/);
+    db.prepare("DELETE FROM journal_trades WHERE manual = 1").run();             // later checks count the EA trade only
     assert.strictEqual((await eve.get(`/journal/${tid}`)).status !== 200 || !(await eve.get(`/journal/${tid}`)).text.includes('XAUUSD'), true);
 
     // Mentor Mode: only students; Bob shares, asks about a trade, the mentor replies, Bob sees the reply
@@ -349,7 +443,7 @@ function client(base, ip) {
     assert.match(r.text, /Equity and drawdown/);
     assert.match((await bob.get('/journal/insights?tab=prop')).text, /Pick an account above/);
     // Time and Habits tabs, journal hero + recap
-    assert.match((await bob.get('/journal/insights?tab=time')).text, /Session clock[\s\S]*Sessions, ranked[\s\S]*Hour by weekday/);
+    assert.match((await bob.get('/journal/insights?tab=time')).text, /Session clock[\s\S]*Sessions, ranked[\s\S]*Candle clock[\s\S]*BEFORE THE OPEN[\s\S]*Hour by weekday/);
     assert.match((await bob.get('/journal/insights?tab=time&tz=mt5')).text, /MT5 server time/);
     assert.match((await bob.get('/journal/insights?tab=habits')).text, /Trade number of the day[\s\S]*After a win, after a loss/);
     assert.match((await bob.get('/journal')).text, /class="pl-hero"[\s\S]*This week[\s\S]*Last session[\s\S]*Recent trades/);
@@ -572,6 +666,9 @@ function client(base, ip) {
         body: new URLSearchParams({ name: 'Cara', email: 'cara@test.com', password: 'carapass123' }).toString() });
       assert.strictEqual(su.status, 302);
       r = await ct.post('/login', { email: 'cara@test.com', password: 'carapass123' });
+      assert.match(r.text, /Set up your desk/);   // guided set-up first, ending on the card step
+      assert.match(r.text, /"card":15/);
+      r = await ct.get('/dashboard');
       assert.match(r.text, /Your 15-day free trial is ready/);
       const caraId = db.prepare("SELECT id FROM users WHERE email = 'cara@test.com'").get().id;
       await ct.post('/accounts', { account_number: '4242' });
@@ -827,6 +924,22 @@ function client(base, ip) {
       assert.strictEqual((await hit('/login', '10.6.0.4', { 'cf-connecting-ip': '10.4.0.99' })).status, 429);
       process.env.RATE_LIMIT_PER_MIN = '100000';
       delete process.env.RATE_LIMIT_API_PER_MIN;
+    }
+
+    // installable app: manifest + icons, and a service worker that is never cached and never caches
+    {
+      const mf = await fetch(base + '/manifest.webmanifest');
+      assert.strictEqual(mf.status, 200);
+      const m = await mf.json();
+      assert.strictEqual(m.display, 'standalone');
+      for (const ic of m.icons) assert.strictEqual((await fetch(base + ic.src)).status, 200);
+      const sw = await fetch(base + '/sw.js');
+      assert.strictEqual(sw.status, 200);
+      assert.strictEqual(sw.headers.get('cache-control'), 'no-cache');
+      assert.doesNotMatch(await sw.text(), /cache\.put|cache\.add|addAll/);
+      const home = await fetch(base + '/login').then((x) => x.text());
+      assert.match(home, /rel="manifest" href="\/manifest\.webmanifest"/);
+      assert.match(home, /src="\/app\/install\.js\?v=/);
     }
 
     console.log('All smoke tests passed');

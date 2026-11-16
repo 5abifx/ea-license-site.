@@ -105,6 +105,24 @@ if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'ny_off
 // Journal: 1 = the trader typed the original stop-loss on the trade page, so EA re-sends keep it
 const jCols = db.prepare('PRAGMA table_info(journal_trades)').all().map((c) => c.name);
 if (!jCols.includes('sl_edited')) db.exec('ALTER TABLE journal_trades ADD COLUMN sl_edited INTEGER NOT NULL DEFAULT 0');
+// Log trade / tagging (src/logtrade.js): A+..F grade, followed the plan (Yes/Partly/No), 1 = typed in by hand
+if (!jCols.includes('grade')) {
+  db.exec('ALTER TABLE journal_trades ADD COLUMN grade TEXT');
+  db.exec(`UPDATE journal_trades SET grade = CASE rating WHEN 5 THEN 'A+' WHEN 4 THEN 'A' WHEN 3 THEN 'B' WHEN 2 THEN 'C' WHEN 1 THEN 'F' END WHERE rating IS NOT NULL`);
+}
+if (!jCols.includes('followed')) db.exec("ALTER TABLE journal_trades ADD COLUMN followed TEXT NOT NULL DEFAULT ''");
+if (!jCols.includes('manual')) db.exec('ALTER TABLE journal_trades ADD COLUMN manual INTEGER NOT NULL DEFAULT 0');
+// days the trader chose not to trade, with why and how they felt
+db.exec(`CREATE TABLE IF NOT EXISTS journal_days (
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  day        TEXT NOT NULL,
+  reasons    TEXT NOT NULL DEFAULT '',
+  emotion    TEXT NOT NULL DEFAULT '',
+  notes      TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, day)
+)`);
 // A stop at entry or in profit (break-even / trailed before the journal saw the first stop)
 // is not a risk, so R and risk % cannot be worked out from it.
 db.exec(`UPDATE journal_trades SET r = NULL, risk_money = NULL, risk_pct = NULL

@@ -41,7 +41,7 @@ requestAnimationFrame(hero);
 const ws=[...document.querySelectorAll('#words div')];
 const hc=document.querySelector('.hero .c'),wm=document.querySelector('.close .wm');
 const LS=document.getElementById('learn');
-function onScroll(){const vh=innerHeight;{const r=LS.getBoundingClientRect();const p=Math.max(0,Math.min(.999,(vh*.1-r.top)/(r.height-vh)));const act=Math.floor(p*ws.length);ws.forEach((d,i)=>d.classList.toggle('on',reduce||i<=act))}
+function onScroll(){const vh=innerHeight;if(LS){const r=LS.getBoundingClientRect();const p=Math.max(0,Math.min(.999,(vh*.1-r.top)/(r.height-vh)));const act=Math.floor(p*ws.length);ws.forEach((d,i)=>d.classList.toggle('on',reduce||i<=act))}
  if(reduce)return;const y=scrollY;hc.style.transform=`translateY(${y*.35}px)`;hc.style.opacity=Math.max(0,1-y/(vh*.7));
  H.style.transform=`translateY(${y*.2}px) scale(${1+y/4000})`;
  if(wm){const r=wm.getBoundingClientRect();wm.style.transform=`translate(${Math.max(0,(r.top-vh*.35)*.3)}px,-12%)`}}
@@ -54,7 +54,7 @@ const io=new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting)return
  e.target.querySelectorAll('[data-count]').forEach(b=>{if(reduce)return;const to=+b.dataset.count,s=performance.now();const f=n=>{const p=Math.min(1,(n-s)/1400);b.textContent=Math.round(to*(1-Math.pow(1-p,3)));p<1&&requestAnimationFrame(f)};requestAnimationFrame(f)});io.unobserve(e.target)}),{threshold:.3});
 document.querySelectorAll('.gauges').forEach(g=>io.observe(g));
 const cw=['sizes','guards','journals','protects'];let ci=0;const ce=document.getElementById('cyc');
-if(!reduce)setInterval(()=>{ce.classList.add('sw');setTimeout(()=>{ci=(ci+1)%cw.length;ce.textContent=cw[ci];ce.classList.remove('sw')},350)},2200);
+if(!reduce&&ce)setInterval(()=>{ce.classList.add('sw');setTimeout(()=>{ci=(ci+1)%cw.length;ce.textContent=cw[ci];ce.classList.remove('sw')},350)},2200);
 
 /* ===== live graphics: story, footprint, replay tester, skill scenes ===== */
 const mono='"JetBrains Mono",monospace',sans='Manrope,sans-serif';
@@ -76,7 +76,7 @@ const draws=[];
 const RPL=window.RPL={};document.addEventListener('click',e=>{const b=e.target.closest('[data-rp]');if(b&&RPL[b.dataset.rp])RPL[b.dataset.rp]()});
 /* ===== home page live graphics ===== */
 /* 1. one bad day: without limits vs with KATANA */
-(function(){const [C,X]=canv('bd');const note=document.getElementById('bd-now');
+(function(){if(!document.getElementById('bd'))return;const [C,X]=canv('bd');const note=document.getElementById('bd-now');
  const W=[0,-.5,-1.1,-.7,-1.6,-2.4,-3.3,-4.4,-5.1,-6.6,-7.8,-9.1];const LIM=-3,FIRM=-5,N=W.length;
  const K=W.map(v=>Math.max(v,LIM));let f=0,last=0;C._enter=()=>{f=0};RPL.bd=()=>{f=0};
  const notes=[[0,'Same trader, same bad day. Two different endings.'],[3,'Two losses in a row. Frustration starts.'],[5,'Revenge trade, bigger lot. The stop gets moved.'],[6.2,'KATANA hits the daily limit and locks trading. Day over at −3%.'],[8,'Without limits the losses keep stacking.'],[10,'−5%: the prop firm\'s line is gone. Challenge failed.']];
@@ -116,7 +116,7 @@ const RPL=window.RPL={};document.addEventListener('click',e=>{const b=e.target.c
 })();
 
 /* 3. how a trade flows: one small picture per step */
-(function(){const [c,x]=canv('scene');const st=document.getElementById('scene-t');const ws=[...document.querySelectorAll('#words div')];let cur=-1,t0=0;
+(function(){if(!document.getElementById('scene'))return;const [c,x]=canv('scene');const st=document.getElementById('scene-t');const ws=[...document.querySelectorAll('#words div')];let cur=-1,t0=0;
  const T=['You set risk per trade, daily loss and max drawdown once. KATANA remembers them on every chart.','You pick the trade. KATANA works out the lot size from your risk and places the stop for you.','Hit the daily limit and KATANA closes every trade and locks trading until tomorrow. No "one more trade".','Every closed trade lands in your calendar by day and account, with no spreadsheet.','Turn a real trade into a 9:16 story card with the real candles and your R.'];
  const pick=()=>{let a=0;ws.forEach((d,i)=>{if(d.classList.contains('on'))a=i});return a};
  const ease=p=>1-Math.pow(1-Math.max(0,Math.min(1,p)),3);
@@ -150,7 +150,7 @@ const RPL=window.RPL={};document.addEventListener('click',e=>{const b=e.target.c
 })();
 
 /* 4. journal calendar fills in */
-(function(){const G=document.getElementById('jc-g'),T=document.getElementById('jc-tot');const v=[312,-140,488,0,226,-95,640,175,-210,390,128,0,-60,515,244,402,-180,96,310,-45];
+(function(){const G=document.getElementById('jc-g'),T=document.getElementById('jc-tot');if(!G)return;const v=[312,-140,488,0,226,-95,640,175,-210,390,128,0,-60,515,244,402,-180,96,310,-45];
  const cells=v.map((n,i)=>{const el=document.createElement('i');el.innerHTML=`<span>${i+1+Math.floor(i/5)*2}</span><b>${n?(n>0?'+':'−')+Math.abs(n):'·'}</b>`;G.appendChild(el);return el});
  let done=false,tms=[];const run=()=>{tms.forEach(clearTimeout);cells.forEach(c=>c.className='');T.textContent='+$0';let tot=0;tms=v.map((n,i)=>setTimeout(()=>{if(n)cells[i].className=n>0?'w':'l';tot+=n;T.textContent='+$'+tot.toLocaleString('en-US')},reduce?0:300+i*110))};RPL.jc=run;
  new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting||done)return;done=true;run()}),{threshold:.35}).observe(G);
@@ -162,7 +162,7 @@ const RPL=window.RPL={};document.addEventListener('click',e=>{const b=e.target.c
 })();
 
 /* 6. mentorship band: slow heatmap glow */
-(function(){const [c,x]=canv('cv-m');const r=Rnd(3);const B=[...Array(6)].map(()=>({y:.15+r()*.7,a:.12+r()*.3,w:8+r()*20,sp:.15+r()*.4,ph:r()*6}));
+(function(){if(!document.getElementById('cv-m'))return;const [c,x]=canv('cv-m');const r=Rnd(3);const B=[...Array(6)].map(()=>({y:.15+r()*.7,a:.12+r()*.3,w:8+r()*20,sp:.15+r()*.4,ph:r()*6}));
  draws.push([c,t=>{const w=c.width,h=c.height,d=c._d,s=t/1000;x.globalCompositeOperation='source-over';x.fillStyle='#050507';x.fillRect(0,0,w,h);x.globalCompositeOperation='lighter';
   for(const b of B){for(let X0=w*.35;X0<w;X0+=10*d){const n=Math.sin(X0/(90*d)+s*b.sp+b.ph)*.5+.5;const a=b.a*n*((X0-w*.35)/(w*.65));const y=b.y*h,bw=b.w*d;const g=x.createLinearGradient(0,y-bw,0,y+bw);g.addColorStop(0,`rgba(${RGB},0)`);g.addColorStop(.5,`rgba(${RGB},${a.toFixed(3)})`);g.addColorStop(1,`rgba(${RGB},0)`);x.fillStyle=g;x.fillRect(X0,y-bw,10*d,bw*2)}}
   x.globalCompositeOperation='source-over'}]);
@@ -212,3 +212,7 @@ window.RPL.pvx=()=>{const el=document.getElementById('pvx');if(!el)return;el.cla
  const run=()=>{tm.forEach(clearTimeout);today=0;F.classList.remove('done','warn');paint();let t=reduce?0:600;steps.forEach(s=>{tm.push(setTimeout(()=>{today=Math.max(0,s===999?cap:today+s);if(today>cap)today=cap;paint()},t));t+=reduce?0:750})};
  window.RPL.cx=run;paint();let done=false;new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting||done)return;done=true;run()}),{threshold:.35}).observe(F);
 })();
+// student messages: on PC the floating cards drift a little with the mouse
+(()=>{const st=document.querySelector('#dms .dm-stage');if(!st||!matchMedia('(pointer:fine)').matches)return;
+ st.addEventListener('pointermove',e=>{const r=st.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;
+  st.querySelectorAll('.dm-fl').forEach((f,i)=>{const k=(i%2?14:-10)*(1+i*.2);f.style.translate=`${x*k}px ${y*k}px`})})})();

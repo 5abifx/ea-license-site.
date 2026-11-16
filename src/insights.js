@@ -296,7 +296,7 @@ function leaks(trades, { money, esc }) {
     .forEach((m) => (mist[m] ||= []).push(t)));
   const mw = Object.entries(mist).filter(([, l]) => l.length >= 2 && sum(l) < 0).sort((a, b) => sum(a[1]) - sum(b[1]));
   const emo = {};
-  trades.filter((t) => t.emotion).forEach((t) => (emo[t.emotion] ||= []).push(t));
+  trades.forEach((t) => String(t.emotion || '').split(/[,;]+/).map((e) => e.trim()).filter(Boolean).forEach((e) => (emo[e] ||= []).push(t)));
   const ew = Object.entries(emo).filter(([, l]) => l.length >= 3).map(([k, l]) => ({ k, l, w: winPct(l) })).sort((a, b) => a.w - b.w);
   const badEmo = ew[0] && ew[0].w < overallWin - 10 ? ew[0] : null;
   if (mw.length || badEmo) {
