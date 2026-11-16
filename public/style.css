@@ -77,6 +77,10 @@ ol.steps li { margin-bottom: 10px; }
 .row select { width: auto; margin: 0; }
 .row label.check { margin: 0; }
 /* transparent overlay preview: checkerboard shows what is see-through */
+.motion-card .row label.mv-file, .motion-card .row label.mv-dim { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; max-width: 100%; }
+.motion-card #mv-file { max-width: 100%; min-width: 0; }
+.motion-card [hidden] { display: none !important; }
+.motion-card #mv-dim { width: 140px; }
 .cards canvas.overlay { background: #2a2d33 repeating-conic-gradient(#3a3d44 0 25%, transparent 0 50%) 0 0 / 24px 24px; }
 
 /* journal: account tabs */

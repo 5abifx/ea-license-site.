@@ -859,6 +859,24 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       </form>
     </section>
 
+    <section class="card motion-card">
+      <h2>Motion card <span class="tag">7-second video · 9:16</span></h2>
+      <p class="muted">The result as a short video for Instagram, TikTok or Discord. Uses the $ / % / R choice and KATANA line from above.</p>
+      <div class="row">
+        <select id="mv-scene" aria-label="Motion background"><option value="ember">Background: Ember glow</option><option value="candles">Background: Trade candles</option><option value="bars">Background: Volume bars</option><option value="own">Background: My photo or clip</option></select>
+        <label class="mv-file" id="mv-filebox" hidden>Photo or clip <input type="file" id="mv-file" accept="image/*,video/*"></label>
+        <label class="mv-dim" id="mv-dimbox" hidden>Darken <input type="range" id="mv-dim" min="0" max="90" value="55"></label>
+      </div>
+      <p class="muted small" id="mv-private" hidden>Your photo or clip stays on this device. It is only drawn into the video, never uploaded.</p>
+      <div class="cards">
+        <figure>
+          <canvas id="mv"></canvas>
+          <span class="share-btns"><button type="button" class="small" id="mv-rec">Make video</button><button type="button" class="small secondary" id="mv-share" hidden>Share</button></span>
+          <span class="muted small" id="mv-st" aria-live="polite"></span>
+        </figure>
+      </div>
+    </section>
+
     ${req.user.is_admin ? `<section class="card">
       <h2>Story overlay <span class="tag">admin test · transparent PNG</span></h2>
       <p class="muted">Quote, the real candles of this trade with entry/exit arrows, and the result, on a transparent background for Instagram stories. No prices, SL or TP. Only admins see this for now.</p>
@@ -915,6 +933,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     ${req.user.is_admin ? '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Montserrat:wght@500;600&display=swap">' : ''}
     <script id="trade-data" type="application/json">${json}</script>
     <script src="/cards.js"></script>
+    <script src="/motion-card.js"></script>
     ${req.user.is_admin ? '<script src="/overlay.js"></script>' : ''}
     <script src="/journal.js"></script>`);
   });
