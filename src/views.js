@@ -28,6 +28,7 @@ const ICONS = {
   eas: '<path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/>',
   journal: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   insights: '<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
+  studio: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/>',
   plan: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/>',
   plans: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
   gift: '<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7C10 3 7 3 7 5s5 2 5 2 5 0 5-2-3-2-5 2"/>',
@@ -133,7 +134,7 @@ function appShell(req, u, flashHtml, body, title) {
   </div>
   <nav class="side-nav" id="side-nav" aria-label="Members menu">
     ${group('Main menu', `${item('/dashboard', 'eas', 'My EAs')}
-      ${req.hasJournal ? item('/journal/desk', 'desk', 'Desk') + item('/journal', 'journal', 'Journal', on('/journal') && !on('/journal/insights') && !on('/journal/mentor') && !on('/journal/desk') && !on('/journal/plan')) + item('/journal/plan', 'plan', 'Plan a trade') + item('/journal/insights', 'insights', 'Insights') : ''}
+      ${req.hasJournal ? item('/journal/desk', 'desk', 'Desk') + item('/journal', 'journal', 'Journal', on('/journal') && !on('/journal/insights') && !on('/journal/studio') && !on('/journal/mentor') && !on('/journal/desk') && !on('/journal/plan')) + item('/journal/plan', 'plan', 'Plan a trade') + item('/journal/insights', 'insights', 'Insights') + item('/journal/studio', 'studio', 'Share Studio') : ''}
       ${req.mentorEligible && (req.hasJournal || u.mentor_share) ? item('/journal/mentor', 'chat', `Mentor review${req.mentorNew ? `<em class="count">${req.mentorNew}</em>` : ''}`, on('/journal/mentor')) : ''}`)}
     ${group('Account', `${item('/settings', 'user', 'Trading profile')}${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}${item('/profile', 'user', 'My page')}${item('/affiliate', 'gift', 'Affiliate')}
       ${u.google_sub ? '' : item('/password', 'lock', 'Password')}`)}

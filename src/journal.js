@@ -394,6 +394,47 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
   // ---------- account report: share cards of a whole account (or all accounts) ----------
   // ?period=YYYY-MM (a month) | 30 | 90 | all, ?account= as on the journal. Account numbers are always masked.
+  // Share Studio: motion share cards for a trade, day, session, week, month or quarter.
+  // The page gets a compact list of recent trades; candles load per trade when a trade card is picked.
+  app.get('/journal/studio', requireUser, requireJournal, (req, res) => {
+    const u = req.user;
+    const { liveAccts, sel, where, args } = scope(req);
+    const cur = (sel ? sel.cur : liveAccts[0]?.cur) || '';
+    const rows = db.prepare(`SELECT id, symbol, side, lots, entry, exit, open_time, close_time, net, r, risk_pct, pips, pct FROM journal_trades
+      WHERE ${where} AND close_time >= date('now', '-400 days') ORDER BY close_time DESC LIMIT 2000`).all(...args);
+    const off = u.ny_offset ?? desk.NY_DEFAULT;
+    const num = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+    const trades = prep(rows).map((t) => ({
+      id: t.id, s: t.symbol, side: t.side, o: t.open_time, c: t.close_time, net: t.net, r: t.r, pips: num(t.pips), pct: num(t.pct),
+      entry: num(t.entry), exit: num(t.exit), lots: num(t.lots), risk: num(t.risk_pct), sess: desk.sessionOf(t, off),
+    }));
+    const json = JSON.stringify({ trades, cur, handle: u.card_handle || u.name || '' }).replace(/</g, '\\u003c');
+    const acctOpts = [...(liveAccts.length > 1 ? [['', 'All accounts']] : []), ...liveAccts.map((a) => [a.account_number, `Account ••${String(a.account_number).slice(-2)}`])];
+    page(req, res, 'Share Studio', `
+    <link rel="stylesheet" href="/studio.css">
+    <div class="ss">
+      <div class="ss-top"><h1 class="ss-title">Share Studio</h1>${acctOpts.length > 1 ? `<form method="get" class="ss-acct"><select name="account" onchange="this.form.submit()" aria-label="Account">${acctOpts.map(([v, l]) => `<option value="${esc(v)}"${(sel ? sel.account_number : '') === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></form>` : ''}</div>
+      ${trades.length ? `<nav class="ss-steps" id="steps" aria-label="Steps"></nav><div class="ss-bar"><i id="pb"></i></div>
+      <div class="ss-wrap"><canvas id="pv"></canvas><div id="q" class="ss-q" aria-live="polite"></div></div>
+      <input type="file" id="own" accept="image/*,video/*" hidden>` : `<p class="muted">No trades in the last year yet. Once the Journal EA sends trades (or you log one), your cards show up here.</p>`}
+    </div>
+    <script id="studio-data" type="application/json">${json}</script>
+    <script src="/cards.js"></script>
+    <script src="/cine-card.js"></script>
+    <script src="/studio.js"></script>`);
+  });
+
+  // closing prices of one trade's saved candles, for the price line on a trade card
+  app.get('/journal/studio/line/:id', requireUser, requireJournal, (req, res) => {
+    const t = db.prepare('SELECT candles, open_time, close_time FROM journal_trades WHERE id = ? AND user_id = ?').get(Number(req.params.id), req.user.id);
+    if (!t) return res.status(404).json({ closes: [] });
+    let k = []; try { k = JSON.parse(t.candles || '[]'); } catch { k = []; }
+    const o = Date.parse(String(t.open_time).replace(' ', 'T') + 'Z') / 1000, c = Date.parse(String(t.close_time).replace(' ', 'T') + 'Z') / 1000;
+    const closes = k.map((x) => Number(x[4])).filter(Number.isFinite);
+    const idx = (ts) => { let best = 0; k.forEach((x, i) => { if (x[0] <= ts) best = i; }); return best; };
+    res.json({ closes, iEntry: k.length ? idx(o) : 0, iExit: k.length ? idx(c) : 0 });
+  });
+
   app.get('/journal/report', requireUser, requireJournal, (req, res) => {
     const u = req.user;
     const sc = scope(req);

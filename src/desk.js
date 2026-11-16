@@ -217,3 +217,5 @@ function tagTrades(trades, offset) {
 
 module.exports = { tagTrades, timeStats, candleStats, habits, recap, desk, FIRMS, NY_DEFAULT, serverToday, hhmm };
 module.exports.prepRows = (rows) => require('./insights').prep(rows);
+// name of the New York session a trade opened in (Share Studio)
+module.exports.sessionOf = (t, offset) => { const m = clock(t, offset).min; return (SESS.find((s) => inSess(s, m)) || SESS[0]).name; };
