@@ -349,7 +349,7 @@ function client(base, ip) {
     assert.match(r.text, /Equity and drawdown/);
     assert.match((await bob.get('/journal/insights?tab=prop')).text, /Pick an account above/);
     // Time and Habits tabs, journal hero + recap
-    assert.match((await bob.get('/journal/insights?tab=time')).text, /Session clock[\s\S]*Sessions, ranked[\s\S]*Hour by weekday/);
+    assert.match((await bob.get('/journal/insights?tab=time')).text, /Session clock[\s\S]*Sessions, ranked[\s\S]*Candle clock[\s\S]*BEFORE THE OPEN[\s\S]*Hour by weekday/);
     assert.match((await bob.get('/journal/insights?tab=time&tz=mt5')).text, /MT5 server time/);
     assert.match((await bob.get('/journal/insights?tab=habits')).text, /Trade number of the day[\s\S]*After a win, after a loss/);
     assert.match((await bob.get('/journal')).text, /class="pl-hero"[\s\S]*This week[\s\S]*Last session[\s\S]*Recent trades/);
