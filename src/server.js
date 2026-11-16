@@ -143,6 +143,9 @@ const flash = (req, type, msg) => { req.session.flash = { type, msg }; };
 const page = (req, res, title, body, opts) => res.send(layout(req, title, body, opts));
 const myeas = require('./myeas');
 const refs = referrals.setup(app, { db, page });
+const aff = require('./affiliates').setup(app, { db, page, flash: (req, type, msg) => { req.session.flash = { type, msg }; }, requireUser: (req, res, next) => (req.user ? next() : res.redirect('/login')),
+  requireAdmin: (req, res, next) => (req.user && req.user.is_admin ? next() : res.status(404).send('Not found')), refs });
+app.locals.affTradeBox = aff.tradeBox;
 const requireUser = (req, res, next) => (req.user ? next() : res.redirect('/login'));
 const requireAdmin = (req, res, next) =>
   req.user && req.user.is_admin ? next() : res.status(404).send('Not found');
@@ -791,7 +794,7 @@ app.get('/admin/users/:id', requireAdmin, (req, res) => {
       <button class="small secondary">${u.trial ? 'Restart free trial' : 'Start free trial'}</button></form>`}
     ${stripe.needsCardTrial(u) ? `<p class="notice"><span>Signed up but has not added a card yet, so the ${trialDays()}-day free trial has not started. Nothing runs until they pick a plan and add a card (or you start a trial or mark them paid).</span></p>` : ''}
     ${u.plan_request ? `<p class="notice"><span>Requested on the site: <strong>${esc((getPlan(u.plan_request.split(':')[0]) || {}).name || u.plan_request)}</strong>, ${esc(u.plan_request.split(':')[1] || '')}. Check the payment, then press Mark as paid.</span></p>` : ''}
-    ${refs.adminNote(u)}
+    ${refs.adminNote(u)}${aff.adminNote(u)}
     ${u.plan ? `<p class="muted">Current plan: <strong>${esc((getPlan(u.plan) || {}).name || u.plan)}</strong> · ${esc(u.billing)}</p>` : ''}
     <div>
     </div>
@@ -853,7 +856,10 @@ app.post('/admin/users/:id/paid', requireAdmin, (req, res) => {
 // end of the Stripe billing period) is used instead when it is later. Returns the referral note ('' if none).
 // `paid`: { amount (US$ actually paid, if known), via: 'stripe' | 'admin' } for the sales track record
 function applyPaid(u, plan, billing, until = null, paid = {}) {
-  logSale(u.id, 'ea', { plan: plan ? plan.id : '', billing: plan ? billing : '', amount: paid.amount != null ? paid.amount : plan ? dueNow(plan, billing) : null, via: paid.via || 'admin' });
+  // no amount from Stripe (Admin "Mark as paid"): the plan price, less the friend's first-payment discount
+  const amount = paid.amount != null ? paid.amount : plan ? Math.round(dueNow(plan, billing) * (100 - refs.discountFor(u))) / 100 : null;
+  logSale(u.id, 'ea', { plan: plan ? plan.id : '', billing: plan ? billing : '', amount, via: paid.via || 'admin' });
+  const affNote = aff.onEaPaid(u, Number(amount) || 0, plan ? plan.id : '');
   const days = plan && billing === 'annual' ? BILLING.annual.days : PAID_DAYS;
   const from = u.expires_at && !isExpired(u) ? u.expires_at : new Date().toISOString().slice(0, 19).replace('T', ' ');
   let refNote = '';
@@ -872,7 +878,7 @@ function applyPaid(u, plan, billing, until = null, paid = {}) {
       if (!db.prepare('SELECT 1 FROM user_eas WHERE user_id = ?').get(u.id)) grantAllActiveEas(u.id);
     }
   })();
-  return refNote;
+  return refNote + affNote;
 }
 
 app.post('/admin/users/:id', requireAdmin, (req, res) => {
@@ -1012,7 +1018,7 @@ app.post('/admin/eas/:id/delete', requireAdmin, (req, res) => {
 });
 
 require('./help')(app, { db, page });
-const mentor = require('./mentorship')(app, { db, page, flash, requireUser, requireAdmin, grantAllActiveEas, PAYMENT_URL });
+const mentor = require('./mentorship')(app, { db, page, flash, requireUser, requireAdmin, grantAllActiveEas, PAYMENT_URL, affiliates: aff });
 const stripe = require('./stripe')(app, { db, flash, requireUser, applyPaid, startTrial, refs, mentor });
 sales.routes(app, { db, page, requireAdmin, stripe, backup, mentorPlans: require('./mentorship').MENTOR_PLANS });
 require('./pricing')(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL: process.env.CONTACT_URL || '', refs, stripe });

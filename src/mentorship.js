@@ -37,7 +37,7 @@ const OG = {
   image: 'og-mentorship.png',
 };
 
-module.exports = function mentorship(app, { db, page, flash, requireUser, requireAdmin, grantAllActiveEas, PAYMENT_URL }) {
+module.exports = function mentorship(app, { db, page, flash, requireUser, requireAdmin, grantAllActiveEas, PAYMENT_URL, affiliates }) {
   const cols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   if (!cols.includes('mentor_plan')) db.exec("ALTER TABLE users ADD COLUMN mentor_plan TEXT NOT NULL DEFAULT ''");   // mentorship | full (paid)
   if (!cols.includes('mentor_paid_at')) db.exec('ALTER TABLE users ADD COLUMN mentor_paid_at TEXT');
@@ -267,6 +267,7 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
     const upgrade = !u.mentor_plan || (u.mentor_plan === 'mentorship' && p.id === 'full');
     db.transaction(() => {
       track(u.id, 'paid', p.id);
+      if (affiliates) affiliates.onMentorPaid(u, p.id);   // the referrer's flat share, once per plan
       if (upgrade) db.prepare("UPDATE users SET mentor_plan = ?, mentor_paid_at = datetime('now') WHERE id = ?").run(p.id, u.id);
       db.prepare(`UPDATE users SET status = 'active', trial = 0, trial_used = 1, max_accounts = MAX(max_accounts, 3),
                   expires_at = CASE WHEN expires_at IS NULL THEN NULL ELSE MAX(expires_at, datetime('now', ?)) END WHERE id = ?`)

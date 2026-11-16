@@ -857,6 +857,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         <button class="small secondary">Save handle</button>
         <input type="hidden" name="back" value="${t.id}">
       </form>
+      ${req.app.locals.affTradeBox ? req.app.locals.affTradeBox(req.user, t) : ''}
     </section>
 
     ${req.user.is_admin ? `<section class="card">
