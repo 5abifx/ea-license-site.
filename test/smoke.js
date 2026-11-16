@@ -942,6 +942,32 @@ function client(base, ip) {
       assert.match(home, /src="\/app\/install\.js\?v=/);
     }
 
+    // What's new: draft is hidden, publish shows it once, closing marks it seen
+    {
+      r = await admin.get('/admin/whatsnew');
+      assert.match(r.text, /Next update/);
+      assert.match(r.text, /Share Studio/);   // seeded draft
+      r = await admin.post('/admin/whatsnew', { name: 'Test feature', line: 'One short line', link: 'https://evil.example', icon: 'clock', audience: 'all' });
+      assert.match(r.text, /Added &quot;Test feature&quot;/);
+      const row = db.prepare("SELECT * FROM whatsnew WHERE name = 'Test feature'").get();
+      assert.strictEqual(row.link, '');   // off-site links are dropped
+      assert.strictEqual(row.published_at, null);
+      await admin.post('/admin/users', { name: 'Wes', email: 'wes@test.com', password: 'wespass123', max_accounts: '10' });
+      const wes = client(base, '10.9.9.9');
+      db.prepare("UPDATE users SET status = 'active', tour = 'skip', created_at = datetime('now', '-1 day') WHERE email = 'wes@test.com'").run();
+      await wes.post('/login', { email: 'wes@test.com', password: 'wespass123' });
+      assert.doesNotMatch((await wes.get('/dashboard')).text, /id="wn-data"/);   // drafts are not shown
+      await admin.post('/admin/whatsnew/publish');
+      r = await wes.get('/dashboard');
+      assert.match(r.text, /id="wn-data"/);
+      assert.match(r.text, /Test feature/);
+      assert.match(r.text, /class="wn-dot"/);
+      r = await wes.post('/api/whatsnew/seen');
+      assert.doesNotMatch((await wes.get('/dashboard')).text, /id="wn-data"/);
+      assert.match((await wes.get('/whats-new')).text, /Test feature/);
+      assert.strictEqual((await wes.get('/admin/whatsnew')).status, 404);
+    }
+
     console.log('All smoke tests passed');
   } finally {
     server.close();
