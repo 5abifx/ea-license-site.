@@ -2055,6 +2055,7 @@ tr:target { background: var(--accent-soft); }
   .lt-g3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lt-rec { order: -1; padding: 14px 18px; } .lt-rec .lt-rl, .lt-rec > p { display: none; }
   .lt-form, .lt-tcard { padding: 18px; }
+}
 @media (max-width: 440px) { .lt-grades { gap: 5px; } .lt-grades b { font-size: 17px; } .lt-grades small { font-size: 10px; } .lt-mkv { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* Insights > Time: candle clock (same heat ring as the session clock, one candle around the dial) */
 .cc-card .ck-wrap > [hidden] { display: none !important; }
@@ -2065,6 +2066,6 @@ tr:target { background: var(--accent-soft); }
 .cc-card .cc-hot { color: #ff9a5c; }
 .cc-card .ck-l { cursor: pointer; }
 .cc-tf a { cursor: pointer; }
-.cc-card .ck-wrap { grid-template-columns: minmax(240px, 440px) minmax(220px, 360px); justify-content: center; gap: 40px; }
+.cc-card .ck-wrap { grid-template-columns: minmax(220px, 360px) minmax(220px, 360px); justify-content: center; gap: 40px; }
 .cc-card .ck-side .ck-l { font-size: 14px; padding: 9px 8px; }
 @media (max-width: 560px) { .cc-card .ck-wrap { grid-template-columns: 1fr; gap: 16px; } }
