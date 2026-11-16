@@ -198,7 +198,16 @@ function client(base, ip) {
     assert.match((await fetch(base + '/robots.txt').then((x) => x.text())), /Disallow: \//);
     const robots = await fetch(base + '/robots.txt').then((x) => x.text());
     assert.match(robots, /User-agent: GPTBot\nDisallow: \//);                     // AI training bots stay out
-    assert.match(robots, /User-agent: \*\nAllow: \/\$\nAllow: \/mentorship/);     // search and AI search bots read public pages
+    assert.match(robots, /User-agent: \*\nAllow: \/\$\nAllow: \/katana\n[\s\S]*Allow: \/pricing\n/);     // search and AI search bots read public pages
+    assert.match(robots, /Sitemap: https:\/\/5abifx\.com\/sitemap\.xml/);
+    const sm = await fetch(base + '/sitemap.xml').then((x) => x.text());
+    assert.match(sm, /<loc>https:\/\/5abifx\.com\/katana<\/loc>/);
+    for (const p of ['/', '/katana', '/trade-journal', '/faq']) {
+      const h = await fetch(base + p).then((x) => x.text());
+      assert.match(h, /<link rel="canonical" href="https:\/\/5abifx\.com\//, p);
+      assert.match(h, /application\/ld\+json/, p);
+      assert.doesNotMatch(h, /Compass/i, p);                                       // indicator stays private
+    }
     assert.doesNotMatch(robots, /OAI-SearchBot|PerplexityBot/);
 
     // Sign in with Google: fake token endpoint returns an ID token for a verified Gmail address

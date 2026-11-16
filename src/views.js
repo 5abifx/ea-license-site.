@@ -70,14 +70,16 @@ function layout(req, title, body, opts = {}) {
   const og = opts.og || {}; // link preview (Discord, iMessage, WhatsApp): { title, desc, image }
   const trial = trialDays();
   const desc = `KATANA risk manager, trade journal and live mentorship for MT5 traders.${trial ? ` ${trial}-day free trial, then plans from ${PRICE_TEXT}.` : ` Plans from ${PRICE_TEXT}.`}`;
+  const seoMeta = u ? null : require('./seo').metaFor(req.path);
   const flashHtml = flash ? `<div class="flash ${esc(flash.type)}">${esc(flash.msg)}</div>` : '';
   // the pill only shows when the site name differs from the brand (e.g. "EA Licensing")
   const pill = SITE_NAME !== BRAND ? `<span class="pill">${esc(SITE_NAME)}</span>` : '';
   return `<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} · ${esc(SITE_NAME)}</title>
-<meta name="description" content="${esc(og.desc || desc)}">
+<title>${esc((seoMeta && seoMeta.title) || `${title} · ${SITE_NAME}`)}</title>
+<meta name="description" content="${esc((seoMeta && seoMeta.desc) || og.desc || desc)}">
+${require('./seo').headTags(req, opts)}
 <meta name="theme-color" content="#0a0a0b">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="${esc(SITE_NAME)}">

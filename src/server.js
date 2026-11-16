@@ -230,8 +230,32 @@ require('./welcome')(app, { db, requireUser });   // student welcome + journal r
 
 // ---------- auth ----------
 // Signed-out home: the cinematic page (src/cine-pages/home.html + public/cine/home.*). Signed in: the dashboard.
-app.get('/', (req, res) => {
-  if (req.user) return res.redirect('/dashboard');
+// /katana and /trade-journal: the same page cut down to one product's sections, each with its own hero,
+// so Google can list them as separate links under the home result (titles/descriptions in src/seo.js)
+const PRODUCT_PAGES = {
+  '/': {
+    HEROH: 'Your rules.<br><span class="m">Enforced on every trade.</span>',
+    PILLS: '<a href="#katana">KATANA</a><a href="#learn">How it works</a><a href="#journal">Journal</a><a href="#price">Plans</a>',
+    HEROFOOT: 'KATANA sizes every position and stops you at your daily limit. <span>Every closed trade lands in your journal.</span>',
+  },
+  '/katana': {
+    kicker: 'KATANA · MT5 risk manager',
+    HEROH: 'One bad day<br><span class="m">stays one bad day.</span>',
+    PILLS: '<a href="#learn">How it works</a><a href="#shield">Shield</a><a href="#payout">Prop rules</a><a href="#price">Plans</a>',
+    HEROFOOT: 'Lot size from your risk, a stop on every trade, <span>and a hard lock at your daily limit.</span>',
+    keep: ['badday', 'real', 'katana', 'shield', 'payout', 'learn', 'cyc', 'price', 'apply'],
+  },
+  '/trade-journal': {
+    kicker: 'MT5 trade journal',
+    HEROH: 'Every trade logged.<br><span class="m">Every leak found.</span>',
+    PILLS: '<a href="#journal">Calendar</a><a href="#plan">Plan a trade</a><a href="#found">Insights</a><a href="#cards">Share cards</a><a href="#price">Plans</a>',
+    HEROFOOT: 'Connect MT5 once. <span>Every closed trade lands in your journal with the real chart.</span>',
+    keep: ['journal', 'plan', 'found', 'dash', 'cards', 'price', 'apply'],
+  },
+};
+app.get(['/', '/katana', '/trade-journal'], (req, res) => {
+  if (req.user && req.path === '/') return res.redirect('/dashboard');
+  const pp = PRODUCT_PAGES[req.path];
   const signup = SIGNUP_MODE !== 'closed';
   const trial = signup ? trialDays() : 0;
   const join = trial ? 'Start free trial' : 'Create account';
@@ -256,11 +280,12 @@ app.get('/', (req, res) => {
   </div>
 </section>`;
   res.send(cinePage(req, 'home', {
-    KICKER: `MT5 risk manager · trade journal${trial ? ` · ${trial}-day free trial` : ''}`,
+    KICKER: `${pp.kicker || 'MT5 risk manager · trade journal'}${trial ? ` · ${trial}-day free trial` : ''}`,
+    HEROH: pp.HEROH, PILLS: pp.PILLS, HEROFOOT: pp.HEROFOOT,
     JOINBTN: signup ? `<a class="go pri" href="/signup">${join}</a>` : '',
     PRICE: price,
     CTA: signup ? `<a class="cta" href="/signup">${join}</a><a class="cta2" href="/login">Already a member? <b>Sign in</b></a>` : '<a class="cta" href="/login">Sign in</a>',
-  }, { title: `${SITE_NAME} · Risk manager & trade journal for MT5` }));
+  }, { title: `${SITE_NAME} · Risk manager & trade journal for MT5`, keep: pp.keep, ld: req.path === '/' ? require('./seo').homeData() : require('./seo').productData(req.path) }));
 });
 
 app.get('/login', (req, res) => {

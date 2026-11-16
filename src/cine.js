@@ -29,11 +29,15 @@ function cinePage(req, name, slots, opts = {}) {
     FOOT,
     ...slots,
   });
+  const page = opts.keep ? keepSections(body, opts.keep) : body;
+  const seo = require('./seo');
+  const meta = seo.metaFor(req.path) || {};
   return `<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${esc(opts.title || SITE_NAME)}</title>
-<meta name="description" content="${esc(desc)}">
+<title>${esc(meta.title || opts.title || SITE_NAME)}</title>
+<meta name="description" content="${esc(meta.desc || desc)}">
+${seo.headTags(req, opts)}
 <meta name="theme-color" content="#050507">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="${esc(SITE_NAME)}">
@@ -48,12 +52,20 @@ function cinePage(req, name, slots, opts = {}) {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@200;300;400&family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/cine/${name}.css?v=${v}">
 </head><body>
-${body}
+${page}
 <p class="risk">${RISK}</p>
 <script src="/cine/${name}.js?v=${v}"></script>
 ${require('./support').supportWidget(req)}
 </body></html>`;
 }
 const STARTED = Date.now();
+
+// keep only the listed top-level <section id=".."> blocks (a section without an id counts as 'cyc')
+function keepSections(html, keep) {
+  return html.replace(/<section\b[^>]*>[\s\S]*?\n<\/section>\n?/g, (m) => {
+    const id = (m.match(/^<section\b[^>]*\bid="([^"]+)"/) || [])[1] || 'cyc';
+    return keep.includes(id) ? m : '';
+  });
+}
 
 module.exports = { cinePage };
