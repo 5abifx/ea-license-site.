@@ -212,3 +212,7 @@ window.RPL.pvx=()=>{const el=document.getElementById('pvx');if(!el)return;el.cla
  const run=()=>{tm.forEach(clearTimeout);today=0;F.classList.remove('done','warn');paint();let t=reduce?0:600;steps.forEach(s=>{tm.push(setTimeout(()=>{today=Math.max(0,s===999?cap:today+s);if(today>cap)today=cap;paint()},t));t+=reduce?0:750})};
  window.RPL.cx=run;paint();let done=false;new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting||done)return;done=true;run()}),{threshold:.35}).observe(F);
 })();
+// student messages: on PC the floating cards drift a little with the mouse
+(()=>{const st=document.querySelector('#dms .dm-stage');if(!st||!matchMedia('(pointer:fine)').matches)return;
+ st.addEventListener('pointermove',e=>{const r=st.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;
+  st.querySelectorAll('.dm-fl').forEach((f,i)=>{const k=(i%2?14:-10)*(1+i*.2);f.style.translate=`${x*k}px ${y*k}px`})})})();
