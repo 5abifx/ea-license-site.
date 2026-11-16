@@ -239,8 +239,9 @@ module.exports = function registerMentor(app, { db, page, flash, requireUser, re
           <h2>Student's notes</h2>
           <dl class="kv">
             <dt>Setup</dt><dd>${esc(t.setup) || '<span class="muted">-</span>'}</dd>
-            <dt>Emotion</dt><dd>${esc(t.emotion) || '<span class="muted">-</span>'}</dd>
-            <dt>Rating</dt><dd>${t.rating ? '★'.repeat(t.rating) : '<span class="muted">-</span>'}</dd>
+            <dt>Felt</dt><dd>${esc(t.emotion) || '<span class="muted">-</span>'}</dd>
+            <dt>Grade</dt><dd>${esc(t.grade || ({ 5: 'A+', 4: 'A', 3: 'B', 2: 'C', 1: 'F' })[t.rating] || '') || '<span class="muted">-</span>'}</dd>
+            <dt>Followed plan</dt><dd>${esc(t.followed) || '<span class="muted">-</span>'}</dd>
             <dt>Mistakes</dt><dd>${esc(t.mistakes) || '<span class="muted">-</span>'}</dd>
           </dl>
           ${t.notes ? `<p class="note-text">${esc(t.notes).replace(/\n/g, '<br>')}</p>` : ''}

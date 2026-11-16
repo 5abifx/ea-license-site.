@@ -331,6 +331,29 @@ function client(base, ip) {
     assert.match(r.text, /Notes saved/);
     assert.match(r.text, /Clean &lt;b&gt;setup&lt;\/b&gt;/);
     assert.match(r.text, /"partials":\[\{"time":"2026-10-28T15:12:00"/);          // final close is not a partial
+    // Log trade: chips + grade on an EA trade, a hand-logged trade, a no-trade day, quick tagging
+    assert.match(r.text, /Review this trade/);
+    assert.match(r.text, /value="A\+" checked/);                                   // 5 stars became A+
+    r = await bob.post(`/journal/${tid}`, [['feel', 'Patient'], ['feel', 'FOMO'], ['feel_own', 'Tired'], ['mist', 'Entered early'], ['mist_own', ''], ['grade', 'B'], ['followed', 'Partly'], ['notes', 'ok']]);
+    assert.match(r.text, /value="Tired" checked/);
+    assert.match(r.text, /value="B" checked/);
+    assert.strictEqual(db.prepare('SELECT emotion, grade, followed, mistakes FROM journal_trades WHERE id = ?').get(tid).emotion, 'Patient, FOMO, Tired');
+    r = await bob.get('/journal/log');
+    assert.match(r.text, /Continue your draft\?/);
+    r = await bob.post('/journal/log', { kind: 'trade', account: '0', symbol: 'eurusd', side: 'SELL', entry: '1.0850', sl: '1.0870', exit: '1.0810', net: '200', open_time: '2026-10-29T09:00', close_time: '2026-10-29T10:00', feel: 'Calm', grade: 'A' });
+    assert.match(r.text, /Trade saved/);
+    assert.match(r.text, /Logged by hand/);
+    assert.match(r.text, /\+2\.00R/);
+    assert.match((await bob.post('/journal/log', { kind: 'trade', symbol: 'X' })).text, /Type the result/);
+    assert.match((await bob.post('/journal/log', { kind: 'trade', account: '999999', symbol: 'X', net: '1' })).text, /Pick one of your accounts/);
+    r = await bob.post('/journal/log', { kind: 'none', day: '2026-10-30', why: 'News day', feel: 'Calm' });
+    assert.match(r.text, /No-trade day saved/);
+    assert.match(r.text, /No trade<\/span>/);
+    assert.match(r.text, /Manual trades/);
+    r = await bob.get('/journal/tag');
+    assert.strictEqual(r.status, 200);
+    assert.match((await bob.get('/journal/insights')).text, /Feelings and grades/);
+    db.prepare("DELETE FROM journal_trades WHERE manual = 1").run();             // later checks count the EA trade only
     assert.strictEqual((await eve.get(`/journal/${tid}`)).status !== 200 || !(await eve.get(`/journal/${tid}`)).text.includes('XAUUSD'), true);
 
     // Mentor Mode: only students; Bob shares, asks about a trade, the mentor replies, Bob sees the reply
