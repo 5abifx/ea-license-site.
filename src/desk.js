@@ -48,6 +48,36 @@ function timeStats(trades, offset) {
   return { offset, halves, best, worst, ranked, rows, sessions: SESS };
 }
 
+// ---------- candle clock ----------
+// Where inside the 1H and 4H candle each trade was opened, in MT5 server time (that is how MT5 draws the candles).
+// The new candle is minute 0. "Before the open" and "After the open" are the 10 minutes either side of it.
+const PARTS = {
+  60: [{ key: 'post', name: 'After the open', from: 0, to: 10 }, { key: 'early', name: 'Early candle', from: 10, to: 30 },
+    { key: 'late', name: 'Late candle', from: 30, to: 50 }, { key: 'pre', name: 'Before the open', from: 50, to: 60 }],
+  240: [{ key: 'post', name: 'After the open', from: 0, to: 10 }, { key: 'early', name: 'First hour', from: 10, to: 60 },
+    { key: 'mid', name: 'Middle', from: 60, to: 180 }, { key: 'late', name: 'Last hour', from: 180, to: 230 }, { key: 'pre', name: 'Before the open', from: 230, to: 240 }],
+};
+function candleStats(trades) {
+  const out = {};
+  for (const tf of [60, 240]) {
+    const step = tf === 60 ? 1 : 5;
+    const cells = Array.from({ length: tf / step }, () => []);
+    const parts = PARTS[tf].map((p) => ({ ...p, list: [] }));
+    trades.forEach((t) => {
+      const m = clock(t, 0).min % tf;
+      cells[Math.floor(m / step)].push(t);
+      parts.find((p) => m >= p.from && m < p.to).list.push(t);
+    });
+    const ps = parts.map(({ list, ...p }) => ({ ...p, ...group(list) }));
+    const judged = ps.filter((p) => p.n >= 3);
+    const worst = judged.length ? judged.reduce((a, b) => (b.net < a.net ? b : a)) : null;
+    const best = judged.length ? judged.reduce((a, b) => (b.net > a.net ? b : a)) : null;
+    out[tf] = { tf, step, cells: cells.map((l, i) => ({ from: i * step, ...group(l) })), parts: ps,
+      worst: worst && worst.net < 0 ? worst.key : null, best: best && best.net > 0 ? best.key : null };
+  }
+  return out;
+}
+
 // ---------- habits ----------
 function habits(trades) {
   const byAcct = {};
@@ -185,5 +215,5 @@ function tagTrades(trades, offset) {
         SESS.findIndex((s) => inSess(s, k.min)), k.dow, day, k.min]; }) };
 }
 
-module.exports = { tagTrades, timeStats, habits, recap, desk, FIRMS, NY_DEFAULT, serverToday, hhmm };
+module.exports = { tagTrades, timeStats, candleStats, habits, recap, desk, FIRMS, NY_DEFAULT, serverToday, hhmm };
 module.exports.prepRows = (rows) => require('./insights').prep(rows);
