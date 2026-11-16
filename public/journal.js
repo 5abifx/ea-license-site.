@@ -47,6 +47,9 @@
       drawOv();
     }, 'image/png'); });
   }
+  // motion card: a short video recorded in this browser (public/motion-card.js)
+  const mv = window.MotionCard && window.MotionCard.mount(trade, () => ({ mode: val('mode').value, rm: val('rm').checked }), trade.symbol);
+  if (mv) ['mode', 'rm'].forEach((id) => val(id).addEventListener('change', mv.sync));
   draw(); drawOv();
   if (document.fonts) {
     Promise.all([
@@ -55,6 +58,6 @@
       document.fonts.load('400 30px Manrope'),
       ...(ov ? [document.fonts.load('400 100px "DM Serif Display"'), document.fonts.load('italic 400 100px "DM Serif Display"'),
         document.fonts.load('600 30px Montserrat'), document.fonts.load('500 30px Montserrat')] : []),
-    ]).catch(() => {}).finally(() => { draw(); drawOv(); });
+    ]).catch(() => {}).finally(() => { draw(); drawOv(); if (mv) mv.card.play(); });
   }
 })();

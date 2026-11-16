@@ -286,5 +286,7 @@ function render(resultCanvas, chartCanvas, trade, opts) {
 window.TradeCards = { render, styles: { a: 'Cinematic', b: 'Chart first', c: 'Ticket' },
   // drawing kit for the account report cards (public/report.js)
   kit: { W, H, PAD, D, M, B, INK, SOFT, DIM, FAINT, ORANGE, WIN, LOSS, LINE, MINUS, MON, T, fitSize, bg, brand,
+    // number formats + trade facts, used by the motion card (public/motion-card.js)
+    fmt: { num, money, pctTxt, rTxt, duration, dayTxt, timeTxt, isWin, label },
     onLogo: (f) => { if (LOGO.complete && LOGO.width) f(); else logoWait.push(f); } } };
 })();
