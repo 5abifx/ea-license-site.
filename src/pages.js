@@ -11,7 +11,6 @@ module.exports = function pages(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, T
   app.get('/robots.txt', (req, res) => {
     // AI search bots (they find and recommend the site) may read the public pages; bots that only
     // collect AI training data are told to stay out. Everything behind sign-in is closed to all bots.
-    const open = 'Allow: /$\nAllow: /mentorship\nAllow: /why\nAllow: /faq\nAllow: /terms\nAllow: /privacy\nAllow: /help/\nDisallow: /\n';
     const open = 'Allow: /$\nAllow: /katana\nAllow: /trade-journal\nAllow: /mentorship\nAllow: /pricing\nAllow: /why\nAllow: /faq\nAllow: /terms\nAllow: /privacy\nAllow: /help/\nAllow: /cine/\nAllow: /shots/\nAllow: /*.css\nAllow: /*.js\nAllow: /*.png\nAllow: /*.webp\nDisallow: /\n';
     const noTraining = ['GPTBot', 'CCBot', 'Google-Extended', 'Applebot-Extended', 'anthropic-ai', 'ClaudeBot', 'Bytespider', 'meta-externalagent', 'cohere-training-data-crawler', 'Diffbot', 'Omgilibot'];
     res.type('text/plain').send(noTraining.map((b) => `User-agent: ${b}\nDisallow: /\n`).join('\n') + `\nUser-agent: *\n${open}\nSitemap: ${seo.SITE_URL}/sitemap.xml\n`);

@@ -221,7 +221,6 @@ function client(base, ip) {
     assert.match((await fetch(base + '/robots.txt').then((x) => x.text())), /Disallow: \//);
     const robots = await fetch(base + '/robots.txt').then((x) => x.text());
     assert.match(robots, /User-agent: GPTBot\nDisallow: \//);                     // AI training bots stay out
-    assert.match(robots, /User-agent: \*\nAllow: \/\$\nAllow: \/mentorship\nAllow: \/why/);     // search and AI search bots read public pages
     assert.match(robots, /User-agent: \*\nAllow: \/\$\nAllow: \/katana\n[\s\S]*Allow: \/pricing\n/);     // search and AI search bots read public pages
     assert.match(robots, /Sitemap: https:\/\/5abifx\.com\/sitemap\.xml/);
     const sm = await fetch(base + '/sitemap.xml').then((x) => x.text());

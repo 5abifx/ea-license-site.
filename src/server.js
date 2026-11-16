@@ -241,7 +241,7 @@ require('./tour')(app, { db, requireUser });      // "How should we show you aro
 const PRODUCT_PAGES = {
   '/': {
     HEROH: 'Your rules.<br><span class="m">Enforced on every trade.</span>',
-    PILLS: '<a href="#katana">KATANA</a><a href="#learn">How it works</a><a href="#journal">Journal</a><a href="#price">Plans</a>',
+    PILLS: '<a href="#katana">KATANA</a><a href="#learn">How it works</a><a href="#journal">Journal</a><a href="/why">With vs without</a><a href="#price">Plans</a>',
     HEROFOOT: 'KATANA sizes every position and stops you at your daily limit. <span>Every closed trade lands in your journal.</span>',
   },
   '/katana': {
