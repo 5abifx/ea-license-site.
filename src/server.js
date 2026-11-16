@@ -227,6 +227,7 @@ app.use((req, res, next) => { req.hasJournal = journalAccess(req.user); next(); 
 const { studentBox: mentorBox } = require('./mentor')(app, { db, page, flash, requireUser, requireAdmin });
 require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, setJournalAccess: (f) => { journalAccess = f; } });
 require('./welcome')(app, { db, requireUser });   // student welcome + journal result reveal
+require('./tour')(app, { db, requireUser });      // "How should we show you around?" guided tour (public/tour.js)
 
 // ---------- auth ----------
 // Signed-out home: the cinematic page (src/cine-pages/home.html + public/cine/home.*). Signed in: the dashboard.

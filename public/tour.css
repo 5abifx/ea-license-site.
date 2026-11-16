@@ -1,0 +1,78 @@
+/* Guided tour of the members area (public/tour.js): liquid glass on black, same look as the guided sign-up */
+.tr-scrim{position:fixed;inset:0;z-index:9000;background:rgba(3,3,5,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;transition:opacity .35s}
+.tr-scrim.in{opacity:1}
+.tr-scrim.clear{background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}
+.tr-hole{position:fixed;z-index:9001;border-radius:14px;pointer-events:none;box-shadow:0 0 0 9999px rgba(3,3,5,.66),0 0 0 1px rgba(255,176,122,.9),0 0 26px rgba(255,90,31,.55);transition:all .45s cubic-bezier(.6,0,.2,1)}
+.tr-hole:after{content:"";position:absolute;inset:-6px;border-radius:18px;border:1px solid rgba(255,176,122,.5);animation:tr-ping 1.8s ease-out infinite}
+@keyframes tr-ping{from{opacity:.9;transform:scale(.97)}to{opacity:0;transform:scale(1.06)}}
+
+.tr-glass{position:relative;color:#f2f2f4;font:15px/1.5 Manrope,system-ui,sans-serif;background:linear-gradient(180deg,rgba(28,28,32,.86),rgba(12,12,15,.9));backdrop-filter:blur(22px) saturate(170%);-webkit-backdrop-filter:blur(22px) saturate(170%);border:1px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 30px 80px rgba(0,0,0,.6)}
+.tr-glass h2,.tr-glass h3{font-family:Sora,Manrope,sans-serif;font-weight:600;letter-spacing:-.03em;color:#f2f2f4;margin:0}
+.tr-glass p{margin:0}
+.tr-glass button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.tr-glass .tr-x{position:absolute;top:14px;right:16px;color:#8a8a94;font-size:20px;line-height:1;padding:4px}
+.tr-glass .tr-x:hover{color:#f2f2f4}
+
+/* picker */
+.tr-pick{position:fixed;z-index:9002;left:50%;top:50%;width:min(720px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;transform:translate(-50%,-46%) scale(.98);opacity:0;transition:all .45s cubic-bezier(.2,.8,.2,1);padding:30px}
+.tr-pick.in{opacity:1;transform:translate(-50%,-50%)}
+.tr-pick .tr-k{font-size:12px;color:#8a8a94;margin-bottom:6px}
+.tr-pick h2{font-size:clamp(24px,3.4vw,32px);line-height:1.1;margin-bottom:6px}
+.tr-pick h2 em{font-style:normal;color:#ff5a1f}
+.tr-pick .tr-sub{color:#8a8a94;font-size:14px;margin-bottom:22px}
+.tr-opts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.tr-opt{position:relative;overflow:hidden;display:flex;flex-direction:column;gap:12px;padding:20px;border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.09);box-shadow:inset 0 1px 0 rgba(255,255,255,.12);transition:transform .2s,border-color .2s}
+.tr-opt:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.2)}
+.tr-opt:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.12) 50%,transparent 70%);transform:translateX(-120%);transition:transform .8s ease}
+.tr-opt:hover:after{transform:translateX(120%)}
+.tr-opt.adv{background:linear-gradient(160deg,rgba(255,90,31,.14),rgba(255,255,255,.025) 60%);border-color:rgba(255,90,31,.28)}
+.tr-opt h3{font-size:19px;display:flex;align-items:center;gap:8px}
+.tr-opt h3 small{font:600 11px Manrope;color:#ffb07a;background:rgba(255,90,31,.16);padding:2px 8px;border-radius:999px;letter-spacing:0}
+.tr-opt .tr-n{color:#8a8a94;font-size:13px;margin-top:-6px}
+.tr-opt ul{list-style:none;margin:0;padding:0;display:grid;gap:7px;font-size:14px;color:#cfcfd6;flex:1}
+.tr-opt li{display:flex;gap:9px;align-items:flex-start}
+.tr-opt li:before{content:"";flex:none;width:5px;height:5px;border-radius:50%;background:#8a8a94;margin-top:8px}
+.tr-opt.adv li:before{background:#ff5a1f}
+.tr-pill{display:inline-flex;justify-content:center;align-items:center;gap:8px;background:linear-gradient(180deg,#fff,#e6e6ea)!important;color:#000!important;font-weight:700!important;font-size:14px;padding:11px 22px;border-radius:999px;box-shadow:0 0 0 1px rgba(255,255,255,.4),0 10px 30px rgba(255,255,255,.12);transition:transform .2s,box-shadow .2s}
+.tr-pill:hover{transform:translateY(-1px);box-shadow:0 0 0 1px #fff,0 12px 36px rgba(255,255,255,.22)}
+.tr-pill.ghost{background:rgba(255,255,255,.06)!important;color:#f2f2f4!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.tr-later{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:18px;flex-wrap:wrap}
+.tr-later span{font-size:13px;color:#8a8a94}
+.tr-later button{color:#8a8a94;font-size:14px;padding:8px 4px}.tr-later button:hover{color:#f2f2f4}
+
+/* step card */
+.tr-card{position:fixed;z-index:9003;width:min(360px,calc(100vw - 32px));padding:20px 20px 16px;opacity:0;transform:translateY(8px);transition:opacity .3s,transform .3s,left .45s cubic-bezier(.6,0,.2,1),top .45s cubic-bezier(.6,0,.2,1)}
+.tr-card.in{opacity:1;transform:none}
+.tr-card.center{left:50%!important;top:50%!important;transform:translate(-50%,-50%);width:min(440px,calc(100vw - 32px));padding:28px}
+.tr-card .tr-step{font-size:12px;color:#8a8a94;margin-bottom:8px;display:flex;gap:8px;align-items:center}
+.tr-card .tr-step b{color:#ffb07a;font-weight:600}
+.tr-card h3{font-size:19px;line-height:1.2;margin-bottom:8px;padding-right:20px}
+.tr-card.center h3{font-size:26px}
+.tr-card p{color:#c4c4cc;font-size:14px}
+.tr-card .tr-tip{margin-top:12px;font-size:13px;color:#ffb07a;background:rgba(255,90,31,.1);border-radius:10px;padding:8px 11px}
+.tr-bar{height:3px;background:rgba(255,255,255,.07);border-radius:3px;margin:16px 0 14px;overflow:hidden}
+.tr-bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#ff5a1f,#ff7a3d 70%,#ffb07a);box-shadow:0 0 12px rgba(255,90,31,.7);transition:width .6s cubic-bezier(.6,0,.2,1)}
+.tr-nav{display:flex;align-items:center;gap:10px}
+.tr-nav .tr-skip{color:#8a8a94;font-size:13px;margin-right:auto}.tr-nav .tr-skip:hover{color:#f2f2f4}
+.tr-nav .tr-back{color:#c4c4cc;font-size:14px;padding:8px 10px}.tr-nav .tr-back:hover{color:#fff}
+.tr-card .tr-pill{padding:9px 18px}
+
+@media (max-width:760px){
+  .tr-pick{padding:22px 18px;top:auto;bottom:16px;transform:translate(-50%,10%);max-height:calc(100vh - 40px)}
+  .tr-pick.in{transform:translate(-50%,0)}
+  .tr-opts{grid-template-columns:1fr}
+  .tr-opt ul{display:none}
+  .tr-card,.tr-card.center{left:16px!important;right:16px;top:auto!important;bottom:16px;width:auto;transform:translateY(10px)}
+  .tr-card.in,.tr-card.center.in{transform:none}
+  .tr-card.center h3{font-size:22px}
+}
+/* the site's own button style (mono, caps, glow ring) must not leak in */
+.tr-glass button{text-transform:none;letter-spacing:0;font-family:Manrope,system-ui,sans-serif;border-radius:999px;min-height:0}
+.tr-glass button:not(.tr-pill){padding:6px 8px;font-size:14px;font-weight:500;box-shadow:none!important}
+.tr-glass button:focus{outline:none}
+.tr-glass button:focus-visible{outline:2px solid #ffb07a;outline-offset:2px}
+.tr-card .tr-pill{padding:9px 18px}
+.tr-pick .tr-pill{padding:12px 22px}
+.tr-glass{text-align:left}
+.tr-glass .tr-pill:focus,.tr-glass .tr-pill:focus-visible{outline:none;box-shadow:0 0 0 1px rgba(255,255,255,.4),0 10px 30px rgba(255,255,255,.12)!important}
+.tr-glass .tr-pill:focus-visible{box-shadow:0 0 0 2px #050507,0 0 0 4px #ffb07a!important}
