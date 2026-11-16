@@ -40,6 +40,7 @@ const ICONS = {
   pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
   cap: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5M22 9v6"/>',
+  tour: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
 };
 const icon = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
 
@@ -134,6 +135,7 @@ function appShell(req, u, flashHtml, body, title) {
     ${u.is_admin ? group('Owner', `${item('/admin/sales', 'insights', 'Sales')}${item('/admin/usage', 'pulse', 'Feature usage')}${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/usage'))}${item('/admin/eas', 'upload', 'EAs')}${item('/mentor', 'cap', `Mentor${req.mentorWaiting ? `<em class="count">${req.mentorWaiting}</em>` : ''}`)}`) : ''}
     <div class="side-group side-end">
       ${item('/faq', 'help', 'Help &amp; FAQ')}
+      <a href="#tour" data-tour-open title="Show me around">${icon('tour')}<span>Show me around</span></a>
       <form method="post" action="/logout"><button class="link" title="Sign out">${icon('out')}<span>Sign out</span></button></form>
     </div>
   </nav>
@@ -148,6 +150,7 @@ function appShell(req, u, flashHtml, body, title) {
 </div>
 <script src="/privacy.js"></script>
 ${require('./features').clientTag()}`;
+${require('./tour').script(req, u)}`;
 }
 
 // split sign-in / sign-up screen: brand pitch on the left, the form on the right

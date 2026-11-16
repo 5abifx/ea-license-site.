@@ -232,6 +232,7 @@ const onboard = require('./onboard')(app, { db, page, flash, requireUser, trialD
   stripe: { on: () => stripe.on(), needsCardTrial: (u) => stripe.needsCardTrial(u) } });
 require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, onboard, setJournalAccess: (f) => { journalAccess = f; } });
 require('./welcome')(app, { db, requireUser });   // student welcome + journal result reveal
+require('./tour')(app, { db, requireUser });      // "How should we show you around?" guided tour (public/tour.js)
 
 // ---------- auth ----------
 // Signed-out home: the cinematic page (src/cine-pages/home.html + public/cine/home.*). Signed in: the dashboard.
