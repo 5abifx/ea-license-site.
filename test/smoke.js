@@ -134,7 +134,7 @@ function client(base, ip) {
     assert.match(r.text, /Set up your desk/);
     r = await tia.post('/start', { name: 'Tia', style: 'day', market: 'gold', acct: 'eval', firm: 'ftmo', goal: 'pass', pain: 'bogus', done: '1', reset: '1' });
     assert.match(r.text, /Free trial: 15 days left/);
-    r = await tia.get('/profile');
+    r = await tia.get('/settings');
     assert.match(r.text, /value="ftmo" checked/);
     assert.match(r.text, /value="day" checked/);
     assert.doesNotMatch(r.text, /value="bogus"/);

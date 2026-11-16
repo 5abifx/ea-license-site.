@@ -135,11 +135,9 @@ function appShell(req, u, flashHtml, body, title) {
     ${group('Main menu', `${item('/dashboard', 'eas', 'My EAs')}
       ${req.hasJournal ? item('/journal/desk', 'desk', 'Desk') + item('/journal', 'journal', 'Journal', on('/journal') && !on('/journal/insights') && !on('/journal/mentor') && !on('/journal/desk') && !on('/journal/plan')) + item('/journal/plan', 'plan', 'Plan a trade') + item('/journal/insights', 'insights', 'Insights') : ''}
       ${req.mentorEligible && (req.hasJournal || u.mentor_share) ? item('/journal/mentor', 'chat', `Mentor review${req.mentorNew ? `<em class="count">${req.mentorNew}</em>` : ''}`, on('/journal/mentor')) : ''}`)}
-    ${group('Account', `${item('/profile', 'user', 'Profile')}${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}
+    ${group('Account', `${item('/settings', 'user', 'Trading profile')}${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}${item('/profile', 'user', 'My page')}${item('/affiliate', 'gift', 'Affiliate')}
       ${u.google_sub ? '' : item('/password', 'lock', 'Password')}`)}
-    ${u.is_admin ? group('Owner', `${item('/admin/sales', 'insights', 'Sales')}${item('/admin/usage', 'pulse', 'Feature usage')}${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/usage'))}${item('/admin/eas', 'upload', 'EAs')}${item('/mentor', 'cap', `Mentor${req.mentorWaiting ? `<em class="count">${req.mentorWaiting}</em>` : ''}`)}`) : ''}
-    ${group('Account', `${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}${item('/profile', 'user', 'My page')}${item('/affiliate', 'gift', 'Affiliate')}
-    ${u.is_admin ? group('Owner', `${item('/admin/sales', 'insights', 'Sales')}${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/affiliates'))}${item('/admin/eas', 'upload', 'EAs')}${item('/admin/affiliates', 'gift', 'Affiliates')}${item('/mentor', 'cap', `Mentor${req.mentorWaiting ? `<em class="count">${req.mentorWaiting}</em>` : ''}`)}`) : ''}
+    ${u.is_admin ? group('Owner', `${item('/admin/sales', 'insights', 'Sales')}${item('/admin/usage', 'pulse', 'Feature usage')}${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/affiliates') && !on('/admin/usage'))}${item('/admin/eas', 'upload', 'EAs')}${item('/admin/affiliates', 'gift', 'Affiliates')}${item('/mentor', 'cap', `Mentor${req.mentorWaiting ? `<em class="count">${req.mentorWaiting}</em>` : ''}`)}`) : ''}
     <div class="side-group side-end">
       <a href="/?install=1" data-install style="display:none" title="Get the app">${icon('app')}<span>Get the app</span></a>
       ${item('/faq', 'help', 'Help &amp; FAQ')}
@@ -157,7 +155,7 @@ function appShell(req, u, flashHtml, body, title) {
 </div>
 </div>
 <script src="/privacy.js"></script>
-${require('./features').clientTag()}`;
+${require('./features').clientTag()}
 ${require('./tour').script(req, u)}`;
 }
 

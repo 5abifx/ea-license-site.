@@ -1501,7 +1501,6 @@ select option:disabled { color: #6b6b73; }
 .tm-rd { display: grid; gap: 8px; margin-top: auto; border-top: 1px solid var(--line); padding-top: 12px; } .tm-rd .tp-l { color: var(--muted); }
 .tm-rdb { width: 100%; height: 56px; display: block; }
 .tm-nd .tm-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); } @media (max-width: 420px) { .tm-afp b { font-size: 16px; } }
-=======
 /* ---------- Trade plans + What we found: black, white and orange; green/red only on money ---------- */
 .found { margin: 0 0 18px; }
 .found h2 { margin: 0; }

@@ -1,6 +1,6 @@
 // Guided first run after sign-up (Google or email): one question per screen, a "trader file" filling in beside it,
 // a with-vs-without risk screen, then the card step when the trial needs a card. Answers live in users.profile (JSON),
-// can be changed on /profile, and feed the journal: the name, the prop firm guard of new accounts, the goal on Insights.
+// can be changed on /settings, and feed the journal: the name, the prop firm guard of new accounts, the goal on Insights.
 const { esc } = require('./views');
 
 const Q = [
@@ -107,7 +107,7 @@ module.exports = function onboard(app, { db, page, flash, requireUser, stripe, t
   });
 
   // Profile settings: the same answers as chips, all on one page
-  app.get('/profile', requireUser, (req, res) => {
+  app.get('/settings', requireUser, (req, res) => {
     const u = req.user, a = read(u);
     const chips = (q) => q.opts.map(([k, l]) => `<label class="pchip"><input type="${q.multi ? 'checkbox' : 'radio'}" name="${q.id}" value="${k}"${[].concat(a[q.id] || []).includes(k) ? ' checked' : ''}><span>${esc(l)}</span></label>`).join('');
     page(req, res, 'Profile', `
