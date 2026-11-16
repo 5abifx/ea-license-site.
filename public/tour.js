@@ -122,6 +122,14 @@
     }
     scrim.classList.add('clear'); card.classList.remove('center');
     var r = target.getBoundingClientRect(), pad = 6;
+    // headings: hug the words, centred (the element box has extra space under the text)
+    if (/^H[1-3]$/.test(target.tagName)) {
+      try {
+        var rg = document.createRange(); rg.selectNodeContents(target); var t = rg.getBoundingClientRect();
+        var fs = parseFloat(getComputedStyle(target).fontSize) || 20, mid = t.top + t.height / 2, h = fs * 1.1;
+        r = { left: t.left, right: t.right, width: t.width, top: mid - h / 2, bottom: mid + h / 2, height: h }; pad = 10;
+      } catch (e) {}
+    }
     if (!hole) { hole = el('div', 'tr-hole'); document.body.appendChild(hole); }
     hole.style.left = (r.left - pad) + 'px'; hole.style.top = (r.top - pad) + 'px';
     hole.style.width = (r.width + pad * 2) + 'px'; hole.style.height = (r.height + pad * 2) + 'px';

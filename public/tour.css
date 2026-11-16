@@ -80,9 +80,9 @@
 /* ---- liquid glass (same recipe as the guided sign-up) ---- */
 .tr-amb{position:absolute;inset:0;overflow:hidden;pointer-events:none}
 .tr-amb i{position:absolute;border-radius:50%;filter:blur(90px);animation:tr-drift 22s ease-in-out infinite alternate}
-.tr-amb i:nth-child(1){width:560px;height:560px;background:#ff5a1f;left:8vw;top:30vh;opacity:.28}
-.tr-amb i:nth-child(2){width:440px;height:440px;background:#26c6a0;left:62vw;top:6vh;opacity:.18;animation-duration:28s}
-.tr-amb i:nth-child(3){width:380px;height:380px;background:#8a8aa8;left:40vw;top:70vh;opacity:.18;animation-duration:34s}
+.tr-amb i:nth-child(1){width:560px;height:560px;background:#ff5a1f;left:8vw;top:30vh;opacity:.07}
+.tr-amb i:nth-child(2){width:440px;height:440px;background:#26c6a0;left:62vw;top:6vh;opacity:.05;animation-duration:28s}
+.tr-amb i:nth-child(3){width:380px;height:380px;background:#8a8aa8;left:40vw;top:70vh;opacity:.06;animation-duration:34s}
 @keyframes tr-drift{to{transform:translate(90px,-70px) scale(1.18)}}
 .tr-scrim.clear .tr-amb{display:none}
 .tr-glass{background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.035) 45%,rgba(255,255,255,.02));backdrop-filter:blur(28px) saturate(190%);-webkit-backdrop-filter:blur(28px) saturate(190%);border:1px solid rgba(255,255,255,.13);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 -1px 0 rgba(0,0,0,.35),inset 0 0 30px rgba(255,255,255,.03),0 30px 90px rgba(0,0,0,.55);overflow:hidden}
@@ -95,7 +95,9 @@
 .tr-scrim{background:rgba(3,3,5,.5)}
 .tr-hole{box-shadow:0 0 0 9999px rgba(3,3,5,.55),0 0 0 1px rgba(255,255,255,.55),0 0 30px rgba(255,90,31,.5),inset 0 0 20px rgba(255,255,255,.08)}
 .tr-opt{background:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 10px 30px rgba(0,0,0,.25)}
-.tr-opt.adv{background:linear-gradient(160deg,rgba(255,90,31,.22),rgba(255,255,255,.04) 55%);border-color:rgba(255,140,90,.35)}
+.tr-opt.adv{background:linear-gradient(160deg,rgba(255,90,31,.05),rgba(255,255,255,.03) 55%);border-color:rgba(255,255,255,.12)}
 .tr-glass .tr-back,.tr-later button{background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.03))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 0 0 1px rgba(255,255,255,.08)!important;padding:8px 14px!important;border-radius:999px}
 .tr-glass .tr-back:hover,.tr-later button:hover{background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.05))!important}
 .tr-glass .tr-x{width:30px;height:30px;padding:0!important;border-radius:50%;background:rgba(255,255,255,.07)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.15)!important;z-index:2}
+.tr-opt.adv li:before{background:rgba(255,160,120,.55)}
+.tr-opt h3 small{background:rgba(255,255,255,.07);color:#c4c4cc}
