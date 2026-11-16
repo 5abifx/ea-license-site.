@@ -43,7 +43,8 @@ function cinePage(req, name, slots, opts = {}) {
 <meta property="og:image" content="${esc(origin)}/${og.image || 'og.png'}?v=3">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/app/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="5ABI.FX"><meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@200;300;400&family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/cine/${name}.css?v=${v}">
@@ -51,6 +52,7 @@ function cinePage(req, name, slots, opts = {}) {
 ${body}
 <p class="risk">${RISK}</p>
 <script src="/cine/${name}.js?v=${v}"></script>
+<script src="/app/install.js?v=${v}" defer></script>
 ${require('./support').supportWidget(req)}
 </body></html>`;
 }

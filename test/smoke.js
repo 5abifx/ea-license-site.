@@ -829,6 +829,22 @@ function client(base, ip) {
       delete process.env.RATE_LIMIT_API_PER_MIN;
     }
 
+    // installable app: manifest + icons, and a service worker that is never cached and never caches
+    {
+      const mf = await fetch(base + '/manifest.webmanifest');
+      assert.strictEqual(mf.status, 200);
+      const m = await mf.json();
+      assert.strictEqual(m.display, 'standalone');
+      for (const ic of m.icons) assert.strictEqual((await fetch(base + ic.src)).status, 200);
+      const sw = await fetch(base + '/sw.js');
+      assert.strictEqual(sw.status, 200);
+      assert.strictEqual(sw.headers.get('cache-control'), 'no-cache');
+      assert.doesNotMatch(await sw.text(), /cache\.put|cache\.add|addAll/);
+      const home = await fetch(base + '/login').then((x) => x.text());
+      assert.match(home, /rel="manifest" href="\/manifest\.webmanifest"/);
+      assert.match(home, /src="\/app\/install\.js\?v=/);
+    }
+
     console.log('All smoke tests passed');
   } finally {
     server.close();

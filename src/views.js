@@ -37,6 +37,7 @@ const ICONS = {
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 2-2.5 2-2.5 4M12 17h.01"/>',
   out: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>',
   chat: '<path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12z"/><path d="M8.5 11h7M8.5 14h4"/>',
+  app: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M12 7v7m0 0l-3-3m3 3l3-3M10 18h4"/>',
   cap: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5M22 9v6"/>',
 };
 const icon = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
@@ -87,7 +88,8 @@ function layout(req, title, body, opts = {}) {
 <meta property="og:image" content="${esc(origin)}/${og.image || 'og.png'}?v=3">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/favicon.png" type="image/png"><link rel="apple-touch-icon" href="/app/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="5ABI.FX"><meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@200;300;400;600&family=Manrope:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/style.css">
@@ -102,6 +104,7 @@ ${opts.wide
 <span class="muted">${RISK}</span>
 </div></footer>`}
 <script src="/menu.js"></script>
+<script src="/app/install.js" defer></script>
 ${u && !opts.wide ? '<script src="/ignite.js"></script>' : ''}
 ${require('./support').supportWidget(req)}
 </body></html>`;
@@ -131,6 +134,7 @@ function appShell(req, u, flashHtml, body, title) {
       ${u.google_sub ? '' : item('/password', 'lock', 'Password')}`)}
     ${u.is_admin ? group('Owner', `${item('/admin/sales', 'insights', 'Sales')}${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas') && !on('/admin/sales'))}${item('/admin/eas', 'upload', 'EAs')}${item('/mentor', 'cap', `Mentor${req.mentorWaiting ? `<em class="count">${req.mentorWaiting}</em>` : ''}`)}`) : ''}
     <div class="side-group side-end">
+      <a href="/?install=1" data-install style="display:none" title="Get the app">${icon('app')}<span>Get the app</span></a>
       ${item('/faq', 'help', 'Help &amp; FAQ')}
       <form method="post" action="/logout"><button class="link" title="Sign out">${icon('out')}<span>Sign out</span></button></form>
     </div>
