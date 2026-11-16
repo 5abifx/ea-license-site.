@@ -138,6 +138,8 @@ function appShell(req, u, flashHtml, body, title) {
     ${group('Account', `${item('/profile', 'user', 'Profile')}${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}
       ${u.google_sub ? '' : item('/password', 'lock', 'Password')}`)}
     ${u.is_admin ? group('Owner', `${item('/admin/sales', 'insights', 'Sales')}${item('/admin/usage', 'pulse', 'Feature usage')}${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/usage'))}${item('/admin/eas', 'upload', 'EAs')}${item('/mentor', 'cap', `Mentor${req.mentorWaiting ? `<em class="count">${req.mentorWaiting}</em>` : ''}`)}`) : ''}
+    ${group('Account', `${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}${item('/profile', 'user', 'My page')}${item('/affiliate', 'gift', 'Affiliate')}
+    ${u.is_admin ? group('Owner', `${item('/admin/sales', 'insights', 'Sales')}${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/affiliates'))}${item('/admin/eas', 'upload', 'EAs')}${item('/admin/affiliates', 'gift', 'Affiliates')}${item('/mentor', 'cap', `Mentor${req.mentorWaiting ? `<em class="count">${req.mentorWaiting}</em>` : ''}`)}`) : ''}
     <div class="side-group side-end">
       <a href="/?install=1" data-install style="display:none" title="Get the app">${icon('app')}<span>Get the app</span></a>
       ${item('/faq', 'help', 'Help &amp; FAQ')}

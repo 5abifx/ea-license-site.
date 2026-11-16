@@ -14,6 +14,7 @@ process.env.RATE_LIMIT_PER_MIN = '100000';   // the tests send many requests fro
 const app = require('../src/server');
 const { db } = require('../src/db');
 
+const anonGet = async (base, u) => { const r = await fetch(base + u, { redirect: 'manual' }); return { status: r.status, text: await r.text() }; };
 function client(base, ip) {
   let cookies = {};
   const go = async (method, url, body) => {
@@ -188,13 +189,45 @@ function client(base, ip) {
     assert.match((await admin.get(`/admin/users/${riaId}`)).text, /Referred by .*tia/);
     const tiaExp = db.prepare('SELECT expires_at FROM users WHERE id = ?').get(tiaId).expires_at;
     r = await admin.post(`/admin/users/${riaId}/paid`, { plan: 'katana', billing: 'monthly' });
-    assert.match(r.text, /got 30 free days/);
+    assert.match(r.text, /Affiliate tia@test.com earns \$3\.20/);                     // 20% of the $16 she paid
     const tiaExp2 = db.prepare('SELECT expires_at FROM users WHERE id = ?').get(tiaId).expires_at;
-    assert.strictEqual(Math.round((Date.parse(tiaExp2 + 'Z') - Date.parse(tiaExp + 'Z')) / 864e5), 30);
-    r = await admin.post(`/admin/users/${riaId}/paid`, { plan: 'katana', billing: 'monthly' });   // second payment: no new reward
-    assert.doesNotMatch(r.text, /free days/);
+    assert.strictEqual(tiaExp2, tiaExp);                                                // no free days any more
+    r = await admin.post(`/admin/users/${riaId}/paid`, { plan: 'katana', billing: 'monthly' });   // every payment earns
+    assert.match(r.text, /earns \$4\.00/);
     assert.doesNotMatch((await ria.get('/subscribe?plan=katana')).text, /off first payment/);
     assert.match((await tia.get('/dashboard')).text, /1 joined · 1 paid/);
+    // affiliate page: commissions wait for the hold days, then the admin pays them
+    r = await tia.get('/affiliate');
+    assert.match(r.text, /Get paid every month/);
+    assert.match(r.text, /Ri•+/);                                                       // name cut short
+    assert.doesNotMatch(r.text, /ria@test\.com/);
+    assert.match(r.text, /\$7\.20 counting soon/);
+    assert.doesNotMatch((await admin.get('/admin/affiliates')).text, /Mark \$/);
+    db.prepare("UPDATE commissions SET ready_at = datetime('now', '-1 minute')").run();
+    await tia.post('/affiliate/payout', { payout_method: 'Interac · tia@test.com' });
+    r = await admin.get('/admin/affiliates');
+    assert.match(r.text, /Interac · tia@test.com/);
+    r = await admin.post(`/admin/affiliates/${tiaId}/paid`);
+    assert.match(r.text, /\$7\.20 marked as paid to tia@test.com/);
+    assert.match((await tia.get('/affiliate')).text, /Interac · tia@test.com/);       // in her payout history
+    r = await admin.post('/admin/affiliates/settings', { aff_ea_pct: '25', aff_mentor_flat: '200', aff_friend_pct: '10', aff_min_payout: '50', aff_hold_days: '14', aff_cookie_days: '60' });
+    assert.match(r.text, /Affiliate settings saved/);
+    assert.match((await tia.get('/dashboard')).text, /<b>10% off<\/b>.*<b>25%<\/b>/s);
+    db.prepare("DELETE FROM settings WHERE key LIKE 'aff_%'").run();
+    // public page: off by default, then on with a username; the referral link sits behind it
+    assert.strictEqual((await anonGet(base, '/@tiatrades')).status, 404);
+    r = await tia.post('/profile', { on: '1', handle: '@TiaTrades', name: 'Tia K', bio: 'Gold scalper <b>', ig: 'https://instagram.com/tia.fx/', stats: '1', join: '1' });
+    assert.match(r.text, /live at 5abifx.com\/@tiatrades/);
+    r = await anonGet(base, '/@tiatrades');
+    assert.strictEqual(r.status, 200);
+    assert.match(r.text, /Tia K/);
+    assert.match(r.text, /Gold scalper &lt;b&gt;/);
+    assert.match(r.text, /instagram.com\/tia.fx"/);
+    assert.match(r.text, /href="\/r\/[A-Z0-9]+\?to=signup"/);
+    assert.doesNotMatch(r.text, /tia@test\.com/);
+    assert.strictEqual(db.prepare('SELECT SUM(n) AS n FROM ref_clicks WHERE user_id = ?').get(tiaId).n, 2);   // Ria's /r/ visit + this one
+    r = await ria.post('/profile', { on: '1', handle: 'tiatrades' });
+    assert.match(r.text, /@tiatrades is taken/);
     process.env.TRIAL_DAYS = '0';
 
     // public info pages, 404 and link preview tags
