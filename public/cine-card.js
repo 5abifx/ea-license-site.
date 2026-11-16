@@ -156,6 +156,8 @@ function create(canvas, data, opts) {
     // top: what this is
     let top = wide ? 150 : post ? 170 : 250;
     c.globalAlpha = A(tm, 0.1, 0.7);
+    // 5ABIFX: always on, top centre, cannot be hidden
+    text(c, '5ABIFX', cx, wide ? 56 : post ? 64 : 112, { fam: BIG, size: 30, w: 700, ls: 8, color: 'rgba(255,255,255,.75)' });
     if (S.title) {
       if (o.kind === 'trade') {
         const sub = [data.side, S.date ? data.dateTxt : ''].filter(Boolean).join(' · ').toUpperCase();
@@ -234,7 +236,7 @@ function create(canvas, data, opts) {
         ry += wide ? 50 : 62;
       });
     }
-    // footer: the one brand spot. "KATANA × name" tag, then the site
+    // footer: "KATANA × name" tag only
     c.globalAlpha = A(tm, 0.1, 0.6); // brand shows at first glance
     const fy = H - (wide ? 110 : 170), lw2 = 60, brand = o.brand || 'KATANA';
     const hd = S.handle ? String(o.tag || data.handle || '').trim() : '';
@@ -244,7 +246,6 @@ function create(canvas, data, opts) {
     drawLogo(fx, fy - 30, lw2);
     text(c, brand, fx + lw2 + 14, fy, { fam: BIG, w: 700, size: 38, align: 'left', ls: 4 });
     if (hd) { text(c, '×', fx + lw2 + 14 + bwid + 30, fy - 2, { size: 34, w: 500, color: 'rgba(255,255,255,.6)' }); text(c, hd, fx + lw2 + 14 + bwid + 60, fy, { fam: BIG, size: 38, w: 700, align: 'left', ls: 4 }); }
-    text(c, '5ABIFX', cx, fy + 54, { fam: BIG, size: 28, w: 700, ls: 6, color: 'rgba(255,255,255,.7)' }); // always on, cannot be hidden
     c.globalAlpha = 1; c.shadowBlur = 0;
   }
   const logo = new Image(); logo.src = (window.CineCardLogo || '/logo.png');
