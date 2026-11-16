@@ -45,6 +45,41 @@ function text(c, s, x, y, o) {
   c.fillText(String(s), x, y);
   if ('letterSpacing' in c) c.letterSpacing = '0px';
 }
+// instrument badge: glass circle in the card's style with a simple mark per market
+const CUR = { EUR: '€', GBP: '£', USD: '$', JPY: '¥', AUD: 'A$', NZD: 'N$', CAD: 'C$', CHF: 'Fr' };
+function instrument(sym) {
+  const s = String(sym || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (/^(BTC|XBT)/.test(s)) return { t: 'glyph', g: '₿', col: '#f7931a' };
+  if (/^ETH/.test(s)) return { t: 'glyph', g: 'Ξ', col: '#9aa6ff' };
+  if (/^(XAU|GOLD|GC)/.test(s)) return { t: 'bar', a: '#fff1c2', b: '#d9a93a', d: '#8a6416' };
+  if (/^(XAG|SILVER|SI\b)/.test(s)) return { t: 'bar', a: '#ffffff', b: '#c3cad6', d: '#6d7684' };
+  if (/^(WTI|USOIL|UKOIL|XTI|XBR|BRENT|CL\d*$|OIL)/.test(s)) return { t: 'drop', col: '#e9eef6' };
+  const idx = [[/^(NQ|MNQ|NAS|US100|USTEC|NDX)/, 'NQ'], [/^(ES|MES|SPX|US500|SP500)/, 'ES'], [/^(YM|MYM|US30|DJ|DOW)/, 'YM'], [/^(DAX|GER|DE40)/, 'DAX'], [/^(RTY|M2K|US2000)/, 'RTY']];
+  for (const [r, l] of idx) if (r.test(s)) return { t: 'label', g: l };
+  if (s.length >= 6 && CUR[s.slice(0, 3)]) return { t: 'glyph', g: CUR[s.slice(0, 3)], col: '#f4f4f6' };
+  return null;
+}
+function drawBadge(c, ins, x, y, r) {
+  c.save();
+  const ring = c.createLinearGradient(x - r, y - r, x + r, y + r); ring.addColorStop(0, 'rgba(255,255,255,.55)'); ring.addColorStop(1, 'rgba(255,255,255,.08)');
+  c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fillStyle = 'rgba(14,15,19,.72)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = ring; c.stroke();
+  if (ins.t === 'glyph' || ins.t === 'label') {
+    const sz = ins.t === 'label' ? (ins.g.length > 2 ? r * 0.62 : r * 0.78) : r * (ins.g.length > 1 ? 0.8 : 1.15);
+    c.shadowColor = ins.col || 'rgba(255,255,255,.4)'; c.shadowBlur = 14;
+    c.font = `700 ${sz}px ${BIG}`; c.fillStyle = ins.col || '#f4f4f6'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(ins.g, x, y + 2);
+  } else if (ins.t === 'bar') {
+    const w = r * 1.25, h = r * 0.62, tw = w * 0.62, by = y + h / 2;
+    const g = c.createLinearGradient(0, by - h, 0, by); g.addColorStop(0, ins.a); g.addColorStop(0.55, ins.b); g.addColorStop(1, ins.d);
+    c.beginPath(); c.moveTo(x - w / 2, by); c.lineTo(x + w / 2, by); c.lineTo(x + tw / 2, by - h); c.lineTo(x - tw / 2, by - h); c.closePath();
+    c.shadowColor = ins.b; c.shadowBlur = 16; c.fillStyle = g; c.fill();
+    c.shadowBlur = 0; c.fillStyle = 'rgba(255,255,255,.55)'; c.fillRect(x - tw / 2 + 4, by - h + 3, tw - 8, 3);
+  } else if (ins.t === 'drop') {
+    const h = r * 1.05; c.beginPath(); c.moveTo(x, y - h / 2);
+    c.bezierCurveTo(x + r * 0.5, y, x + r * 0.42, y + h / 2, x, y + h / 2); c.bezierCurveTo(x - r * 0.42, y + h / 2, x - r * 0.5, y, x, y - h / 2);
+    c.fillStyle = ins.col; c.shadowColor = 'rgba(255,255,255,.35)'; c.shadowBlur = 12; c.fill();
+  }
+  c.restore();
+}
 function fit(c, s, max, size, fam, w, ls = 0) {
   c.font = `${w} ${size}px ${fam}`; if ('letterSpacing' in c) c.letterSpacing = ls + 'px';
   const m = c.measureText(String(s)).width; if ('letterSpacing' in c) c.letterSpacing = '0px';
@@ -125,7 +160,9 @@ function create(canvas, data, opts) {
       if (o.kind === 'trade') {
         const sub = [data.side, S.date ? data.dateTxt : ''].filter(Boolean).join(' · ').toUpperCase();
         c.font = `700 64px ${BIG}`; const w1 = c.measureText(data.symbol || '').width; c.font = `600 30px ${TXT}`; const w2 = sub ? c.measureText(sub).width + 26 : 0;
-        const x0 = cx - (w1 + w2) / 2;
+        const ins = instrument(data.symbol), br = 46, bw = ins ? br * 2 + 22 : 0;
+        const x0 = cx - (bw + w1 + w2) / 2 + bw;
+        if (ins) drawBadge(c, ins, x0 - 22 - br, top - 23, br);
         text(c, data.symbol || '', x0, top, { fam: BIG, w: 700, size: 64, align: 'left' });
         if (sub) text(c, sub, x0 + w1 + 26, top - 4, { size: 30, w: 600, color: 'rgba(255,255,255,.62)', align: 'left', ls: 2 });
       } else {
@@ -202,11 +239,11 @@ function create(canvas, data, opts) {
     const fy = H - (wide ? 110 : 170), lw2 = 60, brand = o.brand || 'KATANA';
     const hd = S.handle ? String(o.tag || data.handle || '').trim() : '';
     c.font = `700 38px ${BIG}`; if ('letterSpacing' in c) c.letterSpacing = '4px'; const bwid = c.measureText(brand).width; if ('letterSpacing' in c) c.letterSpacing = '0px';
-    c.font = `700 36px ${TXT}`; const hw = hd ? c.measureText(hd).width + 64 : 0;
+    c.font = `700 38px ${BIG}`; if ('letterSpacing' in c) c.letterSpacing = '4px'; const hw = hd ? c.measureText(hd).width + 64 : 0; if ('letterSpacing' in c) c.letterSpacing = '0px';
     const fx = cx - (lw2 + 14 + bwid + hw) / 2;
     drawLogo(fx, fy - 30, lw2);
     text(c, brand, fx + lw2 + 14, fy, { fam: BIG, w: 700, size: 38, align: 'left', ls: 4 });
-    if (hd) { text(c, '×', fx + lw2 + 14 + bwid + 30, fy - 2, { size: 30, w: 500, color: 'rgba(255,255,255,.6)' }); text(c, hd, fx + lw2 + 14 + bwid + 60, fy, { size: 36, w: 700, align: 'left' }); }
+    if (hd) { text(c, '×', fx + lw2 + 14 + bwid + 30, fy - 2, { size: 34, w: 500, color: 'rgba(255,255,255,.6)' }); text(c, hd, fx + lw2 + 14 + bwid + 60, fy, { fam: BIG, size: 38, w: 700, align: 'left', ls: 4 }); }
     text(c, '5ABIFX', cx, fy + 54, { fam: BIG, size: 28, w: 700, ls: 6, color: 'rgba(255,255,255,.7)' }); // always on, cannot be hidden
     c.globalAlpha = 1; c.shadowBlur = 0;
   }
