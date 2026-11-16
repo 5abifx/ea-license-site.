@@ -78,6 +78,9 @@ function client(base, ip) {
     const bob2 = client(base);
     await bob2.post('/login', { email: 'bob@test.com', password: 'bobpass123' });
     assert.match((await bob2.get('/dashboard')).text, /Gold Scalper/);
+    // My EAs: setup steps with the next step open, own stylesheet
+    { const d = (await bob2.get('/dashboard')).text;
+      assert.match(d, /data-setup/); assert.match(d, /Add your MT5 account/); assert.match(d, /myeas\.css/); }
     // student intro: not for regular members, on for admins
     assert.equal(JSON.parse((await bob2.get('/api/intro')).text).ok, false);
     assert.doesNotMatch((await bob2.get('/dashboard')).text, /intro\.js/);
