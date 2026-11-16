@@ -195,10 +195,16 @@ function client(base, ip) {
     assert.match(r.text, /doesn&#39;t exist|doesn't exist/);
     assert.match((await anon.get('/')).text, /property="og:image" content="http:\/\/127\.0\.0\.1:\d+\/og\.png\?v=3"/);
     assert.match((await anon.get('/mentorship')).text, /property="og:image" content="[^"]+\/og-mentorship\.png\?v=3"/);
+    r = await anon.get('/why');                                                   // with vs without showcase
+    assert.strictEqual(r.status, 200);
+    assert.match(r.text, /Smaller damage/);
+    assert.match(r.text, /esma\.europa\.eu/);                                    // facts carry their source
+    assert.match((await tia.get('/why')).text, /href="\/pricing">See plans/);
+    assert.match((await anon.get('/')).text, /href="\/why"/);
     assert.match((await fetch(base + '/robots.txt').then((x) => x.text())), /Disallow: \//);
     const robots = await fetch(base + '/robots.txt').then((x) => x.text());
     assert.match(robots, /User-agent: GPTBot\nDisallow: \//);                     // AI training bots stay out
-    assert.match(robots, /User-agent: \*\nAllow: \/\$\nAllow: \/mentorship/);     // search and AI search bots read public pages
+    assert.match(robots, /User-agent: \*\nAllow: \/\$\nAllow: \/mentorship\nAllow: \/why/);     // search and AI search bots read public pages
     assert.doesNotMatch(robots, /OAI-SearchBot|PerplexityBot/);
 
     // Sign in with Google: fake token endpoint returns an ID token for a verified Gmail address

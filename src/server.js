@@ -1012,6 +1012,7 @@ app.post('/admin/eas/:id/delete', requireAdmin, (req, res) => {
 });
 
 require('./help')(app, { db, page });
+require('./why')(app, { trialDays, signupOpen: () => SIGNUP_MODE !== 'closed' });
 const mentor = require('./mentorship')(app, { db, page, flash, requireUser, requireAdmin, grantAllActiveEas, PAYMENT_URL });
 const stripe = require('./stripe')(app, { db, flash, requireUser, applyPaid, startTrial, refs, mentor });
 sales.routes(app, { db, page, requireAdmin, stripe, backup, mentorPlans: require('./mentorship').MENTOR_PLANS });
