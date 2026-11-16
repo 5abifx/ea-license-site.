@@ -55,7 +55,7 @@
   // ---------- the question ----------
   function ask() {
     clear();
-    scrim = el('div', 'tr-scrim'); document.body.appendChild(scrim);
+    scrim = el('div', 'tr-scrim', '<div class="tr-amb"><i></i><i></i><i></i></div>'); document.body.appendChild(scrim);
     var j = has.j;
     pick = el('div', 'tr-pick tr-glass');
     pick.setAttribute('role', 'dialog'); pick.setAttribute('aria-label', 'Choose a tour');
@@ -94,7 +94,7 @@
     cur = { m: s0.m, i: i, n: L.length };
     // a step on another page: go there and pick up again on load
     if (!DEMO && s.path && location.pathname !== s.path) { location.href = s.path; return; }
-    if (!scrim) { scrim = el('div', 'tr-scrim'); document.body.appendChild(scrim); requestAnimationFrame(function () { scrim && scrim.classList.add('in'); }); }
+    if (!scrim) { scrim = el('div', 'tr-scrim', '<div class="tr-amb"><i></i><i></i><i></i></div>'); document.body.appendChild(scrim); requestAnimationFrame(function () { scrim && scrim.classList.add('in'); }); }
     if (pick) { pick.parentNode.removeChild(pick); pick = null; }
     var target = find(s.sel);
     if (target) {
