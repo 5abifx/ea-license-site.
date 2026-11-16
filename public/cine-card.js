@@ -13,12 +13,12 @@ const GRADE_COL = { ember: '#ff6a2a', blood: '#c3141d', teal: '#13a88a', gold: '
 const ARTS = { smoke: 'Smoke', ember: 'Ember glow', floor: 'Trading floor' };
 /* every line on the card is optional; members pick what they are happy to show */
 const FIELDS = {
-  trade: { title: 'Symbol and side', date: 'Date', line: 'Price line', quote: 'Quote', alt: 'Second unit', entry: 'Entry', exit: 'Exit', size: 'Size', held: 'Time held', risk: 'Risk %', handle: 'Name tag', site: '5abifx.com' },
-  period: { title: 'Period name', quote: 'Quote', alt: 'Second unit', bars: 'Day-by-day bars', trades: 'Trades', winrate: 'Win rate', green: 'Green days', best: 'Best day / trade', handle: 'Name tag', site: '5abifx.com' },
+  trade: { title: 'Symbol and side', date: 'Date', line: 'Price line', quote: 'Quote', alt: 'Second unit', entry: 'Entry', exit: 'Exit', size: 'Size', held: 'Time held', risk: 'Risk %', handle: 'Name tag' },
+  period: { title: 'Period name', quote: 'Quote', alt: 'Second unit', bars: 'Day-by-day bars', trades: 'Trades', winrate: 'Win rate', green: 'Green days', best: 'Best day / trade', handle: 'Name tag' },
 };
 const DEFAULTS = {
-  trade: { title: true, date: true, line: true, quote: false, alt: false, entry: false, exit: false, size: false, held: false, risk: false, handle: true, site: true },
-  period: { title: true, quote: false, alt: false, bars: true, trades: false, winrate: false, green: false, best: false, handle: true, site: true },
+  trade: { title: true, date: true, line: true, quote: false, alt: false, entry: false, exit: false, size: false, held: false, risk: false, handle: true },
+  period: { title: true, quote: false, alt: false, bars: true, trades: false, winrate: false, green: false, best: false, handle: true },
 };
 
 const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
@@ -198,7 +198,7 @@ function create(canvas, data, opts) {
       });
     }
     // footer: the one brand spot. "KATANA × name" tag, then the site
-    c.globalAlpha = A(tm, 2.8, 3.4);
+    c.globalAlpha = A(tm, 0.1, 0.6); // brand shows at first glance
     const fy = H - (wide ? 110 : 170), lw2 = 60, brand = o.brand || 'KATANA';
     const hd = S.handle ? String(o.tag || data.handle || '').trim() : '';
     c.font = `700 38px ${BIG}`; if ('letterSpacing' in c) c.letterSpacing = '4px'; const bwid = c.measureText(brand).width; if ('letterSpacing' in c) c.letterSpacing = '0px';
@@ -207,7 +207,7 @@ function create(canvas, data, opts) {
     drawLogo(fx, fy - 30, lw2);
     text(c, brand, fx + lw2 + 14, fy, { fam: BIG, w: 700, size: 38, align: 'left', ls: 4 });
     if (hd) { text(c, '×', fx + lw2 + 14 + bwid + 30, fy - 2, { size: 30, w: 500, color: 'rgba(255,255,255,.6)' }); text(c, hd, fx + lw2 + 14 + bwid + 60, fy, { size: 36, w: 700, align: 'left' }); }
-    if (S.site) text(c, '5abifx.com', cx, fy + 52, { size: 28, w: 500, color: 'rgba(255,255,255,.6)' });
+    text(c, '5ABIFX', cx, fy + 54, { fam: BIG, size: 28, w: 700, ls: 6, color: 'rgba(255,255,255,.7)' }); // always on, cannot be hidden
     c.globalAlpha = 1; c.shadowBlur = 0;
   }
   const logo = new Image(); logo.src = (window.CineCardLogo || '/logo.png');
