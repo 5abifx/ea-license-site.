@@ -167,7 +167,7 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
       ? '<a class="go hide-s" href="/dashboard">My EAs</a><a class="go" href="#price">See the plans</a>'
       : '<a class="go hide-s" href="/">Home</a><a class="go" href="/login?next=mentorship">Sign in</a><a class="go" href="#price">See the plans</a>';
     res.send(cinePage(req, 'mentorship', { NAVR: navr, SEATS: seatsGauge(), PRICE: pricing(u, waiting, pr), SOCIALS: socials() },
-      { title: `Mentorship · ${OG.title.split(' · ')[0]}`, og: OG }));
+      { title: `Mentorship · ${OG.title.split(' · ')[0]}`, og: OG, ld: require('./seo').mentorshipData() }));
   });
 
   // ---------- waitlist and checkout ----------
