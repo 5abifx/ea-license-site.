@@ -13,12 +13,12 @@ const GRADE_COL = { ember: '#ff6a2a', blood: '#c3141d', teal: '#13a88a', gold: '
 const ARTS = { smoke: 'Smoke', ember: 'Ember glow', floor: 'Trading floor' };
 /* every line on the card is optional; members pick what they are happy to show */
 const FIELDS = {
-  trade: { title: 'Symbol and side', date: 'Date', line: 'Price line', quote: 'Quote', alt: 'Second unit', entry: 'Entry', exit: 'Exit', size: 'Size', held: 'Time held', risk: 'Risk %', handle: 'My handle', katana: 'KATANA line', site: '5abifx.com' },
-  period: { title: 'Period name', quote: 'Quote', alt: 'Second unit', bars: 'Day-by-day bars', trades: 'Trades', winrate: 'Win rate', green: 'Green days', best: 'Best day / trade', handle: 'My handle', katana: 'KATANA line', site: '5abifx.com' },
+  trade: { title: 'Symbol and side', date: 'Date', line: 'Price line', quote: 'Quote', alt: 'Second unit', entry: 'Entry', exit: 'Exit', size: 'Size', held: 'Time held', risk: 'Risk %', handle: 'Name tag', site: '5abifx.com' },
+  period: { title: 'Period name', quote: 'Quote', alt: 'Second unit', bars: 'Day-by-day bars', trades: 'Trades', winrate: 'Win rate', green: 'Green days', best: 'Best day / trade', handle: 'Name tag', site: '5abifx.com' },
 };
 const DEFAULTS = {
-  trade: { title: true, date: true, line: true, quote: false, alt: false, entry: false, exit: false, size: false, held: false, risk: false, handle: true, katana: false, site: true },
-  period: { title: true, quote: false, alt: false, bars: true, trades: false, winrate: false, green: false, best: false, handle: true, katana: false, site: true },
+  trade: { title: true, date: true, line: true, quote: false, alt: false, entry: false, exit: false, size: false, held: false, risk: false, handle: true, site: true },
+  period: { title: true, quote: false, alt: false, bars: true, trades: false, winrate: false, green: false, best: false, handle: true, site: true },
 };
 
 const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
@@ -197,19 +197,17 @@ function create(canvas, data, opts) {
         ry += wide ? 50 : 62;
       });
     }
-    // footer: 5ABI.FX × handle, site, KATANA
+    // footer: the one brand spot. "KATANA × name" tag, then the site
     c.globalAlpha = A(tm, 2.8, 3.4);
-    const fy = H - (wide ? 110 : 170), lw2 = 64;
-    const brand = '5ABI.FX', hd = S.handle && data.handle ? data.handle : '';
-    c.font = `700 40px ${BIG}`; const bwid = c.measureText(brand).width;
-    c.font = `700 36px ${TXT}`; const hw = hd ? c.measureText(hd).width + 70 : 0;
-    const total2 = lw2 + 14 + bwid + hw, fx = cx - total2 / 2;
+    const fy = H - (wide ? 110 : 170), lw2 = 60, brand = o.brand || 'KATANA';
+    const hd = S.handle ? String(o.tag || data.handle || '').trim() : '';
+    c.font = `700 38px ${BIG}`; if ('letterSpacing' in c) c.letterSpacing = '4px'; const bwid = c.measureText(brand).width; if ('letterSpacing' in c) c.letterSpacing = '0px';
+    c.font = `700 36px ${TXT}`; const hw = hd ? c.measureText(hd).width + 64 : 0;
+    const fx = cx - (lw2 + 14 + bwid + hw) / 2;
     drawLogo(fx, fy - 30, lw2);
-    text(c, brand, fx + lw2 + 14, fy, { fam: BIG, w: 700, size: 40, align: 'left' });
-    if (hd) { text(c, '×', fx + lw2 + 14 + bwid + 26, fy - 2, { size: 30, w: 500, color: 'rgba(255,255,255,.6)', align: 'center' }); text(c, hd, fx + lw2 + 14 + bwid + 56, fy, { size: 36, w: 700, align: 'left' }); }
-    let fy2 = fy + 52;
-    if (S.site) { text(c, '5abifx.com', cx, fy2, { size: 28, w: 500, color: 'rgba(255,255,255,.6)' }); fy2 += 44; }
-    if (S.katana) text(c, 'PROTECTED BY KATANA', cx, fy2, { size: 22, w: 700, color: K.ORANGE, ls: 5 });
+    text(c, brand, fx + lw2 + 14, fy, { fam: BIG, w: 700, size: 38, align: 'left', ls: 4 });
+    if (hd) { text(c, '×', fx + lw2 + 14 + bwid + 30, fy - 2, { size: 30, w: 500, color: 'rgba(255,255,255,.6)' }); text(c, hd, fx + lw2 + 14 + bwid + 60, fy, { size: 36, w: 700, align: 'left' }); }
+    if (S.site) text(c, '5abifx.com', cx, fy + 52, { size: 28, w: 500, color: 'rgba(255,255,255,.6)' });
     c.globalAlpha = 1; c.shadowBlur = 0;
   }
   const logo = new Image(); logo.src = (window.CineCardLogo || '/logo.png');
