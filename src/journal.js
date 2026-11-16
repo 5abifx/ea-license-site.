@@ -392,12 +392,20 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const latest = db.prepare(`SELECT MAX(close_time) AS t FROM journal_trades WHERE ${where}`).get(...args).t;
     if (!latest) return res.redirect('/journal');
     const q = String(req.query.period || req.query.month || '');
-    const period = /^\d{4}-(0[1-9]|1[0-2])$/.test(q) || ['30', '90', 'all'].includes(q) ? q : latest.slice(0, 7);
-    const isMonth = period.length === 7;
+    const period = /^\d{4}-(0[1-9]|1[0-2])$/.test(q) || ['day', 'week', 'quarter', '30', '90', 'all'].includes(q) ? q : latest.slice(0, 7);
+    const isMonth = /^\d{4}-\d\d$/.test(period);
     let from = '', to = '';
     if (isMonth) {
       const [y, m] = period.split('-').map(Number);
       from = period + '-01'; to = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+    } else if (period === 'day') {
+      from = latest.slice(0, 10);
+    } else if (period === 'week') {   // Monday of the week of the latest trade
+      const d0 = new Date(latest.slice(0, 10) + 'T00:00:00Z');
+      from = new Date(d0 - ((d0.getUTCDay() + 6) % 7) * 864e5).toISOString().slice(0, 10);
+    } else if (period === 'quarter') {
+      const y = latest.slice(0, 4), qm = Math.floor((Number(latest.slice(5, 7)) - 1) / 3) * 3 + 1;
+      from = `${y}-${String(qm).padStart(2, '0')}-01`;
     } else if (period !== 'all') {
       from = new Date(Date.parse(latest.slice(0, 10) + 'T00:00:00Z') - (Number(period) - 1) * 864e5).toISOString().slice(0, 10);
     }
@@ -420,7 +428,9 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     trades.forEach((t) => { const k = t.symbol; (symbols[k] ||= { n: 0, net: 0 }); symbols[k].n++; symbols[k].net += t.net; });
 
     const monthName = (ym) => new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1, 1)).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-    const label = isMonth ? monthName(period) : period === 'all' ? 'All time' : `Last ${period} days`;
+    const dd = (x) => new Date(x + 'T00:00:00Z').toLocaleString('en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    const label = isMonth ? monthName(period) : period === 'all' ? 'All time' : period === 'day' ? dd(from)
+      : period === 'week' ? `Week of ${dd(from)}` : period === 'quarter' ? `Q${(Number(from.slice(5, 7)) + 2) / 3} ${from.slice(0, 4)}` : `Last ${period} days`;
     const first = trades[0]?.close_time.slice(0, 10) || '', last = trades.at(-1)?.close_time.slice(0, 10) || '';
     const acctName = sel ? `Account ••${String(sel.account_number).slice(-2)}` : liveAccts.length > 1 ? `${liveAccts.length} accounts` : liveAccts[0] ? `Account ••${String(liveAccts[0].account_number).slice(-2)}` : '';
     const data = {
@@ -446,7 +456,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     // periods to pick: the last 6 months with trades + ranges
     const months = db.prepare(`SELECT DISTINCT substr(close_time, 1, 7) AS m FROM journal_trades WHERE ${where} ORDER BY m DESC LIMIT 6`).all(...args).map((r) => r.m);
     if (isMonth && !months.includes(period)) months.unshift(period);
-    const opts = [...months.map((m) => [m, monthName(m)]), ['30', 'Last 30 days'], ['90', 'Last 90 days'], ['all', 'All time']];
+    const opts = [...months.map((m) => [m, monthName(m)]), ['day', 'Latest day'], ['week', 'This week'], ['quarter', 'This quarter'], ['30', 'Last 30 days'], ['90', 'Last 90 days'], ['all', 'All time']];
     const acctOpts = [...(liveAccts.length > 1 ? [['', 'All accounts']] : []), ...liveAccts.map((a) => [a.account_number, `Account ••${String(a.account_number).slice(-2)}`]),
       ...(sel && !liveAccts.includes(sel) ? [[sel.account_number, `Account ••${String(sel.account_number).slice(-2)}`]] : [])];
     const back = `/journal?${new URLSearchParams(Object.entries({ account: sel ? sel.account_number : '', month: isMonth ? period : '' }).filter(([, v]) => v)).toString()}`;
@@ -468,11 +478,20 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         <figure><canvas id="r2"></canvas><span class="share-btns"><button type="button" class="small" data-save="r2">Save card 2</button><button type="button" class="small secondary" data-share="r2" hidden>Share</button></span></figure>
       </div>
       <h2 class="report-big-h">Big report <span class="muted small">one picture, iPad / desktop size (4:3)</span></h2>
+      <h2 class="report-big-h">Motion card <span class="muted small">7-second video of this period</span></h2>
+      <div class="row motion-card">
+        <select id="mv-what" aria-label="What to show"><option value="period">Period total</option>${data.sessions && data.sessions.length ? '<option value="session">Best session</option>' : ''}</select>
+        <select id="mv-scene" aria-label="Motion background"><option value="ember">Ember glow</option><option value="bars">Volume bars</option><option value="own">My photo or clip</option></select>
+        <select id="mv-size" aria-label="Video size"><option value="story">Story 9:16</option><option value="post">Post 4:5</option></select>
+        <input type="file" id="mv-file" accept="image/*,video/*" hidden>
+      </div>
+      <div class="cards"><figure><canvas id="mv"></canvas><span class="share-btns"><button type="button" class="small" id="mv-rec">Make video</button><button type="button" class="small secondary" id="mv-share" hidden>Share</button></span><span class="muted small" id="mv-st" aria-live="polite"></span></figure></div>
       <figure class="report-big"><canvas id="r3"></canvas><span class="share-btns"><button type="button" class="small" data-save="r3">Save big report</button><button type="button" class="small secondary" data-share="r3" hidden>Share</button></span></figure>` : '<p class="muted">No closed trades in this period. Pick another one above.</p>'}
       <p class="muted small">Your handle on the cards: <strong>${esc(u.card_handle || '5abifx.com')}</strong>. Change it on any trade page.</p>
     </section>
     <script id="report-data" type="application/json">${json}</script>
     <script src="/cards.js"></script>
+    <script src="/motion-card.js"></script>
     <script src="/report.js"></script>`);
   });
 
@@ -860,10 +879,11 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     </section>
 
     <section class="card motion-card">
-      <h2>Motion card <span class="tag">7-second video · 9:16</span></h2>
+      <h2>Motion card <span class="tag">7-second video · story or post</span></h2>
       <p class="muted">The result as a short video for Instagram, TikTok or Discord. Uses the $ / % / R choice and KATANA line from above.</p>
       <div class="row">
         <select id="mv-scene" aria-label="Motion background"><option value="ember">Background: Ember glow</option><option value="candles">Background: Trade candles</option><option value="bars">Background: Volume bars</option><option value="own">Background: My photo or clip</option></select>
+        <select id="mv-size" aria-label="Video size"><option value="story">Story 9:16</option><option value="post">Post 4:5</option></select>
         <label class="mv-file" id="mv-filebox" hidden>Photo or clip <input type="file" id="mv-file" accept="image/*,video/*"></label>
         <label class="mv-dim" id="mv-dimbox" hidden>Darken <input type="range" id="mv-dim" min="0" max="90" value="55"></label>
       </div>

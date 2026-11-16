@@ -6,7 +6,8 @@
 const K = window.TradeCards.kit, F = K.fmt;
 const { W, H, PAD, D, M, INK, SOFT, DIM, FAINT, ORANGE, WIN, LOSS, T, fitSize } = K;
 const LEN = 7, FPS = 30;
-const SCENES = { ember: 'Ember glow', candles: 'Trade candles', bars: 'Volume bars', own: 'My background' };
+const SIZES = { story: 'Story 9:16', post: 'Post 4:5' };
+const SCENES0 = { ember: 'Ember glow', candles: 'Trade candles', bars: 'Volume bars', own: 'My background' };
 
 const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const ease = x => 1 - Math.pow(1 - clamp(x), 4);
@@ -37,6 +38,8 @@ function candlesOf(t) {
 }
 
 function create(canvas, trade, opts) {
+  // story 9:16 (1080x1920) or feed post 4:5 (1080x1350)
+  let H = opts && opts.size === 'post' ? 1350 : K.H;
   canvas.width = W; canvas.height = H;
   const c = canvas.getContext('2d');
   const o = Object.assign({ mode: 'money', scene: 'ember', rm: true, dim: 0.55 }, opts || {});
@@ -102,7 +105,7 @@ function create(canvas, trade, opts) {
     const s = Math.max(W / mw, H / mh) * z;
     c.drawImage(media, (W - mw * s) / 2, (H - mh * s) / 2, mw * s, mh * s);
   }
-  const SC = { ember: sceneEmber, candles: sceneCandles, bars: sceneBars, own: sceneOwn };
+  const SCENES = { ember: sceneEmber, candles: sceneCandles, bars: sceneBars, own: sceneOwn };
 
   /* darkens the art so the number always reads, more for a member's own background */
   function shade() {
@@ -114,7 +117,7 @@ function create(canvas, trade, opts) {
   }
 
   function frame(tm) {
-    SC[o.scene](tm); shade();
+    SCENES[o.scene](tm); shade();
     // a soft dark edge keeps small text readable on bright photos
     c.shadowColor = 'rgba(0,0,0,.75)'; c.shadowBlur = o.scene === 'own' ? 14 : 0;
     const win = F.isWin(trade), col = win ? WIN : LOSS;
@@ -124,9 +127,9 @@ function create(canvas, trade, opts) {
     const hd = trade.handle || '5abifx.com';
     T(c, hd, W - PAD, 153, { fam: M, size: fitSize(c, hd, 420, 26, M, 400, 2), color: SOFT, align: 'right', ls: 2 });
     // what was traded
-    const a1 = ease(seg(tm, 0.2, 0.9)), cy = 930;
+    const a1 = ease(seg(tm, 0.2, 0.9)), cy = Math.round(H * 0.484);
     c.globalAlpha = a1;
-    const top = [trade.symbol, trade.side, F.dayTxt(trade.close)].filter(Boolean).join('  ·  ');
+    const top = o.top || [trade.symbol, trade.side, F.dayTxt(trade.close)].filter(Boolean).join('  ·  ');
     T(c, top, W / 2, cy - 250 + 30 * (1 - a1), { fam: M, size: fitSize(c, top, W - 2 * PAD, 34, M, 400, 6), color: SOFT, align: 'center', ls: 6 });
     // the big number counts up
     const val = valueOf(trade, o.mode), p = expo(seg(tm, 0.5, 2.3));
@@ -149,8 +152,8 @@ function create(canvas, trade, opts) {
     c.globalAlpha = a2;
     const sub = subLine(trade, o.mode);
     if (sub) T(c, sub, W / 2, cy + 100, { fam: M, size: fitSize(c, sub, W - 2 * PAD, 40, M, 400), color: INK, align: 'center' });
-    const cells = [['ENTRY', trade.entry], ['EXIT', trade.exit], ['HELD', F.duration(trade)]];
-    const cw = (W - 2 * PAD) / 3, ry = 1330 + 40 * (1 - a2);
+    const cells = o.cells || [['ENTRY', trade.entry], ['EXIT', trade.exit], ['HELD', F.duration(trade)]];
+    const cw = (W - 2 * PAD) / 3, ry = Math.round(H * 0.693) + 40 * (1 - a2);
     c.fillStyle = 'rgba(255,255,255,.14)'; c.fillRect(PAD, ry - 80, (W - 2 * PAD) * a2, 2);
     cells.forEach(([k, v], i) => {
       const x = PAD + cw * i + cw / 2, s = String(v ?? '—');
@@ -231,11 +234,65 @@ function create(canvas, trade, opts) {
   }
 
   return {
-    set(next) { Object.assign(o, next || {}); },
+    set(next) {
+      Object.assign(o, next || {});
+      const h = o.size === 'post' ? 1350 : K.H;
+      if (h !== H) { H = h; canvas.height = H; }
+    },
     setBackground, play, stop, record, canRecord: () => format() !== null && !!canvas.captureStream,
     still(sec) { frozen = sec; }, // for screenshots
   };
 }
 
-window.MotionCard = { create, scenes: SCENES, length: LEN };
+/* wires the motion card controls on a page: #mv canvas, #mv-scene, #mv-size, #mv-file, #mv-dim, #mv-rec, #mv-share, #mv-st.
+   extra() returns the page's own options (mode, KATANA line, period text...). */
+function mount(trade, extra, fileTag) {
+  const val = (id) => document.getElementById(id), cv = val('mv');
+  if (!cv) return null;
+  const st = val('mv-st'), rec = val('mv-rec'), shareBtn = val('mv-share');
+  const mc = create(cv, trade, Object.assign({ size: val('mv-size') ? val('mv-size').value : 'story' }, extra()));
+  let video = null;
+  const remember = (k, id) => { try { const v = localStorage.getItem(k); if (v && v !== 'own' && val(id) && val(id).querySelector(`option[value="${v}"]`)) val(id).value = v; } catch (e) {} };
+  remember('motionScene', 'mv-scene'); remember('motionSize', 'mv-size');
+  const own = () => { const on = val('mv-scene').value === 'own'; ['mv-filebox', 'mv-dimbox', 'mv-private'].forEach((id) => { if (val(id)) val(id).hidden = !on; }); };
+  const sync = () => {
+    mc.set(Object.assign({ scene: val('mv-scene').value, size: val('mv-size') ? val('mv-size').value : 'story' }, extra()));
+    video = null; shareBtn.hidden = true; mc.play();
+  };
+  val('mv-scene').addEventListener('change', () => {
+    own(); sync();
+    try { localStorage.setItem('motionScene', val('mv-scene').value); } catch (e) {}
+    if (val('mv-scene').value === 'own' && !val('mv-file').files[0]) val('mv-file').click();
+  });
+  if (val('mv-size')) val('mv-size').addEventListener('change', () => { sync(); try { localStorage.setItem('motionSize', val('mv-size').value); } catch (e) {} });
+  if (val('mv-dim')) val('mv-dim').addEventListener('input', (e) => mc.set({ dim: e.target.value / 100 }));
+  // the photo or clip is read in the browser only, never sent to the server
+  val('mv-file').addEventListener('change', (e) => {
+    st.textContent = '';
+    mc.setBackground(e.target.files[0] || null).then(() => sync()).catch((err) => { st.textContent = err.message; });
+  });
+  if (!mc.canRecord()) { rec.disabled = true; st.textContent = 'This browser cannot record video. Try Chrome or Safari.'; }
+  const name = (ext) => `5ABIFX-${String(fileTag || 'card').replace(/[^\w-]+/g, '-')}-motion.${ext}`;
+  rec.addEventListener('click', () => {
+    rec.disabled = true; shareBtn.hidden = true;
+    mc.record((p) => { st.textContent = `Recording ${Math.round(p * 100)}%`; }).then((r) => {
+      video = r; rec.disabled = false; rec.textContent = 'Make again';
+      st.textContent = `Saved ${r.ext.toUpperCase()} (${(r.blob.size / 1e6).toFixed(1)} MB)`;
+      const file = new File([r.blob], name(r.ext), { type: r.blob.type });
+      // phones: Share opens the share sheet (Instagram, Discord, Save video); computers download the file
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { shareBtn.hidden = false; st.textContent = 'Ready. Tap Share to post or save it.'; return; }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(r.blob); a.download = name(r.ext); a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    }).catch((err) => { st.textContent = err.message; rec.disabled = false; });
+  });
+  shareBtn.addEventListener('click', () => {
+    if (video) navigator.share({ files: [new File([video.blob], name(video.ext), { type: video.blob.type })] }).catch(() => {});
+  });
+  own(); sync();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => mc.play());
+  return { sync, card: mc };
+}
+
+window.MotionCard = { create, mount, scenes: SCENES0, sizes: SIZES, length: LEN };
 })();
