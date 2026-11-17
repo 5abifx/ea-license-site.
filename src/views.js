@@ -42,6 +42,7 @@ const ICONS = {
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
   app: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M12 7v7m0 0l-3-3m3 3l3-3M10 18h4"/>',
   cap: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5M22 9v6"/>',
+  star: '<path d="M12 3l2.5 6 6.5.5-5 4 1.5 6.5L12 16l-5.5 4 1.5-6.5-5-4 6.5-.5z"/>',
   tour: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
 };
 const icon = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
@@ -124,12 +125,15 @@ function appShell(req, u, flashHtml, body, title) {
   const item = (href, ic, text, active = on(href)) => `<a href="${href}" title="${text.replace(/<[^>]*>.*$/, '')}"${active ? ' class="on" aria-current="page"' : ''}>${icon(ic)}<span>${text}</span></a>`;
   const group = (label, items) => (items.trim() ? `<div class="side-group"><div class="side-label">${label}</div>${items}</div>` : '');
   const adminPage = req.path.startsWith('/admin');
+  const wnNew = require('./whatsnew').count(u);   // What's new lines this member has not seen (orange dot)
+  const wnDot = wnNew ? '<em class="wn-dot" aria-label="new"></em>' : '';
   return `<script>try{if(localStorage.getItem('sideFold')==='1')document.documentElement.classList.add('side-fold')}catch(e){}</script>
 <div class="app">
 <aside class="side">
   <div class="side-top">
     <a class="brand" href="/dashboard">${brandMark()}</a>
     ${planBox(u)}
+    <a class="wn-top${wnNew ? ' on' : ''}" href="/whats-new" data-wn-open aria-label="What's new">${icon('star')}${wnDot}</a>
     <button type="button" class="menu-btn" data-menu aria-controls="side-nav" aria-expanded="false" aria-label="Menu"><i></i><i></i><i></i></button>
   </div>
   <nav class="side-nav" id="side-nav" aria-label="Members menu">
@@ -138,9 +142,10 @@ function appShell(req, u, flashHtml, body, title) {
       ${req.mentorEligible && (req.hasJournal || u.mentor_share) ? item('/journal/mentor', 'chat', `Mentor review${req.mentorNew ? `<em class="count">${req.mentorNew}</em>` : ''}`, on('/journal/mentor')) : ''}`)}
     ${group('Account', `${item('/settings', 'user', 'Trading profile')}${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}${item('/profile', 'user', 'My page')}${item('/affiliate', 'gift', 'Affiliate')}
       ${u.google_sub ? '' : item('/password', 'lock', 'Password')}`)}
-    ${u.is_admin ? group('Owner', `${item('/admin/sales', 'insights', 'Sales')}${item('/admin/usage', 'pulse', 'Feature usage')}${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/affiliates') && !on('/admin/usage'))}${item('/admin/eas', 'upload', 'EAs')}${item('/admin/affiliates', 'gift', 'Affiliates')}${item('/mentor', 'cap', `Mentor${req.mentorWaiting ? `<em class="count">${req.mentorWaiting}</em>` : ''}`)}`) : ''}
+    ${u.is_admin ? group('Owner', `${item('/admin/sales', 'insights', 'Sales')}${item('/admin/usage', 'pulse', 'Feature usage')}${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/affiliates') && !on('/admin/usage') && !on('/admin/whatsnew'))}${item('/admin/eas', 'upload', 'EAs')}${item('/admin/whatsnew', 'star', "What's new")}${item('/admin/affiliates', 'gift', 'Affiliates')}${item('/mentor', 'cap', `Mentor${req.mentorWaiting ? `<em class="count">${req.mentorWaiting}</em>` : ''}`)}`) : ''}
     <div class="side-group side-end">
       <a href="/?install=1" data-install style="display:none" title="Get the app">${icon('app')}<span>Get the app</span></a>
+      <a href="/whats-new" data-wn-open title="What's new"${on('/whats-new') ? ' class="on" aria-current="page"' : wnNew ? ' class="wn-has"' : ''}>${icon('star')}<span>What's new${wnNew ? `<em class="count">${wnNew}</em>` : ''}</span>${wnDot}</a>
       ${item('/faq', 'help', 'Help &amp; FAQ')}
       <a href="#tour" data-tour-open title="Show me around">${icon('tour')}<span>Show me around</span></a>
       <form method="post" action="/logout"><button class="link" title="Sign out">${icon('out')}<span>Sign out</span></button></form>
@@ -157,7 +162,8 @@ function appShell(req, u, flashHtml, body, title) {
 </div>
 <script src="/privacy.js"></script>
 ${require('./features').clientTag()}
-${require('./tour').script(req, u)}`;
+${require('./tour').script(req, u)}
+${require('./whatsnew').script(req, u)}`;
 }
 
 // split sign-in / sign-up screen: brand pitch on the left, the form on the right

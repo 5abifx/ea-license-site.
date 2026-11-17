@@ -2200,4 +2200,17 @@ tr:target { background: var(--accent-soft); }
   .ov-chart { height: 200px; } .ov-bars { height: 170px; }
   .ov-btns .ov-btn { flex: 1; justify-content: center; padding: 10px 8px; }
   .ov-days button { flex: 0 0 28px; }
+
+/* ---------- What's new (src/whatsnew.js): orange dot in the menu, star button in the phone top bar ---------- */
+.wn-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ff5a1f; box-shadow: 0 0 10px #ff5a1f; font-style: normal; flex: none; }
+.side-nav a.wn-has { position: relative; color: var(--text); background: rgba(255,90,31,.07); box-shadow: inset 0 0 0 1px rgba(255,90,31,.3); }
+.side-nav a .wn-dot { display: none; }
+.wn-top { display: none; }
+@media (min-width: 901px) {
+  .side-fold .side-nav a .wn-dot { display: block; position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; }
+}
+@media (max-width: 900px) {
+  .wn-top { display: grid; place-items: center; position: relative; width: 42px; height: 42px; margin-left: auto; border-radius: 10px; border: 1px solid var(--line); background: var(--card-2, #17171a); color: var(--muted); }
+  .wn-top.on { color: var(--text); }
+  .wn-top .wn-dot { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; }
 }
