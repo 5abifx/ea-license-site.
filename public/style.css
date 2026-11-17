@@ -2215,3 +2215,12 @@ tr:target { background: var(--accent-soft); }
   .wn-top.on { color: var(--text); }
   .wn-top .wn-dot { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; }
 }
+
+/* Save / Share / Open for videos and pictures made in the browser (public/save-file.js) */
+.sv-out { margin-top: 10px; }
+.sv-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sv-btns a { text-decoration: none; }
+.sv-tip { margin: 8px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--muted, #9aa0a6); max-width: 440px; }
+.ss-q .sv-btns { gap: 12px; }
+.cards figure .sv-btns { justify-content: center; }
+.cards figure .sv-tip { text-align: center; margin-left: auto; margin-right: auto; }
