@@ -754,7 +754,7 @@ void DrawPanel()
       Row(r++, "Open trades", IntegerToString(g_mCount), CText);
       Row(r++, "Balance", Money(AccountInfoDouble(ACCOUNT_BALANCE)), CText);
       Row(r++, "Last send", g_lastWrite > 0 ? IntegerToString((long)(TimeGMT() - g_lastWrite)) + " s ago" : "-", CText);
-      Row(r++, "Read only", "never trades here", CMuted);
+      Row(r++, "Read only", "never trades", CMuted);
       for(; r < P_ROWS - 1; ) Row(r++, " ", " ", CMuted);
      }
    else
@@ -766,7 +766,7 @@ void DrawPanel()
       Row(r++, "Master", g_mLogin > 0 ? IntegerToString(g_mLogin) : "-", CText);
       Row(r++, "Lot mode", lm, CText);
       Row(r++, "Copied today", IntegerToString(g_copiedToday), CText);
-      Row(r++, "Avg delay", g_delayN > 0 ? DoubleToString(g_delaySum / g_delayN, 1) + " s" : "-", CText);
+      Row(r++, "Avg delay", g_delayN > 0 ? (g_delaySum / g_delayN < 1 ? "under 1 s" : DoubleToString(g_delaySum / g_delayN, 1) + " s") : "-", CText);
       double eq = AccountInfoDouble(ACCOUNT_EQUITY);
       double dl = (StopDailyLossPct > 0) ? eq - DailyFloor() : 0;
       double ml = (StopMaxLossPct > 0) ? eq - MaxFloor() : 0;
