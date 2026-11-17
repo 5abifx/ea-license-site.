@@ -2200,6 +2200,7 @@ tr:target { background: var(--accent-soft); }
   .ov-chart { height: 200px; } .ov-bars { height: 170px; }
   .ov-btns .ov-btn { flex: 1; justify-content: center; padding: 10px 8px; }
   .ov-days button { flex: 0 0 28px; }
+}
 
 /* ---------- What's new (src/whatsnew.js): orange dot in the menu, star button in the phone top bar ---------- */
 .wn-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ff5a1f; box-shadow: 0 0 10px #ff5a1f; font-style: normal; flex: none; }
