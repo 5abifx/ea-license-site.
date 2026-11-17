@@ -2069,3 +2069,17 @@ tr:target { background: var(--accent-soft); }
 .cc-card .ck-wrap { grid-template-columns: minmax(220px, 360px) minmax(220px, 360px); justify-content: center; gap: 40px; }
 .cc-card .ck-side .ck-l { font-size: 14px; padding: 9px 8px; }
 @media (max-width: 560px) { .cc-card .ck-wrap { grid-template-columns: 1fr; gap: 16px; } }
+
+/* ---------- What's new (src/whatsnew.js): orange dot in the menu, star button in the phone top bar ---------- */
+.wn-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ff5a1f; box-shadow: 0 0 10px #ff5a1f; font-style: normal; flex: none; }
+.side-nav a.wn-has { position: relative; color: var(--text); background: rgba(255,90,31,.07); box-shadow: inset 0 0 0 1px rgba(255,90,31,.3); }
+.side-nav a .wn-dot { display: none; }
+.wn-top { display: none; }
+@media (min-width: 901px) {
+  .side-fold .side-nav a .wn-dot { display: block; position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; }
+}
+@media (max-width: 900px) {
+  .wn-top { display: grid; place-items: center; position: relative; width: 42px; height: 42px; margin-left: auto; border-radius: 10px; border: 1px solid var(--line); background: var(--card-2, #17171a); color: var(--muted); }
+  .wn-top.on { color: var(--text); }
+  .wn-top .wn-dot { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; }
+}
