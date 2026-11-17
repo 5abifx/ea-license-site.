@@ -422,6 +422,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <script id="studio-data" type="application/json">${json}</script>
     <script src="/cards.js"></script>
     <script src="/cine-card.js"></script>
+    <script src="/save-file.js"></script>
     <script src="/studio.js"></script>`);
   });
 
@@ -537,12 +538,13 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         <select id="mv-size" aria-label="Video size"><option value="story">Story 9:16</option><option value="post">Post 4:5</option></select>
         <input type="file" id="mv-file" accept="image/*,video/*" hidden>
       </div>
-      <div class="cards"><figure><canvas id="mv"></canvas><span class="share-btns"><button type="button" class="small" id="mv-rec">Make video</button><button type="button" class="small secondary" id="mv-share" hidden>Share</button></span><span class="muted small" id="mv-st" aria-live="polite"></span></figure></div>
+      <div class="cards"><figure><canvas id="mv"></canvas><span class="share-btns"><button type="button" class="small" id="mv-rec">Make video</button></span><span class="muted small" id="mv-st" aria-live="polite"></span></figure></div>
       <figure class="report-big"><canvas id="r3"></canvas><span class="share-btns"><button type="button" class="small" data-save="r3">Save big report</button><button type="button" class="small secondary" data-share="r3" hidden>Share</button></span></figure>` : '<p class="muted">No closed trades in this period. Pick another one above.</p>'}
       <p class="muted small">Your handle on the cards: <strong>${esc(u.card_handle || '5abifx.com')}</strong>. Change it on any trade page.</p>
     </section>
     <script id="report-data" type="application/json">${json}</script>
     <script src="/cards.js"></script>
+    <script src="/save-file.js"></script>
     <script src="/motion-card.js"></script>
     <script src="/report.js"></script>`);
   });
@@ -961,7 +963,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       <div class="cards">
         <figure>
           <canvas id="mv"></canvas>
-          <span class="share-btns"><button type="button" class="small" id="mv-rec">Make video</button><button type="button" class="small secondary" id="mv-share" hidden>Share</button></span>
+          <span class="share-btns"><button type="button" class="small" id="mv-rec">Make video</button></span>
           <span class="muted small" id="mv-st" aria-live="polite"></span>
         </figure>
       </div>
@@ -1020,6 +1022,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     ${req.user.is_admin ? '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Montserrat:wght@500;600&display=swap">' : ''}
     <script id="trade-data" type="application/json">${json}</script>
     <script src="/cards.js"></script>
+    <script src="/save-file.js"></script>
     <script src="/motion-card.js"></script>
     ${req.user.is_admin ? '<script src="/overlay.js"></script>' : ''}
     <script src="/journal.js"></script>`);

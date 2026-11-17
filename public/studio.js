@@ -140,7 +140,7 @@
     { k: 'Sign', h: 'How should we <em>sign</em> it?', hint: 'Your name or handle goes next to KATANA at the bottom. 5ABIFX sits small in the top corner.' },
     { k: 'Share', h: 'Ready to <em>post</em>', hint: 'Video for Reels, Stories and TikTok. Picture for X and Discord.' },
   ];
-  let step = 0, video = null;
+  let step = 0;
   const q = $('q');
 
   function render() {
@@ -164,7 +164,7 @@
         <p class="ss-sub">SIZE</p><div class="ss-chips big" data-key="size">${[['story', 'Story', '9:16 Reels, Stories'], ['post', 'Post', '4:5 feed'], ['wide', 'Wide', '16:9 X, Discord']].map(([v, l, h]) => chip(v, l, h, A.size === v, ic(v))).join('')}</div>`;
     }
     if (s.k === 'Share') {
-      body = `<div class="ss-act" style="margin-top:0"><button type="button" class="ss-pill or" id="rec">Make video</button><button type="button" class="ss-pill" id="png">Save picture</button><button type="button" class="ss-pill" id="shr" hidden>Share</button></div><p class="ss-note" id="st" role="status"></p>`;
+      body = `<div class="ss-act" style="margin-top:0"><button type="button" class="ss-pill or" id="rec">Make video</button><button type="button" class="ss-pill" id="png">Make picture</button></div><p class="ss-note" id="st" role="status"></p>`;
     }
     q.innerHTML = `<p class="ss-k">STEP ${step + 1} OF ${STEPS.length} · ${s.k.toUpperCase()}</p><h2 class="ss-h">${s.h}</h2>${body}<p class="ss-hint">${s.hint}</p>
       <div class="ss-act">${step ? '<button type="button" class="ss-ghost" data-nav="-1">← Back</button>' : ''}${step < STEPS.length - 1 ? '<button type="button" class="ss-pill" data-nav="1">Continue →</button>' : ''}</div>`;
@@ -176,25 +176,22 @@
 
   const fileName = (ext) => `5abifx-${A.card}-${(A.pick[A.card] || '').replace(/[^\w-]+/g, '-')}.${ext}`;
   function deliver(blob, ext) {
-    const st = $('st'), shr = $('shr'), file = new File([blob], fileName(ext), { type: blob.type });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {   // phones: share sheet (Instagram, Discord, Save)
-      video = file; shr.hidden = false; st.textContent = 'Ready. Tap Share to post or save it.'; return;
-    }
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
-    st.textContent = `Saved ${file.name} (${(blob.size / 1e6).toFixed(1)} MB).`;
+    const st = $('st');
+    if (!blob || !blob.size) { st.textContent = 'It came out empty. Keep this page open while it records and try again.'; return; }
+    // Save link + Share (where the device can share files) + Open, each tapped by the member: works on PC, Android and iPhone
+    if (window.SaveFile) { window.SaveFile.offer({ status: st, blob, name: fileName(ext), kind: ext === 'png' ? 'picture' : 'video', btn: 'ss-pill or', alt: 'ss-pill' }); return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fileName(ext); document.body.appendChild(a); a.click(); a.remove();
   }
   function wireShare() {
     const rec = $('rec'), st = $('st');
-    if (!cc.canRecord()) { rec.disabled = true; st.textContent = 'This browser cannot make videos. Save picture works, or try Chrome or Safari.'; }
+    if (!cc.canRecord()) { rec.disabled = true; st.textContent = (window.SaveFile ? window.SaveFile.noRecord() : 'This browser cannot make videos.') + ' Make picture still works.'; }
     rec.onclick = () => {
-      rec.disabled = true; $('shr').hidden = true;
-      cc.record((p) => { st.textContent = 'Making your video… ' + Math.round(p * 100) + '%'; })
+      rec.disabled = true; if (window.SaveFile) window.SaveFile.clear(st);
+      cc.record((p) => { st.textContent = 'Making your video… ' + Math.round(p * 100) + '% (keep this page open)'; })
         .then((x) => { rec.disabled = false; deliver(x.blob, x.ext); })
         .catch((e) => { rec.disabled = false; st.textContent = e.message; });
     };
-    $('png').onclick = () => cc.still().then((b) => deliver(b, 'png'));
-    $('shr').onclick = () => { if (video) navigator.share({ files: [video] }).catch(() => {}); };
+    $('png').onclick = () => { if (window.SaveFile) window.SaveFile.clear(st); cc.still().then((b) => deliver(b, 'png')); };
   }
 
   $('steps').onclick = (e) => { const b = e.target.closest('[data-step]'); if (b) { step = +b.dataset.step; render(); } };

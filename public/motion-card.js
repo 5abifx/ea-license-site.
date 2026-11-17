@@ -244,12 +244,12 @@ function create(canvas, trade, opts) {
   };
 }
 
-/* wires the motion card controls on a page: #mv canvas, #mv-scene, #mv-size, #mv-file, #mv-dim, #mv-rec, #mv-share, #mv-st.
+/* wires the motion card controls on a page: #mv canvas, #mv-scene, #mv-size, #mv-file, #mv-dim, #mv-rec, #mv-st (+ /save-file.js).
    extra() returns the page's own options (mode, KATANA line, period text...). */
 function mount(trade, extra, fileTag) {
   const val = (id) => document.getElementById(id), cv = val('mv');
   if (!cv) return null;
-  const st = val('mv-st'), rec = val('mv-rec'), shareBtn = val('mv-share');
+  const st = val('mv-st'), rec = val('mv-rec');
   const mc = create(cv, trade, Object.assign({ size: val('mv-size') ? val('mv-size').value : 'story' }, extra()));
   let video = null;
   const remember = (k, id) => { try { const v = localStorage.getItem(k); if (v && v !== 'own' && val(id) && val(id).querySelector(`option[value="${v}"]`)) val(id).value = v; } catch (e) {} };
@@ -257,7 +257,7 @@ function mount(trade, extra, fileTag) {
   const own = () => { const on = val('mv-scene').value === 'own'; ['mv-filebox', 'mv-dimbox', 'mv-private'].forEach((id) => { if (val(id)) val(id).hidden = !on; }); };
   const sync = () => {
     mc.set(Object.assign({ scene: val('mv-scene').value, size: val('mv-size') ? val('mv-size').value : 'story' }, extra()));
-    video = null; shareBtn.hidden = true; mc.play();
+    video = null; if (window.SaveFile) window.SaveFile.clear(st); mc.play();
   };
   val('mv-scene').addEventListener('change', () => {
     own(); sync();
@@ -271,23 +271,19 @@ function mount(trade, extra, fileTag) {
     st.textContent = '';
     mc.setBackground(e.target.files[0] || null).then(() => sync()).catch((err) => { st.textContent = err.message; });
   });
-  if (!mc.canRecord()) { rec.disabled = true; st.textContent = 'This browser cannot record video. Try Chrome or Safari.'; }
+  const SF = window.SaveFile;
+  if (!mc.canRecord()) { rec.disabled = true; st.textContent = SF ? SF.noRecord() : 'This browser cannot record video. Try Chrome or Safari.'; }
   const name = (ext) => `5ABIFX-${String(fileTag || 'card').replace(/[^\w-]+/g, '-')}-motion.${ext}`;
   rec.addEventListener('click', () => {
-    rec.disabled = true; shareBtn.hidden = true;
-    mc.record((p) => { st.textContent = `Recording ${Math.round(p * 100)}%`; }).then((r) => {
+    rec.disabled = true; if (SF) SF.clear(st);
+    mc.record((p) => { st.textContent = `Making your video ${Math.round(p * 100)}% (keep this page open)`; }).then((r) => {
       video = r; rec.disabled = false; rec.textContent = 'Make again';
-      st.textContent = `Saved ${r.ext.toUpperCase()} (${(r.blob.size / 1e6).toFixed(1)} MB)`;
-      const file = new File([r.blob], name(r.ext), { type: r.blob.type });
-      // phones: Share opens the share sheet (Instagram, Discord, Save video); computers download the file
-      if (navigator.canShare && navigator.canShare({ files: [file] })) { shareBtn.hidden = false; st.textContent = 'Ready. Tap Share to post or save it.'; return; }
+      if (!r.blob.size) { st.textContent = 'The video came out empty. Keep this page open while it records and try again.'; return; }
+      // Save link, Share (where the device can share files) and Open, tapped by the member: works on PC, Android and iPhone
+      if (SF) { SF.offer({ status: st, blob: r.blob, name: name(r.ext), kind: 'video' }); return; }
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(r.blob); a.download = name(r.ext); a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      a.href = URL.createObjectURL(r.blob); a.download = name(r.ext); document.body.appendChild(a); a.click(); a.remove();
     }).catch((err) => { st.textContent = err.message; rec.disabled = false; });
-  });
-  shareBtn.addEventListener('click', () => {
-    if (video) navigator.share({ files: [new File([video.blob], name(video.ext), { type: video.blob.type })] }).catch(() => {});
   });
   own(); sync();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => mc.play());
