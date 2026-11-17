@@ -7,6 +7,7 @@ const deskView = require('./desk-view');
 const terminal = require('./terminal');
 const news = require('./news');
 const terminalView = require('./terminal-view');
+const overview = require('./overview');
 const TP = require('./tradeplans');
 const LT = require('./logtrade');
 const express = require('express');
@@ -680,10 +681,23 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const cut = since90 ? new Date(Date.parse(since90 + 'T00:00:00Z') - 89 * 864e5).toISOString().slice(0, 10) : '';
     rows.forEach((t) => { if (t.close_time >= cut) cnt[t.symbol] = (cnt[t.symbol] || 0) + 1; });
     const topSyms = Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([sym, n]) => ({ sym, n }));
+    // graphite overview on top: balance, account cards, month chart, weekday, recent, sessions, days traded
+    const ovAccts = (sel ? [sel] : liveAccts).map((a) => {
+      const manual = a.account_number === LT.MANUAL;
+      const lb = manual ? null : db.prepare('SELECT balance_after FROM journal_trades WHERE user_id = ? AND account_number = ? AND balance_after IS NOT NULL ORDER BY close_time DESC LIMIT 1').get(u.id, a.account_number);
+      const short = manual ? 'Manual' : priv(esc(a.broker ? String(a.broker).split(/[-\s]/)[0] : 'Account'), `••${esc(String(a.account_number).slice(-2))}`);
+      return { account_number: a.account_number, broker: a.broker, manual, balance: lb ? Number(lb.balance_after) : NaN, short,
+        label: manual ? 'Manual trades' : priv(`${esc(a.broker ? String(a.broker).split(/[-\s]/)[0] : 'Account')} ••${esc(String(a.account_number).slice(-2))}`, maskNum(a.account_number)),
+        href: `/journal/desk?account=${encodeURIComponent(a.account_number)}` };
+    });
+    const plainMoney = (v) => `${v < 0 ? '−' : ''}${cur === 'USD' || !cur ? '$' : ''}${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cur && cur !== 'USD' ? ' ' + esc(cur) : ''}`;
+    const ovHtml = overview.html(prep(rows), ovAccts, { today: desk.serverToday(off), cur, money: m, plain: plainMoney, sessionOf: (t) => desk.sessionOf(t, off) });
     page(req, res, 'Desk', `
     <div class="row between page-head"><h1>Desk</h1>
       <span class="head-btns"><button type="button" class="small secondary replay-btn" data-replay title="Play the opening animation again">↻ Replay</button><button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers and your name, so you can screenshot this page">Hide private info</button></span></div>
     ${acctBar(req, '/journal/desk', qs, sc, cur)}
+    ${ovHtml}
+    <h2 class="ov-sec">Today's desk</h2>
     ${terminalView.html(T, { news: N, money: m, cur, market: topSyms, acctNote: one ? (prop ? 'Prop firm rules included' : 'Add firm rules in Insights › Prop firm to include them') : 'All accounts' })}`);
   });
 
