@@ -954,7 +954,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       <h2>Motion card <span class="tag">7-second video · story or post</span></h2>
       <p class="muted">The result as a short video for Instagram, TikTok or Discord. Uses the $ / % / R choice and KATANA line from above.</p>
       <div class="row">
-        <select id="mv-scene" aria-label="Motion background"><option value="ember">Background: Ember glow</option><option value="candles">Background: Trade candles</option><option value="bars">Background: Volume bars</option><option value="own">Background: My photo or clip</option></select>
+        <select id="mv-scene" aria-label="Motion background"><option value="replay">Trade replay: entry to exit, candle by candle</option><option value="ember">Background: Ember glow</option><option value="candles">Background: Trade candles</option><option value="bars">Background: Volume bars</option><option value="own">Background: My photo or clip</option></select>
         <select id="mv-size" aria-label="Video size"><option value="story">Story 9:16</option><option value="post">Post 4:5</option></select>
         <label class="mv-file" id="mv-filebox" hidden>Photo or clip <input type="file" id="mv-file" accept="image/*,video/*"></label>
         <label class="mv-dim" id="mv-dimbox" hidden>Darken <input type="range" id="mv-dim" min="0" max="90" value="55"></label>
