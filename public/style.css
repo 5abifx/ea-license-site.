@@ -2225,18 +2225,26 @@ tr:target { background: var(--accent-soft); }
 .cards figure .sv-btns { justify-content: center; }
 .cards figure .sv-tip { text-align: center; margin-left: auto; margin-right: auto; }
 
-/* Trade page: Chart / Review / Share tabs instead of one long scroll (public/trade-tabs.js) */
-.ttabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; margin: 6px 0 18px; display: flex; width: max-content; max-width: 100%; backdrop-filter: blur(10px); background: rgba(19,19,21,.85); }
-.ttabs button { padding: 9px 18px; }
-.tsh-top { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; margin: 10px 0 6px; }
-.tsh-top > .row { margin: 0; }
-.tsh-tabs { flex-wrap: wrap; }
-.tsh-pane > .muted.small:first-child { margin-top: 6px; }
-.tsh-pane .tag { display: inline-block; margin: 6px 0; }
+/* Trade page: Chart / Review / Share tabs in the Share Studio look (public/trade-tabs.js, public/journal.js) */
+.ttabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; gap: 6px; margin: 8px 0 22px; padding: 6px 0 0; background: rgba(10,10,11,.55); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,.06); }
+.tsh .ss-chip { white-space: normal; }
+.ttabs button { background: none; border: 0; box-shadow: none; border-radius: 0; color: #4a4a54; font: 700 11px Manrope, system-ui, sans-serif; letter-spacing: .16em; text-transform: uppercase; padding: 10px 14px 12px; position: relative; min-height: 0; }
+.ttabs button:hover { color: #8a8a94; box-shadow: none; }
+.ttabs button[aria-pressed="true"] { color: #f2f2f4; }
+.ttabs button[aria-pressed="true"]::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, #ff5a1f, #ff7a3d 70%, #ffb07a); box-shadow: 0 0 12px rgba(255,90,31,.7); }
+.tsh.ss { max-width: none; }
+.tsh-pv { display: grid; gap: 14px; justify-items: center; position: sticky; top: 64px; }
+.tsh-cv { width: 100%; max-width: 360px; border-radius: 20px; background: #000; display: block; box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+.tsh-cv.overlay { background: repeating-conic-gradient(#1b1b1f 0 25%, #121215 0 50%) 0 0 / 22px 22px; }
+.tsh-studio { font-size: 13px; color: #8a8a94; }
+.ss-dim { display: inline-flex; align-items: center; gap: 10px; color: #8a8a94; font-size: 13px; margin: 0; }
+.tsh-aff { margin-top: 26px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.06); }
+.tsh .sv-btns { gap: 12px; }
 details.tdet > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
 details.tdet > summary::-webkit-details-marker { display: none; }
 details.tdet > summary h2 { margin: 0; }
 details.tdet > summary h2::after { content: ' ›'; color: var(--muted); display: inline-block; transition: transform .2s; }
 details.tdet[open] > summary h2::after { transform: rotate(90deg); }
 details.tdet[open] > summary { margin-bottom: 14px; }
-@media (max-width: 640px) { .ttabs { width: 100%; } .ttabs button { flex: 1; padding: 9px 6px; } }
+@media (max-width: 820px) { .tsh-pv { position: static; } .tsh-cv { max-width: 230px; border-radius: 14px; } }
+@media (max-width: 640px) { .ttabs { position: static; } .ttabs button { flex: 1; padding: 10px 4px 12px; } }

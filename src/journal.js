@@ -897,11 +897,12 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     }
 
     page(req, res, `${t.symbol} ${t.side}`, `
+    <link rel="stylesheet" href="/studio.css">
     <p><a href="/journal">← All trades</a></p>
     <h1>${esc(t.symbol)} ${esc(t.side)} <span class="${cls(t.net)}">${money(t.net, t.currency)}</span></h1>
     <p class="muted"><span class="priv"><span class="priv-real">Account ${esc(t.account_number)} · position ${esc(t.position_id)}</span><span class="priv-mask">Account ••${esc(String(t.account_number).slice(-2))}</span></span> · ${fmtDate(t.open_time)} → ${fmtDate(t.close_time)} (broker time)</p>
 
-    <nav class="seg ttabs" id="ttabs" aria-label="Trade page">
+    <nav class="ttabs" id="ttabs" aria-label="Trade page">
       <button type="button" data-go="chart" aria-pressed="true">Chart</button><button type="button" data-go="review" aria-pressed="false">Review${LT.gradeOf(t) ? ` · ${esc(LT.gradeOf(t))}` : ''}</button><button type="button" data-go="share" aria-pressed="false">Share</button>
     </nav>
 
@@ -965,73 +966,16 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
     <div data-tab="review">${mentorBox ? mentorBox(req, t) : ''}</div>
 
-    <section class="card tsh" id="share" data-tab="share">
-      <div class="row between"><h2>Share this trade</h2><a class="small" href="/journal/studio">Share Studio: week, month and more →</a></div>
-      <div class="tsh-top">
-        <div class="seg tsh-tabs" role="tablist" aria-label="What to make">
-          <button type="button" role="tab" id="tab-pic" data-pane="pic" aria-pressed="true" aria-selected="true">Picture cards</button><button type="button" role="tab" id="tab-vid" data-pane="vid" aria-pressed="false" aria-selected="false">Video</button>${req.user.is_admin ? '<button type="button" role="tab" id="tab-ov" data-pane="ov" aria-pressed="false" aria-selected="false">Overlay</button>' : ''}
-        </div>
-      <div class="row">
-        <select id="style" aria-label="Card style"><option value="a">Style: Cinematic</option><option value="b">Style: Chart first</option><option value="c">Style: Ticket</option></select>
-        <select id="mode"><option value="money">Show $ amount</option><option value="pct">Show % of account</option><option value="r">Show R multiple</option></select>
-        <label class="check"><input type="checkbox" id="rm" checked> KATANA risk line</label>
+    <section class="ss tsh" id="share" data-tab="share">
+      <nav class="ss-steps" id="tsteps" aria-label="Steps"></nav><div class="ss-bar"><i id="tpb"></i></div>
+      <div class="ss-wrap">
+        <div class="tsh-pv"><canvas id="mv" class="tsh-cv"></canvas><canvas id="c1" class="tsh-cv" hidden></canvas><canvas id="c2" class="tsh-cv" hidden></canvas>${req.user.is_admin ? '<canvas id="ov" class="tsh-cv overlay" hidden></canvas>' : ''}
+          <a class="tsh-studio" href="/journal/studio">Share a whole day, week or month in Share Studio →</a></div>
+        <div id="tq" class="ss-q" aria-live="polite"></div>
       </div>
-      </div>
-      <div class="tsh-pane" id="pane-pic" role="tabpanel" aria-labelledby="tab-pic">
-      <p class="muted small">Two story pictures: card 1 is the result, card 2 is the real chart of this trade.</p>
-      <div class="cards">
-        <figure><canvas id="c1"></canvas><button class="small" data-save="c1">Save card 1</button></figure>
-        <figure><canvas id="c2"></canvas><button class="small" data-save="c2">Save card 2</button></figure>
-      </div>
-      <form method="post" action="/journal/handle" class="row">
-        <input name="card_handle" value="${esc(req.user.card_handle)}" placeholder="Your handle on the cards, e.g. @5abi.fx" maxlength="40">
-        <button class="small secondary">Save handle</button>
-        <input type="hidden" name="back" value="${t.id}">
-      </form>
-      ${req.app.locals.affTradeBox ? req.app.locals.affTradeBox(req.user, t) : ''}
-      </div>
-      <div class="tsh-pane motion-card" id="pane-vid" role="tabpanel" aria-labelledby="tab-vid" hidden>
-      <p class="muted small">A short video for Reels, TikTok or Discord. Trade replay plays this trade from entry to exit.</p>
-      <div class="row">
-        <select id="mv-scene" aria-label="Motion background"><option value="replay">Trade replay: entry to exit, candle by candle</option><option value="ember">Background: Ember glow</option><option value="candles">Background: Trade candles</option><option value="bars">Background: Volume bars</option><option value="own">Background: My photo or clip</option></select>
-        <select id="mv-size" aria-label="Video size"><option value="story">Story 9:16</option><option value="post">Post 4:5</option></select>
-        <label class="mv-file" id="mv-filebox" hidden>Photo or clip <input type="file" id="mv-file" accept="image/*,video/*"></label>
-        <label class="mv-dim" id="mv-dimbox" hidden>Darken <input type="range" id="mv-dim" min="0" max="90" value="55"></label>
-      </div>
-      <p class="muted small" id="mv-private" hidden>Your photo or clip stays on this device. It is only drawn into the video, never uploaded.</p>
-      <div class="cards">
-        <figure>
-          <canvas id="mv"></canvas>
-          <span class="share-btns"><button type="button" class="small" id="mv-rec">Make video</button></span>
-          <span class="muted small" id="mv-st" aria-live="polite"></span>
-        </figure>
-      </div>
-      </div>
-    ${req.user.is_admin ? `<div class="tsh-pane" id="pane-ov" role="tabpanel" aria-labelledby="tab-ov" hidden>
-      <p class="tag">admin test · transparent PNG</p>
-      <p class="muted">Quote, the real candles of this trade with entry/exit arrows, and the result, on a transparent background for Instagram stories. No prices, SL or TP. Only admins see this for now.</p>
-      <div class="row">
-        <select id="ov-style">${Object.entries({ scalper: 'Scalper', trend: 'Trend following', counter: 'Counter trend', swing: 'Swing' }).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
-        <select id="ov-show"><option value="pct">Show %</option><option value="r">Show R</option><option value="pips">Show pips</option></select>
-        <label class="check"><input type="checkbox" id="ov-ad" checked> 5ABI.FX line</label>
-        <button type="button" class="small secondary" id="ov-next">Next quote</button>
-        <label class="check"><input type="checkbox" id="ov-candles" checked> Candles</label>
-        <label class="check"><input type="checkbox" id="ov-scrim"> Dark fade</label>
-      </div>
-      <div class="row">
-        <label>Preview photo <input type="file" id="ov-photo" accept="image/*"></label>
-        <label class="check"><input type="checkbox" id="ov-bake"> Include photo in PNG</label>
-      </div>
-      <div class="cards">
-        <figure><canvas id="ov" class="overlay"></canvas><button class="small" data-save-ov>Save overlay PNG</button></figure>
-      </div>
-      </div>` : ''}
+      <input type="file" id="tfile" accept="image/*,video/*" hidden>${req.user.is_admin ? '<input type="file" id="tovfile" accept="image/*" hidden>' : ''}
+      ${req.app.locals.affTradeBox ? `<div id="taff" class="tsh-aff" hidden>${req.app.locals.affTradeBox(req.user, t)}</div>` : ''}
     </section>
-
-
-
-
-
 
     ${req.user.is_admin ? '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Montserrat:wght@500;600&display=swap">' : ''}
     <script id="trade-data" type="application/json">${json}</script>
