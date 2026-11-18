@@ -13,7 +13,7 @@
 //| need two MT5 installs (e.g. FundedNext MT5 + FTMO MT5).          |
 //+------------------------------------------------------------------+
 #property copyright "5ABI.FX"
-#property version   "1.00"
+#property version   "1.10"
 #property description "5ABI.FX Copier: Master shares trades, Follower copies them"
 #property description "with its own lot size and daily / max loss guards."
 
@@ -22,7 +22,8 @@
 enum ENUM_ROLE     { ROLE_MASTER = 0,   // Master (send my trades)
                      ROLE_FOLLOWER = 1  // Follower (copy trades here)
                    };
-enum ENUM_LOT_MODE { LOT_BALANCE = 0,   // Balance ratio (my balance / Master balance)
+enum ENUM_LOT_MODE { LOT_MATCH = 5,     // Same risk % as Master (recommended)
+                     LOT_BALANCE = 0,   // Balance ratio (my balance / Master balance)
                      LOT_RISK = 1,      // Risk % per trade (needs Master SL)
                      LOT_MULTIPLY = 2,  // Master lots x multiplier
                      LOT_SAME = 3,      // Same lots as Master
@@ -35,8 +36,8 @@ input string        Channel         = "MAIN";        // Channel (same name on Ma
 input long          OnlyAccount     = 0;             // Only run on this account number (0 = any)
 
 input group "Follower: lot size"
-input ENUM_LOT_MODE LotMode         = LOT_BALANCE;   // Lot mode
-input double        LotMultiplier   = 1.0;           // Multiplier (Balance ratio and Multiplier modes)
+input ENUM_LOT_MODE LotMode         = LOT_MATCH;     // Lot mode
+input double        LotMultiplier   = 1.0;           // Multiplier (all modes except Fixed; 0.5 = half the risk)
 input double        RiskPercent     = 0.5;           // Risk % per trade (Risk mode)
 input double        FixedLot        = 0.10;          // Fixed lot (Fixed mode)
 input double        MaxLotPerTrade  = 5.0;           // Max lots per copied trade (0 = no cap)
@@ -63,7 +64,7 @@ input group "Panel"
 input bool          ShowPanel       = true;          // Show the panel on the chart
 input int           TimerMs         = 100;           // Check every N milliseconds
 
-#define CP_VER       "1.00"
+#define CP_VER       "1.10"
 #define CP_MAGIC     55102026
 #define CP_DIR       "5ABI_Copier\\"
 #define CP_TAG       "5C"
@@ -90,6 +91,8 @@ struct MasterPos
    double   sl;
    double   tp;
    datetime opened;    // Master server time
+   double   risk;      // Master money lost if SL is hit (0 = no SL)
+   double   val;       // Master money per 1.0 price move per lot
   };
 MasterPos g_m[];
 int      g_mCount     = 0;
@@ -110,6 +113,7 @@ bool     g_userPaused  = false;
 double   g_delaySum    = 0;
 int      g_delayN      = 0;
 datetime g_lastLog     = 0;
+string   g_lastRisk    = "-";
 
 //+------------------------------------------------------------------+
 //| helpers                                                          |
@@ -161,7 +165,15 @@ void MasterTick()
       ulong t = PositionGetTicket(i);
       if(t == 0) continue;
       long type = PositionGetInteger(POSITION_TYPE);
-      body += StringFormat("P;%I64u;%s;%d;%.2f;%.10g;%.10g;%.10g;%I64d\n",
+      string psym = PositionGetString(POSITION_SYMBOL);
+      double popen = PositionGetDouble(POSITION_PRICE_OPEN), psl = PositionGetDouble(POSITION_SL);
+      double pvol = PositionGetDouble(POSITION_VOLUME);
+      ENUM_ORDER_TYPE pot = (type == POSITION_TYPE_BUY) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+      double risk = 0, val = 0;
+      if(psl > 0 && OrderCalcProfit(pot, psym, pvol, popen, psl, risk)) risk = (risk < 0) ? -risk : 0;
+      else risk = 0;
+      if(!OrderCalcProfit(ORDER_TYPE_BUY, psym, 1.0, popen, popen + 1.0, val)) val = 0;
+      body += StringFormat("P;%I64u;%s;%d;%.2f;%.10g;%.10g;%.10g;%I64d;%.2f;%.6f\n",
                            t,
                            PositionGetString(POSITION_SYMBOL),
                            (int)type,
@@ -169,7 +181,8 @@ void MasterTick()
                            PositionGetDouble(POSITION_PRICE_OPEN),
                            PositionGetDouble(POSITION_SL),
                            PositionGetDouble(POSITION_TP),
-                           (long)PositionGetInteger(POSITION_TIME));
+                           (long)PositionGetInteger(POSITION_TIME),
+                           risk, val);
       n++;
      }
 
@@ -250,6 +263,8 @@ bool ReadMaster()
          tmp[count].sl     = StringToDouble(f[6]);
          tmp[count].tp     = StringToDouble(f[7]);
          tmp[count].opened = (datetime)StringToInteger(f[8]);
+         tmp[count].risk   = (k >= 11) ? StringToDouble(f[9]) : 0;
+         tmp[count].val    = (k >= 11) ? StringToDouble(f[10]) : 0;
          count++;
         }
       else if(f[0] == "E")
@@ -338,6 +353,18 @@ double LossPerLot(const string sym, const int type, const double entry, const do
    return MathAbs(profit);
   }
 
+// lots that give the same $ size as the Master, scaled by balance.
+// Corrects for brokers whose contract size differs (e.g. gold 100 oz vs 10 oz).
+double BalanceLots(const MasterPos &m, const string sym, const double entry)
+  {
+   if(g_mBalance <= 0) return 0;
+   double lots = m.volume * AccountInfoDouble(ACCOUNT_BALANCE) / g_mBalance;
+   double mine = 0;
+   if(m.val > 0 && OrderCalcProfit(ORDER_TYPE_BUY, sym, 1.0, entry, entry + 1.0, mine) && mine > 0)
+      lots *= m.val / mine;
+   return lots;
+  }
+
 double CalcLots(const MasterPos &m, const string sym, const int type, const double entry)
   {
    double bal = AccountInfoDouble(ACCOUNT_BALANCE);
@@ -350,14 +377,26 @@ double CalcLots(const MasterPos &m, const string sym, const int type, const doub
       case LOT_RISK:
         {
          double lpl = LossPerLot(sym, type, entry, m.sl);
-         if(lpl > 0) { lots = bal * RiskPercent / 100.0 / lpl; break; }
-         // no stop loss on the Master trade: fall back to balance ratio
+         lots = (lpl > 0) ? bal * RiskPercent / 100.0 / lpl
+                          : BalanceLots(m, sym, entry) * LotMultiplier;   // no SL on Master
+         break;
+        }
+      case LOT_MATCH:
+        {
+         // same % of balance at risk as the Master trade, measured to the same SL price
+         double lpl = Reverse ? 0 : LossPerLot(sym, type, entry, m.sl);
+         if(m.risk > 0 && g_mBalance > 0 && lpl > 0)
+            lots = bal * (m.risk / g_mBalance) / lpl * LotMultiplier;
+         else
+            lots = BalanceLots(m, sym, entry) * LotMultiplier;           // no SL yet
+         break;
         }
       default:
-         lots = (g_mBalance > 0) ? m.volume * bal / g_mBalance * LotMultiplier : 0;
+         lots = BalanceLots(m, sym, entry) * LotMultiplier;
      }
    return NormalizeLots(sym, lots);
   }
+
 
 //+------------------------------------------------------------------+
 //| copy tags: comment "5C|<master ticket>|<master lots>|<my lots>"  |
@@ -636,6 +675,10 @@ void FollowerTick()
          MarkDone(m.ticket);
          openCopies++;
          g_copiedToday++;
+         double myRisk = (sl > 0) ? LossPerLot(sym, type, entry, sl) * lots / AccountInfoDouble(ACCOUNT_BALANCE) * 100.0 : 0;
+         double mRisk  = (m.risk > 0 && g_mBalance > 0) ? m.risk / g_mBalance * 100.0 : 0;
+         g_lastRisk = (sl > 0 ? DoubleToString(myRisk, 2) + "%" : "no SL") +
+                      " (M " + (mRisk > 0 ? DoubleToString(mRisk, 2) + "%" : "no SL") + ")";
          double delay = (double)(TimeGMT() - g_mGmt) + (double)(g_mNow - m.opened);
          g_delaySum += MathMax(0.0, delay);
          g_delayN++;
@@ -759,13 +802,14 @@ void DrawPanel()
      }
    else
      {
-      string modes[] = {"Balance ratio", "Risk %", "Multiplier", "Same lots", "Fixed lot"};
+      string modes[] = {"Balance ratio", "Risk %", "Multiplier", "Same lots", "Fixed lot", "Match Master %"};
       string lm = modes[(int)LotMode];
       if(LotMode == LOT_BALANCE && g_mBalance > 0)
          lm += " " + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE) / g_mBalance * LotMultiplier, 2) + "x";
       Row(r++, "Master", g_mLogin > 0 ? IntegerToString(g_mLogin) : "-", CText);
       Row(r++, "Lot mode", lm, CText);
       Row(r++, "Copied today", IntegerToString(g_copiedToday), CText);
+      Row(r++, "Last risk", g_lastRisk, CText);
       Row(r++, "Avg delay", g_delayN > 0 ? (g_delaySum / g_delayN < 1 ? "under 1 s" : DoubleToString(g_delaySum / g_delayN, 1) + " s") : "-", CText);
       double eq = AccountInfoDouble(ACCOUNT_EQUITY);
       double dl = (StopDailyLossPct > 0) ? eq - DailyFloor() : 0;
