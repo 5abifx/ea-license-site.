@@ -141,17 +141,29 @@ function create(canvas, trade, opts) {
   const dot = (x, y, col, r, glow) => { c.fillStyle = col; c.globalAlpha *= 0.3; c.beginPath(); c.arc(x, y, r * glow, 0, 7); c.fill(); c.globalAlpha /= 0.3; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); };
   function frameReplay(tm) {
     const R = RP, win = F.isWin(trade), col = win ? WIN : LOSS, val = valueOf(trade, o.mode);
-    const post = H < 1500, x0 = 60, x1 = W - 60, gut = 210, y0 = post ? 300 : 340, y1 = Math.round(H * (post ? 0.6 : 0.6));
-    // background: dark with a soft glow
-    c.fillStyle = '#050507'; c.fillRect(0, 0, W, H);
-    c.globalAlpha = 0.35; c.drawImage(glow, 30 * Math.sin(tm * 0.4), 0); c.globalAlpha = 1;
+    const st = o.rstyle || 'candles', hide = !!o.hide, mini = st === 'minimal', term = st === 'terminal', lineSt = st === 'line' || mini;
+    const post = H < 1500, x0 = 60, x1 = W - 60, gut = mini ? 0 : 210;
+    const y0 = mini ? Math.round(H * 0.47) : post ? 300 : 340, y1 = mini ? Math.round(H * (post ? 0.64 : 0.62)) : Math.round(H * 0.6);
+    const DF = term ? M : D;   // the terminal style uses the mono font for the big number too
+    // background: dark with a soft glow, or the member's own photo / clip behind the chart
+    c.fillStyle = term ? '#020403' : '#050507'; c.fillRect(0, 0, W, H);
+    if (o.rphoto && media) { sceneOwn(tm); c.fillStyle = `rgba(5,5,7,${(0.45 + o.dim * 0.45).toFixed(2)})`; c.fillRect(0, 0, W, H); }
+    else if (!term) { c.globalAlpha = 0.35; c.drawImage(glow, 30 * Math.sin(tm * 0.4), 0); c.globalAlpha = 1; }
+    if (term) {   // scan lines
+      c.fillStyle = 'rgba(47,211,166,.035)'; for (let yy = 0; yy < H; yy += 6) c.fillRect(0, yy, W, 2);
+    }
     // top: brand, handle, what was traded
     c.globalAlpha = ease(seg(tm, 0, 0.6));
     K.brand(c, PAD, 140);
     const hd = trade.handle || '5abifx.com';
     T(c, hd, W - PAD, 153, { fam: M, size: fitSize(c, hd, 420, 26, M, 400, 2), color: SOFT, align: 'right', ls: 2 });
     const top = [trade.symbol, trade.side, F.dayTxt(trade.close)].filter(Boolean).join('  ·  ');
-    T(c, top, PAD, y0 - 60, { fam: M, size: fitSize(c, top, W - 2 * PAD, 30, M, 400, 6), color: SOFT, ls: 6 });
+    const ty = mini ? Math.round(H * (post ? 0.2 : 0.24)) : y0 - 60;
+    if (term) {
+      c.strokeStyle = 'rgba(47,211,166,.35)'; c.lineWidth = 2; c.strokeRect(PAD - 20, ty - 46, W - 2 * PAD + 40, 64);
+      const lots = trade.lots ? `${trade.lots} LOT` : '';
+      T(c, ['■ ' + (trade.symbol || ''), trade.side, lots].filter(Boolean).join('   '), PAD, ty, { fam: M, size: 28, color: WIN, ls: 3, w: 500 });
+    } else T(c, top, mini ? W / 2 : PAD, ty, { fam: M, size: fitSize(c, top, W - 2 * PAD, 30, M, 400, 6), color: SOFT, ls: 6, align: mini ? 'center' : 'left' });
     c.globalAlpha = 1;
     // the replay clock: candles before the entry, the entry, the trade candle by candle, the exit
     const run = seg(tm, 2.0, 7.0), IN = 1.5, OUT = 7.0;
@@ -159,19 +171,24 @@ function create(canvas, trade, opts) {
     if (R) {
       const { ks, ia, ib, e, x, sl, tp, lo, hi } = R, cw = (x1 - gut - x0) / ks.length;
       const X = i => x0 + (i + 0.5) * cw, Y = v => y0 + (hi - v) / (hi - lo) * (y1 - y0);
-      c.strokeStyle = 'rgba(255,255,255,.05)'; c.lineWidth = 1;
-      for (let i = 0; i <= 5; i++) { const gy = y0 + (y1 - y0) * i / 5; c.beginPath(); c.moveTo(x0, gy); c.lineTo(x1, gy); c.stroke(); }
+      if (!mini) {
+        c.strokeStyle = term ? 'rgba(47,211,166,.10)' : 'rgba(255,255,255,.05)'; c.lineWidth = 1;
+        for (let i = 0; i <= 5; i++) { const gy = y0 + (y1 - y0) * i / 5; c.beginPath(); c.moveTo(x0, gy); c.lineTo(x1, gy); c.stroke(); }
+        if (term) for (let i = 0; i <= 8; i++) { const gx = x0 + (x1 - gut - x0) * i / 8; c.beginPath(); c.moveTo(gx, y0); c.lineTo(gx, y1); c.stroke(); }
+      }
       const nTrade = ib - ia + 1, pos = run * nTrade, full = Math.floor(pos), part = pos - full;
       const xa = X(ia) - cw / 2, xNow = tm < OUT ? X(ia + Math.min(full, nTrade - 1)) + cw * (part - 0.5) : X(ib) + cw / 2;
       // risk and target zones grow with the trade
       const za = seg(tm, IN, IN + 0.5);
-      if (za > 0) {
+      if (za > 0 && !mini) {
         c.globalAlpha = za;
         if (tp !== null) { c.fillStyle = 'rgba(47,211,166,.10)'; c.fillRect(xa, Math.min(Y(e), Y(tp)), Math.max(0, xNow - xa), Math.abs(Y(tp) - Y(e))); }
         if (sl !== null) { c.fillStyle = 'rgba(255,90,100,.10)'; c.fillRect(xa, Math.min(Y(e), Y(sl)), Math.max(0, xNow - xa), Math.abs(Y(sl) - Y(e))); }
         c.globalAlpha = 1;
       }
+      const pts = [], after = [];
       const drawK = (k, i, alpha) => {
+        if (lineSt) { (alpha < 0.4 ? after : pts).push([X(i), Y(k.c)]); return; }
         const up = k.c >= k.o, cx = X(i), kc0 = up ? WIN : LOSS;
         c.globalAlpha = alpha; c.strokeStyle = c.fillStyle = kc0; c.lineWidth = Math.max(1.5, Math.min(3, cw * 0.14));
         c.beginPath(); c.moveTo(cx, Y(k.h)); c.lineTo(cx, Y(k.l)); c.stroke();
@@ -195,8 +212,20 @@ function create(canvas, trade, opts) {
       // after the exit: the market kept going, shown faint
       const post0 = Math.floor((ks.length - 1 - ib) * ease(seg(tm, OUT + 0.4, OUT + 1.4)));
       for (let i = 1; i <= post0; i++) drawK(ks[ib + i], ib + i, 0.3);
+      if (lineSt && pts.length) {
+        if (tm >= 2.0 && tm < OUT + 0.3) pts.push([xNow, Y(price)]);
+        if (tm >= OUT) pts.push([X(ib), Y(x)]);
+        const lc = tm >= 2 ? col : INK, g = c.createLinearGradient(0, y0, 0, y1);
+        g.addColorStop(0, (tm >= 2 ? col : '#ffffff') + '33'); g.addColorStop(1, 'rgba(0,0,0,0)');
+        c.beginPath(); pts.forEach(([px, py], i) => (i ? c.lineTo(px, py) : c.moveTo(px, py)));
+        c.lineTo(pts[pts.length - 1][0], y1); c.lineTo(pts[0][0], y1); c.closePath(); c.fillStyle = g; c.fill();
+        c.save(); c.shadowColor = lc; c.shadowBlur = 24; c.strokeStyle = lc; c.lineWidth = mini ? 4 : 5; c.lineJoin = 'round';
+        c.beginPath(); pts.forEach(([px, py], i) => (i ? c.lineTo(px, py) : c.moveTo(px, py))); c.stroke(); c.restore();
+        if (after.length) { c.globalAlpha = 0.3; c.strokeStyle = INK; c.lineWidth = 3; c.beginPath(); c.moveTo(X(ib), Y(x)); after.forEach(([px, py]) => c.lineTo(px, py)); c.stroke(); c.globalAlpha = 1; }
+      }
       // stop, target and entry lines from the entry to the right, tags in the gutter
-      const lines = [[tp, 'TARGET ' + trade.tp, WIN], [sl, 'STOP ' + trade.sl, LOSS], [e, 'ENTRY ' + trade.entry, INK]].filter(z => z[0] !== null);
+      const pv = v => (hide ? '' : ' ' + v);
+      const lines = mini ? [] : [[tp, 'TARGET' + pv(trade.tp), WIN], [sl, 'STOP' + pv(trade.sl), LOSS], [e, 'ENTRY' + pv(trade.entry), INK]].filter(z => z[0] !== null);
       c.globalAlpha = za;
       lines.forEach(([v, , lc]) => { c.setLineDash([6, 8]); c.strokeStyle = lc; c.globalAlpha = 0.55 * za; c.lineWidth = 2;
         c.beginPath(); c.moveTo(xa, Y(v)); c.lineTo(x1 - gut + 10, Y(v)); c.stroke(); c.setLineDash([]); });
@@ -210,12 +239,12 @@ function create(canvas, trade, opts) {
         const pa = seg(tm, IN, IN + 0.6), ex = X(ia), ey = Y(e);
         c.strokeStyle = INK; c.globalAlpha = 1 - pa; c.lineWidth = 3; c.beginPath(); c.arc(ex, ey, 10 + 60 * pa, 0, 7); c.stroke(); c.globalAlpha = 1;
         dot(ex, ey, INK, 8, 2.4);
-        c.globalAlpha = ease(seg(tm, IN, IN + 0.4)) * (1 - seg(tm, OUT - 0.4, OUT));
-        tag(`${trade.side || 'ENTRY'} ${trade.entry}`, Math.max(x0 + 10, ex - 90), ey + (R.buy ? 56 : -56), INK, 'left');
+        c.globalAlpha = ease(seg(tm, IN, IN + 0.4)) * (1 - seg(tm, OUT - 0.4, OUT)) * (mini ? 0 : 1);
+        tag(`${trade.side || 'ENTRY'}${pv(trade.entry)}`, Math.max(x0 + 10, ex - 90), ey + (R.buy ? 56 : -56), INK, 'left');
         c.globalAlpha = 1;
       }
       // live price line while the trade runs
-      if (tm >= 2.0 && tm < OUT + 0.3) {
+      if (tm >= 2.0 && tm < OUT + 0.3 && !mini) {
         const py = Y(price), lc = (R.buy ? price >= e : price <= e) ? WIN : LOSS;
         c.globalAlpha = 0.7; c.strokeStyle = lc; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x0, py); c.lineTo(x1 - gut + 10, py); c.stroke(); c.globalAlpha = 1;
         dot(xNow, py, lc, 6, 2.2);
@@ -226,7 +255,7 @@ function create(canvas, trade, opts) {
         c.strokeStyle = col; c.globalAlpha = 1 - pa; c.lineWidth = 4; c.beginPath(); c.arc(ex, ey, 12 + 90 * pa, 0, 7); c.stroke(); c.globalAlpha = 1;
         dot(ex, ey, col, 10, 2.6);
         c.globalAlpha = ease(seg(tm, OUT + 0.1, OUT + 0.5));
-        tag(`${win ? 'BOOKED' : 'CLOSED'} ${trade.exit}`, Math.min(x1 - gut - 10, Math.max(x0 + 10, ex)), ey + (ey > (y0 + y1) / 2 ? -58 : 58), col, 'center');
+        if (!mini) tag(`${win ? 'BOOKED' : 'CLOSED'}${pv(trade.exit)}`, Math.min(x1 - gut - 10, Math.max(x0 + 10, ex)), ey + (ey > (y0 + y1) / 2 ? -58 : 58), col, 'center');
         c.globalAlpha = 1;
       }
     } else {
@@ -243,20 +272,23 @@ function create(canvas, trade, opts) {
     if (R && price !== null && x0p !== e0) live = val.v * clamp((price - e0) / (x0p - e0), -3, 3);
     if (tm < 2.0) live = 0;
     if (tm >= OUT + 0.3) live = val.v;
-    const ny = Math.round(H * (post ? 0.745 : 0.715)), full = val.f(val.v), size = fitSize(c, full, W - 2 * PAD, post ? 170 : 200, D, 300, -6);
+    const ny = mini ? Math.round(H * (post ? 0.4 : 0.4)) : Math.round(H * (post ? 0.745 : 0.715)), full = val.f(val.v);
+    const size = fitSize(c, full, W - 2 * PAD, mini ? (post ? 210 : 240) : post ? 170 : 200, DF, 300, term ? -2 : -6);
     const ncol = tm >= OUT ? col : live > 0 ? WIN : live < 0 ? LOSS : INK;
     c.globalAlpha = ease(seg(tm, 0.6, 1.2));
-    T(c, tm >= OUT ? (win ? 'RESULT' : 'RESULT · RISK KEPT') : 'LIVE P&L', W / 2, ny - size * 0.82, { fam: M, size: 22, color: DIM, align: 'center', ls: 6 });
+    const clockTxt = (() => { const a = tsOf(trade.open), b = tsOf(trade.close); if (a === null || b === null || b < a) return ''; const sec = Math.round((b - a) / 1000 * (tm >= OUT ? 1 : run)); return [Math.floor(sec / 3600), Math.floor(sec / 60) % 60, sec % 60].map(v => String(v).padStart(2, '0')).join(':'); })();
+    const lab = tm >= OUT ? (win ? 'RESULT' : 'RESULT · RISK KEPT') : term && clockTxt ? `LIVE P&L  ·  IN TRADE ${clockTxt}` : 'LIVE P&L';
+    T(c, lab, W / 2, ny - size * 0.82, { fam: M, size: 22, color: DIM, align: 'center', ls: 6 });
     const txt = val.f(live);
     c.save(); c.shadowColor = ncol; c.shadowBlur = tm >= OUT ? 40 + 30 * Math.sin(tm * 2.4) : 18;
-    T(c, txt, W / 2, ny, { fam: D, w: 300, size, color: ncol, align: 'center', ls: -6 }); c.restore();
-    T(c, txt, W / 2, ny, { fam: D, w: 300, size, color: ncol, align: 'center', ls: -6 });
+    T(c, txt, W / 2, ny, { fam: DF, w: 300, size, color: ncol, align: 'center', ls: term ? -2 : -6 }); c.restore();
+    T(c, txt, W / 2, ny, { fam: DF, w: 300, size, color: ncol, align: 'center', ls: term ? -2 : -6 });
     // after the exit: second line, facts, KATANA line
     const a2 = ease(seg(tm, OUT + 0.5, OUT + 1.2));
     c.globalAlpha = a2;
     const sub = subLine(trade, o.mode);
     if (sub) T(c, sub, W / 2, ny + 74, { fam: M, size: fitSize(c, sub, W - 2 * PAD, 36, M, 400), color: INK, align: 'center' });
-    const cells = [['ENTRY', trade.entry], ['EXIT', trade.exit], ['HELD', F.duration(trade)]];
+    const cells = hide ? [['SIDE', trade.side], ['RESULT', F.rTxt(F.num(trade.r)) || '—'], ['HELD', F.duration(trade)]] : [['ENTRY', trade.entry], ['EXIT', trade.exit], ['HELD', F.duration(trade)]];
     const cw2 = (W - 2 * PAD) / 3, ry = Math.round(H * (post ? 0.86 : 0.83));
     c.fillStyle = 'rgba(255,255,255,.14)'; c.fillRect(PAD, ry - 64, (W - 2 * PAD) * a2, 2);
     cells.forEach(([k, v], i) => {
@@ -272,6 +304,13 @@ function create(canvas, trade, opts) {
     }
     T(c, 'JOURNALED ON 5ABIFX.COM', W / 2, y, { fam: M, size: 22, color: FAINT, align: 'center', ls: 5 });
     c.globalAlpha = 1;
+    if (term && price !== null && !hide) {   // a price ticker running along the top edge
+      const dg = String(trade.entry || '').split('.')[1]?.length ?? 2, up = R && (R.buy ? price >= R.e : price <= R.e);
+      const item = `${trade.symbol} ${Number(price).toFixed(dg)} ${up ? '▲' : '▼'}      `;
+      c.fillStyle = 'rgba(47,211,166,.08)'; c.fillRect(0, 0, W, 44);
+      c.font = `500 20px ${M}`; const iw = c.measureText(item).width, off = (tm * 80) % iw;
+      for (let xx = -off; xx < W; xx += iw) T(c, item, xx, 30, { fam: M, size: 20, color: up ? WIN : LOSS, w: 500 });
+    }
   }
 
   const SCENES = { ember: sceneEmber, candles: sceneCandles, bars: sceneBars, own: sceneOwn };
