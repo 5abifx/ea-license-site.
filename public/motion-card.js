@@ -7,12 +7,36 @@ const K = window.TradeCards.kit, F = K.fmt;
 const { W, H, PAD, D, M, INK, SOFT, DIM, FAINT, ORANGE, WIN, LOSS, T, fitSize } = K;
 const LEN = 7, FPS = 30;
 const SIZES = { story: 'Story 9:16', post: 'Post 4:5' };
-const SCENES0 = { ember: 'Ember glow', candles: 'Trade candles', bars: 'Volume bars', own: 'My background' };
+const SCENES0 = { replay: 'Trade replay', ember: 'Ember glow', candles: 'Trade candles', bars: 'Volume bars', own: 'My background' };
+const RLEN = 10;   // the replay plays a little longer than the other cards
 
 const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const ease = x => 1 - Math.pow(1 - clamp(x), 4);
 const expo = x => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * clamp(x)));
 const seg = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, p) => a + (b - a) * p;
+const tsOf = s => { if (!s) return null; const v = Date.parse(/[zZ]|[+-]\d\d:\d\d$/.test(s) ? s : s + 'Z'); return Number.isFinite(v) ? v : null; };
+
+/* candles around the trade for the replay: some before the entry, the trade itself, a few after the exit */
+function replayOf(t) {
+  const all = (t.candles || []).map(x => ({ t: x[0] * 1000, o: x[1], h: x[2], l: x[3], c: x[4] }));
+  const e = F.num(t.entry), x = F.num(t.exit), op = tsOf(t.open), cl = tsOf(t.close);
+  if (all.length < 3 || e === null || x === null || op === null || cl === null) return null;
+  const near = ms => { let b = 0; all.forEach((k, i) => { if (Math.abs(k.t - ms) < Math.abs(all[b].t - ms)) b = i; }); return b; };
+  const io = near(op), ic = Math.max(io, near(cl));
+  const a = Math.max(0, io - 24), b = Math.min(all.length - 1, ic + 8);
+  let ks = all.slice(a, b + 1), ia = io - a, ib = ic - a;
+  const n = Math.ceil(ks.length / 90);   // long trades: merge candles so about 90 are drawn
+  if (n > 1) {
+    const m = [];
+    for (let i = 0; i < ks.length; i += n) { const g = ks.slice(i, i + n); m.push({ t: g[0].t, o: g[0].o, h: Math.max(...g.map(k => k.h)), l: Math.min(...g.map(k => k.l)), c: g[g.length - 1].c }); }
+    ks = m; ia = Math.floor(ia / n); ib = Math.floor(ib / n);
+  }
+  const sl = F.num(t.sl), tp = F.num(t.tp), buy = t.side !== 'SELL';
+  const prices = ks.flatMap(k => [k.h, k.l]).concat([e, x, sl, tp].filter(v => v !== null));
+  let lo = Math.min(...prices), hi = Math.max(...prices); const pad = ((hi - lo) || 1) * 0.1; lo -= pad; hi += pad;
+  return { ks, ia, ib, e, x, sl: sl !== null && (buy ? sl < e : sl > e) ? sl : null, tp, lo, hi, buy };
+}
 
 /* the value shown, as a number we can count up, and its text at any point of the count */
 function valueOf(t, mode) {
@@ -45,6 +69,7 @@ function create(canvas, trade, opts) {
   const o = Object.assign({ mode: 'money', scene: 'ember', rm: true, dim: 0.55 }, opts || {});
   const kc = candlesOf(trade);
   let media = null, raf = 0, t0 = 0, frozen = null;
+  const len = () => (o.scene === 'replay' ? RLEN : LEN);
 
   /* the static glow is drawn once and then drifted, so each frame stays cheap on phones */
   const glow = document.createElement('canvas'); glow.width = W; glow.height = H;
@@ -105,6 +130,150 @@ function create(canvas, trade, opts) {
     const s = Math.max(W / mw, H / mh) * z;
     c.drawImage(media, (W - mw * s) / 2, (H - mh * s) / 2, mw * s, mh * s);
   }
+  /* ---------- trade replay: the trade plays out candle by candle, from the entry to the exit ---------- */
+  const RP = replayOf(trade);
+  const tag = (txt, x, y, col, align) => {   // small boxed label
+    c.font = `500 22px ${M}`; const tw = c.measureText(txt).width + 26, bx = align === 'right' ? x - tw : align === 'center' ? x - tw / 2 : x;
+    c.fillStyle = 'rgba(5,5,7,.88)'; c.fillRect(bx, y - 19, tw, 38);
+    c.strokeStyle = col; c.lineWidth = 1.5; c.strokeRect(bx, y - 19, tw, 38);
+    T(c, txt, bx + tw / 2, y + 8, { fam: M, size: 22, color: col, align: 'center', w: 500 });
+  };
+  const dot = (x, y, col, r, glow) => { c.fillStyle = col; c.globalAlpha *= 0.3; c.beginPath(); c.arc(x, y, r * glow, 0, 7); c.fill(); c.globalAlpha /= 0.3; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); };
+  function frameReplay(tm) {
+    const R = RP, win = F.isWin(trade), col = win ? WIN : LOSS, val = valueOf(trade, o.mode);
+    const post = H < 1500, x0 = 60, x1 = W - 60, gut = 210, y0 = post ? 300 : 340, y1 = Math.round(H * (post ? 0.6 : 0.6));
+    // background: dark with a soft glow
+    c.fillStyle = '#050507'; c.fillRect(0, 0, W, H);
+    c.globalAlpha = 0.35; c.drawImage(glow, 30 * Math.sin(tm * 0.4), 0); c.globalAlpha = 1;
+    // top: brand, handle, what was traded
+    c.globalAlpha = ease(seg(tm, 0, 0.6));
+    K.brand(c, PAD, 140);
+    const hd = trade.handle || '5abifx.com';
+    T(c, hd, W - PAD, 153, { fam: M, size: fitSize(c, hd, 420, 26, M, 400, 2), color: SOFT, align: 'right', ls: 2 });
+    const top = [trade.symbol, trade.side, F.dayTxt(trade.close)].filter(Boolean).join('  ·  ');
+    T(c, top, PAD, y0 - 60, { fam: M, size: fitSize(c, top, W - 2 * PAD, 30, M, 400, 6), color: SOFT, ls: 6 });
+    c.globalAlpha = 1;
+    // the replay clock: candles before the entry, the entry, the trade candle by candle, the exit
+    const run = seg(tm, 2.0, 7.0), IN = 1.5, OUT = 7.0;
+    let price = R ? R.e : F.num(trade.entry) ?? 0;
+    if (R) {
+      const { ks, ia, ib, e, x, sl, tp, lo, hi } = R, cw = (x1 - gut - x0) / ks.length;
+      const X = i => x0 + (i + 0.5) * cw, Y = v => y0 + (hi - v) / (hi - lo) * (y1 - y0);
+      c.strokeStyle = 'rgba(255,255,255,.05)'; c.lineWidth = 1;
+      for (let i = 0; i <= 5; i++) { const gy = y0 + (y1 - y0) * i / 5; c.beginPath(); c.moveTo(x0, gy); c.lineTo(x1, gy); c.stroke(); }
+      const nTrade = ib - ia + 1, pos = run * nTrade, full = Math.floor(pos), part = pos - full;
+      const xa = X(ia) - cw / 2, xNow = tm < OUT ? X(ia + Math.min(full, nTrade - 1)) + cw * (part - 0.5) : X(ib) + cw / 2;
+      // risk and target zones grow with the trade
+      const za = seg(tm, IN, IN + 0.5);
+      if (za > 0) {
+        c.globalAlpha = za;
+        if (tp !== null) { c.fillStyle = 'rgba(47,211,166,.10)'; c.fillRect(xa, Math.min(Y(e), Y(tp)), Math.max(0, xNow - xa), Math.abs(Y(tp) - Y(e))); }
+        if (sl !== null) { c.fillStyle = 'rgba(255,90,100,.10)'; c.fillRect(xa, Math.min(Y(e), Y(sl)), Math.max(0, xNow - xa), Math.abs(Y(sl) - Y(e))); }
+        c.globalAlpha = 1;
+      }
+      const drawK = (k, i, alpha) => {
+        const up = k.c >= k.o, cx = X(i), kc0 = up ? WIN : LOSS;
+        c.globalAlpha = alpha; c.strokeStyle = c.fillStyle = kc0; c.lineWidth = Math.max(1.5, Math.min(3, cw * 0.14));
+        c.beginPath(); c.moveTo(cx, Y(k.h)); c.lineTo(cx, Y(k.l)); c.stroke();
+        const bt = Y(Math.max(k.o, k.c)), bb = Y(Math.min(k.o, k.c));
+        c.fillRect(cx - cw * 0.32, bt, cw * 0.64, Math.max(3, bb - bt)); c.globalAlpha = 1;
+      };
+      // before the entry: they slide in quickly, a little dim
+      const pre = Math.floor(ia * ease(seg(tm, 0.2, 1.3)));
+      for (let i = 0; i < pre; i++) drawK(ks[i], i, 0.55);
+      // the trade
+      if (tm >= 2.0) {
+        for (let j = 0; j < Math.min(full, nTrade); j++) drawK(ks[ia + j], ia + j, 1);
+        if (full < nTrade) {   // the candle that is forming right now
+          const k = ks[ia + full], p = part, cur = lerp(k.o, k.c, p);
+          drawK({ o: k.o, c: cur, h: Math.max(k.o, cur, lerp(k.o, k.h, Math.min(1, p * 1.6))), l: Math.min(k.o, cur, lerp(k.o, k.l, Math.min(1, p * 1.6))) }, ia + full, 1);
+          price = cur;
+        } else price = ks[ib].c;
+        if (full === 0 && part < 0.2) price = lerp(e, price, part / 0.2);
+      }
+      if (tm >= OUT) price = lerp(price, x, ease(seg(tm, OUT, OUT + 0.3)));
+      // after the exit: the market kept going, shown faint
+      const post0 = Math.floor((ks.length - 1 - ib) * ease(seg(tm, OUT + 0.4, OUT + 1.4)));
+      for (let i = 1; i <= post0; i++) drawK(ks[ib + i], ib + i, 0.3);
+      // stop, target and entry lines from the entry to the right, tags in the gutter
+      const lines = [[tp, 'TARGET ' + trade.tp, WIN], [sl, 'STOP ' + trade.sl, LOSS], [e, 'ENTRY ' + trade.entry, INK]].filter(z => z[0] !== null);
+      c.globalAlpha = za;
+      lines.forEach(([v, , lc]) => { c.setLineDash([6, 8]); c.strokeStyle = lc; c.globalAlpha = 0.55 * za; c.lineWidth = 2;
+        c.beginPath(); c.moveTo(xa, Y(v)); c.lineTo(x1 - gut + 10, Y(v)); c.stroke(); c.setLineDash([]); });
+      c.globalAlpha = za;
+      const tags = lines.map(z => ({ z, y: Y(z[0]) })).sort((p, q) => p.y - q.y);
+      for (let i = 1; i < tags.length; i++) if (tags[i].y - tags[i - 1].y < 44) tags[i].y = tags[i - 1].y + 44;
+      tags.forEach(({ z: [, l, lc], y }) => tag(l, x1, y, lc, 'right'));
+      c.globalAlpha = 1;
+      // the entry: a pulse and what was done
+      if (tm >= IN) {
+        const pa = seg(tm, IN, IN + 0.6), ex = X(ia), ey = Y(e);
+        c.strokeStyle = INK; c.globalAlpha = 1 - pa; c.lineWidth = 3; c.beginPath(); c.arc(ex, ey, 10 + 60 * pa, 0, 7); c.stroke(); c.globalAlpha = 1;
+        dot(ex, ey, INK, 8, 2.4);
+        c.globalAlpha = ease(seg(tm, IN, IN + 0.4)) * (1 - seg(tm, OUT - 0.4, OUT));
+        tag(`${trade.side || 'ENTRY'} ${trade.entry}`, Math.max(x0 + 10, ex - 90), ey + (R.buy ? 56 : -56), INK, 'left');
+        c.globalAlpha = 1;
+      }
+      // live price line while the trade runs
+      if (tm >= 2.0 && tm < OUT + 0.3) {
+        const py = Y(price), lc = (R.buy ? price >= e : price <= e) ? WIN : LOSS;
+        c.globalAlpha = 0.7; c.strokeStyle = lc; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x0, py); c.lineTo(x1 - gut + 10, py); c.stroke(); c.globalAlpha = 1;
+        dot(xNow, py, lc, 6, 2.2);
+      }
+      // the exit: where it was booked
+      if (tm >= OUT) {
+        const pa = seg(tm, OUT, OUT + 0.7), ex = X(ib), ey = Y(x);
+        c.strokeStyle = col; c.globalAlpha = 1 - pa; c.lineWidth = 4; c.beginPath(); c.arc(ex, ey, 12 + 90 * pa, 0, 7); c.stroke(); c.globalAlpha = 1;
+        dot(ex, ey, col, 10, 2.6);
+        c.globalAlpha = ease(seg(tm, OUT + 0.1, OUT + 0.5));
+        tag(`${win ? 'BOOKED' : 'CLOSED'} ${trade.exit}`, Math.min(x1 - gut - 10, Math.max(x0 + 10, ex)), ey + (ey > (y0 + y1) / 2 ? -58 : 58), col, 'center');
+        c.globalAlpha = 1;
+      }
+    } else {
+      // no candles saved: a simple line from the entry to the exit
+      const p = ease(run), yy = (y0 + y1) / 2, xa = x0 + 40, xb = x1 - gut;
+      c.globalAlpha = ease(seg(tm, IN, IN + 0.4)); c.strokeStyle = col; c.lineWidth = 4;
+      c.beginPath(); c.moveTo(xa, yy + 120); c.lineTo(lerp(xa, xb, p), yy + 120 - 240 * p); c.stroke();
+      dot(xa, yy + 120, INK, 8, 2.4); if (p >= 1) dot(xb, yy - 120, col, 10, 2.6); c.globalAlpha = 1;
+      price = null;
+    }
+    // the number: live P&L while it runs, then the result
+    const e0 = R ? R.e : null, x0p = R ? R.x : null;
+    let live = val.v * ease(run);
+    if (R && price !== null && x0p !== e0) live = val.v * clamp((price - e0) / (x0p - e0), -3, 3);
+    if (tm < 2.0) live = 0;
+    if (tm >= OUT + 0.3) live = val.v;
+    const ny = Math.round(H * (post ? 0.745 : 0.715)), full = val.f(val.v), size = fitSize(c, full, W - 2 * PAD, post ? 170 : 200, D, 300, -6);
+    const ncol = tm >= OUT ? col : live > 0 ? WIN : live < 0 ? LOSS : INK;
+    c.globalAlpha = ease(seg(tm, 0.6, 1.2));
+    T(c, tm >= OUT ? (win ? 'RESULT' : 'RESULT · RISK KEPT') : 'LIVE P&L', W / 2, ny - size * 0.82, { fam: M, size: 22, color: DIM, align: 'center', ls: 6 });
+    const txt = val.f(live);
+    c.save(); c.shadowColor = ncol; c.shadowBlur = tm >= OUT ? 40 + 30 * Math.sin(tm * 2.4) : 18;
+    T(c, txt, W / 2, ny, { fam: D, w: 300, size, color: ncol, align: 'center', ls: -6 }); c.restore();
+    T(c, txt, W / 2, ny, { fam: D, w: 300, size, color: ncol, align: 'center', ls: -6 });
+    // after the exit: second line, facts, KATANA line
+    const a2 = ease(seg(tm, OUT + 0.5, OUT + 1.2));
+    c.globalAlpha = a2;
+    const sub = subLine(trade, o.mode);
+    if (sub) T(c, sub, W / 2, ny + 74, { fam: M, size: fitSize(c, sub, W - 2 * PAD, 36, M, 400), color: INK, align: 'center' });
+    const cells = [['ENTRY', trade.entry], ['EXIT', trade.exit], ['HELD', F.duration(trade)]];
+    const cw2 = (W - 2 * PAD) / 3, ry = Math.round(H * (post ? 0.86 : 0.83));
+    c.fillStyle = 'rgba(255,255,255,.14)'; c.fillRect(PAD, ry - 64, (W - 2 * PAD) * a2, 2);
+    cells.forEach(([k, v], i) => {
+      const x = PAD + cw2 * i + cw2 / 2, s = String(v ?? '—');
+      T(c, k, x, ry, { fam: M, size: 20, color: DIM, align: 'center', ls: 5 });
+      T(c, s, x, ry + 48, { fam: M, size: fitSize(c, s, cw2 - 20, 36, M, 400), align: 'center' });
+    });
+    c.globalAlpha = ease(seg(tm, OUT + 0.8, OUT + 1.4));
+    const y = H - (post ? 50 : PAD);
+    if (o.rm && !post) {
+      const rk = F.num(trade.risk), s = rk !== null ? `RISK ${rk.toFixed(2)}% · PROTECTED BY KATANA` : 'PROTECTED BY KATANA';
+      T(c, s, W / 2, y - 60, { fam: M, size: 24, color: ORANGE, align: 'center', ls: 4 });
+    }
+    T(c, 'JOURNALED ON 5ABIFX.COM', W / 2, y, { fam: M, size: 22, color: FAINT, align: 'center', ls: 5 });
+    c.globalAlpha = 1;
+  }
+
   const SCENES = { ember: sceneEmber, candles: sceneCandles, bars: sceneBars, own: sceneOwn };
 
   /* darkens the art so the number always reads, more for a member's own background */
@@ -117,6 +286,7 @@ function create(canvas, trade, opts) {
   }
 
   function frame(tm) {
+    if (o.scene === 'replay') return frameReplay(tm);
     SCENES[o.scene](tm); shade();
     // a soft dark edge keeps small text readable on bright photos
     c.shadowColor = 'rgba(0,0,0,.75)'; c.shadowBlur = o.scene === 'own' ? 14 : 0;
@@ -173,7 +343,7 @@ function create(canvas, trade, opts) {
 
   function loop(now) {
     if (!t0) t0 = now;
-    const tm = ((now - t0) / 1000) % LEN;
+    const tm = ((now - t0) / 1000) % len();
     frame(frozen ?? tm);
     raf = requestAnimationFrame(loop);
   }
@@ -224,7 +394,7 @@ function create(canvas, trade, opts) {
       play(); rec.start(250);
       const st = performance.now();
       const tick = () => {
-        const p = (performance.now() - st) / 1000 / LEN;
+        const p = (performance.now() - st) / 1000 / len();
         if (onProgress) onProgress(clamp(p));
         if (p >= 1) { rec.stop(); return; }
         setTimeout(tick, 100);
