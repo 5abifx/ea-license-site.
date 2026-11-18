@@ -876,12 +876,12 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const partials = card.partials;
     TP.match(db, req.user);
     const plan = db.prepare("SELECT * FROM trade_plans WHERE trade_id = ? AND user_id = ? AND status = 'matched'").get(t.id, req.user.id);
-    let planHtml = '<p class="muted small plan-none"><span class="ptag no">No plan</span> <a href="/journal/plan">Plan your next trade</a></p>';
+    let planHtml = '<p class="muted small plan-none" data-tab="chart"><span class="ptag no">No plan</span> <a href="/journal/plan">Plan your next trade</a></p>';
     if (plan) {
       const c = TP.compare(plan, t);
       const ck = JSON.parse(plan.checks || '[]');
       const cost = (r) => (r.cost && r.cost > 0 ? `<em class="${r.kind === 'left' ? 'left' : 'risk'}">${r.kind === 'left' ? `${money(r.cost, t.currency).replace(/^[+]/, '')} left` : `+${money(r.cost, t.currency).replace(/^[+]/, '')} risk`}</em>` : '');
-      planHtml = `<section class="card pvr">
+      planHtml = `<section class="card pvr" data-tab="chart">
         <div class="row between"><h2>Plan vs result</h2><span class="pvr-score"><span class="pips">${c.rows.map((r) => `<i class="${r.ok ? 'ok' : ''}"></i>`).join('')}</span><b>${c.followed}/${c.total}</b> kept</span></div>
         <div class="pvr-split">
           <div class="pvr-chart">${TP.chartSvg(plan, t)}<p class="small muted"><i class="k-pl"></i>Plan <i class="k-ac"></i>What you did</p></div>
@@ -901,8 +901,12 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <h1>${esc(t.symbol)} ${esc(t.side)} <span class="${cls(t.net)}">${money(t.net, t.currency)}</span></h1>
     <p class="muted"><span class="priv"><span class="priv-real">Account ${esc(t.account_number)} · position ${esc(t.position_id)}</span><span class="priv-mask">Account ••${esc(String(t.account_number).slice(-2))}</span></span> · ${fmtDate(t.open_time)} → ${fmtDate(t.close_time)} (broker time)</p>
 
-    ${t.manual && !card.candles.length ? `<section class="card"><div class="row between"><h2>Logged by hand</h2><span class="muted small">No chart: the Journal EA did not see this trade</span></div>
-      <dl class="tv-kv lt-mkv"><div><dt>Entry</dt><dd>${fx(t.entry) || '-'}</dd></div><div><dt>Stop loss</dt><dd class="neg">${fx(t.sl) || '-'}</dd></div><div><dt>Take profit</dt><dd class="pos">${fx(t.tp) || '-'}</dd></div><div><dt>Exit</dt><dd>${fx(t.exit) || '-'}</dd></div><div><dt>Result</dt><dd class="${cls(t.net)}">${money(t.net, t.currency)}${t.r !== null && t.r !== undefined ? ` · ${t.r >= 0 ? '+' : '−'}${Math.abs(t.r).toFixed(2)}R` : ''}</dd></div><div><dt>Lots</dt><dd>${t.lots ?? '-'}</dd></div></dl></section>` : `<section class="card tv-card" id="tv">
+    <nav class="seg ttabs" id="ttabs" aria-label="Trade page">
+      <button type="button" data-go="chart" aria-pressed="true">Chart</button><button type="button" data-go="review" aria-pressed="false">Review${LT.gradeOf(t) ? ` · ${esc(LT.gradeOf(t))}` : ''}</button><button type="button" data-go="share" aria-pressed="false">Share</button>
+    </nav>
+
+    ${t.manual && !card.candles.length ? `<section class="card" data-tab="chart"><div class="row between"><h2>Logged by hand</h2><span class="muted small">No chart: the Journal EA did not see this trade</span></div>
+      <dl class="tv-kv lt-mkv"><div><dt>Entry</dt><dd>${fx(t.entry) || '-'}</dd></div><div><dt>Stop loss</dt><dd class="neg">${fx(t.sl) || '-'}</dd></div><div><dt>Take profit</dt><dd class="pos">${fx(t.tp) || '-'}</dd></div><div><dt>Exit</dt><dd>${fx(t.exit) || '-'}</dd></div><div><dt>Result</dt><dd class="${cls(t.net)}">${money(t.net, t.currency)}${t.r !== null && t.r !== undefined ? ` · ${t.r >= 0 ? '+' : '−'}${Math.abs(t.r).toFixed(2)}R` : ''}</dd></div><div><dt>Lots</dt><dd>${t.lots ?? '-'}</dd></div></dl></section>` : `<section class="card tv-card" id="tv" data-tab="chart">
       <div class="row between"><h2>Trade replay</h2><span class="muted small">${esc(t.tf || '')} candles saved by the Journal EA</span></div>
       <div class="tv-grid">
         <div class="tv-main">
@@ -930,14 +934,51 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
     ${planHtml}
 
-    <section class="card">
-      <h2>Share cards <span class="tag">5ABI.FX story · 9:16</span></h2>
-      <p class="muted">Swipe story: card 1 is the result, card 2 is the real MT5 chart of this trade.</p>
+    <section class="card" data-tab="chart">
+      <details class="tdet"${t.r === null && t.entry !== null ? ' open' : ''}><summary><h2>All trade details</h2><span class="muted small">costs, best and worst move, partials, original stop</span></summary>
+      <table><tbody>
+        <tr><th>Entry</th><td>${fx(t.entry)}</td><th>Exit</th><td>${fx(t.exit)}</td></tr>
+        <tr><th>Stop loss</th><td>${fx(t.sl) || '-'}${t.sl_edited ? ' <span class="muted">(edited)</span>' : ''}</td><th>Take profit</th><td>${fx(t.tp) || '-'}</td></tr>
+        <tr><th>Lots</th><td>${t.lots ?? '-'}</td><th>Pips</th><td>${t.pips ?? '-'}</td></tr>
+        <tr><th>R multiple</th><td>${t.r === null ? '-' : t.r.toFixed(2)}</td><th>Risk</th><td>${t.risk_pct === null ? '-' : t.risk_pct.toFixed(2) + '%'}</td></tr>
+        <tr><th>Gross / costs</th><td>${money(t.profit)} / ${money((t.commission || 0) + (t.swap || 0))}</td><th>Best / worst move</th><td>${fx(t.mfe) || '-'} / ${fx(t.mae) || '-'}</td></tr>
+        <tr><th>Magic / comment</th><td>${t.magic ?? '-'} ${esc(t.comment)}</td><th>Partial closes</th><td>${partials.length ? partials.map((p) => `${p.lots} @ ${fx(p.price)}`).join('<br>') : 'none'}</td></tr>
+      </tbody></table>
+      ${t.r === null && t.entry !== null ? `<p class="muted">${t.sl !== null && (t.side === 'BUY' ? t.sl >= t.entry : t.sl <= t.entry)
+        ? 'The stop shown is at break-even or in profit, so it was moved before the journal saw your first stop. Type your original stop-loss to get R and risk %.'
+        : 'No stop-loss was recorded. Type the stop-loss you used to get R and risk %.'}</p>` : ''}
+      <form method="post" action="/journal/${t.id}/sl" class="inline-form">
+        <label>Original stop-loss <input name="sl" inputmode="decimal" placeholder="${t.side === 'BUY' ? 'below' : 'above'} entry ${fx(t.entry)}" value="${t.sl_edited ? fx(t.sl) : ''}" required></label>
+        <button class="secondary small">Save stop</button>
+      </form>
+      </details>
+    </section>
+
+    <section class="card lt-review" id="review" data-tab="review">
+      <div class="row between"><h2>Review this trade</h2>${LT.gradeOf(t) ? `<span class="lt-gb sm">${esc(LT.gradeOf(t))}</span>` : ''}</div>
+      <form method="post" action="/journal/${t.id}" class="lt-form lt-inline">
+        ${LT.fields(t)}
+        <div class="lt-save"><button class="btn lt-go">Save review</button></div>
+      </form>
+      <script src="/logtrade.js" defer></script>
+    </section>
+
+    <div data-tab="review">${mentorBox ? mentorBox(req, t) : ''}</div>
+
+    <section class="card tsh" id="share" data-tab="share">
+      <div class="row between"><h2>Share this trade</h2><a class="small" href="/journal/studio">Share Studio: week, month and more →</a></div>
+      <div class="tsh-top">
+        <div class="seg tsh-tabs" role="tablist" aria-label="What to make">
+          <button type="button" role="tab" id="tab-pic" data-pane="pic" aria-pressed="true" aria-selected="true">Picture cards</button><button type="button" role="tab" id="tab-vid" data-pane="vid" aria-pressed="false" aria-selected="false">Video</button>${req.user.is_admin ? '<button type="button" role="tab" id="tab-ov" data-pane="ov" aria-pressed="false" aria-selected="false">Overlay</button>' : ''}
+        </div>
       <div class="row">
         <select id="style" aria-label="Card style"><option value="a">Style: Cinematic</option><option value="b">Style: Chart first</option><option value="c">Style: Ticket</option></select>
         <select id="mode"><option value="money">Show $ amount</option><option value="pct">Show % of account</option><option value="r">Show R multiple</option></select>
         <label class="check"><input type="checkbox" id="rm" checked> KATANA risk line</label>
       </div>
+      </div>
+      <div class="tsh-pane" id="pane-pic" role="tabpanel" aria-labelledby="tab-pic">
+      <p class="muted small">Two story pictures: card 1 is the result, card 2 is the real chart of this trade.</p>
       <div class="cards">
         <figure><canvas id="c1"></canvas><button class="small" data-save="c1">Save card 1</button></figure>
         <figure><canvas id="c2"></canvas><button class="small" data-save="c2">Save card 2</button></figure>
@@ -948,11 +989,9 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         <input type="hidden" name="back" value="${t.id}">
       </form>
       ${req.app.locals.affTradeBox ? req.app.locals.affTradeBox(req.user, t) : ''}
-    </section>
-
-    <section class="card motion-card">
-      <h2>Motion card <span class="tag">7-second video · story or post</span></h2>
-      <p class="muted">The result as a short video for Instagram, TikTok or Discord. Uses the $ / % / R choice and KATANA line from above.</p>
+      </div>
+      <div class="tsh-pane motion-card" id="pane-vid" role="tabpanel" aria-labelledby="tab-vid" hidden>
+      <p class="muted small">A short video for Reels, TikTok or Discord. Trade replay plays this trade from entry to exit.</p>
       <div class="row">
         <select id="mv-scene" aria-label="Motion background"><option value="replay">Trade replay: entry to exit, candle by candle</option><option value="ember">Background: Ember glow</option><option value="candles">Background: Trade candles</option><option value="bars">Background: Volume bars</option><option value="own">Background: My photo or clip</option></select>
         <select id="mv-size" aria-label="Video size"><option value="story">Story 9:16</option><option value="post">Post 4:5</option></select>
@@ -967,10 +1006,9 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
           <span class="muted small" id="mv-st" aria-live="polite"></span>
         </figure>
       </div>
-    </section>
-
-    ${req.user.is_admin ? `<section class="card">
-      <h2>Story overlay <span class="tag">admin test · transparent PNG</span></h2>
+      </div>
+    ${req.user.is_admin ? `<div class="tsh-pane" id="pane-ov" role="tabpanel" aria-labelledby="tab-ov" hidden>
+      <p class="tag">admin test · transparent PNG</p>
       <p class="muted">Quote, the real candles of this trade with entry/exit arrows, and the result, on a transparent background for Instagram stories. No prices, SL or TP. Only admins see this for now.</p>
       <div class="row">
         <select id="ov-style">${Object.entries({ scalper: 'Scalper', trend: 'Trend following', counter: 'Counter trend', swing: 'Swing' }).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
@@ -987,37 +1025,13 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       <div class="cards">
         <figure><canvas id="ov" class="overlay"></canvas><button class="small" data-save-ov>Save overlay PNG</button></figure>
       </div>
-    </section>` : ''}
-
-    <section class="card">
-      <h2>Trade</h2>
-      <table><tbody>
-        <tr><th>Entry</th><td>${fx(t.entry)}</td><th>Exit</th><td>${fx(t.exit)}</td></tr>
-        <tr><th>Stop loss</th><td>${fx(t.sl) || '-'}${t.sl_edited ? ' <span class="muted">(edited)</span>' : ''}</td><th>Take profit</th><td>${fx(t.tp) || '-'}</td></tr>
-        <tr><th>Lots</th><td>${t.lots ?? '-'}</td><th>Pips</th><td>${t.pips ?? '-'}</td></tr>
-        <tr><th>R multiple</th><td>${t.r === null ? '-' : t.r.toFixed(2)}</td><th>Risk</th><td>${t.risk_pct === null ? '-' : t.risk_pct.toFixed(2) + '%'}</td></tr>
-        <tr><th>Gross / costs</th><td>${money(t.profit)} / ${money((t.commission || 0) + (t.swap || 0))}</td><th>Best / worst move</th><td>${fx(t.mfe) || '-'} / ${fx(t.mae) || '-'}</td></tr>
-        <tr><th>Magic / comment</th><td>${t.magic ?? '-'} ${esc(t.comment)}</td><th>Partial closes</th><td>${partials.length ? partials.map((p) => `${p.lots} @ ${fx(p.price)}`).join('<br>') : 'none'}</td></tr>
-      </tbody></table>
-      ${t.r === null && t.entry !== null ? `<p class="muted">${t.sl !== null && (t.side === 'BUY' ? t.sl >= t.entry : t.sl <= t.entry)
-        ? 'The stop shown is at break-even or in profit, so it was moved before the journal saw your first stop. Type your original stop-loss to get R and risk %.'
-        : 'No stop-loss was recorded. Type the stop-loss you used to get R and risk %.'}</p>` : ''}
-      <form method="post" action="/journal/${t.id}/sl" class="inline-form">
-        <label>Original stop-loss <input name="sl" inputmode="decimal" placeholder="${t.side === 'BUY' ? 'below' : 'above'} entry ${fx(t.entry)}" value="${t.sl_edited ? fx(t.sl) : ''}" required></label>
-        <button class="secondary small">Save stop</button>
-      </form>
+      </div>` : ''}
     </section>
 
-    <section class="card lt-review" id="review">
-      <div class="row between"><h2>Review this trade</h2>${LT.gradeOf(t) ? `<span class="lt-gb sm">${esc(LT.gradeOf(t))}</span>` : ''}</div>
-      <form method="post" action="/journal/${t.id}" class="lt-form lt-inline">
-        ${LT.fields(t)}
-        <div class="lt-save"><button class="btn lt-go">Save review</button></div>
-      </form>
-      <script src="/logtrade.js" defer></script>
-    </section>
 
-    ${mentorBox ? mentorBox(req, t) : ''}
+
+
+
 
     ${req.user.is_admin ? '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Montserrat:wght@500;600&display=swap">' : ''}
     <script id="trade-data" type="application/json">${json}</script>
@@ -1025,7 +1039,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <script src="/save-file.js"></script>
     <script src="/motion-card.js"></script>
     ${req.user.is_admin ? '<script src="/overlay.js"></script>' : ''}
-    <script src="/journal.js"></script>`);
+    <script src="/journal.js"></script>
+    <script src="/trade-tabs.js"></script>`);
   });
 
   app.post('/journal/handle', requireUser, requireJournal, (req, res) => {

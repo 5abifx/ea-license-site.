@@ -2224,3 +2224,19 @@ tr:target { background: var(--accent-soft); }
 .ss-q .sv-btns { gap: 12px; }
 .cards figure .sv-btns { justify-content: center; }
 .cards figure .sv-tip { text-align: center; margin-left: auto; margin-right: auto; }
+
+/* Trade page: Chart / Review / Share tabs instead of one long scroll (public/trade-tabs.js) */
+.ttabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; margin: 6px 0 18px; display: flex; width: max-content; max-width: 100%; backdrop-filter: blur(10px); background: rgba(19,19,21,.85); }
+.ttabs button { padding: 9px 18px; }
+.tsh-top { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; margin: 10px 0 6px; }
+.tsh-top > .row { margin: 0; }
+.tsh-tabs { flex-wrap: wrap; }
+.tsh-pane > .muted.small:first-child { margin-top: 6px; }
+.tsh-pane .tag { display: inline-block; margin: 6px 0; }
+details.tdet > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+details.tdet > summary::-webkit-details-marker { display: none; }
+details.tdet > summary h2 { margin: 0; }
+details.tdet > summary h2::after { content: ' ›'; color: var(--muted); display: inline-block; transition: transform .2s; }
+details.tdet[open] > summary h2::after { transform: rotate(90deg); }
+details.tdet[open] > summary { margin-bottom: 14px; }
+@media (max-width: 640px) { .ttabs { width: 100%; } .ttabs button { flex: 1; padding: 9px 6px; } }
