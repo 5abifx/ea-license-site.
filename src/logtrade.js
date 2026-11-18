@@ -29,7 +29,7 @@ const gradeOf = (t) => t.grade || STAR_GRADE[t.rating] || '';
 const isTagged = (t) => !!(t.emotion || t.grade || t.followed || t.rating);
 
 // the review form body: plan, feelings, mistakes, grade, setup, notes. t = trade row (or {} for a new one)
-function fields(t = {}, { compact = false } = {}) {
+function fields(t = {}, { compact = false, parts = false } = {}) {
   const feel = new Set(list(t.emotion).map((x) => x.toLowerCase()));
   const mist = new Set(list(t.mistakes).map((x) => x.toLowerCase()));
   const g = gradeOf(t);
@@ -40,22 +40,31 @@ function fields(t = {}, { compact = false } = {}) {
   const feelOrig = list(t.emotion), mistOrig = list(t.mistakes);
   const ownFeel = extra(feel, [...FEEL_GOOD, ...FEEL_BAD].map(([k]) => k)).map((x) => feelOrig.find((o) => o.toLowerCase() === x));
   const ownMist = extra(mist, MISTAKES).map((x) => mistOrig.find((o) => o.toLowerCase() === x));
-  return `
-    <div class="lt-blk"><h4>Did you follow your plan?</h4>
-      <div class="lt-seg" role="radiogroup">${PLAN.map((p) => `<label><input type="radio" name="followed" value="${p}"${t.followed === p ? ' checked' : ''}><span>${p}</span></label>`).join('')}</div></div>
-    <div class="lt-blk"><h4>How did you feel?</h4>
+  const P = {
+    plan: `<div class="lt-blk"><h4>Did you follow your plan?</h4>
+      <div class="lt-seg" role="radiogroup">${PLAN.map((p) => `<label><input type="radio" name="followed" value="${p}"${t.followed === p ? ' checked' : ''}><span>${p}</span></label>`).join('')}</div></div>`,
+    feel: `<div class="lt-blk"><h4>How did you feel?</h4>
       <div class="lt-feel">
         <div><p class="lt-q"><i class="dot good"></i>Good</p><div class="lt-chips" data-own="feel">${FEEL_GOOD.map(([k, i]) => chip('feel', k, i, feel.has(k.toLowerCase()))).join('')}${ownFeel.filter((x) => !BAD.has(x.toLowerCase())).map((x) => chip('feel', x, '', true)).join('')}</div></div>
         <div><p class="lt-q"><i class="dot bad"></i>Not so good</p><div class="lt-chips" data-own="feel" data-bad>${FEEL_BAD.slice(0, compact ? 6 : 99).map(([k, i]) => chip('feel', k, i, feel.has(k.toLowerCase()), true)).join('')}${compact ? FEEL_BAD.slice(6).filter(([k]) => feel.has(k.toLowerCase())).map(([k, i]) => chip('feel', k, i, true, true)).join('') : ''}</div></div>
       </div>
-      ${own('feel', 'Add your own feeling…')}</div>
-    <div class="lt-blk"><h4>Any mistakes? <small>leave empty if none</small></h4>
+      ${own('feel', 'Add your own feeling…')}</div>`,
+    mist: `<div class="lt-blk"><h4>Any mistakes? <small>leave empty if none</small></h4>
       <div class="lt-chips" data-own="mist">${MISTAKES.map((k) => chip('mist', k, '', mist.has(k.toLowerCase()), true)).join('')}${ownMist.map((x) => chip('mist', x, '', true, true)).join('')}</div>
-      ${own('mist', 'Add your own mistake…')}</div>
-    <div class="lt-blk"><h4>Grade this trade <small>how well you traded, not the money</small></h4>
-      <div class="lt-grades" role="radiogroup">${GRADES.map(([k, l]) => `<label><input type="radio" name="grade" value="${k}"${g === k ? ' checked' : ''}><span><b>${k}</b><small>${l}</small></span></label>`).join('')}</div></div>
-    ${compact ? '' : `<div class="lt-blk"><h4>Setup <small>optional</small></h4><input name="setup" value="${esc(t.setup || '')}" maxlength="120" placeholder="e.g. London breakout"></div>`}
-    <div class="lt-blk"><h4>Notes</h4><textarea name="notes" rows="${compact ? 2 : 4}" maxlength="4000" placeholder="What did you see? What did you do well? What would you do differently?">${esc(t.notes || '')}</textarea></div>`;
+      ${own('mist', 'Add your own mistake…')}</div>`,
+    grade: `<div class="lt-blk"><h4>Grade this trade <small>how well you traded, not the money</small></h4>
+      <div class="lt-grades" role="radiogroup">${GRADES.map(([k, l]) => `<label><input type="radio" name="grade" value="${k}"${g === k ? ' checked' : ''}><span><b>${k}</b><small>${l}</small></span></label>`).join('')}</div></div>`,
+    setup: compact ? '' : `<div class="lt-blk"><h4>Setup <small>optional</small></h4><input name="setup" value="${esc(t.setup || '')}" maxlength="120" placeholder="e.g. London breakout"></div>`,
+    notes: `<div class="lt-blk"><h4>Notes</h4><textarea name="notes" rows="${compact ? 2 : 4}" maxlength="4000" placeholder="What did you see? What did you do well? What would you do differently?">${esc(t.notes || '')}</textarea></div>`,
+  };
+  if (parts) return P;
+  return `
+    ${P.plan}
+    ${P.feel}
+    ${P.mist}
+    ${P.grade}
+    ${P.setup}
+    ${P.notes}`;
 }
 
 // form body -> columns. Old forms (emotion select + 1-5 rating) still work.

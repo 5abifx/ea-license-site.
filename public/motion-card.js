@@ -178,7 +178,8 @@ function create(canvas, trade, opts) {
     } else T(c, top, mini ? W / 2 : PAD, ty, { fam: M, size: fitSize(c, top, W - 2 * PAD, 30, M, 400, 6), color: SOFT, ls: 6, align: mini ? 'center' : 'left' });
     c.globalAlpha = 1;
     // the replay clock: candles before the entry, the entry, the trade candle by candle, the exit
-    const run = seg(tm, 2.0, 7.0), IN = 1.5, OUT = 7.0;
+    // one continuous move: the candles before the entry, the entry, then straight into the trade (no pause)
+    const IN = 1.0, GO = 1.25, OUT = 7.0, run = seg(tm, GO, OUT);
     let price = R ? R.e : F.num(trade.entry) ?? 0;
     if (R) {
       const { ks, ia, ib, e, x, sl, tp, lo, hi } = R, cw = (x1 - gut - x0) / ks.length;
@@ -208,10 +209,10 @@ function create(canvas, trade, opts) {
         c.fillRect(cx - cw * 0.32, bt, cw * 0.64, Math.max(3, bb - bt)); c.globalAlpha = 1;
       };
       // before the entry: they slide in quickly, a little dim
-      const pre = Math.floor(ia * ease(seg(tm, 0.2, 1.3)));
+      const pre = Math.min(ia, Math.floor((ia + 1) * seg(tm, 0.1, IN)));
       for (let i = 0; i < pre; i++) drawK(ks[i], i, 0.55);
       // the trade
-      if (tm >= 2.0) {
+      if (tm >= GO) {
         for (let j = 0; j < Math.min(full, nTrade); j++) drawK(ks[ia + j], ia + j, 1);
         if (full < nTrade) {   // the candle that is forming right now
           const k = ks[ia + full], sub = k.sub || [k], m = sub.length * part, j = Math.min(sub.length - 1, Math.floor(m)), done = sub.slice(0, j), now = sub[j];
@@ -227,10 +228,10 @@ function create(canvas, trade, opts) {
       const post0 = Math.floor((ks.length - 1 - ib) * ease(seg(tm, OUT + 0.4, OUT + 1.4)));
       for (let i = 1; i <= post0; i++) drawK(ks[ib + i], ib + i, 0.3);
       if (lineSt && pts.length) {
-        if (tm >= 2.0 && tm < OUT + 0.3) pts.push([xNow, Y(price)]);
+        if (tm >= GO && tm < OUT + 0.3) pts.push([xNow, Y(price)]);
         if (tm >= OUT) pts.push([X(ib), Y(x)]);
-        const lc = tm >= 2 ? col : INK, g = c.createLinearGradient(0, y0, 0, y1);
-        g.addColorStop(0, (tm >= 2 ? col : '#ffffff') + '33'); g.addColorStop(1, 'rgba(0,0,0,0)');
+        const lc = tm >= GO ? col : INK, g = c.createLinearGradient(0, y0, 0, y1);
+        g.addColorStop(0, (tm >= GO ? col : '#ffffff') + '33'); g.addColorStop(1, 'rgba(0,0,0,0)');
         c.beginPath(); pts.forEach(([px, py], i) => (i ? c.lineTo(px, py) : c.moveTo(px, py)));
         c.lineTo(pts[pts.length - 1][0], y1); c.lineTo(pts[0][0], y1); c.closePath(); c.fillStyle = g; c.fill();
         c.save(); c.shadowColor = lc; c.shadowBlur = 24; c.strokeStyle = lc; c.lineWidth = mini ? 4 : 5; c.lineJoin = 'round';
@@ -258,7 +259,7 @@ function create(canvas, trade, opts) {
         c.globalAlpha = 1;
       }
       // live price line while the trade runs
-      if (tm >= 2.0 && tm < OUT + 0.3 && !mini) {
+      if (tm >= GO && tm < OUT + 0.3 && !mini) {
         const py = Y(price), lc = (R.buy ? price >= e : price <= e) ? WIN : LOSS;
         c.globalAlpha = 0.7; c.strokeStyle = lc; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x0, py); c.lineTo(x1 - gut + 10, py); c.stroke(); c.globalAlpha = 1;
         dot(xNow, py, lc, 6, 2.2);
@@ -284,7 +285,7 @@ function create(canvas, trade, opts) {
     const e0 = R ? R.e : null, x0p = R ? R.x : null;
     let live = val.v * ease(run);
     if (R && price !== null && x0p !== e0) live = val.v * clamp((price - e0) / (x0p - e0), -3, 3);
-    if (tm < 2.0) live = 0;
+    if (tm < GO) live = 0;
     if (tm >= OUT + 0.3) live = val.v;
     const ny = mini ? Math.round(H * (post ? 0.4 : 0.4)) : Math.round(H * (post ? 0.745 : 0.715)), full = val.f(val.v);
     const size = fitSize(c, full, W - 2 * PAD, mini ? (post ? 210 : 240) : post ? 170 : 200, DF, 300, term ? -2 : -6);
@@ -509,7 +510,7 @@ function mount(trade, extra, fileTag) {
     }).catch((err) => { st.textContent = err.message; rec.disabled = false; });
   });
   own(); sync();
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => mc.play());
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (!cv.closest('[hidden]')) mc.play(); });
   return { sync, card: mc };
 }
 
