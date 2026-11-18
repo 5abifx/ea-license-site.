@@ -17,25 +17,37 @@ const seg = (t, a, b) => clamp((t - a) / (b - a));
 const lerp = (a, b, p) => a + (b - a) * p;
 const tsOf = s => { if (!s) return null; const v = Date.parse(/[zZ]|[+-]\d\d:\d\d$/.test(s) ? s : s + 'Z'); return Number.isFinite(v) ? v : null; };
 
-/* candles around the trade for the replay: some before the entry, the trade itself, a few after the exit */
+/* candles around the trade for the replay, on a timeframe that suits how long the trade lasted:
+   the biggest of M1, M5, M15, H1, H4, D1 that still gives the trade at least 4 candles
+   (a 3-minute scalp plays on M1, a 1-hour trade on M15, a 6-hour trade on H1).
+   Each big candle keeps the small candles it was made from, so the forming candle moves the way price really moved. */
+const TFS = [[60, 'M1'], [300, 'M5'], [900, 'M15'], [3600, 'H1'], [14400, 'H4'], [86400, 'D1']];
 function replayOf(t) {
-  const all = (t.candles || []).map(x => ({ t: x[0] * 1000, o: x[1], h: x[2], l: x[3], c: x[4] }));
+  const raw = (t.candles || []).map(x => ({ t: x[0] * 1000, o: x[1], h: x[2], l: x[3], c: x[4] }));
   const e = F.num(t.entry), x = F.num(t.exit), op = tsOf(t.open), cl = tsOf(t.close);
-  if (all.length < 3 || e === null || x === null || op === null || cl === null) return null;
-  const near = ms => { let b = 0; all.forEach((k, i) => { if (Math.abs(k.t - ms) < Math.abs(all[b].t - ms)) b = i; }); return b; };
+  if (raw.length < 3 || e === null || x === null || op === null || cl === null) return null;
+  let base = Infinity;   // the saved candles' own timeframe, in seconds
+  for (let i = 1; i < raw.length; i++) { const d = (raw[i].t - raw[i - 1].t) / 1000; if (d > 0 && d < base) base = d; }
+  const held = Math.max(0, (cl - op) / 1000), usable = TFS.filter(([sec]) => sec >= base);
+  const pick = usable.filter(([sec]) => held / sec >= 4).pop() || usable[0] || [base, ''];
+  const tf = pick[0] * 1000;
+  // build the bigger candles, keeping the small ones inside each
+  let ks = [];
+  raw.forEach(k => {
+    const at = Math.floor(k.t / tf) * tf, last = ks[ks.length - 1];
+    if (last && last.t === at) { last.h = Math.max(last.h, k.h); last.l = Math.min(last.l, k.l); last.c = k.c; last.sub.push(k); }
+    else ks.push({ t: at, o: k.o, h: k.h, l: k.l, c: k.c, sub: [k] });
+  });
+  const near = ms => { let b = 0; ks.forEach((k, i) => { if (Math.abs(k.t + tf / 2 - ms) < Math.abs(ks[b].t + tf / 2 - ms)) b = i; }); return b; };
   const io = near(op), ic = Math.max(io, near(cl));
-  const a = Math.max(0, io - 24), b = Math.min(all.length - 1, ic + 8);
-  let ks = all.slice(a, b + 1), ia = io - a, ib = ic - a;
-  const n = Math.ceil(ks.length / 90);   // long trades: merge candles so about 90 are drawn
-  if (n > 1) {
-    const m = [];
-    for (let i = 0; i < ks.length; i += n) { const g = ks.slice(i, i + n); m.push({ t: g[0].t, o: g[0].o, h: Math.max(...g.map(k => k.h)), l: Math.min(...g.map(k => k.l)), c: g[g.length - 1].c }); }
-    ks = m; ia = Math.floor(ia / n); ib = Math.floor(ib / n);
-  }
+  const a = Math.max(0, io - 14), b = Math.min(ks.length - 1, ic + 5);
+  ks = ks.slice(a, b + 1);
+  let ia = io - a, ib = ic - a;
+  const tfName = pick[1];
   const sl = F.num(t.sl), tp = F.num(t.tp), buy = t.side !== 'SELL';
   const prices = ks.flatMap(k => [k.h, k.l]).concat([e, x, sl, tp].filter(v => v !== null));
   let lo = Math.min(...prices), hi = Math.max(...prices); const pad = ((hi - lo) || 1) * 0.1; lo -= pad; hi += pad;
-  return { ks, ia, ib, e, x, sl: sl !== null && (buy ? sl < e : sl > e) ? sl : null, tp, lo, hi, buy };
+  return { ks, ia, ib, e, x, sl: sl !== null && (buy ? sl < e : sl > e) ? sl : null, tp, lo, hi, buy, tfName };
 }
 
 /* the value shown, as a number we can count up, and its text at any point of the count */
@@ -157,12 +169,12 @@ function create(canvas, trade, opts) {
     K.brand(c, PAD, 140);
     const hd = trade.handle || '5abifx.com';
     T(c, hd, W - PAD, 153, { fam: M, size: fitSize(c, hd, 420, 26, M, 400, 2), color: SOFT, align: 'right', ls: 2 });
-    const top = [trade.symbol, trade.side, F.dayTxt(trade.close)].filter(Boolean).join('  ·  ');
+    const top = [trade.symbol, trade.side, R && R.tfName, F.dayTxt(trade.close)].filter(Boolean).join('  ·  ');
     const ty = mini ? Math.round(H * (post ? 0.2 : 0.24)) : y0 - 60;
     if (term) {
       c.strokeStyle = 'rgba(47,211,166,.35)'; c.lineWidth = 2; c.strokeRect(PAD - 20, ty - 46, W - 2 * PAD + 40, 64);
       const lots = trade.lots ? `${trade.lots} LOT` : '';
-      T(c, ['■ ' + (trade.symbol || ''), trade.side, lots].filter(Boolean).join('   '), PAD, ty, { fam: M, size: 28, color: WIN, ls: 3, w: 500 });
+      T(c, ['■ ' + (trade.symbol || ''), trade.side, lots, R && R.tfName].filter(Boolean).join('   '), PAD, ty, { fam: M, size: 28, color: WIN, ls: 3, w: 500 });
     } else T(c, top, mini ? W / 2 : PAD, ty, { fam: M, size: fitSize(c, top, W - 2 * PAD, 30, M, 400, 6), color: SOFT, ls: 6, align: mini ? 'center' : 'left' });
     c.globalAlpha = 1;
     // the replay clock: candles before the entry, the entry, the trade candle by candle, the exit
@@ -202,8 +214,10 @@ function create(canvas, trade, opts) {
       if (tm >= 2.0) {
         for (let j = 0; j < Math.min(full, nTrade); j++) drawK(ks[ia + j], ia + j, 1);
         if (full < nTrade) {   // the candle that is forming right now
-          const k = ks[ia + full], p = part, cur = lerp(k.o, k.c, p);
-          drawK({ o: k.o, c: cur, h: Math.max(k.o, cur, lerp(k.o, k.h, Math.min(1, p * 1.6))), l: Math.min(k.o, cur, lerp(k.o, k.l, Math.min(1, p * 1.6))) }, ia + full, 1);
+          const k = ks[ia + full], sub = k.sub || [k], m = sub.length * part, j = Math.min(sub.length - 1, Math.floor(m)), done = sub.slice(0, j), now = sub[j];
+          const cur = lerp(now.o, now.c, m - j);   // price inside the small candle that is forming
+          const hh = Math.max(k.o, cur, ...done.map(q => q.h)), ll = Math.min(k.o, cur, ...done.map(q => q.l));
+          drawK({ o: k.o, c: cur, h: hh, l: ll }, ia + full, 1);
           price = cur;
         } else price = ks[ib].c;
         if (full === 0 && part < 0.2) price = lerp(e, price, part / 0.2);
