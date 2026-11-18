@@ -363,11 +363,11 @@ function client(base, ip) {
     assert.doesNotMatch(r.text.split('report-data')[1], /\d{6,}/);   // no full account number in the card data
     r = await bob.get('/journal');
     r = await bob.post(`/journal/${tid}`, { setup: 'London breakout', emotion: 'Calm', rating: '5', notes: 'Clean <b>setup</b>' });
-    assert.match(r.text, /Notes saved/);
+    assert.match(r.text, /Review saved/);
     assert.match(r.text, /Clean &lt;b&gt;setup&lt;\/b&gt;/);
     assert.match(r.text, /"partials":\[\{"time":"2026-10-28T15:12:00"/);          // final close is not a partial
     // Log trade: chips + grade on an EA trade, a hand-logged trade, a no-trade day, quick tagging
-    assert.match(r.text, /Review this trade/);
+    assert.match(r.text, /TRADE RECAP/);
     assert.match(r.text, /value="A\+" checked/);                                   // 5 stars became A+
     r = await bob.post(`/journal/${tid}`, [['feel', 'Patient'], ['feel', 'FOMO'], ['feel_own', 'Tired'], ['mist', 'Entered early'], ['mist_own', ''], ['grade', 'B'], ['followed', 'Partly'], ['notes', 'ok']]);
     assert.match(r.text, /value="Tired" checked/);

@@ -10,6 +10,7 @@ const terminalView = require('./terminal-view');
 const overview = require('./overview');
 const TP = require('./tradeplans');
 const LT = require('./logtrade');
+const RV = require('./review-view');
 const express = require('express');
 const { esc, fmtDate } = require('./views');
 // setup tag chips (members-only): one shape and one target, any number of levels and confluences
@@ -896,6 +897,12 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       </section>`;
     }
 
+    const offR = req.user.ny_offset ?? desk.NY_DEFAULT;
+    const hist = db.prepare('SELECT net, r, grade, rating FROM journal_trades WHERE user_id = ? AND symbol = ? AND id != ? ORDER BY close_time DESC LIMIT 500').all(req.user.id, t.symbol, t.id);
+    const setups = db.prepare("SELECT setup, COUNT(*) n FROM journal_trades WHERE user_id = ? AND setup IS NOT NULL AND setup != '' GROUP BY lower(setup) ORDER BY n DESC LIMIT 6").all(req.user.id).map((x) => x.setup);
+    let session = '';
+    try { session = desk.sessionOf(t, offR); } catch (e) { session = ''; }
+    const reviewHtml = RV.html(t, { money, setups, R: RV.recap(t, { hist, session, planCheck: plan ? (() => { const c = TP.compare(plan, t); return { followed: c.followed, total: c.total }; })() : null }) });
     page(req, res, `${t.symbol} ${t.side}`, `
     <link rel="stylesheet" href="/studio.css">
     <p><a href="/journal">← All trades</a></p>
@@ -955,14 +962,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       </details>
     </section>
 
-    <section class="card lt-review" id="review" data-tab="review">
-      <div class="row between"><h2>Review this trade</h2>${LT.gradeOf(t) ? `<span class="lt-gb sm">${esc(LT.gradeOf(t))}</span>` : ''}</div>
-      <form method="post" action="/journal/${t.id}" class="lt-form lt-inline">
-        ${LT.fields(t)}
-        <div class="lt-save"><button class="btn lt-go">Save review</button></div>
-      </form>
-      <script src="/logtrade.js" defer></script>
-    </section>
+    ${reviewHtml}
 
     <div data-tab="review">${mentorBox ? mentorBox(req, t) : ''}</div>
 
@@ -1028,7 +1028,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     db.prepare(`UPDATE journal_trades SET setup = ?, emotion = ?, mistakes = ?, notes = ?, rating = ?, grade = ?, followed = ?, updated_at = datetime('now') WHERE id = ?`)
       .run(R.setup, R.emotion, R.mistakes, R.notes, R.rating, R.grade, R.followed, t.id);
     if (req.body.next === 'tag') { flash(req, 'ok', `${t.symbol} tagged.`); return res.redirect('/journal/tag'); }
-    flash(req, 'ok', 'Notes saved.');
-    res.redirect(`/journal/${t.id}`);
+    flash(req, 'ok', 'Review saved.');
+    res.redirect(`/journal/${t.id}#review`);
   });
 };
