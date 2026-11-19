@@ -270,10 +270,19 @@ function create(canvas, data, opts) {
     });
   }
   function format() { const l = ['video/mp4;codecs=avc1.42E01F', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm']; return window.MediaRecorder ? l.find(m => MediaRecorder.isTypeSupported(m)) || '' : null; }
+  /* frame by frame through VideoOut (exact start, no lag, sharp MP4); the live recorder only where that is missing */
   function record(onProgress) {
+    if (!(window.VideoOut && VideoOut.supported())) return recordLive(onProgress);
+    cancelAnimationFrame(raf); raf = 0;
+    if (media && media.pause) media.pause();
+    return VideoOut.render({ canvas, seconds: LEN + 1, fps: FPS, onProgress, draw: (t) => VideoOut.seek(media, t).then(() => frame(t)) })
+      .catch(() => null)
+      .then((r) => { play(); return r || recordLive(onProgress); });
+  }
+  function recordLive(onProgress) {
     const mime = format();
     if (mime === null || !canvas.captureStream) return Promise.reject(new Error('This browser cannot record video. Try Chrome or Safari.'));
-    const stream = canvas.captureStream(FPS), rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 8e6 } : undefined), parts = [];
+    const stream = canvas.captureStream(FPS), rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 12e6 } : undefined), parts = [];
     rec.ondataavailable = e => e.data.size && parts.push(e.data);
     return new Promise((res) => {
       rec.onstop = () => { stream.getTracks().forEach(t => t.stop()); const type = rec.mimeType || mime || 'video/webm'; res({ blob: new Blob(parts, { type }), ext: type.includes('mp4') ? 'mp4' : 'webm' }); };

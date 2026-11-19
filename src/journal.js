@@ -422,7 +422,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     </div>
     <script id="studio-data" type="application/json">${json}</script>
     <script src="/cards.js"></script>
-    <script src="/cine-card.js"></script>
+    <script src="/video-out.js"></script><script src="/cine-card.js"></script>
     <script src="/save-file.js"></script>
     <script src="/studio.js"></script>`);
   });
@@ -546,7 +546,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <script id="report-data" type="application/json">${json}</script>
     <script src="/cards.js"></script>
     <script src="/save-file.js"></script>
-    <script src="/motion-card.js"></script>
+    <script src="/video-out.js"></script><script src="/motion-card.js"></script>
     <script src="/report.js"></script>`);
   });
 
@@ -981,7 +981,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <script id="trade-data" type="application/json">${json}</script>
     <script src="/cards.js"></script>
     <script src="/save-file.js"></script>
-    <script src="/motion-card.js"></script>
+    <script src="/video-out.js"></script><script src="/motion-card.js"></script>
     ${req.user.is_admin ? '<script src="/overlay.js"></script>' : ''}
     <script src="/journal.js"></script>
     <script src="/trade-tabs.js"></script>`);
