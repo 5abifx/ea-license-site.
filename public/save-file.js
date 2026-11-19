@@ -61,6 +61,7 @@ function offer(opts) {
   else if (isIOS && kind === 'video') tips.push(share ? 'To put it in Photos: tap Share, then Save Video.' : 'Save video puts it in the Files app. Open video, then the share icon, then Save Video puts it in Photos.');
   else if (isIOS) tips.push(share ? 'To put it in Photos: tap Share, then Save Image.' : 'Or tap Open picture, then press and hold it and choose Save to Photos.');
   else if (!touch()) tips.push(`Save ${word} puts it in your Downloads folder.`);
+  if (kind === 'video') tips.push('Sharpest on WhatsApp: tap HD before you send, or send it as a Document. On Instagram, turn on Settings, Data usage and media quality, Upload at highest quality.');
   if (/webm/.test(type)) tips.push('This browser makes WebM videos, which iPhone and Instagram may not open. For an MP4, make it in Chrome, Edge or Safari.');
   tip.textContent = tips.join(' ');
   tip.hidden = !tips.length;

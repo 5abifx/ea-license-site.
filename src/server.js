@@ -97,6 +97,12 @@ app.get('/vendor/lightweight-charts.js', (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=86400');
   res.sendFile(LWC_FILE);
 });
+// mp4-muxer (MIT, npm package): packs the share videos made frame by frame (public/video-out.js) into MP4
+const MUX_FILE = require.resolve('mp4-muxer');   // build/mp4-muxer.js: defines window.Mp4Muxer
+app.get('/vendor/mp4-muxer.js', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.sendFile(MUX_FILE);
+});
 app.use(rate.limiter);   // after the files: pictures and styles never count
 app.use(cookieSession({
   name: 'eals',

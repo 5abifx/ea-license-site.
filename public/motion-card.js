@@ -432,11 +432,20 @@ function create(canvas, trade, opts) {
     const list = ['video/mp4;codecs=avc1.42E01F', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
     return window.MediaRecorder ? list.find(m => MediaRecorder.isTypeSupported(m)) || '' : null;
   }
+  /* frame by frame through VideoOut (exact start, no lag, sharp MP4); the live recorder only where that is missing */
   function record(onProgress) {
+    if (!(window.VideoOut && VideoOut.supported())) return recordLive(onProgress);
+    cancelAnimationFrame(raf); raf = 0;
+    if (media && media.pause) media.pause();
+    return VideoOut.render({ canvas, seconds: len(), fps: FPS, onProgress, draw: (t) => VideoOut.seek(media, t).then(() => frame(t)) })
+      .catch(() => null)
+      .then((r) => { play(); return r || recordLive(onProgress); });
+  }
+  function recordLive(onProgress) {
     const mime = format();
     if (mime === null || !canvas.captureStream) return Promise.reject(new Error('This browser cannot record video. Try Chrome or Safari.'));
     const stream = canvas.captureStream(FPS);
-    const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 8e6 } : undefined);
+    const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 12e6 } : undefined);
     const parts = [];
     rec.ondataavailable = e => e.data.size && parts.push(e.data);
     return new Promise((res) => {
