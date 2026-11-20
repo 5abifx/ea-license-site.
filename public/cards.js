@@ -85,6 +85,31 @@ function bg(c, glow = 1) {
   v.addColorStop(0, 'rgba(5,5,7,.55)'); v.addColorStop(1, 'rgba(5,5,7,.95)');
   c.fillStyle = v; c.fillRect(0, 0, W, H);
 }
+/* a member's own photo (or a still from their clip) behind the card, cover-fit.
+   Darken drains the colour as it darkens, so a dark photo turns a calm near-black grey
+   (no muddy brown or purple tint under the card's white, teal and orange text). */
+function photoBg(c, m, d, w = W, h = H, z = 1) {
+  c.fillStyle = '#050507'; c.fillRect(0, 0, w, h);
+  const mw = m && (m.videoWidth || m.naturalWidth || m.width), mh = m && (m.videoHeight || m.naturalHeight || m.height);
+  if (!mw || !mh) return;
+  const s = Math.max(w / mw, h / mh) * z;
+  c.drawImage(m, (w - mw * s) / 2, (h - mh * s) / 2, mw * s, mh * s);
+  d = Math.max(0, Math.min(1, d));
+  if (d > 0) { c.globalCompositeOperation = 'saturation'; c.globalAlpha = Math.min(1, d * 1.15); c.fillStyle = '#000'; c.fillRect(0, 0, w, h); }
+  c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
+}
+/* card background: the site's dark glow, or the member's photo darkened by the Darken slider */
+function back(c, glow) {
+  if (!state.photo) return bg(c, glow);
+  const d = state.dim ?? 0.55;
+  photoBg(c, state.photo, d);
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, `rgba(5,5,7,${(0.55 + d * 0.4).toFixed(2)})`); g.addColorStop(0.4, `rgba(5,5,7,${(0.2 + d * 0.65).toFixed(2)})`);
+  g.addColorStop(0.7, `rgba(5,5,7,${(0.25 + d * 0.65).toFixed(2)})`); g.addColorStop(1, `rgba(5,5,7,${(0.65 + d * 0.33).toFixed(2)})`);
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  // a soft dark edge so small text reads on any photo
+  c.shadowColor = 'rgba(0,0,0,.7)'; c.shadowBlur = 12;
+}
 function brand(c, x, y, align = 'left') {
   const lw = 74, lh = LOGO.width ? lw * LOGO.height / LOGO.width : 46;
   c.font = `400 38px ${D}`;
@@ -205,7 +230,7 @@ function chartArea(c, t, x0, y0, w, h) {
 
 /* ---------- card 1 styles ---------- */
 function cardA(c, t) {
-  bg(c); head(c, t);
+  back(c); head(c, t);
   T(c, label(t), PAD, 420, { fam: M, size: 28, color: acc(t), ls: 6 });
   const sym = t.symbol || '';
   T(c, sym, PAD - 6, 560, { fam: D, w: 300, size: fitSize(c, sym, W - 2 * PAD, 150, D, 300, -4), ls: -4 });
@@ -218,7 +243,7 @@ function cardA(c, t) {
   foot(c, t);
 }
 function cardB(c, t) {
-  bg(c, 0.5); head(c, t);
+  back(c, 0.5); head(c, t);
   chartArea(c, t, 60, 240, W - 120, 860);
   T(c, label(t), PAD, 1210, { fam: M, size: 28, color: acc(t), ls: 6 });
   const sym = t.symbol || '';
@@ -229,7 +254,7 @@ function cardB(c, t) {
   foot(c, t);
 }
 function cardC(c, t) {
-  bg(c, 0.45); brand(c, W / 2, 150, 'center');
+  back(c, 0.45); brand(c, W / 2, 150, 'center');
   const cx = W / 2, cy = 780, R = 300, rv = num(t.r), win = isWin(t);
   c.strokeStyle = 'rgba(255,255,255,.12)'; c.lineWidth = 2; c.setLineDash([2, 12]);
   c.beginPath(); c.arc(cx, cy, R, 0, 7); c.stroke(); c.setLineDash([]);
@@ -257,7 +282,7 @@ function cardC(c, t) {
 
 /* ---------- card 2: the real chart ---------- */
 function cardChart(c, t) {
-  bg(c, 0.6); head(c, t);
+  back(c, 0.6); head(c, t);
   T(c, [t.symbol, t.side, t.tf].filter(Boolean).join(' · '), PAD, 300, { fam: M, size: 28, color: DIM, ls: 6 });
   const r = primary(t);
   T(c, r, PAD - 6, 440, { fam: D, w: 200, size: fitSize(c, r, W - 2 * PAD, 150, D, 200, -6), color: acc(t), ls: -6 });
@@ -285,6 +310,8 @@ function render(resultCanvas, chartCanvas, trade, opts) {
 }
 window.TradeCards = { render, styles: { a: 'Cinematic', b: 'Chart first', c: 'Ticket' },
   // drawing kit for the account report cards (public/report.js)
-  kit: { W, H, PAD, D, M, B, INK, SOFT, DIM, FAINT, ORANGE, WIN, LOSS, LINE, MINUS, MON, T, fitSize, bg, brand,
+  kit: { W, H, PAD, D, M, B, INK, SOFT, DIM, FAINT, ORANGE, WIN, LOSS, LINE, MINUS, MON, T, fitSize, bg, photoBg, brand,
+    // number formats + trade facts, used by the motion card (public/motion-card.js)
+    fmt: { num, money, pctTxt, rTxt, duration, dayTxt, timeTxt, isWin, label },
     onLogo: (f) => { if (LOGO.complete && LOGO.width) f(); else logoWait.push(f); } } };
 })();

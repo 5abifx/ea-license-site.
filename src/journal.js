@@ -7,18 +7,20 @@ const deskView = require('./desk-view');
 const terminal = require('./terminal');
 const news = require('./news');
 const terminalView = require('./terminal-view');
+const overview = require('./overview');
 const TP = require('./tradeplans');
+const LT = require('./logtrade');
+const RV = require('./review-view');
 const express = require('express');
 const { esc, fmtDate } = require('./views');
 // setup tag chips (members-only): one shape and one target, any number of levels and confluences
 const tagForm = (cur) => { const have = new Set(TP.setupTags(cur)); return `<div class="tp-tags">${TP.TAGS.map(([k, l, opts, one]) => `<div class="tp-tg"><span>${l}</span><div class="tp-seg"${one ? ' data-one' : ''}>${opts.map((o) => `<label><input type="${one ? 'radio' : 'checkbox'}" name="${k}" value="${esc(o)}"${have.has(o) ? ' checked' : ''}><span>${esc(o)}</span></label>`).join('')}</div></div>`).join('')}</div>`; };
 
 const JOURNAL_CODE = process.env.JOURNAL_EA_CODE || 'JOURNAL';
-const EMOTIONS = ['', 'Calm', 'Confident', 'Patient', 'Anxious', 'Greedy', 'Fearful', 'Revenge', 'Bored', 'FOMO'];
 
 const KEEP_IF_EDITED = ['sl', 'r', 'risk_money', 'risk_pct'];   // columns the trader can correct
 
-module.exports = function registerJournal(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, setJournalAccess }) {
+module.exports = function registerJournal(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, setJournalAccess, onboard }) {
   TP.init(db);
   const hasJournal = (u) => !!u && (u.is_admin || (u.status === 'active' && !isExpired(u) && !!db.prepare(`
     SELECT 1 FROM user_eas ue JOIN eas e ON e.id = ue.ea_id
@@ -148,7 +150,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
   // private text (account numbers, broker servers): hidden when "Hide private info" is on
   const priv = (real, mask) => `<span class="priv"><span class="priv-real">${real}</span><span class="priv-mask">${mask}</span></span>`;
-  const acctLabel = (a) => priv(`${esc(a.broker || 'Account')} · ${esc(a.account_number)}`, `Account ••${esc(String(a.account_number).slice(-2))}`);
+  const acctLabel = (a) => (a.account_number === LT.MANUAL ? 'Manual trades' : priv(`${esc(a.broker || 'Account')} · ${esc(a.account_number)}`, `Account ••${esc(String(a.account_number).slice(-2))}`));
 
   // accounts: live ones are still on My EAs; removed ones keep their trades in their own tab;
   // hidden ones (user's choice) are left out of the tabs and "All accounts" until shown again.
@@ -156,6 +158,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   const scope = (req) => {
     const u = req.user;
     const live = new Set(db.prepare('SELECT account_number FROM accounts WHERE user_id = ?').all(u.id).map((a) => a.account_number));
+    live.add(LT.MANUAL);   // trades logged by hand are always live
     const hidden = new Set(db.prepare('SELECT account_number FROM journal_hidden WHERE user_id = ?').all(u.id).map((a) => a.account_number));
     const accts = db.prepare(`SELECT account_number, COUNT(*) AS n, SUM(net) AS net, MAX(broker) AS broker, MAX(currency) AS cur
         FROM journal_trades WHERE user_id = ? GROUP BY account_number ORDER BY MAX(close_time) DESC`).all(u.id);
@@ -195,7 +198,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
   // columns the insights read
   const INS_COLS = `id, account_number, symbol, side, lots, entry, exit, sl, tp, open_time, close_time, net, r, risk_pct,
-    balance_after, mfe, mae, candles, setup, emotion, mistakes`;
+    balance_after, mfe, mae, candles, setup, emotion, mistakes, grade, followed, rating`;
   // lighter set for the recap, the desk and the Time / Habits tabs
   const DESK_COLS = 'id, account_number, symbol, side, lots, open_time, close_time, net, r, balance_after, setup';
   const PROP_COLS = 'prop_daily, prop_max, prop_target, prop_start, prop_consistency, prop_firm';
@@ -231,6 +234,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const cur = (sel ? sel.cur : liveAccts[0]?.cur) || '';
     const days = {};
     trades.forEach((t) => { (days[t.close_time.slice(0, 10)] ||= []).push(t); });
+    // days the trader logged as "no trade" (from Log trade)
+    const noTrade = Object.fromEntries(db.prepare('SELECT day, reasons FROM journal_days WHERE user_id = ? AND substr(day, 1, 7) = ?').all(u.id, month).map((d) => [d.day, d.reasons]));
     const sum = (l) => l.reduce((s, t) => s + (t.net || 0), 0);
     const dayKeys = Object.keys(days).sort();
     const net = sum(trades), wins = trades.filter((t) => t.net > 0).length;
@@ -257,7 +262,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       const l = days[iso(d)] || [], s = sum(l), weekend = cell % 7 >= 5;
       grid += l.length
         ? `<button type="button" class="day ${s >= 0 ? 'win' : 'loss'}" data-day="${iso(d)}" aria-pressed="${iso(d) === pickDay}"><span class="d">${d}</span><span class="v ${cls(s)}">${short(s)}</span><span class="n" title="${l.length} trade${l.length > 1 ? 's' : ''}">${l.length}<span class="w"> trade${l.length > 1 ? 's' : ''}</span></span></button>`
-        : `<div class="day${weekend ? ' off' : ''}"><span class="d">${d}</span></div>`;
+        : `<div class="day${weekend ? ' off' : ''}${noTrade[iso(d)] !== undefined ? ' lt-nt' : ''}"${noTrade[iso(d)] ? ` title="${esc(noTrade[iso(d)])}"` : ''}><span class="d">${d}</span>${noTrade[iso(d)] !== undefined ? '<span class="n">No trade</span>' : ''}</div>`;
       week.push(l);
       if ((cell + 1) % 7 === 0) weekCell();
     }
@@ -338,9 +343,16 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
     page(req, res, 'Trade Journal', `
     <div class="row between page-head"><h1>Trade Journal</h1>
-      <span class="head-btns"><button type="button" class="small secondary replay-btn" data-replay title="Play the opening animation again">↻ Replay</button><a class="btn small" href="/journal/plan">Plan a trade</a>${accts.length ? `<a class="btn small" href="/journal/report${qs({})}" title="A picture of this month's results to share, like the trade cards">Share report</a>` : ''}
+      <span class="head-btns"><button type="button" class="small secondary replay-btn" data-replay title="Play the opening animation again">↻ Replay</button><a class="btn small secondary" href="/journal/plan">Plan a trade</a><a class="btn small lt-logbtn" href="/journal/log">+ Log trade</a>${accts.length ? `<a class="btn small" href="/journal/report${qs({})}" title="A picture of this month's results to share, like the trade cards">Share report</a>` : ''}
       <button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers, your name and the journal key, so you can screenshot this page">Hide private info</button></span></div>
     ${acctBar(req, '/journal', qs, sc, cur)}
+    <div class="lt-strip" id="lt-draft" data-draft="lt-draft-${u.id}" hidden><span class="ic" aria-hidden="true">✎</span>
+      <span class="tx"><b>Untitled trade</b><span class="muted small">Draft saved on this device</span></span>
+      <a class="btn small secondary" href="/journal/log">Continue</a><button type="button" class="small secondary" data-lt-del aria-label="Delete draft">✕</button></div>
+    ${(() => { const n = LTR.untagged(u); return n ? `<div class="lt-strip"><span class="ic" aria-hidden="true">◎</span>
+      <span class="tx"><b>${n} trade${n > 1 ? 's' : ''} from the EA ${n > 1 ? 'are' : 'is'} waiting for a tag</b><span class="muted small">How you felt and a grade take 10 seconds each</span></span>
+      <a class="btn small lt-tagbtn" href="/journal/tag">Tag now</a></div>` : ''; })()}
+    <script src="/logtrade.js" defer></script>
 
     ${sel && sel.removed ? `<section class="card notice">
       <p><strong>Account ${esc(sel.account_number)} is no longer on <a href="/dashboard">My EAs</a>.</strong> Its ${sel.n} trades are kept here and left out of "All accounts". Add the account again on My EAs to bring it back, or delete these trades for good.</p>
@@ -377,6 +389,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
           <button type="button" class="small secondary key-show">Show</button><button type="button" class="small secondary key-copy">Copy</button></span></li>
         <li>Make sure the account number is on <a href="/dashboard">My EAs</a>, and that MT5 allows <code>${esc(site)}</code> under Tools → Options → Expert Advisors → Allow WebRequest.</li>
       </ol>
+      <p class="muted small">Older trades missing? Open the EA's inputs (double-click the EA name on the chart, or the small face top-right → Inputs), set <strong>On start, also send trades closed in the last N days</strong> to <strong>365</strong> and press OK. The EA then sends the past year a few trades at a time. If some still don't show, also set <strong>Send those days again</strong> to <strong>true</strong> once, then back to false.</p>
       <form method="post" action="/journal/key" onsubmit="return confirm('Make a new key? The old key stops working and you must paste the new one into the EA.')">
         <button class="small secondary">Make a new key</button></form>
     </details>`);
@@ -384,6 +397,51 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
   // ---------- account report: share cards of a whole account (or all accounts) ----------
   // ?period=YYYY-MM (a month) | 30 | 90 | all, ?account= as on the journal. Account numbers are always masked.
+  // Share Studio: motion share cards for a trade, day, session, week, month or quarter.
+  // The page gets a compact list of recent trades; candles load per trade when a trade card is picked.
+  const stock = require('./stock-clips')(app, { requireUser });
+  app.get('/journal/studio', requireUser, requireJournal, (req, res) => {
+    const u = req.user;
+    const { liveAccts, sel, where, args } = scope(req);
+    const cur = (sel ? sel.cur : liveAccts[0]?.cur) || '';
+    const rows = db.prepare(`SELECT id, symbol, side, lots, entry, exit, open_time, close_time, net, r, risk_pct, pips, pct, manual FROM journal_trades
+      WHERE ${where} AND close_time >= date('now', '-400 days') ORDER BY close_time DESC LIMIT 2000`).all(...args);
+    const off = u.ny_offset ?? desk.NY_DEFAULT;
+    const num = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+    const trades = prep(rows).map((t) => ({
+      id: t.id, s: t.symbol, side: t.side, o: t.open_time, c: t.close_time, net: t.net, r: t.r, pips: num(t.pips), pct: num(t.pct),
+      entry: num(t.entry), exit: num(t.exit), lots: num(t.lots), risk: num(t.risk_pct), sess: desk.sessionOf(t, off), m: t.manual ? 1 : 0,
+    }));
+    // owner-only extras (clip studio): Shuffle clips, quote, photo, layout, length
+    const owner = !!u.is_admin;
+    const json = JSON.stringify({ trades, owner, stock: owner && stock.enabled(), cur, handle: u.card_handle || u.name || '' }).replace(/</g, '\\u003c');
+    const acctOpts = [...(liveAccts.length > 1 ? [['', 'All accounts']] : []), ...liveAccts.map((a) => [a.account_number, `Account ••${String(a.account_number).slice(-2)}`])];
+    page(req, res, 'Share Studio', `
+    <link rel="stylesheet" href="/studio.css">
+    <div class="ss">
+      <div class="ss-top"><h1 class="ss-title">Share Studio</h1>${acctOpts.length > 1 ? `<form method="get" class="ss-acct"><select name="account" onchange="this.form.submit()" aria-label="Account">${acctOpts.map(([v, l]) => `<option value="${esc(v)}"${(sel ? sel.account_number : '') === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></form>` : ''}</div>
+      ${trades.length ? `<nav class="ss-steps" id="steps" aria-label="Steps"></nav><div class="ss-bar"><i id="pb"></i></div>
+      <div class="ss-wrap"><canvas id="pv"></canvas><div id="q" class="ss-q" aria-live="polite"></div></div>
+      <input type="file" id="own" accept="image/*,video/*" hidden>` : `<p class="muted">No trades in the last year yet. Once the Journal EA sends trades (or you log one), your cards show up here.</p>`}
+    </div>
+    <script id="studio-data" type="application/json">${json}</script>
+    <script src="/cards.js"></script>
+    <script src="/video-out.js"></script><script src="/cine-card.js"></script>
+    <script src="/save-file.js"></script>
+    <script src="/studio.js"></script>`);
+  });
+
+  // closing prices of one trade's saved candles, for the price line on a trade card
+  app.get('/journal/studio/line/:id', requireUser, requireJournal, (req, res) => {
+    const t = db.prepare('SELECT candles, open_time, close_time FROM journal_trades WHERE id = ? AND user_id = ?').get(Number(req.params.id), req.user.id);
+    if (!t) return res.status(404).json({ closes: [] });
+    let k = []; try { k = JSON.parse(t.candles || '[]'); } catch { k = []; }
+    const o = Date.parse(String(t.open_time).replace(' ', 'T') + 'Z') / 1000, c = Date.parse(String(t.close_time).replace(' ', 'T') + 'Z') / 1000;
+    const closes = k.map((x) => Number(x[4])).filter(Number.isFinite);
+    const idx = (ts) => { let best = 0; k.forEach((x, i) => { if (x[0] <= ts) best = i; }); return best; };
+    res.json({ closes, iEntry: k.length ? idx(o) : 0, iExit: k.length ? idx(c) : 0 });
+  });
+
   app.get('/journal/report', requireUser, requireJournal, (req, res) => {
     const u = req.user;
     const sc = scope(req);
@@ -392,12 +450,20 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const latest = db.prepare(`SELECT MAX(close_time) AS t FROM journal_trades WHERE ${where}`).get(...args).t;
     if (!latest) return res.redirect('/journal');
     const q = String(req.query.period || req.query.month || '');
-    const period = /^\d{4}-(0[1-9]|1[0-2])$/.test(q) || ['30', '90', 'all'].includes(q) ? q : latest.slice(0, 7);
-    const isMonth = period.length === 7;
+    const period = /^\d{4}-(0[1-9]|1[0-2])$/.test(q) || ['day', 'week', 'quarter', '30', '90', 'all'].includes(q) ? q : latest.slice(0, 7);
+    const isMonth = /^\d{4}-\d\d$/.test(period);
     let from = '', to = '';
     if (isMonth) {
       const [y, m] = period.split('-').map(Number);
       from = period + '-01'; to = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+    } else if (period === 'day') {
+      from = latest.slice(0, 10);
+    } else if (period === 'week') {   // Monday of the week of the latest trade
+      const d0 = new Date(latest.slice(0, 10) + 'T00:00:00Z');
+      from = new Date(d0 - ((d0.getUTCDay() + 6) % 7) * 864e5).toISOString().slice(0, 10);
+    } else if (period === 'quarter') {
+      const y = latest.slice(0, 4), qm = Math.floor((Number(latest.slice(5, 7)) - 1) / 3) * 3 + 1;
+      from = `${y}-${String(qm).padStart(2, '0')}-01`;
     } else if (period !== 'all') {
       from = new Date(Date.parse(latest.slice(0, 10) + 'T00:00:00Z') - (Number(period) - 1) * 864e5).toISOString().slice(0, 10);
     }
@@ -420,7 +486,9 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     trades.forEach((t) => { const k = t.symbol; (symbols[k] ||= { n: 0, net: 0 }); symbols[k].n++; symbols[k].net += t.net; });
 
     const monthName = (ym) => new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1, 1)).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-    const label = isMonth ? monthName(period) : period === 'all' ? 'All time' : `Last ${period} days`;
+    const dd = (x) => new Date(x + 'T00:00:00Z').toLocaleString('en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    const label = isMonth ? monthName(period) : period === 'all' ? 'All time' : period === 'day' ? dd(from)
+      : period === 'week' ? `Week of ${dd(from)}` : period === 'quarter' ? `Q${(Number(from.slice(5, 7)) + 2) / 3} ${from.slice(0, 4)}` : `Last ${period} days`;
     const first = trades[0]?.close_time.slice(0, 10) || '', last = trades.at(-1)?.close_time.slice(0, 10) || '';
     const acctName = sel ? `Account ••${String(sel.account_number).slice(-2)}` : liveAccts.length > 1 ? `${liveAccts.length} accounts` : liveAccts[0] ? `Account ••${String(liveAccts[0].account_number).slice(-2)}` : '';
     const data = {
@@ -446,7 +514,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     // periods to pick: the last 6 months with trades + ranges
     const months = db.prepare(`SELECT DISTINCT substr(close_time, 1, 7) AS m FROM journal_trades WHERE ${where} ORDER BY m DESC LIMIT 6`).all(...args).map((r) => r.m);
     if (isMonth && !months.includes(period)) months.unshift(period);
-    const opts = [...months.map((m) => [m, monthName(m)]), ['30', 'Last 30 days'], ['90', 'Last 90 days'], ['all', 'All time']];
+    const opts = [...months.map((m) => [m, monthName(m)]), ['day', 'Latest day'], ['week', 'This week'], ['quarter', 'This quarter'], ['30', 'Last 30 days'], ['90', 'Last 90 days'], ['all', 'All time']];
     const acctOpts = [...(liveAccts.length > 1 ? [['', 'All accounts']] : []), ...liveAccts.map((a) => [a.account_number, `Account ••${String(a.account_number).slice(-2)}`]),
       ...(sel && !liveAccts.includes(sel) ? [[sel.account_number, `Account ••${String(sel.account_number).slice(-2)}`]] : [])];
     const back = `/journal?${new URLSearchParams(Object.entries({ account: sel ? sel.account_number : '', month: isMonth ? period : '' }).filter(([, v]) => v)).toString()}`;
@@ -468,11 +536,21 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         <figure><canvas id="r2"></canvas><span class="share-btns"><button type="button" class="small" data-save="r2">Save card 2</button><button type="button" class="small secondary" data-share="r2" hidden>Share</button></span></figure>
       </div>
       <h2 class="report-big-h">Big report <span class="muted small">one picture, iPad / desktop size (4:3)</span></h2>
+      <h2 class="report-big-h">Motion card <span class="muted small">7-second video of this period</span></h2>
+      <div class="row motion-card">
+        <select id="mv-what" aria-label="What to show"><option value="period">Period total</option>${data.sessions && data.sessions.length ? '<option value="session">Best session</option>' : ''}</select>
+        <select id="mv-scene" aria-label="Motion background"><option value="ember">Ember glow</option><option value="bars">Volume bars</option><option value="own">My photo or clip</option></select>
+        <select id="mv-size" aria-label="Video size"><option value="story">Story 9:16</option><option value="post">Post 4:5</option></select>
+        <input type="file" id="mv-file" accept="image/*,video/*" hidden>
+      </div>
+      <div class="cards"><figure><canvas id="mv"></canvas><span class="share-btns"><button type="button" class="small" id="mv-rec">Make video</button></span><span class="muted small" id="mv-st" aria-live="polite"></span></figure></div>
       <figure class="report-big"><canvas id="r3"></canvas><span class="share-btns"><button type="button" class="small" data-save="r3">Save big report</button><button type="button" class="small secondary" data-share="r3" hidden>Share</button></span></figure>` : '<p class="muted">No closed trades in this period. Pick another one above.</p>'}
       <p class="muted small">Your handle on the cards: <strong>${esc(u.card_handle || '5abifx.com')}</strong>. Change it on any trade page.</p>
     </section>
     <script id="report-data" type="application/json">${json}</script>
     <script src="/cards.js"></script>
+    <script src="/save-file.js"></script>
+    <script src="/video-out.js"></script><script src="/motion-card.js"></script>
     <script src="/report.js"></script>`);
   });
 
@@ -539,7 +617,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         <p class="muted small">Switch off a session, a day, a symbol or a side, or cap your trades a day, and see what this period would have looked like. Your journal does not change.</p>
         <div class="wi-body"><div class="wi-ctl"></div><div class="wi-res"></div></div></section>
         <script id="wi-data" type="application/json">${wiData}</script><script src="/whatif.js"></script>`;
-      body = insightsView.fullHtml(analyze(rows, { money: m, esc }), { money: m, cur, prop: '', whatif });
+      body = (onboard ? onboard.goalHtml(u) : '') + insightsView.fullHtml(analyze(rows, { money: m, esc }), { money: m, cur, prop: '', whatif });
+      body = insightsView.fullHtml(analyze(rows, { money: m, esc }), { money: m, cur, prop: '', whatif }) + LT.insightsHtml(rows, m);
     }
     else if (tab === 'time' || tab === 'habits') {
       const dr = desk.prepRows(db.prepare(`SELECT ${DESK_COLS} FROM journal_trades WHERE ${where}${since ? ' AND close_time >= ?' : ''} ORDER BY close_time`).all(...args, ...(since ? [since] : [])));
@@ -547,7 +626,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       const offsetForm = `<div class="tz-pick"><a href="/journal/insights${qs({ tz: '' })}"${tz === 'ny' ? ' class="on"' : ''}>New York</a><a href="/journal/insights${qs({ tz: 'mt5' })}"${tz === 'mt5' ? ' class="on"' : ''}>MT5 time</a>
         <form method="post" action="/journal/settings/ny-offset" class="tz-off"><input type="hidden" name="back" value="/journal/insights${esc(qs({}))}"><label>MT5 = NY +<input name="offset" type="number" min="-12" max="14" value="${u.ny_offset ?? desk.NY_DEFAULT}"> h</label><button class="small secondary">Save</button></form></div>`;
       body = tab === 'time'
-        ? deskView.timeHtml(desk.timeStats(dr, off), { data: JSON.stringify({ cur, ...desk.tagTrades(dr, off) }).replace(/</g, '\\u003c'), money: m, offsetForm, tzName: tz === 'mt5' ? 'MT5 server time' : 'New York time', shift: tz === 'mt5' ? (u.ny_offset ?? desk.NY_DEFAULT) : 0 })
+        ? deskView.timeHtml(desk.timeStats(dr, off), { data: JSON.stringify({ cur, ...desk.tagTrades(dr, off) }).replace(/</g, '\\u003c'), money: m, offsetForm, tzName: tz === 'mt5' ? 'MT5 server time' : 'New York time', shift: tz === 'mt5' ? (u.ny_offset ?? desk.NY_DEFAULT) : 0, candle: desk.candleStats(dr), nyOff: u.ny_offset ?? desk.NY_DEFAULT })
         : dr.length ? deskView.habitsHtml(desk.habits(dr), { money: (v) => money(v, cur === 'USD' ? 'USD' : '') }) : '<section class="card"><p class="muted">No trades in this period.</p></section>';
     } else {
       // prop firm: one account in full (desk + history + rules form), or a card per account
@@ -609,10 +688,23 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const cut = since90 ? new Date(Date.parse(since90 + 'T00:00:00Z') - 89 * 864e5).toISOString().slice(0, 10) : '';
     rows.forEach((t) => { if (t.close_time >= cut) cnt[t.symbol] = (cnt[t.symbol] || 0) + 1; });
     const topSyms = Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([sym, n]) => ({ sym, n }));
+    // graphite overview on top: balance, account cards, month chart, weekday, recent, sessions, days traded
+    const ovAccts = (sel ? [sel] : liveAccts).map((a) => {
+      const manual = a.account_number === LT.MANUAL;
+      const lb = manual ? null : db.prepare('SELECT balance_after FROM journal_trades WHERE user_id = ? AND account_number = ? AND balance_after IS NOT NULL ORDER BY close_time DESC LIMIT 1').get(u.id, a.account_number);
+      const short = manual ? 'Manual' : priv(esc(a.broker ? String(a.broker).split(/[-\s]/)[0] : 'Account'), `••${esc(String(a.account_number).slice(-2))}`);
+      return { account_number: a.account_number, broker: a.broker, manual, balance: lb ? Number(lb.balance_after) : NaN, short,
+        label: manual ? 'Manual trades' : priv(`${esc(a.broker ? String(a.broker).split(/[-\s]/)[0] : 'Account')} ••${esc(String(a.account_number).slice(-2))}`, maskNum(a.account_number)),
+        href: `/journal/desk?account=${encodeURIComponent(a.account_number)}` };
+    });
+    const plainMoney = (v) => `${v < 0 ? '−' : ''}${cur === 'USD' || !cur ? '$' : ''}${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cur && cur !== 'USD' ? ' ' + esc(cur) : ''}`;
+    const ovHtml = overview.html(prep(rows), ovAccts, { today: desk.serverToday(off), cur, money: m, plain: plainMoney, sessionOf: (t) => desk.sessionOf(t, off) });
     page(req, res, 'Desk', `
     <div class="row between page-head"><h1>Desk</h1>
       <span class="head-btns"><button type="button" class="small secondary replay-btn" data-replay title="Play the opening animation again">↻ Replay</button><button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers and your name, so you can screenshot this page">Hide private info</button></span></div>
     ${acctBar(req, '/journal/desk', qs, sc, cur)}
+    ${ovHtml}
+    <h2 class="ov-sec">Today's desk</h2>
     ${terminalView.html(T, { news: N, money: m, cur, market: topSyms, acctNote: one ? (prop ? 'Prop firm rules included' : 'Add firm rules in Insights › Prop firm to include them') : 'All accounts' })}`);
   });
 
@@ -771,6 +863,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
   const getTrade = (req) => db.prepare('SELECT * FROM journal_trades WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
 
+  const LTR = LT.routes(app, { db, page, flash, requireUser, requireJournal, money });
+
   app.get('/journal/:id', requireUser, requireJournal, (req, res) => {
     const t = getTrade(req);
     if (!t) return res.status(404).send('Not found');
@@ -787,12 +881,12 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const partials = card.partials;
     TP.match(db, req.user);
     const plan = db.prepare("SELECT * FROM trade_plans WHERE trade_id = ? AND user_id = ? AND status = 'matched'").get(t.id, req.user.id);
-    let planHtml = '<p class="muted small plan-none"><span class="ptag no">No plan</span> <a href="/journal/plan">Plan your next trade</a></p>';
+    let planHtml = '<p class="muted small plan-none" data-tab="chart"><span class="ptag no">No plan</span> <a href="/journal/plan">Plan your next trade</a></p>';
     if (plan) {
       const c = TP.compare(plan, t);
       const ck = JSON.parse(plan.checks || '[]');
       const cost = (r) => (r.cost && r.cost > 0 ? `<em class="${r.kind === 'left' ? 'left' : 'risk'}">${r.kind === 'left' ? `${money(r.cost, t.currency).replace(/^[+]/, '')} left` : `+${money(r.cost, t.currency).replace(/^[+]/, '')} risk`}</em>` : '');
-      planHtml = `<section class="card pvr">
+      planHtml = `<section class="card pvr" data-tab="chart">
         <div class="row between"><h2>Plan vs result</h2><span class="pvr-score"><span class="pips">${c.rows.map((r) => `<i class="${r.ok ? 'ok' : ''}"></i>`).join('')}</span><b>${c.followed}/${c.total}</b> kept</span></div>
         <div class="pvr-split">
           <div class="pvr-chart">${TP.chartSvg(plan, t)}<p class="small muted"><i class="k-pl"></i>Plan <i class="k-ac"></i>What you did</p></div>
@@ -807,12 +901,24 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       </section>`;
     }
 
+    const offR = req.user.ny_offset ?? desk.NY_DEFAULT;
+    const hist = db.prepare('SELECT net, r, grade, rating FROM journal_trades WHERE user_id = ? AND symbol = ? AND id != ? ORDER BY close_time DESC LIMIT 500').all(req.user.id, t.symbol, t.id);
+    const setups = db.prepare("SELECT setup, COUNT(*) n FROM journal_trades WHERE user_id = ? AND setup IS NOT NULL AND setup != '' GROUP BY lower(setup) ORDER BY n DESC LIMIT 6").all(req.user.id).map((x) => x.setup);
+    let session = '';
+    try { session = desk.sessionOf(t, offR); } catch (e) { session = ''; }
+    const reviewHtml = RV.html(t, { money, setups, R: RV.recap(t, { hist, session, planCheck: plan ? (() => { const c = TP.compare(plan, t); return { followed: c.followed, total: c.total }; })() : null }) });
     page(req, res, `${t.symbol} ${t.side}`, `
+    <link rel="stylesheet" href="/studio.css">
     <p><a href="/journal">← All trades</a></p>
     <h1>${esc(t.symbol)} ${esc(t.side)} <span class="${cls(t.net)}">${money(t.net, t.currency)}</span></h1>
     <p class="muted"><span class="priv"><span class="priv-real">Account ${esc(t.account_number)} · position ${esc(t.position_id)}</span><span class="priv-mask">Account ••${esc(String(t.account_number).slice(-2))}</span></span> · ${fmtDate(t.open_time)} → ${fmtDate(t.close_time)} (broker time)</p>
 
-    <section class="card tv-card" id="tv">
+    <nav class="ttabs" id="ttabs" aria-label="Trade page">
+      <button type="button" data-go="chart" aria-pressed="true">Chart</button><button type="button" data-go="review" aria-pressed="false">Review${LT.gradeOf(t) ? ` · ${esc(LT.gradeOf(t))}` : ''}</button><button type="button" data-go="share" aria-pressed="false">Share</button>
+    </nav>
+
+    ${t.manual && !card.candles.length ? `<section class="card" data-tab="chart"><div class="row between"><h2>Logged by hand</h2><span class="muted small">No chart: the Journal EA did not see this trade</span></div>
+      <dl class="tv-kv lt-mkv"><div><dt>Entry</dt><dd>${fx(t.entry) || '-'}</dd></div><div><dt>Stop loss</dt><dd class="neg">${fx(t.sl) || '-'}</dd></div><div><dt>Take profit</dt><dd class="pos">${fx(t.tp) || '-'}</dd></div><div><dt>Exit</dt><dd>${fx(t.exit) || '-'}</dd></div><div><dt>Result</dt><dd class="${cls(t.net)}">${money(t.net, t.currency)}${t.r !== null && t.r !== undefined ? ` · ${t.r >= 0 ? '+' : '−'}${Math.abs(t.r).toFixed(2)}R` : ''}</dd></div><div><dt>Lots</dt><dd>${t.lots ?? '-'}</dd></div></dl></section>` : `<section class="card tv-card" id="tv" data-tab="chart">
       <div class="row between"><h2>Trade replay</h2><span class="muted small">${esc(t.tf || '')} candles saved by the Journal EA</span></div>
       <div class="tv-grid">
         <div class="tv-main">
@@ -836,51 +942,12 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       <script type="application/json" id="tv-data">${JSON.stringify({ candles: card.candles, entry: t.entry, exit: t.exit, sl: t.sl, tp: t.tp, side: t.side, open: t.open_time, close: t.close_time, digits: d, partials: card.partials }).replace(/</g, '\\u003c')}</script>
       <script src="/vendor/lightweight-charts.js"></script>
       <script src="/replay.js"></script>
-    </section>
+    </section>`}
 
     ${planHtml}
 
-    <section class="card">
-      <h2>Share cards <span class="tag">5ABI.FX story · 9:16</span></h2>
-      <p class="muted">Swipe story: card 1 is the result, card 2 is the real MT5 chart of this trade.</p>
-      <div class="row">
-        <select id="style" aria-label="Card style"><option value="a">Style: Cinematic</option><option value="b">Style: Chart first</option><option value="c">Style: Ticket</option></select>
-        <select id="mode"><option value="money">Show $ amount</option><option value="pct">Show % of account</option><option value="r">Show R multiple</option></select>
-        <label class="check"><input type="checkbox" id="rm" checked> KATANA risk line</label>
-      </div>
-      <div class="cards">
-        <figure><canvas id="c1"></canvas><button class="small" data-save="c1">Save card 1</button></figure>
-        <figure><canvas id="c2"></canvas><button class="small" data-save="c2">Save card 2</button></figure>
-      </div>
-      <form method="post" action="/journal/handle" class="row">
-        <input name="card_handle" value="${esc(req.user.card_handle)}" placeholder="Your handle on the cards, e.g. @5abi.fx" maxlength="40">
-        <button class="small secondary">Save handle</button>
-        <input type="hidden" name="back" value="${t.id}">
-      </form>
-    </section>
-
-    ${req.user.is_admin ? `<section class="card">
-      <h2>Story overlay <span class="tag">admin test · transparent PNG</span></h2>
-      <p class="muted">Quote, the real candles of this trade with entry/exit arrows, and the result, on a transparent background for Instagram stories. No prices, SL or TP. Only admins see this for now.</p>
-      <div class="row">
-        <select id="ov-style">${Object.entries({ scalper: 'Scalper', trend: 'Trend following', counter: 'Counter trend', swing: 'Swing' }).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
-        <select id="ov-show"><option value="pct">Show %</option><option value="r">Show R</option><option value="pips">Show pips</option></select>
-        <label class="check"><input type="checkbox" id="ov-ad" checked> 5ABI.FX line</label>
-        <button type="button" class="small secondary" id="ov-next">Next quote</button>
-        <label class="check"><input type="checkbox" id="ov-candles" checked> Candles</label>
-        <label class="check"><input type="checkbox" id="ov-scrim"> Dark fade</label>
-      </div>
-      <div class="row">
-        <label>Preview photo <input type="file" id="ov-photo" accept="image/*"></label>
-        <label class="check"><input type="checkbox" id="ov-bake"> Include photo in PNG</label>
-      </div>
-      <div class="cards">
-        <figure><canvas id="ov" class="overlay"></canvas><button class="small" data-save-ov>Save overlay PNG</button></figure>
-      </div>
-    </section>` : ''}
-
-    <section class="card">
-      <h2>Trade</h2>
+    <section class="card" data-tab="chart">
+      <details class="tdet"${t.r === null && t.entry !== null ? ' open' : ''}><summary><h2>All trade details</h2><span class="muted small">costs, best and worst move, partials, original stop</span></summary>
       <table><tbody>
         <tr><th>Entry</th><td>${fx(t.entry)}</td><th>Exit</th><td>${fx(t.exit)}</td></tr>
         <tr><th>Stop loss</th><td>${fx(t.sl) || '-'}${t.sl_edited ? ' <span class="muted">(edited)</span>' : ''}</td><th>Take profit</th><td>${fx(t.tp) || '-'}</td></tr>
@@ -896,27 +963,32 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         <label>Original stop-loss <input name="sl" inputmode="decimal" placeholder="${t.side === 'BUY' ? 'below' : 'above'} entry ${fx(t.entry)}" value="${t.sl_edited ? fx(t.sl) : ''}" required></label>
         <button class="secondary small">Save stop</button>
       </form>
+      </details>
     </section>
 
-    <section class="card">
-      <h2>Your notes</h2>
-      <form method="post" action="/journal/${t.id}" class="grid">
-        <label>Setup<input name="setup" value="${esc(t.setup)}" maxlength="120" placeholder="e.g. London breakout"></label>
-        <label>Emotion<select name="emotion">${EMOTIONS.map((e) => `<option ${e === t.emotion ? 'selected' : ''}>${esc(e)}</option>`).join('')}</select></label>
-        <label>Rating<select name="rating">${['', 1, 2, 3, 4, 5].map((r) => `<option value="${r}" ${String(r) === String(t.rating ?? '') ? 'selected' : ''}>${r ? '★'.repeat(r) : '-'}</option>`).join('')}</select></label>
-        <label>Mistakes<input name="mistakes" value="${esc(t.mistakes)}" maxlength="200" placeholder="e.g. moved stop, entered early"></label>
-        <label class="full">Notes<textarea name="notes" rows="4" maxlength="4000">${esc(t.notes)}</textarea></label>
-        <div><button>Save notes</button></div>
-      </form>
-    </section>
+    ${reviewHtml}
 
-    ${mentorBox ? mentorBox(req, t) : ''}
+    <div data-tab="review">${mentorBox ? mentorBox(req, t) : ''}</div>
+
+    <section class="ss tsh" id="share" data-tab="share">
+      <nav class="ss-steps" id="tsteps" aria-label="Steps"></nav><div class="ss-bar"><i id="tpb"></i></div>
+      <div class="ss-wrap">
+        <div class="tsh-pv"><canvas id="mv" class="tsh-cv"></canvas><canvas id="c1" class="tsh-cv" hidden></canvas><canvas id="c2" class="tsh-cv" hidden></canvas>${req.user.is_admin ? '<canvas id="ov" class="tsh-cv overlay" hidden></canvas>' : ''}
+          <a class="tsh-studio" href="/journal/studio">Share a whole day, week or month in Share Studio →</a></div>
+        <div id="tq" class="ss-q" aria-live="polite"></div>
+      </div>
+      <input type="file" id="tfile" accept="image/*,video/*" hidden>${req.user.is_admin ? '<input type="file" id="tovfile" accept="image/*" hidden>' : ''}
+      ${req.app.locals.affTradeBox ? `<div id="taff" class="tsh-aff" hidden>${req.app.locals.affTradeBox(req.user, t)}</div>` : ''}
+    </section>
 
     ${req.user.is_admin ? '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Montserrat:wght@500;600&display=swap">' : ''}
     <script id="trade-data" type="application/json">${json}</script>
     <script src="/cards.js"></script>
+    <script src="/save-file.js"></script>
+    <script src="/video-out.js"></script><script src="/motion-card.js"></script>
     ${req.user.is_admin ? '<script src="/overlay.js"></script>' : ''}
-    <script src="/journal.js"></script>`);
+    <script src="/journal.js"></script>
+    <script src="/trade-tabs.js"></script>`);
   });
 
   app.post('/journal/handle', requireUser, requireJournal, (req, res) => {
@@ -956,12 +1028,11 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   app.post('/journal/:id', requireUser, requireJournal, (req, res) => {
     const t = getTrade(req);
     if (!t) return res.status(404).send('Not found');
-    const rating = Number(req.body.rating);
-    db.prepare(`UPDATE journal_trades SET setup = ?, emotion = ?, mistakes = ?, notes = ?, rating = ?, updated_at = datetime('now') WHERE id = ?`)
-      .run(String(req.body.setup || '').trim().slice(0, 120), EMOTIONS.includes(req.body.emotion) ? req.body.emotion : '',
-        String(req.body.mistakes || '').trim().slice(0, 200), String(req.body.notes || '').slice(0, 4000),
-        rating >= 1 && rating <= 5 ? rating : null, t.id);
-    flash(req, 'ok', 'Notes saved.');
-    res.redirect(`/journal/${t.id}`);
+    const R = LT.parse(req.body || {}, t);
+    db.prepare(`UPDATE journal_trades SET setup = ?, emotion = ?, mistakes = ?, notes = ?, rating = ?, grade = ?, followed = ?, updated_at = datetime('now') WHERE id = ?`)
+      .run(R.setup, R.emotion, R.mistakes, R.notes, R.rating, R.grade, R.followed, t.id);
+    if (req.body.next === 'tag') { flash(req, 'ok', `${t.symbol} tagged.`); return res.redirect('/journal/tag'); }
+    flash(req, 'ok', 'Review saved.');
+    res.redirect(`/journal/${t.id}#review`);
   });
 };

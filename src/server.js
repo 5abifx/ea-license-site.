@@ -97,6 +97,12 @@ app.get('/vendor/lightweight-charts.js', (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=86400');
   res.sendFile(LWC_FILE);
 });
+// mp4-muxer (MIT, npm package): packs the share videos made frame by frame (public/video-out.js) into MP4
+const MUX_FILE = require.resolve('mp4-muxer');   // build/mp4-muxer.js: defines window.Mp4Muxer
+app.get('/vendor/mp4-muxer.js', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.sendFile(MUX_FILE);
+});
 app.use(rate.limiter);   // after the files: pictures and styles never count
 app.use(cookieSession({
   name: 'eals',
@@ -143,6 +149,9 @@ const flash = (req, type, msg) => { req.session.flash = { type, msg }; };
 const page = (req, res, title, body, opts) => res.send(layout(req, title, body, opts));
 const myeas = require('./myeas');
 const refs = referrals.setup(app, { db, page });
+const aff = require('./affiliates').setup(app, { db, page, flash: (req, type, msg) => { req.session.flash = { type, msg }; }, requireUser: (req, res, next) => (req.user ? next() : res.redirect('/login')),
+  requireAdmin: (req, res, next) => (req.user && req.user.is_admin ? next() : res.status(404).send('Not found')), refs });
+app.locals.affTradeBox = aff.tradeBox;
 const requireUser = (req, res, next) => (req.user ? next() : res.redirect('/login'));
 const requireAdmin = (req, res, next) =>
   req.user && req.user.is_admin ? next() : res.status(404).send('Not found');
@@ -224,14 +233,45 @@ require('./security')(app, { db, page, flash, requireAdmin, rateLimit, finishSig
 // that are registered before the journal module (it fills in the check below).
 let journalAccess = () => false;
 app.use((req, res, next) => { req.hasJournal = journalAccess(req.user); next(); });
+// feature usage tracking + Admin > Feature usage (src/features.js); before the members routes so it sees them
+require('./features').setup(app, { db, express, requireAdmin, page });
 const { studentBox: mentorBox } = require('./mentor')(app, { db, page, flash, requireUser, requireAdmin });
-require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, setJournalAccess: (f) => { journalAccess = f; } });
+// guided first run after sign-up + Profile settings (src/onboard.js); stripe is set up further down, so it is looked up at request time
+const onboard = require('./onboard')(app, { db, page, flash, requireUser, trialDays,
+  stripe: { on: () => stripe.on(), needsCardTrial: (u) => stripe.needsCardTrial(u) } });
+require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, onboard, setJournalAccess: (f) => { journalAccess = f; } });
 require('./welcome')(app, { db, requireUser });   // student welcome + journal result reveal
+require('./tour')(app, { db, requireUser });
+require('./whatsnew')(app, { db, page, flash, requireUser, requireAdmin });   // What's new popup + Admin > What's new (public/whatsnew.js)      // "How should we show you around?" guided tour (public/tour.js)
 
 // ---------- auth ----------
 // Signed-out home: the cinematic page (src/cine-pages/home.html + public/cine/home.*). Signed in: the dashboard.
-app.get('/', (req, res) => {
-  if (req.user) return res.redirect('/dashboard');
+// /katana and /trade-journal: the same page cut down to one product's sections, each with its own hero,
+// so Google can list them as separate links under the home result (titles/descriptions in src/seo.js)
+const PRODUCT_PAGES = {
+  '/': {
+    HEROH: 'Your rules.<br><span class="m">Enforced on every trade.</span>',
+    PILLS: '<a href="#katana">KATANA</a><a href="#learn">How it works</a><a href="#journal">Journal</a><a href="/why">With vs without</a><a href="#price">Plans</a>',
+    HEROFOOT: 'KATANA sizes every position and stops you at your daily limit. <span>Every closed trade lands in your journal.</span>',
+  },
+  '/katana': {
+    kicker: 'KATANA · MT5 risk manager',
+    HEROH: 'One bad day<br><span class="m">stays one bad day.</span>',
+    PILLS: '<a href="#learn">How it works</a><a href="#shield">Shield</a><a href="#payout">Prop rules</a><a href="#price">Plans</a>',
+    HEROFOOT: 'Lot size from your risk, a stop on every trade, <span>and a hard lock at your daily limit.</span>',
+    keep: ['badday', 'real', 'katana', 'shield', 'payout', 'learn', 'cyc', 'price', 'apply'],
+  },
+  '/trade-journal': {
+    kicker: 'MT5 trade journal',
+    HEROH: 'Every trade logged.<br><span class="m">Every leak found.</span>',
+    PILLS: '<a href="#journal">Calendar</a><a href="#plan">Plan a trade</a><a href="#found">Insights</a><a href="#cards">Share cards</a><a href="#price">Plans</a>',
+    HEROFOOT: 'Connect MT5 once. <span>Every closed trade lands in your journal with the real chart.</span>',
+    keep: ['journal', 'plan', 'found', 'dash', 'cards', 'price', 'apply'],
+  },
+};
+app.get(['/', '/katana', '/trade-journal'], (req, res) => {
+  if (req.user && req.path === '/') return res.redirect('/dashboard');
+  const pp = PRODUCT_PAGES[req.path];
   const signup = SIGNUP_MODE !== 'closed';
   const trial = signup ? trialDays() : 0;
   const join = trial ? 'Start free trial' : 'Create account';
@@ -256,11 +296,12 @@ app.get('/', (req, res) => {
   </div>
 </section>`;
   res.send(cinePage(req, 'home', {
-    KICKER: `MT5 risk manager · trade journal${trial ? ` · ${trial}-day free trial` : ''}`,
+    KICKER: `${pp.kicker || 'MT5 risk manager · trade journal'}${trial ? ` · ${trial}-day free trial` : ''}`,
+    HEROH: pp.HEROH, PILLS: pp.PILLS, HEROFOOT: pp.HEROFOOT,
     JOINBTN: signup ? `<a class="go pri" href="/signup">${join}</a>` : '',
     PRICE: price,
     CTA: signup ? `<a class="cta" href="/signup">${join}</a><a class="cta2" href="/login">Already a member? <b>Sign in</b></a>` : '<a class="cta" href="/login">Sign in</a>',
-  }, { title: `${SITE_NAME} · Risk manager & trade journal for MT5` }));
+  }, { title: `${SITE_NAME} · Risk manager & trade journal for MT5`, keep: pp.keep, ld: req.path === '/' ? require('./seo').homeData() : require('./seo').productData(req.path) }));
 });
 
 app.get('/login', (req, res) => {
@@ -372,6 +413,7 @@ function createCustomer(req, { name, email, passwordHash, googleSub = null }) {
       .run(email, name, passwordHash, status, MAX_ACCOUNTS_DEFAULT, googleSub);
     if (status === 'active') grantAllActiveEas(info.lastInsertRowid);
   }
+  db.prepare('UPDATE users SET onboard = 0 WHERE id = ?').run(info.lastInsertRowid);   // guided set-up on first visit
   refs.attach(req, Number(info.lastInsertRowid));
   sales.attachSource(req, Number(info.lastInsertRowid));
   return Number(info.lastInsertRowid);
@@ -542,6 +584,7 @@ app.post('/accounts', requireUser, (req, res) => {
   }
   const r = db.prepare('INSERT OR IGNORE INTO accounts (user_id, account_number, label) VALUES (?, ?, ?)')
     .run(u.id, num, String(req.body.label || '').trim().slice(0, 60));
+  if (r.changes) onboard.prefillProp(u, r.lastInsertRowid);   // prop firm guard from the sign-up answers
   if (u.trial && r.changes) db.prepare('INSERT OR IGNORE INTO trial_accounts (account_number, user_id) VALUES (?, ?)').run(num, u.id);
   flash(req, r.changes ? 'ok' : 'error', r.changes ? `Account ${num} added.` : `Account ${num} is already on your list.`);
   res.redirect('/dashboard');
@@ -791,7 +834,7 @@ app.get('/admin/users/:id', requireAdmin, (req, res) => {
       <button class="small secondary">${u.trial ? 'Restart free trial' : 'Start free trial'}</button></form>`}
     ${stripe.needsCardTrial(u) ? `<p class="notice"><span>Signed up but has not added a card yet, so the ${trialDays()}-day free trial has not started. Nothing runs until they pick a plan and add a card (or you start a trial or mark them paid).</span></p>` : ''}
     ${u.plan_request ? `<p class="notice"><span>Requested on the site: <strong>${esc((getPlan(u.plan_request.split(':')[0]) || {}).name || u.plan_request)}</strong>, ${esc(u.plan_request.split(':')[1] || '')}. Check the payment, then press Mark as paid.</span></p>` : ''}
-    ${refs.adminNote(u)}
+    ${refs.adminNote(u)}${aff.adminNote(u)}
     ${u.plan ? `<p class="muted">Current plan: <strong>${esc((getPlan(u.plan) || {}).name || u.plan)}</strong> · ${esc(u.billing)}</p>` : ''}
     <div>
     </div>
@@ -853,7 +896,10 @@ app.post('/admin/users/:id/paid', requireAdmin, (req, res) => {
 // end of the Stripe billing period) is used instead when it is later. Returns the referral note ('' if none).
 // `paid`: { amount (US$ actually paid, if known), via: 'stripe' | 'admin' } for the sales track record
 function applyPaid(u, plan, billing, until = null, paid = {}) {
-  logSale(u.id, 'ea', { plan: plan ? plan.id : '', billing: plan ? billing : '', amount: paid.amount != null ? paid.amount : plan ? dueNow(plan, billing) : null, via: paid.via || 'admin' });
+  // no amount from Stripe (Admin "Mark as paid"): the plan price, less the friend's first-payment discount
+  const amount = paid.amount != null ? paid.amount : plan ? Math.round(dueNow(plan, billing) * (100 - refs.discountFor(u))) / 100 : null;
+  logSale(u.id, 'ea', { plan: plan ? plan.id : '', billing: plan ? billing : '', amount, via: paid.via || 'admin' });
+  const affNote = aff.onEaPaid(u, Number(amount) || 0, plan ? plan.id : '');
   const days = plan && billing === 'annual' ? BILLING.annual.days : PAID_DAYS;
   const from = u.expires_at && !isExpired(u) ? u.expires_at : new Date().toISOString().slice(0, 19).replace('T', ' ');
   let refNote = '';
@@ -872,7 +918,7 @@ function applyPaid(u, plan, billing, until = null, paid = {}) {
       if (!db.prepare('SELECT 1 FROM user_eas WHERE user_id = ?').get(u.id)) grantAllActiveEas(u.id);
     }
   })();
-  return refNote;
+  return refNote + affNote;
 }
 
 app.post('/admin/users/:id', requireAdmin, (req, res) => {
@@ -1012,7 +1058,8 @@ app.post('/admin/eas/:id/delete', requireAdmin, (req, res) => {
 });
 
 require('./help')(app, { db, page });
-const mentor = require('./mentorship')(app, { db, page, flash, requireUser, requireAdmin, grantAllActiveEas, PAYMENT_URL });
+require('./why')(app, { trialDays, signupOpen: () => SIGNUP_MODE !== 'closed' });
+const mentor = require('./mentorship')(app, { db, page, flash, requireUser, requireAdmin, grantAllActiveEas, PAYMENT_URL, affiliates: aff });
 const stripe = require('./stripe')(app, { db, flash, requireUser, applyPaid, startTrial, refs, mentor });
 sales.routes(app, { db, page, requireAdmin, stripe, backup, mentorPlans: require('./mentorship').MENTOR_PLANS });
 require('./pricing')(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL: process.env.CONTACT_URL || '', refs, stripe });

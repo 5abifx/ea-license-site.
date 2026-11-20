@@ -486,6 +486,22 @@
       navigator.share({ files: [f], title: '5ABI.FX report' }).catch(() => {});
     }, 'image/png'));
   });
+  // motion card of the period (or its best session), a short video made in this browser
+  const per = () => {
+    const ses = val('mv-what') && val('mv-what').value === 'session' && d.sessions[0];
+    const x = ses || { net: d.net, n: d.n, win: d.winRate, totalR: d.totalR };
+    const mode = modeSel.value, tr = ses ? (ses.avgR !== null ? ses.avgR * ses.n : null) : d.totalR;
+    const wr = ses ? ses.win : d.winRate * 100;
+    return {
+      pnl: mode === 'r' ? null : x.net, pct: d.start && x.net !== undefined ? x.net / d.start * 100 : null, r: tr,
+      top: ses ? `${d.label} · ${ses.k} session` : d.label,
+      cells: [['TRADES', String(x.n)], ['WIN RATE', fin(wr) ? Math.round(wr) + '%' : '—'], ses ? ['AVG R', fin(ses.avgR) ? ses.avgR.toFixed(2) + 'R' : '—'] : ['GREEN DAYS', `${d.greenDays}/${d.days}`]],
+    };
+  };
+  const mtrade = { handle: d.handle };
+  const mopts = () => { const p = per(); Object.assign(mtrade, { pnl: p.pnl, pct: p.pct, r: p.r }); return { mode: modeSel.value === 'r' ? 'r' : modeSel.value, rm: val('rkat').checked, top: p.top, cells: p.cells }; };
+  const mvm = window.MotionCard && val('mv') && window.MotionCard.mount(mtrade, mopts, d.label);
+  if (mvm) { [modeSel, val('rkat'), val('mv-what')].forEach((el) => el && el.addEventListener('change', mvm.sync)); }
   draw();
   K.onLogo(draw);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);

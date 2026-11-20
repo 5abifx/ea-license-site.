@@ -2,6 +2,7 @@
 // Tools the member does not have yet still show, locked, with why they need it and where to unlock it.
 // Chart themes get their own section with a colour preview. Accounts show whether an EA checked in lately.
 const { esc, fmtDate } = require('./views');
+const { db } = require('./db');
 
 // what each tool does; codes match Admin > EAs. Tools not listed here show only when the member has them.
 const TOOLS = {
@@ -57,6 +58,48 @@ function themeSvg(t, seed) {
   return out + '</svg>';
 }
 
+// setup steps for a new member: each one ticks itself from what the site can see
+// (an account added, an EA checking in, a first journal trade); "allow the website" can also be ticked by hand.
+function setupSteps({ eas, accounts, hasJournal, trades, site }) {
+  const ea = eas.find((e) => e.code === 'KATANA') || eas.find((e) => e.code !== 'JOURNAL') || eas[0];
+  const jr = eas.find((e) => e.code === 'JOURNAL');
+  const seenAny = accounts.some((a) => a.last_check_at);
+  const T = (ea && TOOLS[ea.code]) || { steps: [] };
+  const dl = (e, label) => (e && e.file_path ? `<a class="mx-pill" href="/download/${e.id}">${esc(label)} <span aria-hidden="true">↓</span></a>` : '<span class="muted small">Download coming soon</span>');
+  const steps = [
+    { key: 'acc', label: 'Add your MT5 account', short: 'Account', done: accounts.length > 0,
+      sub: accounts.length ? `${esc(accounts[0].account_number)} added` : 'The EAs only run on accounts listed here',
+      body: `<h2>Add your MT5 account number</h2>
+        <p>The EAs only run on account numbers listed here. Find yours in MT5 under <b>File → Login to Trade Account</b>, or at the top of the Navigator window.</p>
+        <form method="post" action="/accounts" class="mx-inp">
+          <input name="account_number" placeholder="MT5 account number, e.g. 51234567" inputmode="numeric" pattern="[0-9]{1,20}" required aria-label="MT5 account number">
+          <input name="label" placeholder="Note (optional), e.g. IC Markets live" maxlength="60" aria-label="Note">
+          <button class="mx-pill">Add account <span aria-hidden="true">→</span></button></form>` },
+    { key: 'allow', label: 'Allow this website in MT5', short: 'Allow site', done: seenAny, manual: true, sub: 'One setting, once',
+      body: `<h2>Allow this website in MT5</h2>
+        <p>Your EAs check your licence with this website. MT5 blocks that until you add the address once.</p>
+        <div class="mx-path"><span>Tools</span><span>Options</span><span>Expert Advisors</span><span>Allow WebRequest for listed URL</span></div>
+        <div class="mx-copy mx-g"><code>${esc(site)}</code><button type="button" class="mx-pill sm" data-copy="${esc(site)}">Copy</button></div>
+        <div class="mx-act"><button type="button" class="mx-pill" data-did="allow">I did this <span aria-hidden="true">→</span></button></div>
+        <p class="mx-tip">Prop firm says "AutoTrading disabled by server"? <a href="/help/ea-blocked">Get a ready-to-send email</a> for their support.</p>` },
+    ...(ea ? [{ key: 'ea', label: `Download and attach ${ea.name}`, short: ea.code === 'KATANA' ? 'KATANA' : 'EA', done: seenAny, sub: 'Ticks when it checks in',
+      body: `<h2>Download and attach ${esc(ea.name)}</h2>
+        ${T.steps.length ? `<ol class="mx-ol">${T.steps.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` : '<p>Put the file in MQL5 → Experts, refresh the Navigator and drag it onto a chart.</p>'}
+        <div class="mx-act">${dl(ea, `Download ${ea.name}`)}</div>
+        <p class="mx-tip">This step ticks by itself a minute after the EA checks in from your account.</p>` }] : []),
+    ...(hasJournal && jr && jr !== ea ? [{ key: 'jr', label: 'Connect the Trade Journal', short: 'Journal', done: trades > 0, sub: 'Ticks on your first trade',
+      body: `<h2>Connect the Trade Journal</h2>
+        <ol class="mx-ol"><li>Copy your journal key from the Journal page.</li><li>Put the file in MQL5 → Experts and refresh the Navigator.</li>
+          <li>Drag it onto one extra chart (any symbol), paste the key and switch on Algo Trading.</li><li>Close a trade: it shows in your journal within a minute.</li></ol>
+        <div class="mx-act">${dl(jr, 'Download Trade Journal')}<a class="mx-ghost" href="/journal">Get my journal key →</a></div>` }] : []),
+  ];
+  steps.push({ key: 'app', label: 'Get the app', short: 'App', opt: true, done: false, sub: 'Optional, phone or PC',
+    body: `<h2>Put 5ABI.FX on your home screen</h2>
+      <p>Open your journal and Desk in one tap, full screen, on your phone or PC. Nothing to download from a store.</p>
+      <div class="mx-act"><a class="mx-pill" href="/?install=1">Show me how <span aria-hidden="true">→</span></a></div>` });
+  return steps;
+}
+
 function html({ u, eas, allEas, accounts, full, student, hasJournal, notices, site, refCard, isStudentOnly }) {
   const owned = new Set(eas.map((e) => e.code));
   // owned tools first, then the known tools they do not have yet (locked)
@@ -65,73 +108,98 @@ function html({ u, eas, allEas, accounts, full, student, hasJournal, notices, si
   const card = ({ e, locked }) => {
     const T = TOOLS[e.code] || { kind: e.description || 'Expert Advisor', feats: [], steps: [], glow: 'rgba(140,140,150,.35)', icon: 'bot' };
     const cta = locked
-      ? `<a class="btn" href="${T.unlock.href}">${esc(T.unlock.label)}</a>${T.unlock.note ? `<span class="muted small">${esc(T.unlock.note)}</span>` : ''}`
-      : `${e.file_path ? `<a class="btn" href="/download/${e.id}">Download</a>` : '<span class="muted small">Coming soon</span>'}${T.extra && hasJournal ? `<a class="btn secondary" href="${T.extra.href}">${esc(T.extra.label)}</a>` : ''}`;
-    return `<article class="ea-card${locked ? ' locked' : ''}" style="--glow:${T.glow}">
+      ? `<a class="mx-ghost hi" href="${T.unlock.href}">${esc(T.unlock.label)} →</a>`
+      : `${e.file_path ? `<a class="mx-pill" href="/download/${e.id}">Download <span aria-hidden="true">↓</span></a>` : '<span class="muted small">Coming soon</span>'}${T.extra && hasJournal ? `<a class="mx-ghost" href="${T.extra.href}">${esc(T.extra.label)}</a>` : ''}`;
+    return `<article class="ea-card mx-g mx-tool${locked ? ' locked' : ''}" style="--glow:${T.glow}">
       <div class="ea-top"><span class="ea-ico">${icon(locked ? 'lock' : T.icon)}</span>
-        <div><div class="ea-name">${esc(e.name)}</div><div class="ea-kind">${esc(T.kind)} · v${esc(e.version)}</div></div>
-        <span class="tag ${locked ? 'lock' : 'ok'}">${locked ? 'Locked' : 'Unlocked'}</span></div>
-      ${T.why ? `<p class="ea-why">${locked ? '<b>Why you need it:</b> ' : ''}${esc(T.why)}</p>` : e.description ? `<p class="ea-why">${esc(e.description)}</p>` : ''}
-      ${T.feats.length ? `<ul class="ea-feat">${T.feats.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
+        <div><div class="ea-name">${esc(e.name)}</div><div class="ea-kind">${esc(T.kind)}</div></div>
+        <span class="tag ${locked ? 'lock' : 'ok'}">${locked ? (T.unlock.note ? esc(T.unlock.note) : 'Locked') : 'Unlocked'}</span></div>
+      ${T.why ? `<p class="ea-why">${esc(T.why)}</p>` : e.description ? `<p class="ea-why">${esc(e.description)}</p>` : ''}
+      ${T.feats.length ? `<ul class="ea-feat">${T.feats.slice(0, 3).map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
       ${!locked && T.steps.length ? `<details class="ea-how"><summary>How to install</summary><ol>${T.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol></details>` : ''}
-      <div class="ea-foot">${cta}</div>
+      <div class="ea-foot">${cta}${locked ? '' : `<span class="mx-ver">v${esc(e.version)}</span>`}</div>
     </article>`;
   };
   const now = Date.now();
+  const ago = (t) => {
+    const h = (now - Date.parse(String(t).replace(' ', 'T') + 'Z')) / 3600e3;
+    if (!Number.isFinite(h)) return [99, fmtDate(t)];
+    return [h, h < 1 ? `${Math.max(1, Math.round(h * 60))} min ago` : h < 48 ? `${Math.round(h)} h ago` : `${Math.round(h / 24)} days ago`];
+  };
   const seen = (a) => {
     if (!a.last_check_at) return ['off', 'EA not seen yet'];
-    const h = (now - Date.parse(String(a.last_check_at).replace(' ', 'T') + 'Z')) / 3600e3;
-    if (!Number.isFinite(h)) return ['off', fmtDate(a.last_check_at)];
-    const ago = h < 1 ? `${Math.max(1, Math.round(h * 60))} min ago` : h < 48 ? `${Math.round(h)} h ago` : `${Math.round(h / 24)} days ago`;
-    return [h <= 24 ? 'on' : 'off', `EA seen ${ago}`];
+    const [h, txt] = ago(a.last_check_at);
+    return [h <= 24 ? 'on' : 'off', `EA seen ${txt}`];
   };
   const withCompass = student && eas.some(isStudentOnly);
+  const trades = hasJournal ? (db.prepare('SELECT COUNT(*) n FROM journal_trades WHERE user_id = ?').get(u.id) || {}).n || 0 : 0;
+  const steps = setupSteps({ eas, accounts, hasJournal, trades, site });
+  const need = steps.filter((s) => !s.opt);
+  const doneN = need.filter((s) => s.done).length;
+  const allDone = doneN === need.length;
+  const first = String(u.name || '').trim().split(/\s+/)[0];
+  const hi = first ? `, ${esc(first.slice(0, 20))}` : '';
+  const last = accounts.filter((a) => a.last_check_at).sort((a, b) => String(b.last_check_at).localeCompare(String(a.last_check_at)))[0];
+  const R = 58, C = +(2 * Math.PI * R).toFixed(1);
 
-  return `
-  <div class="row between page-head"><div><span class="kicker">Your trading tools</span><h1>Welcome${u.name ? ', ' + esc(u.name) : ''}</h1></div>
-    <span class="muted small">${eas.length} of ${cards.length} unlocked</span></div>
+  return `<link rel="stylesheet" href="/myeas.css?v=1">
+  <div class="mx-amb" aria-hidden="true"><i></i><i></i><i></i></div>
+  <section class="mx-hero">
+    <div>
+      <div class="mx-chips"><span class="mx-chip mx-g"><b>${eas.length}</b> of ${cards.length} tools unlocked</span><span class="mx-chip mx-g"><b>${accounts.length}</b> of ${u.max_accounts} MT5 accounts</span></div>
+      <h1>${allDone ? `Welcome back${hi}. <em>${owned.has('KATANA') ? 'KATANA' : 'Your EA'}</em> is on guard.` : `Welcome${hi}. Let's get you <em>protected</em>.`}</h1>
+      <p class="mx-lede">${allDone ? 'Your tools are running. Downloads, accounts and chart themes are all here.' : `${need.length} short steps and your EAs are guarding your MT5 account. It takes about five minutes.`}</p>
+    </div>
+    ${allDone ? '' : `<div class="mx-ring" role="img" aria-label="${doneN} of ${need.length} steps done">
+      <svg viewBox="0 0 132 132"><defs><linearGradient id="mxg"><stop offset="0" stop-color="#ff5a1f"/><stop offset="1" stop-color="#ffb07a"/></linearGradient></defs>
+        <circle cx="66" cy="66" r="${R}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="6"/>
+        <circle cx="66" cy="66" r="${R}" fill="none" stroke="url(#mxg)" stroke-width="6" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${(C * (1 - doneN / need.length)).toFixed(1)}"/></svg>
+      <div><b>${doneN}/${need.length}</b><span>steps done</span></div></div>`}
+  </section>
   ${notices}
-  ${cards.length ? `<div class="ea-cards">${cards.map(card).join('')}</div>` : '<section class="card"><p class="muted">No EAs are assigned to your account yet.</p></section>'}
-
-  <section class="card ea-themes">
-    <div class="row between"><h2>Chart themes</h2><span class="muted small">KATANA and Compass switch to the same colours by themselves</span></div>
-    <div class="th-grid">${THEMES.map((t, i) => `<div class="th">
-      <div class="th-pic">${themeSvg(t, 7 + i * 13)}</div>
-      <div class="th-row"><b>${t.name}</b><span><a href="/templates/5ABI.FX%20${t.name}.tpl" download>Download</a>${withCompass ? ` · <a href="/templates/5ABI.FX%20${t.name}%20Compass.tpl" download>with Compass</a>` : ''}</span></div></div>`).join('')}</div>
-    <p class="muted small">Put the file in <strong>File → Open Data Folder → MQL5 → Profiles → Templates</strong>, then right-click a chart → <strong>Templates</strong>.</p>
+  ${allDone ? `<section class="mx-done mx-g"><span class="mx-live"></span><span><b>All set.</b> <span class="muted">${last ? `EA seen ${ago(last.last_check_at)[1]} on ${esc(last.account_number)}` : ''}${hasJournal && trades ? ` · Journal has ${trades} trade${trades === 1 ? '' : 's'}` : ''}</span></span><button type="button" class="mx-ghost" data-open-setup>Setup steps</button></section>` : ''}
+  <section class="mx-setup mx-g" data-setup${allDone ? ' hidden' : ''} aria-label="Setup steps">
+    <div class="mx-steps" role="tablist">${steps.map((s, i) => `<button type="button" role="tab" class="mx-st${s.done ? ' done' : ''}${s.opt ? ' opt' : ''}" data-step="${s.key}"${s.manual ? ' data-manual' : ''}>
+      <i>${s.done ? '✓' : s.opt ? '+' : i + 1}</i><div><span class="l">${esc(s.label)}</span><span class="s">${esc(s.short)}</span><small>${s.sub}</small></div></button>`).join('')}</div>
+    ${steps.map((s, i) => `<div class="mx-focus" data-panel="${s.key}" hidden><span class="mx-k">${s.opt ? 'Optional' : `Step ${i + 1} of ${need.length}`}${s.done ? ' · Done' : ''}</span>${s.body}</div>`).join('')}
   </section>
 
-  <div class="ea-lower">
-  <section class="card">
-    <div class="row between"><h2>Your MT5 accounts</h2><span class="tag">${accounts.length} / ${u.max_accounts}</span></div>
-    <p class="muted small">The EAs only run on the account numbers listed here. Find the number in MT5 under File → Login to Trade Account, or at the top of the Navigator window.</p>
+  <div class="mx-sec"><h2>Your tools</h2><span>${eas.length} of ${cards.length} unlocked</span></div>
+  ${cards.length ? `<div class="ea-cards mx-tools">${cards.map(card).join('')}</div>` : '<section class="card mx-g"><p class="muted">No EAs are assigned to your account yet.</p></section>'}
+
+  <div class="mx-lower">
+  <section class="card mx-g mx-box" id="accounts">
+    <div class="row between"><h2>Your MT5 accounts</h2><span class="muted small">${accounts.length} of ${u.max_accounts}</span></div>
     ${accounts.length ? `<div class="acc-list">${accounts.map((a) => { const [st, txt] = seen(a); return `<div class="acc-row">
       <span class="acc-n"><i class="acc-dot ${st}" aria-hidden="true"></i><strong>${esc(a.account_number)}</strong>${a.label ? `<span class="muted"> · ${esc(a.label)}</span>` : ''}</span>
       <span class="muted small">${txt}</span>
-      <form method="post" action="/accounts/${a.id}/delete" onsubmit="return confirm('Remove account ${esc(a.account_number)}? The EA will stop on it.')"><button class="small danger">Remove</button></form></div>`; }).join('')}</div>` : ''}
+      <form method="post" action="/accounts/${a.id}/delete" onsubmit="return confirm('Remove account ${esc(a.account_number)}? The EA will stop on it.')"><button class="small danger">Remove</button></form></div>`; }).join('')}</div>` : '<p class="muted small">No accounts yet. The EAs only run on account numbers listed here.</p>'}
     ${full ? '<p class="muted small">You have reached the maximum number of accounts. Remove one to add another.</p>' : `
-    <form method="post" action="/accounts" class="row acc-add">
-      <input name="account_number" placeholder="MT5 account number, e.g. 51234567" inputmode="numeric" pattern="[0-9]{1,20}" required aria-label="MT5 account number">
-      <input name="label" placeholder="Note (optional), e.g. IC Markets live" maxlength="60" aria-label="Note">
-      <button>Add account</button>
+    <form method="post" action="/accounts" class="mx-inp acc-add">
+      <input name="account_number" placeholder="MT5 account number" inputmode="numeric" pattern="[0-9]{1,20}" required aria-label="MT5 account number">
+      <input name="label" placeholder="Note (optional)" maxlength="60" aria-label="Note">
+      <button class="mx-pill sm">Add account</button>
     </form>`}
+    <p class="muted small">Find the number in MT5 under File → Login to Trade Account.</p>
   </section>
 
-  <section class="card ea-setup">
-    <h2>Before the first run</h2>
-    <div class="su-grid">
-      <div class="su"><span class="kicker">Step 1</span><p>In MT5 go to <strong>Tools → Options → Expert Advisors</strong>, tick <strong>Allow WebRequest for listed URL</strong> and add:</p>
-        <div class="su-copy"><code>${esc(site)}</code><button type="button" class="small secondary" data-copy="${esc(site)}">Copy</button></div></div>
-      <div class="su"><span class="kicker">Step 2</span><p>Add your MT5 account number under <strong>Your MT5 accounts</strong>.</p></div>
-      <div class="su"><span class="kicker">Step 3</span><p>Prop firm says <strong>"AutoTrading disabled by server"</strong>? <a href="/help/ea-blocked">Get a ready-to-send email</a> for their support.</p></div>
-    </div>
-    ${withCompass ? '<p class="muted small">Indicators like Auction Compass unlock by themselves while the Trade Journal EA runs on any chart in the same MT5.</p>' : ''}
+  <section class="card mx-g mx-box ea-themes">
+    <div class="row between"><h2>Chart themes</h2><span class="muted small">KATANA and Compass match them</span></div>
+    <div class="th-grid">${THEMES.map((t, i) => `<div class="th">
+      <div class="th-pic">${themeSvg(t, 7 + i * 13)}</div>
+      <div class="th-row"><b>${t.name}</b><span><a href="/templates/5ABI.FX%20${t.name}.tpl" download>Download</a>${withCompass ? ` · <a href="/templates/5ABI.FX%20${t.name}%20Compass.tpl" download>with Compass</a>` : ''}</span></div></div>`).join('')}</div>
+    <p class="muted small">Put the file in <strong>MQL5 → Profiles → Templates</strong>, then right-click a chart → <strong>Templates</strong>.</p>
+    ${withCompass ? '<p class="muted small">Auction Compass unlocks by itself while the Trade Journal EA runs on any chart in the same MT5.</p>' : ''}
   </section>
   </div>
-  ${refCard ? `<div class="ea-lower">${refCard}</div>` : ''}
-  <script>document.querySelectorAll('[data-copy]').forEach(function (b) { b.addEventListener('click', function () {
-    var t = b.dataset.copy; var done = function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1500); };
-    if (navigator.clipboard) navigator.clipboard.writeText(t).then(done, function () {}); }); });</script>`;
+
+  <div class="mx-help">
+    <a class="mx-g" href="/faq"><b>Help and FAQ</b><span>Install, accounts, billing</span></a>
+    <a class="mx-g" href="/help/ea-blocked"><b>EA blocked by my prop firm</b><span>Ready-to-send email for their support</span></a>
+    <a class="mx-g" href="/pricing"><b>Plans</b><span>Unlock more tools</span></a>
+  </div>
+  ${refCard ? `<div class="mx-lower">${refCard}</div>` : ''}
+  <script src="/myeas.js?v=1"></script>`;
 }
 
 module.exports = { html, TOOLS };
