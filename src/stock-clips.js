@@ -12,9 +12,11 @@ const TOPICS = {
 };
 const cache = new Map();   // query -> { at, list }, an hour, so a busy evening does not hit the API limit
 
+// Owner only for now (requireAdmin): the clip studio is the owner's own tool.
 module.exports = function registerStockClips(app, { requireUser }) {
+  const ownerOnly = (req, res, next) => (req.user && req.user.is_admin ? next() : res.status(404).end());
   const key = () => process.env.PEXELS_API_KEY || '';
-  app.get('/journal/studio/clips', requireUser, async (req, res) => {
+  app.get('/journal/studio/clips', requireUser, ownerOnly, async (req, res) => {
     if (!key()) return res.status(404).json({ clips: [] });
     const topic = TOPICS[req.query.topic] ? req.query.topic : 'luxury', portrait = req.query.wide !== '1';
     const q = TOPICS[topic][Math.floor(Math.random() * TOPICS[topic].length)];
@@ -35,7 +37,7 @@ module.exports = function registerStockClips(app, { requireUser }) {
     } catch (e) { res.status(502).json({ clips: [] }); }
   });
   // same-origin copy of a Pexels clip, only for browsers where the direct file cannot be drawn into the video
-  app.get('/journal/studio/clip', requireUser, async (req, res) => {
+  app.get('/journal/studio/clip', requireUser, ownerOnly, async (req, res) => {
     let u; try { u = new URL(String(req.query.u || '')); } catch { return res.status(400).end(); }
     if (u.protocol !== 'https:' || !/(^|\.)pexels\.com$/.test(u.hostname)) return res.status(400).end();
     try {

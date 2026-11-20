@@ -15,14 +15,12 @@ const ARTS = { smoke: 'Smoke', ember: 'Ember glow', floor: 'Trading floor' };
 const FIELDS = {
   trade: { title: 'Symbol and side', date: 'Date', line: 'Price line', quote: 'Quote', alt: 'Second unit', entry: 'Entry', exit: 'Exit', size: 'Size', held: 'Time held', risk: 'Risk %', handle: 'Name tag', synced: 'MT5 synced tick' },
   period: { title: 'Period name', quote: 'Quote', alt: 'Second unit', bars: 'Day-by-day bars', trades: 'Trades', winrate: 'Win rate', green: 'Green days', best: 'Best day / trade', handle: 'Name tag', synced: 'MT5 synced tick' },
-  milestone: { heading: 'Heading', handle: 'Your name', line: 'What it was', stats: 'Three numbers', quote: 'Quote', synced: 'MT5 synced tick' },
 };
 const DEFAULTS = {
   trade: { title: true, date: true, line: true, quote: true, alt: false, entry: false, exit: false, size: false, held: false, risk: false, handle: true, synced: true },
   period: { title: true, quote: true, alt: false, bars: true, trades: false, winrate: false, green: false, best: false, handle: true, synced: true },
-  milestone: { heading: true, handle: true, line: true, stats: true, quote: true, synced: true },
 };
-const kindOf = d => (d && (d.kind === 'trade' || d.kind === 'milestone') ? d.kind : 'period');
+const kindOf = d => (d && d.kind === 'trade' ? 'trade' : 'period');
 
 const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const ease = x => 1 - Math.pow(1 - clamp(x), 4);
@@ -98,8 +96,8 @@ function pill(c, s, x, y, dark) {
 
 function create(canvas, data, opts) {
   // len: video seconds (8, 12 or 15; the card is built by about 4 s, the rest is the hold over moving art)
-  // poster: the first 3 frames show the finished card, so the preview in Instagram / WhatsApp shows the result
-  const o = Object.assign({ kind: kindOf(data), unit: 'money', size: 'story', art: 'smoke', grade: 'bw', quote: '', color: false, layout: 'center', dim: 0.45, len: 8, poster: true }, opts || {});
+  // poster (owner only for now): the first 3 frames show the finished card, so the preview in Instagram / WhatsApp shows the result
+  const o = Object.assign({ kind: kindOf(data), unit: 'money', size: 'story', art: 'smoke', grade: 'bw', quote: '', color: false, layout: 'center', dim: 0.45, len: 8, poster: false }, opts || {});
   o.show = Object.assign({}, DEFAULTS[o.kind], (opts || {}).show);
   let W = 1080, H = 1920, SC = 1, media = null, avatar = null, raf = 0, t0 = 0, frozen = null;
   const len = () => Math.max(6, Number(o.len) || 8);
@@ -266,8 +264,7 @@ function create(canvas, data, opts) {
     drawArt(tm);
     c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 18;
     c.globalAlpha = A(tm, 0.1, 0.7); corner();
-    if (o.kind === 'milestone') frameMilestone(tm);
-    else if (W > H && o.layout === 'split') frameSplit(tm);
+    if (W > H && o.layout === 'split') frameSplit(tm);
     else frameCenter(tm);
     c.globalAlpha = 1; c.shadowBlur = 0;
     if (SC !== 1) { c.setTransform(1, 0, 0, 1, 0, 0); ac.setTransform(1, 0, 0, 1, 0, 0); }
@@ -361,91 +358,7 @@ function create(canvas, data, opts) {
     footer(tm, L, fy, 'left');
   }
 
-  /* milestone: a certificate plate built from the member's own record */
-  function frameMilestone(tm) {
-    const S = o.show, wide = W > H, post = !wide && H < 1900, cx = W / 2, m = data;
-    const name = S.handle ? String(o.tag || m.handle || '').trim() : '';
-    const pw = Math.min(W - (wide ? 360 : 110), 1100), statsOn = S.stats && m.stats && m.stats.length;
-    const rows = [64, 92, S.heading ? 112 : 0, name ? 64 + 100 : 0, S.line && m.line ? 56 : 0, 190, statsOn ? 150 : 0, 92];
-    const ph = rows.reduce((a, b) => a + b, 0), sc = Math.min(1, (H - (wide ? 290 : 420)) / ph);
-    const fy = H - (wide ? 100 : post ? 120 : 170);
-    const pTop = Math.max(wide ? 120 : 170, (fy - 60 - ph * sc) / 2 + (wide ? 20 : 30));
-    const rise = 1 - A(tm, 0.15, 1.0);
-    c.save(); c.translate(cx, pTop + 40 * rise); c.scale(sc, sc); c.translate(-cx, 0);
-    const x0 = cx - pw / 2;
-    // the plate: dark glass, hairline frame, orange top edge, gold stitch band
-    c.globalAlpha = A(tm, 0.1, 0.8); c.shadowColor = 'rgba(0,0,0,.55)'; c.shadowBlur = 60;
-    c.beginPath(); if (c.roundRect) c.roundRect(x0, 0, pw, ph, 28); else c.rect(x0, 0, pw, ph);
-    const gl = c.createLinearGradient(0, 0, 0, ph); gl.addColorStop(0, 'rgba(24,25,30,.80)'); gl.addColorStop(1, 'rgba(10,10,13,.86)');
-    c.fillStyle = gl; c.fill(); c.shadowBlur = 0;
-    c.strokeStyle = 'rgba(255,255,255,.16)'; c.lineWidth = 2; c.stroke();
-    c.beginPath(); if (c.roundRect) c.roundRect(x0 + 16, 16, pw - 32, ph - 32, 18); else c.rect(x0 + 16, 16, pw - 32, ph - 32);
-    c.strokeStyle = 'rgba(255,255,255,.06)'; c.stroke();
-    const or = c.createLinearGradient(x0, 0, x0 + pw, 0); or.addColorStop(0, 'rgba(255,90,31,0)'); or.addColorStop(0.5, '#ff5a1f'); or.addColorStop(1, 'rgba(255,90,31,0)');
-    c.fillStyle = or; c.fillRect(x0 + 60, 0, (pw - 120) * A(tm, 0.4, 1.4), 3);
-    stitch(x0 + 70, 64, pw - 140, tm);
-    c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 14;
-    let y = 64 + 70;
-    c.globalAlpha = A(tm, 0.3, 0.9);
-    const kick = '5ABI.FX JOURNAL · ' + (m.kicker || 'MILESTONE');
-    c.font = `700 22px ${TXT}`; if ('letterSpacing' in c) c.letterSpacing = '6px'; const kw = c.measureText(kick).width; if ('letterSpacing' in c) c.letterSpacing = '0px';
-    drawLogo(cx - (kw + 54) / 2, y - 32, 40);
-    text(c, kick, cx - (kw + 54) / 2 + 54, y - 6, { size: 22, w: 700, ls: 6, color: 'rgba(255,255,255,.62)', align: 'left' });
-    y += 22;
-    if (S.heading) { c.globalAlpha = A(tm, 0.45, 1.05); y += 90; text(c, m.heading || '', cx, y, { fam: BIG, size: fit(c, m.heading || '', pw - 120, 76, BIG, 600, -1), w: 600, ls: -1 }); }
-    if (name) {
-      c.globalAlpha = A(tm, 0.6, 1.2); y += 64; text(c, 'THIS RECORD SHOWS THAT', cx, y, { size: 20, w: 700, ls: 6, color: 'rgba(255,255,255,.45)' });
-      y += 92; text(c, name, cx, y, { fam: BIG, size: fit(c, name, pw - 160, 76, BIG, 700), w: 700 });
-    }
-    if (S.line && m.line) { c.globalAlpha = A(tm, 0.8, 1.4); y += 56; text(c, m.line.toUpperCase(), cx, y, { size: fit(c, m.line.toUpperCase(), pw - 120, 22, TXT, 700, 5), w: 700, ls: 5, color: 'rgba(255,255,255,.55)' }); }
-    // the big number, chrome silver, counts up
-    y += 170;
-    const p = expo(seg(tm, 0.7, 2.5)), v = fin(m.big) ? m.big * (p >= 1 ? 1 : p) : null;
-    const bt = m.bigUnit === 'count' ? String(Math.round(v || 0)) + (m.bigSuffix || '') : fmt(v, 'money').replace(/^\+/, m.bigPlus ? '+' : '');
-    const bfull = m.bigUnit === 'count' ? String(m.big) + (m.bigSuffix || '') : fmt(m.big, 'money');
-    const bs = fit(c, bfull, pw - 140, 170, BIG, 700, -4);
-    const silver = c.createLinearGradient(0, y - bs * 0.8, 0, y); silver.addColorStop(0, '#ffffff'); silver.addColorStop(0.5, '#c9ced8'); silver.addColorStop(0.62, '#8e95a3'); silver.addColorStop(1, '#eef1f6');
-    c.globalAlpha = A(tm, 0.6, 1.0); c.save(); c.shadowColor = 'rgba(255,255,255,.25)'; c.shadowBlur = 30; text(c, bt, cx, y, { fam: BIG, size: bs, w: 700, ls: -4, color: silver }); c.restore();
-    const sw = seg(tm, 3.0, 3.9);
-    if (sw > 0 && sw < 1) { const sx = x0 + sw * pw, g = c.createLinearGradient(sx - 120, 0, sx + 120, 0); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,.7)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.save(); c.shadowBlur = 0; text(c, bt, cx, y, { fam: BIG, size: bs, w: 700, ls: -4, color: g }); c.restore(); }
-    // three numbers with thin dividers
-    if (statsOn) {
-      const st = m.stats.slice(0, 3), cw = (pw - 120) / st.length, sy = y + 70;
-      st.forEach(([l, val2], i) => {
-        const px = x0 + 60 + cw * (i + 0.5);
-        c.globalAlpha = A(tm, 2.2 + i * 0.15, 2.7 + i * 0.15);
-        text(c, String(l).toUpperCase(), px, sy, { size: fit(c, String(l).toUpperCase(), cw - 30, 20, TXT, 700, 4), w: 700, ls: 4, color: 'rgba(255,255,255,.45)' });
-        text(c, val2, px, sy + 50, { size: fit(c, String(val2), cw - 30, 36, TXT, 700), w: 700 });
-        if (i) { c.save(); c.shadowBlur = 0; c.fillStyle = 'rgba(255,255,255,.14)'; c.fillRect(x0 + 60 + cw * i - 1, sy - 26, 2, 90); c.restore(); }
-      });
-      y += 150;
-    }
-    // how it was recorded
-    c.globalAlpha = A(tm, 2.6, 3.2);
-    const how = m.synced && S.synced ? 'SYNCED FROM MT5 BY THE JOURNAL EA' : 'RECORDED IN THE 5ABI.FX JOURNAL';
-    c.font = `700 19px ${TXT}`; if ('letterSpacing' in c) c.letterSpacing = '5px'; const hw2 = c.measureText(how).width; if ('letterSpacing' in c) c.letterSpacing = '0px';
-    const tickW = m.synced && S.synced ? 40 : 0, hx = cx - (hw2 + tickW) / 2;
-    if (tickW) syncedTick(hx + 12, y + 40, 13);
-    text(c, how, hx + tickW, y + 47, { size: 19, w: 700, ls: 5, color: 'rgba(255,255,255,.5)', align: 'left' });
-    c.restore();
-    if (S.quote && o.quote) {
-      c.globalAlpha = A(tm, 1.2, 1.9); const q = o.quote.toUpperCase();
-      text(c, q, cx, Math.min(fy - 90, pTop + ph * sc + 80), { size: fit(c, q, W - 220, 26, TXT, 700, 5), w: 700, color: 'rgba(255,255,255,.75)', ls: 5 });
-    }
-    footer(tm, cx, fy, 'center', true);
-  }
-  // a row of small gold diamonds, stitched in one by one (our Phulkari thread)
-  function stitch(x, y, w, tm) {
-    const n = Math.floor(w / 34), g = A(tm, 0.5, 1.8);
-    c.save(); c.shadowBlur = 0;
-    for (let i = 0; i < n; i++) {
-      const k = Math.abs(i - (n - 1) / 2) / ((n - 1) / 2); if (1 - k > g * 1.05) continue;
-      const px = x + (i + 0.5) * w / n, s = i % 3 === 1 ? 7 : 4.5;
-      c.globalAlpha = (0.25 + 0.55 * (1 - k)) * Math.min(1, g * 2); c.fillStyle = i % 3 === 1 ? '#e8b65a' : '#b88a3a';
-      c.beginPath(); c.moveTo(px, y - s); c.lineTo(px + s, y); c.lineTo(px, y + s); c.lineTo(px - s, y); c.closePath(); c.fill();
-    }
-    c.restore();
-  }
+
   const logo = new Image(); logo.src = (window.CineCardLogo || '/logo.png');
   function drawLogo(x, y, w) { if (logo.complete && logo.width) c.drawImage(logo, x, y, w, w * logo.height / logo.width); }
 

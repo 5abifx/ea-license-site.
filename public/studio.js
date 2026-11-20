@@ -76,7 +76,6 @@
       const l = byQ.get(k) || [], g = groupBy(l, (t) => t.c.slice(0, 7));
       return period('QUARTERLY', k.replace(/(\d{4})-(Q\d)/, '$2 $1'), [...g.keys()].sort().map((m) => it(dt(m + '-01').toLocaleString('en-US', { month: 'short', timeZone: 'UTC' }).toUpperCase(), g.get(m))), l, 'Best month');
     },
-    milestone(k) { const m = (D.miles || []).find((x) => x.k === k); return Object.assign({ handle: '' }, m ? m.d : {}); },
     session(k) {
       const [m, s] = k.split('|'), l = (byMonth.get(m) || []).filter((t) => t.sess === s), g = groupBy(l, day);
       return period(s.toUpperCase() + ' SESSION', monthName(m), [...g.keys()].sort().map((d) => it(String(Number(d.slice(8))), g.get(d))), l, 'Best day');
@@ -90,16 +89,15 @@
     session: [...byMonth.keys()].reverse().slice(0, 6).flatMap((m) => [...groupBy(byMonth.get(m), (t) => t.sess).entries()].map(([s, l]) => ({ k: m + '|' + s, at: m, net: agg(l).money, l: `${s} · ${monthName(m)} · ${signed(agg(l).money)}` }))),
     week: [...byWeek.keys()].reverse().slice(0, 26).map((k) => ({ k, at: k, net: agg(byWeek.get(k)).money, l: `Week of ${md(k)} · ${signed(agg(byWeek.get(k)).money)}` })),
     month: [...byMonth.keys()].reverse().slice(0, 12).map((k) => ({ k, at: k, net: agg(byMonth.get(k)).money, l: `${monthName(k)} · ${signed(agg(byMonth.get(k)).money)}` })),
-    milestone: (D.miles || []).slice().sort((a, b) => (a.at < b.at ? 1 : -1)).map((m) => ({ k: m.k, at: m.at, net: 0, l: m.l })),
     quarter: [...byQ.keys()].reverse().slice(0, 4).map((k) => ({ k, at: k, net: agg(byQ.get(k)).money, l: `${k.replace(/(\d{4})-(Q\d)/, '$2 $1')} · ${signed(agg(byQ.get(k)).money)}` })),
   };
   // the default pick: best of the recent past (trades and days: 30 days, weeks: 90), else the latest
   const DEF = {
     trade: OPTS.trade.length ? pickBest(OPTS.trade, since(30)).k : '', day: OPTS.day.length ? pickBest(OPTS.day, since(30)).k : '',
     session: OPTS.session.length ? pickBest(OPTS.session.filter((o) => o.at === OPTS.session[0].at)).k : '',
-    week: OPTS.week.length ? pickBest(OPTS.week, since(90)).k : '', month: OPTS.month[0] ? OPTS.month[0].k : '', milestone: OPTS.milestone[0] ? OPTS.milestone[0].k : '', quarter: OPTS.quarter[0] ? OPTS.quarter[0].k : '',
+    week: OPTS.week.length ? pickBest(OPTS.week, since(90)).k : '', month: OPTS.month[0] ? OPTS.month[0].k : '', quarter: OPTS.quarter[0] ? OPTS.quarter[0].k : '',
   };
-  const NAMES = { trade: ['A trade', 'Best one picked for you'], day: ['A day', ''], session: ['A session', 'London, New York, Asia'], week: ['A week', 'Day by day'], month: ['A month', 'Week by week'], quarter: ['A quarter', 'Month by month'], milestone: ['A milestone', 'Certificate from your record'] };
+  const NAMES = { trade: ['A trade', 'Best one picked for you'], day: ['A day', ''], session: ['A session', 'London, New York, Asia'], week: ['A week', 'Day by day'], month: ['A month', 'Week by week'], quarter: ['A quarter', 'Month by month'] };
 
   // ---------- state ----------
   const A = { card: 'week', pick: {}, unit: store.get('ss.unit') || 'money', art: store.get('ss.art') || 'smoke', grade: store.get('ss.grade') || 'bw', size: store.get('ss.size') || 'story', tag: store.get('ss.tag') ?? D.handle ?? '',
@@ -107,14 +105,18 @@
   Object.keys(DEF).forEach((k) => { A.pick[k] = DEF[k]; });
   if (!DEF.week) A.card = 'trade';
   let show = {}; try { show = JSON.parse(store.get('ss.show') || '{}'); } catch { show = {}; }
-  const kindOf = (c) => (c === 'trade' || c === 'milestone' ? c : 'period');
+  const kindOf = (c) => (c === 'trade' ? 'trade' : 'period');
+  // owner-only extras: members keep the studio exactly as before
+  const OWN = !!D.owner;
+  if (!OWN) { A.quote = ''; A.layout = 'center'; A.len = 8; }
   const dataFor = (c) => build[c](A.pick[c]);
 
-  const cc = window.CineCard.create(pv, dataFor(A.card), { kind: kindOf(A.card), unit: A.unit, art: A.art === 'own' ? 'smoke' : A.art, grade: A.grade, size: A.size, tag: A.tag, quote: A.quote, layout: A.layout, len: A.len, show: show[kindOf(A.card)] });
+  const noTick = (o2) => (OWN ? o2 : Object.assign({}, o2, { synced: false }));
+  const cc = window.CineCard.create(pv, dataFor(A.card), { kind: kindOf(A.card), unit: A.unit, art: A.art === 'own' ? 'smoke' : A.art, grade: A.grade, size: A.size, tag: A.tag, quote: A.quote, layout: A.layout, len: A.len, poster: OWN, show: noTick(show[kindOf(A.card)] || {}) });
   const lineCache = {};
   function load() {
     const d = dataFor(A.card);
-    cc.data(d, kindOf(A.card)); cc.set({ show: show[kindOf(A.card)] || {} }); cc.play();
+    cc.data(d, kindOf(A.card)); cc.set({ show: noTick(show[kindOf(A.card)] || {}) }); cc.play();
     if (A.card === 'trade') {   // the real price line of this trade, from its saved candles
       const id = d._id, put = (x) => { if (A.card === 'trade' && A.pick.trade === String(id)) { cc.data(Object.assign(d, x), 'trade'); cc.play(); } };
       if (lineCache[id]) put(lineCache[id]);
@@ -129,7 +131,7 @@
     month: '<path d="M5 20V10M10 20V4M15 20v-8M20 20v-5"/>', quarter: '<path d="M12 3v9h9A9 9 0 1112 3z"/>',
     money: '<path d="M12 3v18M16 7c-1-1.5-2.5-2-4-2-2.5 0-4 1.3-4 3s1.5 2.5 4 3 4 1.5 4 3.3-1.7 3-4 3c-1.8 0-3.3-.6-4.2-2"/>', pips: '<path d="M4 18h16M6 14l4-4 3 3 5-6"/>', r: '<path d="M5 19V5h6a4 4 0 010 8H5M11 13l6 6"/>', pct: '<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>',
     smoke: '<path d="M4 15c3-2 5 2 8 0s5-2 8 0M4 10c3-2 5 2 8 0s5-2 8 0"/>', ember: '<path d="M12 3c2 4 6 6 6 11a6 6 0 01-12 0c0-3 2-4 3-7 1 2 3 3 3 5"/>', floor: '<path d="M3 20h18M12 9L4 20M12 9l8 11M12 9v11"/>', own: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M21 17l-6-5-9 7"/>',
-    milestone: '<circle cx="12" cy="9" r="6"/><path d="M8.5 14l-1.5 7 5-3 5 3-1.5-7"/>', stock: '<path d="M16 3h5v5M21 3l-7 7M8 21H3v-5M3 21l7-7"/>',
+    stock: '<path d="M16 3h5v5M21 3l-7 7M8 21H3v-5M3 21l7-7"/>',
     center: '<path d="M4 6h16M7 12h10M5 18h14"/>', split: '<path d="M3 6h8M3 12h6M3 18h8"/><path d="M14 16l3-5 2 2 2-5"/>',
     story: '<rect x="7" y="3" width="10" height="18" rx="2"/>', post: '<rect x="5" y="4" width="14" height="16" rx="2"/>', wide: '<rect x="2" y="6" width="20" height="12" rx="2"/>',
   };
@@ -158,11 +160,10 @@
       body = `<div class="ss-chips big" data-key="card">${Object.keys(NAMES).filter((k) => OPTS[k].length).map((k) => chip(k, NAMES[k][0], NAMES[k][1], A.card === k, ic(k))).join('')}</div>
         <p class="ss-sub">WHICH ONE</p><select class="ss-pick" id="pick" aria-label="Which one">${OPTS[A.card].map((x) => `<option value="${esc(x.k)}"${x.k === A.pick[A.card] ? ' selected' : ''}>${esc(x.l)}${x.k === DEF[A.card] ? '  ★' : ''}</option>`).join('')}</select>`;
     }
-    if (s.k === 'Result' && A.card === 'milestone') body = '<p class="ss-hint">A milestone shows its own number, worked out from your journal. Nothing here to pick, just continue.</p>';
-    else if (s.k === 'Result') body = `<div class="ss-chips big" data-key="unit">${[['money', 'Money'], ['pips', 'Pips'], ['r', 'R multiple'], ['pct', 'Percent']].map(([v, l]) => chip(v, l, unitTxt(v), A.unit === v, ic(v))).join('')}</div>`;
+    if (s.k === 'Result') body = `<div class="ss-chips big" data-key="unit">${[['money', 'Money'], ['pips', 'Pips'], ['r', 'R multiple'], ['pct', 'Percent']].map(([v, l]) => chip(v, l, unitTxt(v), A.unit === v, ic(v))).join('')}</div>`;
     if (s.k === 'On the card') {
-      body = `<div class="ss-chips" data-multi>${Object.entries(window.CineCard.fields[o.kind]).map(([k, l]) => chip(k, l, k === 'synced' ? 'Only shows when every trade came from the EA' : '', !!o.show[k])).join('')}</div>
-        <p class="ss-sub">YOUR QUOTE</p><input class="ss-t" id="quote" maxlength="70" value="${esc(A.quote)}" placeholder="e.g. Discipline is the edge" aria-label="Quote">`;
+      body = `<div class="ss-chips" data-multi>${Object.entries(window.CineCard.fields[o.kind]).filter(([k]) => OWN || (k !== 'synced' && k !== 'quote')).map(([k, l]) => chip(k, l, k === 'synced' ? 'Only shows when every trade came from the EA' : '', !!o.show[k])).join('')}</div>
+        ${OWN ? `<p class="ss-sub">YOUR QUOTE</p><input class="ss-t" id="quote" maxlength="70" value="${esc(A.quote)}" placeholder="e.g. Discipline is the edge" aria-label="Quote">` : ''}`;
     }
     if (s.k === 'Look') {
       body = `<div class="ss-chips big" data-key="art">${[['smoke', 'Smoke', 'Soft light, film grain'], ['ember', 'Ember', 'Our orange glow'], ['floor', 'Trading floor', 'Moving grid'], ['own', 'My photo or clip', 'From your device']].concat(D.stock ? [['stock', 'Shuffle a clip', 'Cars, luxury, watches, action']] : []).map(([v, l, h]) => chip(v, l, h, A.art === v, ic(v))).join('')}</div>
@@ -172,14 +173,14 @@
     }
     if (s.k === 'Sign') {
       body = `<input class="ss-t" id="tag" maxlength="24" value="${esc(A.tag)}" placeholder="Your name or @handle" aria-label="Name tag"><div class="ss-tagpv">KATANA<span>×</span><b id="tagpv">${esc(A.tag)}</b></div>
-        <div class="ss-act" style="margin-top:10px"><button type="button" class="ss-ghost" id="avb">${cc.hasAvatar() ? 'Remove my photo' : '+ Add my photo next to the name'}</button></div>
-        <input type="file" id="avf" accept="image/*" hidden>
+        ${OWN ? `<div class="ss-act" style="margin-top:10px"><button type="button" class="ss-ghost" id="avb">${cc.hasAvatar() ? 'Remove my photo' : '+ Add my photo next to the name'}</button></div>
+        <input type="file" id="avf" accept="image/*" hidden>` : ''}
         <p class="ss-sub">SIZE</p><div class="ss-chips big" data-key="size">${[['story', 'Story', '9:16 Reels, Stories'], ['post', 'Post', '4:5 feed'], ['wide', 'Wide', '16:9 X, Discord']].map(([v, l, h]) => chip(v, l, h, A.size === v, ic(v))).join('')}</div>
-        ${A.size === 'wide' && A.card !== 'milestone' ? `<p class="ss-sub">LAYOUT</p><div class="ss-chips" data-key="layout">${chip('center', 'Centred', '', A.layout === 'center', ic('center'))}${chip('split', 'Number left, chart right', '', A.layout === 'split', ic('split'))}</div>` : ''}`;
+        ${OWN && A.size === 'wide' ? `<p class="ss-sub">LAYOUT</p><div class="ss-chips" data-key="layout">${chip('center', 'Centred', '', A.layout === 'center', ic('center'))}${chip('split', 'Number left, chart right', '', A.layout === 'split', ic('split'))}</div>` : ''}`;
     }
     if (s.k === 'Share') {
-      body = `<p class="ss-sub" style="margin-top:0">VIDEO LENGTH</p><div class="ss-chips" data-key="len">${[[8, '8 s', 'Quick'], [12, '12 s', 'Longer hold'], [15, '15 s', 'Full Story']].map(([v, l, h]) => chip(v, l, h, A.len === v)).join('')}</div>
-        <div class="ss-act"><button type="button" class="ss-pill or" id="rec">Make video</button><button type="button" class="ss-pill" id="png">Make HD picture</button></div><p class="ss-note" id="st" role="status"></p>`;
+      body = `${OWN ? `<p class="ss-sub" style="margin-top:0">VIDEO LENGTH</p><div class="ss-chips" data-key="len">${[[8, '8 s', 'Quick'], [12, '12 s', 'Longer hold'], [15, '15 s', 'Full Story']].map(([v, l, h]) => chip(v, l, h, A.len === v)).join('')}</div>` : ''}
+        <div class="ss-act"${OWN ? '' : ' style="margin-top:0"'}><button type="button" class="ss-pill or" id="rec">Make video</button><button type="button" class="ss-pill" id="png">${OWN ? 'Make HD picture' : 'Make picture'}</button></div><p class="ss-note" id="st" role="status"></p>`;
     }
     q.innerHTML = `<p class="ss-k">STEP ${step + 1} OF ${STEPS.length} · ${s.k.toUpperCase()}</p><h2 class="ss-h">${s.h}</h2>${body}<p class="ss-hint">${s.hint}</p>
       <div class="ss-act">${step ? '<button type="button" class="ss-ghost" data-nav="-1">← Back</button>' : ''}${step < STEPS.length - 1 ? '<button type="button" class="ss-pill" data-nav="1">Continue →</button>' : ''}</div>`;
@@ -211,7 +212,7 @@
         .then((x) => { rec.disabled = false; deliver(x.blob, x.ext); })
         .catch((e) => { rec.disabled = false; st.textContent = e.message; });
     };
-    $('png').onclick = () => { if (window.SaveFile) window.SaveFile.clear(st); cc.still(true).then((b) => deliver(b, 'png')); };
+    $('png').onclick = () => { if (window.SaveFile) window.SaveFile.clear(st); cc.still(OWN).then((b) => deliver(b, 'png')); };
   }
 
   $('steps').onclick = (e) => { const b = e.target.closest('[data-step]'); if (b) { step = +b.dataset.step; render(); } };

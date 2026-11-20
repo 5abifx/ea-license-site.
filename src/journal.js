@@ -3,7 +3,6 @@ const crypto = require('crypto');
 const { analyze, propGuard, prep, numbers, score, MIN_TRADES } = require('./insights');
 const insightsView = require('./insights-view');
 const desk = require('./desk');
-const { milestones } = require('./milestones');
 const deskView = require('./desk-view');
 const terminal = require('./terminal');
 const news = require('./news');
@@ -412,13 +411,9 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       id: t.id, s: t.symbol, side: t.side, o: t.open_time, c: t.close_time, net: t.net, r: t.r, pips: num(t.pips), pct: num(t.pct),
       entry: num(t.entry), exit: num(t.exit), lots: num(t.lots), risk: num(t.risk_pct), sess: desk.sessionOf(t, off), m: t.manual ? 1 : 0,
     }));
-    // milestone certificates: from every trade in scope (all time), oldest first
-    const all = db.prepare(`SELECT close_time, net, symbol, manual, account_number, balance_after FROM journal_trades WHERE ${where} AND net IS NOT NULL ORDER BY close_time ASC, id ASC`).all(...args);
-    const accLimits = (sel ? [sel] : liveAccts).map((a) => ({ account_number: a.account_number, limits: limitsOf(db.prepare(`SELECT ${PROP_COLS} FROM accounts WHERE user_id = ? AND account_number = ?`).get(u.id, a.account_number) || {}) }));
-    const cs = { USD: '$', EUR: '€', GBP: '£', JPY: '¥', AUD: 'A$', CAD: 'C$', NZD: 'N$', CHF: 'Fr ', INR: '₹' }[cur] || '$';
-    const mny = (v) => `${v < 0 ? '−' : '+'}${cs}${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const miles = milestones(all, accLimits, mny);
-    const json = JSON.stringify({ trades, miles, stock: stock.enabled(), cur, handle: u.card_handle || u.name || '' }).replace(/</g, '\\u003c');
+    // owner-only extras (clip studio): Shuffle clips, quote, photo, layout, length
+    const owner = !!u.is_admin;
+    const json = JSON.stringify({ trades, owner, stock: owner && stock.enabled(), cur, handle: u.card_handle || u.name || '' }).replace(/</g, '\\u003c');
     const acctOpts = [...(liveAccts.length > 1 ? [['', 'All accounts']] : []), ...liveAccts.map((a) => [a.account_number, `Account ••${String(a.account_number).slice(-2)}`])];
     page(req, res, 'Share Studio', `
     <link rel="stylesheet" href="/studio.css">
