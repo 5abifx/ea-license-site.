@@ -1,9 +1,9 @@
 /* Public profile page 5abifx.com/@name: dark liquid glass */
-:root { --bg: #050507; --edge: rgba(255,255,255,.10); --text: #f2f2f4; --muted: #8a8a94; --teal: #26c6a0; --red: #f0464b; color-scheme: dark; }
+:root { --bg: #050507; --edge: rgba(255,255,255,.10); --text: #f2f2f4; --muted: #8a8a94; --teal: var(--ok); --red: var(--danger); color-scheme: dark; }
 * { box-sizing: border-box; }
 body.pf { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 'Manrope', system-ui, sans-serif; overflow-x: hidden; }
 body.pf::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: -1;
-  background: radial-gradient(600px 380px at 10% 6%, rgba(255,90,31,.10), transparent 70%), radial-gradient(520px 420px at 95% 40%, rgba(38,198,160,.07), transparent 70%); }
+  background: radial-gradient(600px 380px at 10% 6%, rgba(255,90,31,.10), transparent 70%), radial-gradient(520px 420px at 95% 40%, rgba(var(--ok-rgb), .07), transparent 70%); }
 .pf a { color: inherit; }
 .pf-top { max-width: 1040px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 18px max(16px, env(safe-area-inset-left)); }
 .pf-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: 'Sora', sans-serif; font-weight: 600; letter-spacing: .02em; }
@@ -14,7 +14,7 @@ body.pf::before { content: ""; position: fixed; inset: 0; pointer-events: none; 
 .pf-glass { border: 1px solid var(--edge); border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.025));
   box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 30px 60px -30px rgba(0,0,0,.8); backdrop-filter: blur(22px) saturate(140%); -webkit-backdrop-filter: blur(22px) saturate(140%); }
 .pf-cover { height: 170px; border-radius: 24px; overflow: hidden; position: relative; border: 1px solid rgba(255,255,255,.06);
-  background: radial-gradient(420px 170px at 18% 120%, rgba(255,90,31,.55), transparent 70%), radial-gradient(520px 210px at 85% -20%, rgba(38,198,160,.35), transparent 70%), linear-gradient(120deg, #121216, #0a0a0d); }
+  background: radial-gradient(420px 170px at 18% 120%, rgba(255,90,31,.55), transparent 70%), radial-gradient(520px 210px at 85% -20%, rgba(var(--ok-rgb), .35), transparent 70%), linear-gradient(120deg, #121216, #0a0a0d); }
 .pf-cover canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .pf-who { display: flex; gap: 18px; align-items: flex-end; margin: -48px 20px 0; position: relative; }
 .pf-av { width: 100px; height: 100px; flex: none; border-radius: 50%; border: 3px solid var(--bg); background: linear-gradient(140deg, #2b2b33, #141418); display: grid; place-items: center;

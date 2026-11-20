@@ -81,7 +81,7 @@
 .tr-amb{position:absolute;inset:0;overflow:hidden;pointer-events:none}
 .tr-amb i{position:absolute;border-radius:50%;filter:blur(90px);animation:tr-drift 22s ease-in-out infinite alternate}
 .tr-amb i:nth-child(1){width:560px;height:560px;background:#ff5a1f;left:8vw;top:30vh;opacity:.07}
-.tr-amb i:nth-child(2){width:440px;height:440px;background:#26c6a0;left:62vw;top:6vh;opacity:.05;animation-duration:28s}
+.tr-amb i:nth-child(2){width:440px;height:440px;background:var(--ok);left:62vw;top:6vh;opacity:.05;animation-duration:28s}
 .tr-amb i:nth-child(3){width:380px;height:380px;background:#8a8aa8;left:40vw;top:70vh;opacity:.06;animation-duration:34s}
 @keyframes tr-drift{to{transform:translate(90px,-70px) scale(1.18)}}
 .tr-scrim.clear .tr-amb{display:none}

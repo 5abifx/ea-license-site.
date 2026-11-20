@@ -158,8 +158,8 @@ function sessionClock(T, shift) {
   // the 48 tiles
   T.halves.forEach((h) => {
     const k = Math.abs(h.net) / mx, col = !h.n ? 'rgba(255,255,255,.045)'
-      : h.net >= 0 ? `rgba(38,198,160,${(0.2 + 0.8 * k).toFixed(2)})` : `rgba(240,70,75,${(0.28 + 0.72 * k).toFixed(2)})`;
-    s += `<path data-s="${sessOf(h.from)}" class="ck-t" data-m="${h.from}" d="${arc(h.from + 1.6, h.from + 28.4, RR)}" stroke="${col}" stroke-width="${RW}" fill="none"${h.n && k > 0.6 && h.net > 0 ? ' filter="url(#ckglow2)"' : ''}><title>${hhmm(h.from)}–${hhmm(h.from + 30)} · ${h.n} trades</title></path>`;
+      : h.net >= 0 ? `rgba(var(--ok-rgb),${(0.2 + 0.8 * k).toFixed(2)})` : `rgba(var(--danger-rgb),${(0.28 + 0.72 * k).toFixed(2)})`;
+    s += `<path data-s="${sessOf(h.from)}" class="ck-t" data-m="${h.from}" d="${arc(h.from + 1.6, h.from + 28.4, RR)}" style="stroke:${col}" stroke-width="${RW}" fill="none"${h.n && k > 0.6 && h.net > 0 ? ' filter="url(#ckglow2)"' : ''}><title>${hhmm(h.from)}–${hhmm(h.from + 30)} · ${h.n} trades</title></path>`;
   });
   // fine ticks just outside the ring, hour labels inside
   for (let i = 0; i < 24; i++) { const big = i % 6 === 0, [x1, y1] = P(i * 60, RR + RW / 2 + 3), [x2, y2] = P(i * 60, RR + RW / 2 + (big ? 9 : 6));
@@ -189,7 +189,7 @@ function spark(pts) {
   const W = 140, H = 34, lo = Math.min(0, ...pts), hi = Math.max(0, ...pts), sp = hi - lo || 1;
   const pt = (v, i) => `${((i / (pts.length - 1)) * W).toFixed(1)} ${(H - ((v - lo) / sp) * H).toFixed(1)}`;
   const d = pts.map((v, i) => `${i ? 'L' : 'M'}${pt(v, i)}`).join(' '), col = pts.at(-1) >= 0 ? 'var(--ok)' : 'var(--danger)';
-  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${d} L${W} ${H} L0 ${H} Z" fill="${col}" fill-opacity=".1"/><path d="${d}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${d} L${W} ${H} L0 ${H} Z" fill="${col}" fill-opacity=".1"/><path d="${d}" fill="none" style="stroke:${col}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
 }
 function timeHtml(T, { money, offsetForm, tzName, shift = 0, data = '', candle = null, nyOff = 7 }) {
   if (!T.ranked.length) return '<section class="card"><p class="muted">No trades in this period.</p></section>';
@@ -197,7 +197,7 @@ function timeHtml(T, { money, offsetForm, tzName, shift = 0, data = '', candle =
   const rows = T.rows.filter((r, i) => i < 5 || r.n);
   const heat = `<div class="hw" style="--cols:24">
     <span></span>${Array.from({ length: 24 }, (_, h) => `<span class="hw-h">${h % 3 ? '' : String(h).padStart(2, '0')}</span>`).join('')}<span class="hw-h">Total</span>
-    ${rows.map((r) => `<span class="hw-d">${DOW[r.dow]}</span>${r.cells.map((c, h) => `<i data-d="${r.dow}" data-h="${h}"${c.n ? ' tabindex="0" role="button"' : ''} title="${DOW[r.dow]} ${String(h).padStart(2, '0')}:00 · ${c.n} trades${c.n ? ' · ' + money(c.net) : ''}" style="${c.n ? `background:${c.net >= 0 ? 'rgba(38,198,160,' : 'rgba(240,70,75,'}${(0.18 + 0.72 * Math.min(1, Math.abs(c.net) / mx)).toFixed(2)})` : ''}"></i>`).join('')}<b class="${cls(r.total)}">${r.n ? short(r.total) : '-'}</b>`).join('')}
+    ${rows.map((r) => `<span class="hw-d">${DOW[r.dow]}</span>${r.cells.map((c, h) => `<i data-d="${r.dow}" data-h="${h}"${c.n ? ' tabindex="0" role="button"' : ''} title="${DOW[r.dow]} ${String(h).padStart(2, '0')}:00 · ${c.n} trades${c.n ? ' · ' + money(c.net) : ''}" style="${c.n ? `background:${c.net >= 0 ? 'rgba(var(--ok-rgb),' : 'rgba(var(--danger-rgb),'}${(0.18 + 0.72 * Math.min(1, Math.abs(c.net) / mx)).toFixed(2)})` : ''}"></i>`).join('')}<b class="${cls(r.total)}">${r.n ? short(r.total) : '-'}</b>`).join('')}
   </div>`;
   const top = T.ranked[0];
   return `<div class="tm-top">
@@ -243,8 +243,8 @@ function candleWheel(D, money) {
     <circle cx="${C}" cy="${C}" r="${RR - RW / 2 - 4}" fill="url(#${id}bg)"/>`;
   D.cells.forEach((h) => {
     const k = Math.abs(h.net) / mx, col = !h.n ? 'rgba(255,255,255,.045)'
-      : h.net >= 0 ? `rgba(38,198,160,${(0.2 + 0.8 * k).toFixed(2)})` : `rgba(240,70,75,${(0.28 + 0.72 * k).toFixed(2)})`;
-    s += `<path class="ck-t" data-z="${partOf(h.from)}" d="${arc(h.from + pad, h.from + D.step - pad, RR)}" stroke="${col}" stroke-width="${RW}" fill="none"${h.n && k > 0.6 && h.net > 0 ? ` filter="url(#${id}g2)"` : ''}><title>${mm(h.from)}${D.step > 1 ? '–' + mm(h.from + D.step) : ''} · ${h.n} trade${h.n === 1 ? '' : 's'}${h.n ? ' · ' + money(h.net) : ''}</title></path>`;
+      : h.net >= 0 ? `rgba(var(--ok-rgb),${(0.2 + 0.8 * k).toFixed(2)})` : `rgba(var(--danger-rgb),${(0.28 + 0.72 * k).toFixed(2)})`;
+    s += `<path class="ck-t" data-z="${partOf(h.from)}" d="${arc(h.from + pad, h.from + D.step - pad, RR)}" style="stroke:${col}" stroke-width="${RW}" fill="none"${h.n && k > 0.6 && h.net > 0 ? ` filter="url(#${id}g2)"` : ''}><title>${mm(h.from)}${D.step > 1 ? '–' + mm(h.from + D.step) : ''} · ${h.n} trade${h.n === 1 ? '' : 's'}${h.n ? ' · ' + money(h.net) : ''}</title></path>`;
   });
   for (let i = 0; i < 60; i++) { const m = (i * tf) / 60, big = i % 15 === 0, [x1, y1] = P(m, RR + RW / 2 + 3), [x2, y2] = P(m, RR + RW / 2 + (big ? 9 : i % 5 ? 5 : 7));
     s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(255,255,255,${big ? 0.45 : 0.16})" stroke-width="1"/>`; }

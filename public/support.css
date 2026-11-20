@@ -18,7 +18,7 @@
 .sup.open .sup-btn{background:#1b1b21;color:var(--s-fg);box-shadow:0 10px 30px -8px rgba(0,0,0,.8);border:1px solid var(--s-line)}
 .sup.open .sup-o,.sup.open .sup-btn em{display:none}
 .sup.open .sup-x{display:grid}
-.sup-btn::after{content:"";position:absolute;top:8px;right:9px;width:9px;height:9px;border-radius:50%;background:#26c6a0;border:2px solid var(--s-or)}
+.sup-btn::after{content:"";position:absolute;top:8px;right:9px;width:9px;height:9px;border-radius:50%;background:var(--ok);border:2px solid var(--s-or)}
 .sup.open .sup-btn::after,.sup.seen .sup-btn::after{display:none}
 
 .sup-panel{position:absolute;right:0;bottom:70px;width:320px;max-width:calc(100vw - 36px);max-height:calc(100vh - 110px);overflow:auto;

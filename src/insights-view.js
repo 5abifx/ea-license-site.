@@ -75,10 +75,10 @@ function equityChart(eq, money) {
     ${y(0) - y(hi) > 14 ? `<text x="${L - 6}" y="${y(hi) + 4}" text-anchor="end">${short(hi)}</text>` : ''}
     <text x="${L - 6}" y="${y(0) + 4}" text-anchor="end">0</text>
     ${lo < 0 && y(lo) - y(0) > 14 ? `<text x="${L - 6}" y="${y(lo) + 4}" text-anchor="end">${short(lo)}</text>` : ''}
-    <path d="${line} L${x(eq.length - 1)} ${y(0)} L${x(0)} ${y(0)} Z" fill="${up ? 'rgba(38,198,160,.12)' : 'rgba(240,70,75,.12)'}"/>
+    <path d="${line} L${x(eq.length - 1)} ${y(0)} L${x(0)} ${y(0)} Z" style="fill:${up ? 'rgba(var(--ok-rgb),.12)' : 'rgba(var(--danger-rgb),.12)'}"/>
     <path d="${line}" fill="none" stroke="${up ? 'var(--ok)' : 'var(--danger)'}" stroke-width="2" stroke-linejoin="round"/>
     <circle cx="${x(eq.length - 1)}" cy="${y(last.eq)}" r="4" fill="${up ? 'var(--ok)' : 'var(--danger)'}"/>
-    <path d="M${L} ${H + G} ${dd} L${W - R} ${H + G} Z" fill="rgba(240,70,75,.25)"/>
+    <path d="M${L} ${H + G} ${dd} L${W - R} ${H + G} Z" style="fill:rgba(var(--danger-rgb),.25)"/>
     <line x1="${L}" x2="${W - R}" y1="${H + G}" y2="${H + G}" stroke="var(--line)"/>
     <text x="${L - 6}" y="${H + G + 4}" text-anchor="end">DD</text>
     <text x="${L - 6}" y="${H + G + DH + 4}" text-anchor="end">${short(-mdd)}</text>
@@ -87,7 +87,7 @@ function equityChart(eq, money) {
 
 function heatmap(heat) {
   const mx = Math.max(1, ...heat.flatMap((r) => r.cells.map((c) => Math.abs(c.net))));
-  const bg = (c) => (!c.n ? 'var(--card-2)' : c.net >= 0 ? `rgba(38,198,160,${(0.12 + 0.5 * c.net / mx).toFixed(2)})` : `rgba(240,70,75,${(0.12 + 0.5 * -c.net / mx).toFixed(2)})`);
+  const bg = (c) => (!c.n ? 'var(--card-2)' : c.net >= 0 ? `rgba(var(--ok-rgb),${(0.12 + 0.5 * c.net / mx).toFixed(2)})` : `rgba(var(--danger-rgb),${(0.12 + 0.5 * -c.net / mx).toFixed(2)})`);
   return `<div class="heat" role="table" aria-label="Net profit by session and weekday">
     <span></span>${['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((d) => `<span>${d}</span>`).join('')}
     ${heat.map((r) => `<span>${esc(r.name)}</span>${r.cells.map((c) => `<b style="background:${bg(c)}" title="${c.n} trades">${c.n ? short(c.net) : '·'}</b>`).join('')}`).join('')}
@@ -114,7 +114,7 @@ function edgeMap(e) {
   const above = e.win >= 1 / (1 + e.ratio);
   const dx = x(e.ratio), dy = y(e.win);
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Win rate ${Math.round(e.win * 100)}% and win to loss ratio ${e.ratio.toFixed(2)}, ${above ? 'above' : 'below'} the break-even line">
-    <path d="${curve} L${W - R} ${T} L${pts[0][0]} ${T} Z" fill="rgba(38,198,160,.07)"/>
+    <path d="${curve} L${W - R} ${T} L${pts[0][0]} ${T} Z" style="fill:rgba(var(--ok-rgb),.07)"/>
     <line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="var(--line)"/><line x1="${L}" x2="${L}" y1="${T}" y2="${H - B}" stroke="var(--line)"/>
     <path d="${curve}" fill="none" stroke="var(--muted)" stroke-dasharray="4 4"/>
     ${[0.2, 0.4, 0.6, 0.8].map((w) => `<text x="${L - 6}" y="${y(w) + 4}" text-anchor="end">${w * 100}%</text>`).join('')}

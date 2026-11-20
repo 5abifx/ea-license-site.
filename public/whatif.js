@@ -70,7 +70,7 @@
     return `<svg class="wi-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Equity curve, real and what-if">
       <line x1="${L}" x2="${W - Rr}" y1="${Y(0)}" y2="${Y(0)}" stroke="rgba(255,255,255,.08)" vector-effect="non-scaling-stroke"/>
       <path d="${path(BASE.curve)}" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
-      ${R.curve.length ? `<path d="${path(R.curve)} L${X(R.curve.at(-1)[0]).toFixed(1)} ${Y(0)} Z" fill="${up ? 'rgba(38,198,160,.10)' : 'rgba(240,70,75,.10)'}"/>
+      ${R.curve.length ? `<path d="${path(R.curve)} L${X(R.curve.at(-1)[0]).toFixed(1)} ${Y(0)} Z" style="fill:${up ? 'rgba(var(--ok-rgb),.10)' : 'rgba(var(--danger-rgb),.10)'}"/>
       <path d="${path(R.curve)}" fill="none" stroke="${up ? 'var(--ok)' : 'var(--danger)'}" stroke-width="2.2" vector-effect="non-scaling-stroke"/>` : ''}
       <line class="wi-x" x1="0" x2="0" y1="${T - 6}" y2="${H}" stroke="rgba(255,255,255,.25)" vector-effect="non-scaling-stroke" hidden/>
     </svg><div class="wi-tip" hidden></div>`;

@@ -1,4 +1,5 @@
 // Appearance: each member picks their own members-area background, panel tint and accent colour.
+const express = require('express');
 // Saved on the account (users.look, small JSON) so it follows them to every device. An uploaded photo or clip
 // stays on the device it was picked on (browser storage); other devices fall back to Ember.
 // Client: public/look.js (draws the background, measures it, recolours text/panels) + public/look-picker.js.
@@ -113,6 +114,25 @@ module.exports = function setup(app, { db, page, requireUser }) {
     db.prepare('UPDATE users SET look = ? WHERE id = ?').run(JSON.stringify(look), req.user.id);
     res.json({ ok: true, look });
   });
+
+  // Accessibility (public/a11y.js): colour-safe P&L colours, bigger text, contrast, glass cursor. Saved per account.
+  if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'a11y')) db.exec("ALTER TABLE users ADD COLUMN a11y TEXT NOT NULL DEFAULT ''");
+  app.post('/api/a11y', requireUser, express.json({ limit: '2kb' }), (req, res) => {
+    const a = a11yClean(req.body);
+    db.prepare('UPDATE users SET a11y = ? WHERE id = ?').run(JSON.stringify(a), req.user.id);
+    res.json({ ok: true, a11y: a });
+  });
 };
+function a11yClean(raw) {
+  let o = {};
+  try { o = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {}); } catch (e) { o = {}; }
+  return { cb: ['off', 'rg', 'by', 'mono'].includes(o.cb) ? o.cb : 'off', big: !!o.big, hc: !!o.hc, cur: !!o.cur };
+}
+// <head> tags for every page: the saved choice (signed in) + the engine, so it applies before the page paints
+function a11yHead(u) {
+  const json = u ? JSON.stringify(u.a11y ? a11yClean(u.a11y) : {}).replace(/</g, '\\u003c') : '';
+  return `<link rel="stylesheet" href="/a11y.css">${u ? `<script>window.__A11Y=${json}</script>` : ''}<script src="/a11y.js"></script>`;
+}
+module.exports.a11yHead = a11yHead;
 module.exports.tags = tags;
 module.exports.clean = clean;

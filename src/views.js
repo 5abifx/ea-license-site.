@@ -45,6 +45,7 @@ const ICONS = {
   cap: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5M22 9v6"/>',
   star: '<path d="M12 3l2.5 6 6.5.5-5 4 1.5 6.5L12 16l-5.5 4 1.5-6.5-5-4 6.5-.5z"/>',
   tour: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
+  a11y: '<circle cx="12" cy="4.5" r="1.8"/><path d="M5 8.5l7 1.5 7-1.5M12 10v4.5M12 14.5l-3.2 6M12 14.5l3.2 6"/>',
 };
 const icon = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
 
@@ -102,6 +103,7 @@ ${require('./seo').headTags(req, opts)}
 <link rel="stylesheet" href="/style.css">
 ${u && !opts.wide ? '<link rel="stylesheet" href="/look.css"><link rel="stylesheet" href="/topbar.css"><link rel="stylesheet" href="/compact.css"><link rel="stylesheet" href="/dock.css">' : ''}
 <link rel="stylesheet" href="/guards.css">
+${require('./look').a11yHead(u)}
 </head><body>
 ${u && !opts.wide ? appShell(req, u, flashHtml, body, title) : `<header><div class="wrap bar"><a class="brand" href="/">${brandMark()}${pill}</a><button type="button" class="menu-btn" data-menu aria-controls="site-nav" aria-expanded="false" aria-label="Menu"><i></i><i></i><i></i></button><nav id="site-nav">${nav}</nav></div></header>
 ${opts.wide
@@ -145,7 +147,8 @@ function appShell(req, u, flashHtml, body, title) {
       ${tile('/pricing', 'plans', 'Plans', 'Your plan and billing', on('/pricing'))}
       ${tile('/profile', 'user', 'My page', 'Your public trader page', on('/profile'))}
       ${tile('/affiliate', 'gift', 'Affiliate', 'Share and earn', on('/affiliate'))}
-      ${u.google_sub ? '' : tile('/password', 'lock', 'Password', 'Change your password', on('/password'))}`;
+      ${u.google_sub ? '' : tile('/password', 'lock', 'Password', 'Change your password', on('/password'))}
+      <a class="tb-tile" href="#accessibility" data-a11y-open>${cap('a11y')}<b>Accessibility</b><small>Colour-blind colours, text, cursor</small></a>`;
   const helpTiles = `<a class="tb-tile" href="/?install=1" data-install style="display:none">${cap('app')}<b>Get the app</b><small>Add 5ABI.FX to your phone</small></a>
       <a class="tb-tile${on('/whats-new') ? ' on' : ''}" href="/whats-new" data-wn-open>${cap('star', wnNew)}<b>What's new</b><small>${wnNew ? `${wnNew} new for you` : 'Latest updates'}</small></a>
       ${tile('/faq', 'help', 'Help &amp; FAQ', 'Answers and guides', on('/faq'))}
