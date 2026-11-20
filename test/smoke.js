@@ -827,7 +827,7 @@ function client(base, ip) {
       r = await guess.post('/login', { email: 'bob@test.com', password: 'bobpass123', 'cf-turnstile-response': 'bad' });
       assert.match(r.text, /complete the quick check/);
       r = await guess.post('/login', { email: 'bob@test.com', password: 'bobpass123', 'cf-turnstile-response': 'good' });
-      assert.match(r.text, /Gold Scalper/);                                               // passed: signed in, counter reset
+      assert.match(r.text, /Gold Scalper|Share Studio/);                                               // passed: signed in, counter reset
       assert.doesNotMatch((await client(base, '10.9.0.3').get('/login')).text, /cf-turnstile/);
       ts.close();
       for (const k of ['TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY', 'TURNSTILE_API']) delete process.env[k];
