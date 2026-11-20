@@ -101,7 +101,7 @@
 
   // ---------- state ----------
   const A = { card: 'week', pick: {}, unit: store.get('ss.unit') || 'money', art: store.get('ss.art') || 'smoke', grade: store.get('ss.grade') || 'bw', size: store.get('ss.size') || 'story', tag: store.get('ss.tag') ?? D.handle ?? '',
-    quote: store.get('ss.quote') || '', layout: store.get('ss.layout') || 'center', len: Number(store.get('ss.len')) || 8, topic: 'luxury' };
+    quote: store.get('ss.quote') || '', layout: store.get('ss.layout') || 'center', len: Number(store.get('ss.len')) || 8, topic: 'racing' };
   Object.keys(DEF).forEach((k) => { A.pick[k] = DEF[k]; });
   if (!DEF.week) A.card = 'trade';
   let show = {}; try { show = JSON.parse(store.get('ss.show') || '{}'); } catch { show = {}; }
@@ -166,8 +166,8 @@
         ${OWN ? `<p class="ss-sub">YOUR QUOTE</p><input class="ss-t" id="quote" maxlength="70" value="${esc(A.quote)}" placeholder="e.g. Discipline is the edge" aria-label="Quote">` : ''}`;
     }
     if (s.k === 'Look') {
-      body = `<div class="ss-chips big" data-key="art">${[['smoke', 'Smoke', 'Soft light, film grain'], ['ember', 'Ember', 'Our orange glow'], ['floor', 'Trading floor', 'Moving grid'], ['own', 'My photo or clip', 'From your device']].concat(D.stock ? [['stock', 'Shuffle a clip', 'Cars, luxury, watches, action']] : []).map(([v, l, h]) => chip(v, l, h, A.art === v, ic(v))).join('')}</div>
-        ${D.stock && A.art === 'stock' ? `<p class="ss-sub">SHUFFLE FROM</p><div class="ss-chips" data-key="topic">${[['cars', 'Cars'], ['luxury', 'Luxury'], ['watches', 'Watches'], ['city', 'City at night'], ['action', 'Action'], ['nature', 'Moody nature']].map(([v, l]) => chip(v, l, '', A.topic === v)).join('')}</div><p class="ss-note" id="credit"></p>` : ''}
+      body = `<div class="ss-chips big" data-key="art">${[['smoke', 'Smoke', 'Soft light, film grain'], ['ember', 'Ember', 'Our orange glow'], ['floor', 'Trading floor', 'Moving grid'], ['own', 'My photo or clip', 'From your device']].concat(D.stock ? [['stock', 'Shuffle a clip', 'Racing, dark, war, beasts']] : []).map(([v, l, h]) => chip(v, l, h, A.art === v, ic(v))).join('')}</div>
+        ${D.stock && A.art === 'stock' ? `<p class="ss-sub">SHUFFLE FROM</p><div class="ss-chips" data-key="topic">${[['racing', 'Racing & burnouts'], ['dark', 'Dark city'], ['war', 'War'], ['beast', 'Beasts'], ['fight', 'Fight'], ['supercars', 'Supercars'], ['money', 'Money'], ['watches', 'Watches'], ['fire', 'Fire & storm']].map(([v, l]) => chip(v, l, '', A.topic === v)).join('')}</div><p class="ss-note" id="credit"></p>` : ''}
         <p class="ss-sub">COLOUR</p><div class="ss-chips" data-key="grade">${Object.entries(window.CineCard.grades).map(([v, l]) => chip(v, l, '', A.grade === v, `<i class="ss-sw" style="background:${{ natural: 'linear-gradient(135deg,#6a8,#c84)', bw: 'linear-gradient(135deg,#fff,#222)', ember: '#ff6a2a', blood: '#c3141d', teal: '#13a88a', gold: '#d9a441' }[v] || '#888'}"></i>`)).join('')}</div>
         <p class="ss-sub">NUMBER</p><div class="ss-chips" data-key="color">${chip('', 'White', '', !o.color)}${chip('1', 'Green and silver', '', !!o.color)}</div>`;
     }
