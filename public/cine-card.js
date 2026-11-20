@@ -174,7 +174,36 @@ function create(canvas, data, opts) {
       }
     }
     // price line with entry / exit tags (trade) or day bars (period)
-    const chartTop = top + 80, chartH = wide ? 300 : post ? 330 : 520, chartW = Math.min(W - 160, wide ? 1200 : 900), x0 = cx - chartW / 2;
+    const hasChart = (o.kind === 'trade' && S.line && data.closes && data.closes.length > 3) || (o.kind === 'period' && S.bars && data.items && data.items.length);
+    // detail rows (only the ones switched on)
+    const rows = o.kind === 'trade'
+      ? [['entry', 'Entry', data.entry], ['exit', 'Exit', data.exit], ['size', 'Size', data.sizeTxt], ['held', 'Held', data.heldTxt], ['risk', 'Risk', data.riskTxt]]
+      : [['trades', 'Trades', data.trades], ['winrate', 'Win rate', data.winRate], ['green', 'Green days', data.green], ['best', o.kind === 'period' && data.bestLabel ? data.bestLabel : 'Best', data.best]];
+    const on = rows.filter(r => S[r[0]] && r[2] !== undefined && r[2] !== null && r[2] !== '');
+    // story keeps the receipt list; post and wide show the stats as an even grid of columns
+    const grid = wide || post, perRow = !grid ? 1 : on.length <= (wide ? 5 : 4) ? on.length : Math.ceil(on.length / 2);
+    const gridRows = grid && on.length ? Math.ceil(on.length / perRow) : 0, ROWH = 112;
+    const statsH = !on.length ? 0 : grid ? (wide ? 50 : 60) + gridRows * ROWH : 90 + (on.length - 1) * 62 + 14;
+    // footer position, and the lowest line content may reach without touching it
+    const fy = H - (wide ? 110 : 170), limit = fy - 30 - (wide ? 40 : 50);
+    // the result size; it shrinks only if nothing else is left to give
+    const full = fmt(total, unit);
+    let ns = fit(c, full, W - (wide ? 400 : 140), wide ? 190 : post ? 170 : 200, BIG, 700, -6);
+    const quoteH = S.quote && o.quote ? 40 : 0;
+    const altOn = S.alt && ['money', 'pips', 'r', 'pct'].filter(u => u !== unit).some(u => fin(o.kind === 'trade' ? val(data, u) : val(data.total, u)));
+    const altH = altOn ? 50 : 0, gapAfter = o.kind === 'period' ? (grid ? 110 : 130) : 90;
+    const tail = () => quoteH + ns * 0.92 + altH + statsH + (altOn ? 30 : 0);
+    const chartTop = top + 80, chartDef = wide ? 300 : post ? 330 : 520;
+    let chartH = chartDef;
+    if (hasChart) {
+      chartH = Math.max(150, Math.min(chartDef, limit - chartTop - gapAfter - tail()));
+      const over = chartTop + chartH + gapAfter + tail() - limit;
+      if (over > 0) ns = Math.max(90, ns - over / 0.92);
+    } else {
+      const over = top + 120 + tail() - limit;
+      if (over > 0) ns = Math.max(90, ns - over / 0.92);
+    }
+    const chartW = Math.min(W - 160, wide ? 1200 : 900), x0 = cx - chartW / 2;
     if (o.kind === 'trade' && S.line && data.closes && data.closes.length > 3) {
       const k = data.closes, lo = Math.min(...k), hi = Math.max(...k), n = k.length, pr = ease(seg(tm, 0.3, 2.6));
       const X = i => x0 + i / (n - 1) * chartW, Y = v => chartTop + (hi - v) / (hi - lo || 1) * chartH;
@@ -199,9 +228,8 @@ function create(canvas, data, opts) {
         c.globalAlpha = A(tm, 0.4, 0.8); text(c, x.label, px, chartTop + chartH + 44, { size: fit(c, x.label, slot - 8, 24, TXT, 600, 3), w: 600, color: 'rgba(255,255,255,.55)', ls: 3 });
       });
     }
-    const hasChart = (o.kind === 'trade' && S.line && data.closes && data.closes.length > 3) || (o.kind === 'period' && S.bars && data.items && data.items.length);
     // quote
-    let y = hasChart ? chartTop + chartH + (o.kind === 'period' ? 130 : 90) : (wide ? H * 0.42 : H * 0.44);
+    let y = hasChart ? chartTop + chartH + gapAfter : Math.max(top + 120, Math.min(wide ? H * 0.42 : H * 0.44, limit - tail()));
     if (S.quote && o.quote) {
       c.globalAlpha = A(tm, 1.2, 1.9);
       const q = o.quote.toUpperCase();
@@ -209,8 +237,7 @@ function create(canvas, data, opts) {
       y += 40;
     }
     // the result, big and white, counts up
-    const p = expo(seg(tm, 0.6, 2.4)), full = fmt(total, unit), tx = fmt(fin(total) ? total * (p >= 1 ? 1 : p) : null, unit);
-    const ns = fit(c, full, W - (wide ? 400 : 140), wide ? 190 : post ? 170 : 200, BIG, 700, -6);
+    const p = expo(seg(tm, 0.6, 2.4)), tx = fmt(fin(total) ? total * (p >= 1 ? 1 : p) : null, unit);
     y += ns * 0.92;
     c.globalAlpha = A(tm, 0.5, 0.9);
     c.save(); c.shadowColor = 'rgba(255,255,255,.35)'; c.shadowBlur = 40; text(c, tx, cx, y, { fam: BIG, w: 700, size: ns, color: numCol, ls: -6 }); c.restore();
@@ -222,24 +249,32 @@ function create(canvas, data, opts) {
       const u2 = ['money', 'pips', 'r', 'pct'].filter(u => u !== unit).find(u => fin(o.kind === 'trade' ? val(data, u) : val(data.total, u)));
       if (fin(alt)) { c.globalAlpha = A(tm, 2.2, 2.8); text(c, fmt(alt, u2), cx, y + 62, { size: 36, w: 600, color: 'rgba(255,255,255,.8)' }); y += 50; }
     }
-    // detail rows: label left, value right, centred block (like a receipt)
-    const rows = o.kind === 'trade'
-      ? [['entry', 'Entry', data.entry], ['exit', 'Exit', data.exit], ['size', 'Size', data.sizeTxt], ['held', 'Held', data.heldTxt], ['risk', 'Risk', data.riskTxt]]
-      : [['trades', 'Trades', data.trades], ['winrate', 'Win rate', data.winRate], ['green', 'Green days', data.green], ['best', o.kind === 'period' && data.bestLabel ? data.bestLabel : 'Best', data.best]];
-    const on = rows.filter(r => S[r[0]] && r[2] !== undefined && r[2] !== null && r[2] !== '');
-    if (on.length) {
-      let ry = y + (wide ? 70 : 90);
-      const lw = wide ? 300 : 360;
+    if (on.length && !grid) {
+      // story: receipt list, label left, value right
+      let ry = y + 90;
+      const lw = 360;
       on.forEach(([, l, v], i) => {
         c.globalAlpha = A(tm, 2.4 + i * 0.15, 2.9 + i * 0.15);
-        text(c, l, cx - lw / 2 - 20, ry, { size: wide ? 32 : 38, w: 500, color: 'rgba(255,255,255,.6)', align: 'left' });
-        text(c, v, cx + 20, ry, { size: wide ? 32 : 38, w: 700, align: 'left' });
-        ry += wide ? 50 : 62;
+        text(c, l, cx - lw / 2 - 20, ry, { size: 38, w: 500, color: 'rgba(255,255,255,.6)', align: 'left' });
+        text(c, v, cx + 20, ry, { size: 38, w: 700, align: 'left' });
+        ry += 62;
+      });
+    } else if (on.length) {
+      // post / wide: even columns, value on top, small label under it, thin dividers
+      const colW = Math.min(wide ? 300 : 250, (W - 160) / perRow), top0 = y + (wide ? 50 : 60);
+      on.forEach(([, l, v], i) => {
+        const r = Math.floor(i / perRow), inRow = Math.min(perRow, on.length - r * perRow), k = i - r * perRow;
+        const left = cx - inRow * colW / 2, px = left + colW * (k + 0.5), ty = top0 + r * ROWH;
+        c.globalAlpha = A(tm, 2.4 + i * 0.15, 2.9 + i * 0.15);
+        text(c, v, px, ty + 46, { size: fit(c, v, colW - 28, wide ? 42 : 40, TXT, 700), w: 700 });
+        const lab = String(l).toUpperCase();
+        text(c, lab, px, ty + 84, { size: fit(c, lab, colW - 28, 22, TXT, 600, 3), w: 600, color: 'rgba(255,255,255,.55)', ls: 3 });
+        if (k > 0) { c.save(); c.shadowBlur = 0; c.fillStyle = 'rgba(255,255,255,.16)'; c.fillRect(left + colW * k - 1, ty + 12, 2, 80); c.restore(); }
       });
     }
     // footer: "KATANA × name" tag only
     c.globalAlpha = A(tm, 0.1, 0.6); // brand shows at first glance
-    const fy = H - (wide ? 110 : 170), lw2 = 60, brand = o.brand || 'KATANA';
+    const lw2 = 60, brand = o.brand || 'KATANA';
     const hd = S.handle ? String(o.tag || data.handle || '').trim() : '';
     c.font = `700 38px ${BIG}`; if ('letterSpacing' in c) c.letterSpacing = '4px'; const bwid = c.measureText(brand).width; if ('letterSpacing' in c) c.letterSpacing = '0px';
     c.font = `700 38px ${BIG}`; if ('letterSpacing' in c) c.letterSpacing = '4px'; const hw = hd ? c.measureText(hd).width + 64 : 0; if ('letterSpacing' in c) c.letterSpacing = '0px';
