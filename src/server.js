@@ -103,6 +103,12 @@ app.get('/vendor/mp4-muxer.js', (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=86400');
   res.sendFile(MUX_FILE);
 });
+// gifenc (MIT, npm package): GIF export in the owner's Share Studio. CommonJS file wrapped so it defines window.GifEnc
+const GIF_JS = (() => { try { return `(function(){var exports={};${require('fs').readFileSync(require.resolve('gifenc'), 'utf8')}\nwindow.GifEnc=exports;})();`; } catch (e) { return ''; } })();
+app.get('/vendor/gifenc.js', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.type('application/javascript').send(GIF_JS);
+});
 app.use(rate.limiter);   // after the files: pictures and styles never count
 app.use(cookieSession({
   name: 'eals',

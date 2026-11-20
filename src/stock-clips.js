@@ -31,7 +31,7 @@ module.exports = function registerStockClips(app, { requireUser }) {
       // the smallest file that is still at least 1080 on its short side (else the biggest), mp4 only
       const files = (v.video_files || []).filter((f) => f.file_type === 'video/mp4' && f.width && f.height).sort((a, b) => a.width * a.height - b.width * b.height);
       const f = files.find((x) => Math.min(x.width, x.height) >= 1080) || files[files.length - 1];
-      return f && v.duration >= 5 ? { url: f.link, w: f.width, h: f.height, by: v.user?.name || '', page: v.url, src: 'Pexels', tags: String(v.url || '').toLowerCase().replace(/[-/]/g, ' ') } : null;
+      return f && v.duration >= 5 ? { url: f.link, w: f.width, h: f.height, by: v.user?.name || '', page: v.url, src: 'Pexels', thumb: v.image || '', tags: String(v.url || '').toLowerCase().replace(/[-/]/g, ' ') } : null;
     }).filter(Boolean);
   }
   async function fromPixabay(q, portrait) {
@@ -40,7 +40,7 @@ module.exports = function registerStockClips(app, { requireUser }) {
     const j = await r.json();
     const list = (j.hits || []).map((h) => {
       const v = h.videos || {}, f = [v.large, v.medium, v.small].find((x) => x && x.url && Math.min(x.width, x.height) >= 720) || v.medium || v.small;
-      return f && f.url && h.duration >= 5 ? { url: f.url, w: f.width, h: f.height, by: h.user || '', page: h.pageURL, src: 'Pixabay', tags: String(h.tags || '').toLowerCase() } : null;
+      return f && f.url && h.duration >= 5 ? { url: f.url, w: f.width, h: f.height, by: h.user || '', page: h.pageURL, src: 'Pixabay', thumb: (v.tiny && v.tiny.thumbnail) || (v.small && v.small.thumbnail) || (f && f.thumbnail) || '', tags: String(h.tags || '').toLowerCase() } : null;
     }).filter(Boolean);
     // Pixabay has no orientation filter for videos: prefer the ones that match, else keep all (they are cropped to fit)
     const fit = list.filter((c) => (portrait ? c.h > c.w : c.w >= c.h));
