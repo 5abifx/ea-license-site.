@@ -86,9 +86,13 @@ module.exports = function setup(app, { db, page, requireUser, requireAdmin, esc 
       const latest = db.prepare(`SELECT close_time, currency FROM journal_trades WHERE ${live} ORDER BY close_time DESC LIMIT 1`).get(u.id, u.id);
       if (latest) {
         const cur = latest.currency || 'USD', day = latest.close_time.slice(0, 10);
-        const ts = db.prepare(`SELECT net, r FROM journal_trades WHERE ${live} AND substr(close_time, 1, 10) = ? ORDER BY close_time`).all(u.id, u.id, day);
+        const ts = db.prepare(`SELECT net, r, balance_after FROM journal_trades WHERE ${live} AND substr(close_time, 1, 10) = ? ORDER BY close_time`).all(u.id, u.id, day);
         const net = ts.reduce((s, t) => s + (t.net || 0), 0), rs = ts.map((t) => (Number.isFinite(t.r) ? t.r : null));
-        out.last = { day, net, text: money(net, cur), n: ts.length, wins: ts.filter((t) => t.net > 0).length,
+        // a red day is shown as the way back, not as a red number: the R needed at 1% risk of the balance
+        const bal = [...ts].reverse().find((t) => t.balance_after > 0);
+        const startBal = bal ? bal.balance_after - net : 0;
+        const backR = net < 0 && startBal > 0 ? Math.ceil((-net / (startBal * 0.01)) * 10) / 10 : null;
+        out.last = { day, net, text: money(net, cur), lost: net < 0 ? money(net, cur).replace(/^[+−-]/, '') : '', backR, n: ts.length, wins: ts.filter((t) => t.net > 0).length,
           r: rs.every((r) => r !== null) ? Math.round(rs.reduce((s, r) => s + r, 0) * 100) / 100 : null, trades: ts.slice(-8).map((t) => ({ net: t.net, r: t.r })) };
         const since = new Date(Date.parse(day + 'T00:00:00Z') - 89 * 864e5).toISOString().slice(0, 10);
         const rows = db.prepare(`SELECT id, account_number, symbol, side, lots, entry, exit, sl, tp, open_time, close_time, net, r, risk_pct,

@@ -201,16 +201,25 @@
     var h = '<div class="sc-card"><div class="sc-lbl">Today\'s thought</div><div class="sc-quote">“' + D.quote + '”</div><div class="sc-sub">5ABI.FX · a new one each visit</div></div>';
     if (D.last) {
       var dt = new Date(D.last.day + 'T12:00:00'), lab = dt.toLocaleString('en', { weekday: 'short' }) + ' ' + dt.getDate() + ' ' + dt.toLocaleString('en', { month: 'short' });
-      h += '<div class="sc-card"><div class="sc-lbl">Last session · ' + lab + '</div><div class="sc-pl ' + (D.last.net >= 0 ? 'sc-pos' : 'sc-neg') + '">' + esc(D.last.text) + '</div>'
-        + '<div class="sc-sub">' + D.last.n + ' trade' + (D.last.n > 1 ? 's' : '') + ' · ' + D.last.wins + ' win' + (D.last.wins === 1 ? '' : 's') + (D.last.r != null ? ' · ' + (D.last.r > 0 ? '+' : '') + D.last.r + 'R' : '') + '</div>'
-        + '<div class="sc-mini">' + D.last.trades.map(function (t) { return '<span class="' + (t.net >= 0 ? 'sc-pos' : 'sc-neg') + '">' + (t.r != null ? (t.r > 0 ? '+' : '') + Math.round(t.r * 10) / 10 + 'R' : (t.net >= 0 ? 'Win' : 'Loss')) + '</span>'; }).join('') + '</div></div>';
+      var L0 = D.last, rr = L0.backR != null ? L0.backR : (L0.r != null && L0.r < 0 ? -L0.r : null);
+      if (L0.net < 0) {
+        // never a big red number: show the way back
+        h += '<div class="sc-card"><div class="sc-lbl">Bounce back · after ' + lab + '</div>'
+          + (rr != null ? '<div class="sc-pl">+' + rr + 'R</div><div class="sc-sub">is all it takes at 1% risk to win back ' + esc(L0.lost) + '.' + (rr > 1.5 ? ' Two clean ' + Math.round(rr / 2 * 10) / 10 + 'R trades do it too.' : ' One good trade.') + '</div>'
+            : '<div class="sc-pl">One good trade</div><div class="sc-sub">Small size, your best setup only. ' + esc(L0.lost) + ' comes back one trade at a time.</div>')
+          + '<div class="sc-sub" style="margin-top:10px;color:#d4d4d8">Lost the battle, not the war. Trade your plan today.</div></div>';
+      } else {
+        h += '<div class="sc-card"><div class="sc-lbl">Last session · ' + lab + '</div><div class="sc-pl sc-pos">' + esc(L0.text) + '</div>'
+          + '<div class="sc-sub">' + L0.n + ' trade' + (L0.n > 1 ? 's' : '') + ' · ' + L0.wins + ' win' + (L0.wins === 1 ? '' : 's') + (L0.r != null ? ' · ' + (L0.r > 0 ? '+' : '') + L0.r + 'R' : '') + '</div>'
+          + '<div class="sc-mini">' + L0.trades.map(function (t) { return '<span class="' + (t.net >= 0 ? 'sc-pos' : '') + '">' + (t.r != null ? (t.r > 0 ? '+' : '') + Math.round(t.r * 10) / 10 + 'R' : (t.net >= 0 ? 'Win' : 'Loss')) + '</span>'; }).join('') + '</div></div>';
+      }
     }
     var w = D.watch || [];
     h += '<div class="sc-card"><div class="sc-lbl">Watch out today</div>' + (w.length
-      ? '<div class="sc-top"><div class="sc-lbl" style="color:#ffb08a">Your #1 repeat mistake</div><div class="h">' + esc(w[0].title) + '</div><p>' + esc(w[0].text) + '</p>' + (w[0].fix ? '<p class="fix">Today: ' + esc(w[0].fix) + '</p>' : '') + '</div>'
+      ? '<div class="sc-wt"><div class="sc-lbl" style="color:#ffb08a">Your #1 repeat mistake</div><div class="sc-wt-h">' + esc(w[0].title) + '</div><p>' + esc(w[0].text) + '</p>' + (w[0].fix ? '<p class="sc-wt-fix">Today: ' + esc(w[0].fix) + '</p>' : '') + '</div>'
         + w.slice(1).map(function (m) { return '<div class="sc-mis"><span>' + esc(m.title) + (m.tag ? '<small>' + esc(m.tag) + '</small>' : '') + '</span>' + (m.cost ? '<b>' + esc(m.cost) + '</b>' : '') + '</div>'; }).join('')
       : '<p class="sc-sub" style="margin:10px 0 0">' + (D.watchNeed ? 'Log ' + D.watchNeed + ' more trades and your repeat mistakes show here.' : D.last ? 'No repeat mistakes in your last 90 days. Keep it that way.' : 'Connect your MT5 account and your repeat mistakes show here.') + '</p>') + '</div>';
-    h += '<div class="sc-card sc-garage"><div class="sc-lbl">Garage · drag, scroll, tap to rev</div><canvas aria-label="3D car you can turn"></canvas><div class="sc-paint"></div><span class="sc-hint"></span></div>';
+    h += '<div class="sc-card sc-garage"><div class="sc-lbl">Garage · drag, scroll, tap to rev</div><canvas aria-label="3D car you can turn"></canvas><span class="sc-hint"></span></div>';
     R.innerHTML = h;
     var g = R.querySelector('.sc-garage canvas');
     var start = function () { import('/side/garage.js').then(function (m) { m.default(R.querySelector('.sc-garage')); }).catch(function () { R.querySelector('.sc-garage').remove(); }); };

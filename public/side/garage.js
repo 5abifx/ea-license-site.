@@ -5,10 +5,10 @@ import { GLTFLoader } from '/vendor/three/loaders/GLTFLoader.js';
 import { OrbitControls } from '/vendor/three/controls/OrbitControls.js';
 import { RoomEnvironment } from '/vendor/three/environments/RoomEnvironment.js';
 
-const PAINTS = [['Original', '#ffffff'], ['Ember', '#ff7a45'], ['Chrome', '#d8dde6'], ['Teal', '#38d6b4'], ['Royal', '#6f8bff'], ['Gold', '#f2c14e']];
+const PAINTS = { original: '#ffffff', ember: '#ff7a45', chrome: '#d8dde6', teal: '#38d6b4', royal: '#6f8bff', gold: '#f2c14e' };   // picked in Appearance (look.paint)
 
 export default function garage(card) {
-  const cv = card.querySelector('canvas'), hint = card.querySelector('.sc-hint'), paintBox = card.querySelector('.sc-paint');
+  const cv = card.querySelector('canvas'), hint = card.querySelector('.sc-hint');
   const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
   r.setPixelRatio(Math.min(2, devicePixelRatio || 1));
   r.toneMapping = THREE.ACESFilmicToneMapping; r.outputColorSpace = THREE.SRGBColorSpace;
@@ -53,19 +53,18 @@ export default function garage(card) {
     const B = new THREE.Box3().setFromObject(car), long = (B.max.x - B.min.x) > (B.max.z - B.min.z);
     lights[0].position.set(long ? B.max.x + 0.2 : -0.4, 0.45, long ? -0.4 : B.max.z + 0.2);
     lights[1].position.set(long ? B.max.x + 0.2 : 0.4, 0.45, long ? 0.4 : B.max.z + 0.2);
-    setPaint(load());
+    setPaint(paint());
     hint.textContent = 'Tap the car to rev';
   });
 
-  function load() { try { return localStorage.getItem('garagePaint') || 'Original'; } catch (e) { return 'Original'; } }
   function setPaint(name) {
-    const p = PAINTS.find((x) => x[0] === name) || PAINTS[0];
-    mats.forEach((m) => { m.color.set(p[1]); if (name === 'Chrome') { m.metalness = 1; m.roughness = 0.18; } else { m.metalness = m.userData.m ?? (m.userData.m = m.metalness); m.roughness = m.userData.r ?? (m.userData.r = m.roughness); } });
-    paintBox.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.p === name));
-    try { localStorage.setItem('garagePaint', name); } catch (e) { /* private window */ }
+    const hex = PAINTS[name] || PAINTS.original;
+    mats.forEach((m) => {
+      if (m.userData.m === undefined) { m.userData.m = m.metalness; m.userData.r = m.roughness; }
+      m.color.set(hex); m.metalness = name === 'chrome' ? 1 : m.userData.m; m.roughness = name === 'chrome' ? 0.18 : m.userData.r;
+    });
   }
-  paintBox.innerHTML = PAINTS.map((p) => `<button type="button" data-p="${p[0]}" title="${p[0]}" aria-label="${p[0]} paint" style="background:${p[0] === 'Original' ? 'conic-gradient(#333,#ff5a1f,#333)' : p[1]}"></button>`).join('');
-  paintBox.addEventListener('click', (e) => { const b = e.target.closest('[data-p]'); if (b) setPaint(b.dataset.p); });
+  const paint = () => (window.__LOOK && window.__LOOK.paint) || 'original';
 
   // tap the car (not a drag) to rev: it rocks, the lights flash and the floor glows
   const ray = new THREE.Raycaster(); let down = null;
