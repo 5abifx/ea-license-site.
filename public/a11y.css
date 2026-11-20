@@ -1,0 +1,70 @@
+/* Accessibility: colour-safe profit/loss colours, bigger text, stronger contrast and the optional glass cursor.
+   Settings live on <html data-cb data-big data-hc data-cur> (set by public/a11y.js before the page paints). */
+
+/* red-green colour blindness (most common): profit blue, loss amber */
+html[data-cb="rg"] { --ok: #4ea8ff; --ok-rgb: 78,168,255; --danger: #ffb000; --danger-rgb: 255,176,0; --ok-bg: rgba(78,168,255,.14); }
+/* blue-yellow colour blindness: profit green, loss pink-red */
+html[data-cb="by"] { --ok: #3ddc84; --ok-rgb: 61,220,132; --danger: #ff4d7d; --danger-rgb: 255,77,125; --ok-bg: rgba(61,220,132,.14); }
+/* no colour at all: profit white, loss grey (the + and − signs carry the meaning) */
+html[data-cb="mono"] { --ok: #f4f4f5; --ok-rgb: 244,244,245; --danger: #8e8e96; --danger-rgb: 142,142,150; --ok-bg: rgba(255,255,255,.1); }
+
+/* bigger text on members pages */
+html[data-big] .app-body, html[data-big] .app-foot { zoom: 1.14; }
+/* stronger contrast: brighter secondary text and lines */
+html[data-hc] { --muted: #c4c4cc; --line: #3a3a42; --tb-mut: #d4d4d8; }
+html[data-hc] .muted, html[data-hc] small { color: #c4c4cc; }
+
+/* the accessibility button (round, same family as the What's new star) */
+.a11y-btn { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; display: inline-grid; place-items: center; flex: none; cursor: pointer;
+  color: #e4e4e7; background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.03) 55%, rgba(0,0,0,.15));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 -2px 0 rgba(0,0,0,.45), 0 3px 0 rgba(0,0,0,.35), 0 6px 14px rgba(0,0,0,.35);
+  font-size: 0; letter-spacing: 0; text-transform: none; min-height: 0; }
+.a11y-btn svg { width: 17px; height: 17px; }
+.a11y-btn:hover { color: #fff; filter: none; }
+.tb-m .a11y-btn { width: 36px; height: 36px; }
+header .bar .a11y-btn { margin-left: auto; margin-right: 8px; }
+.auth-form .a11y-inline { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 6px 12px 6px 6px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04); color: #d4d4d8; font: 600 12.5px var(--body, inherit); letter-spacing: 0; text-transform: none; cursor: pointer; min-height: 0; }
+.auth-form .a11y-inline .a11y-btn { width: 24px; height: 24px; box-shadow: none; }
+.auth-form .a11y-inline .a11y-btn svg { width: 14px; height: 14px; }
+
+/* the panel */
+.a11y-veil { position: fixed; inset: 0; z-index: 2147482000; background: rgba(3,3,5,.5); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center; padding: 16px; }
+.a11y-box { width: min(440px, 100%); max-height: calc(100vh - 32px); overflow: auto; border-radius: 24px; padding: 22px; color: #f4f4f5; font: 14px/1.45 var(--body, Manrope, system-ui, sans-serif);
+  background: rgba(16,16,20,.94); border: 1px solid rgba(255,255,255,.1); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 30px 80px rgba(0,0,0,.7); }
+.a11y-box h2 { margin: 0 0 4px; font: 600 19px/1.2 var(--display, inherit); }
+.a11y-box > p { margin: 0 0 16px; color: #a1a1aa; font-size: 13px; }
+.a11y-sec + .a11y-sec { margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.08); }
+.a11y-sec h3 { margin: 0 0 8px; font-size: 13px; font-weight: 700; }
+.a11y-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.a11y-opt { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; text-align: left; cursor: pointer; min-height: 0;
+  border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04); color: #e4e4e7; font: 600 12.5px/1.25 var(--body, inherit); letter-spacing: 0; text-transform: none; }
+.a11y-opt small { display: block; font-weight: 500; color: #a1a1aa; font-size: 11.5px; }
+.a11y-opt[aria-pressed="true"] { border-color: #fff; background: rgba(255,255,255,.1); }
+.a11y-sw { flex: none; display: flex; gap: 3px; }
+.a11y-sw i { width: 12px; height: 18px; border-radius: 3px; }
+.a11y-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; }
+.a11y-row span { min-width: 0; } .a11y-row small { display: block; color: #a1a1aa; font-size: 12px; }
+.a11y-tg { flex: none; width: 44px; height: 26px; padding: 0; border-radius: 13px; border: 0; cursor: pointer; position: relative; background: rgba(255,255,255,.16); min-height: 0; box-shadow: none; }
+.a11y-tg::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 2px 4px rgba(0,0,0,.4); }
+.a11y-tg[aria-checked="true"] { background: #26c6a0; }
+.a11y-tg[aria-checked="true"]::after { transform: translateX(18px); }
+.a11y-done { margin-top: 18px; width: 100%; padding: 11px; border-radius: 999px; border: 0; background: #fff; color: #0a0a0b; font: 700 13.5px var(--body, inherit); letter-spacing: 0; text-transform: none; cursor: pointer; }
+.a11y-box :focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+@media (max-width: 420px) { .a11y-opts { grid-template-columns: 1fr; } }
+
+/* optional dark liquid-glass cursor (PC only, off unless the member turns it on) */
+@media (pointer: fine) {
+  html[data-cur] body, html[data-cur] body * { cursor: none !important; }
+  html[data-cur] input, html[data-cur] textarea, html[data-cur] [contenteditable] { cursor: text !important; }
+}
+.gc { position: fixed; left: 0; top: 0; width: 32px; height: 32px; pointer-events: none; z-index: 2147483600; will-change: transform; transition: opacity .15s; }
+.gc.hide { opacity: 0; }
+.gc > * { position: absolute; inset: 0; transform-origin: 5px 3px; transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+.gc .glass { clip-path: polygon(5px 3px, 5px 21.5px, 9.8px 17px, 13.2px 24.6px, 16.4px 23.2px, 13px 15.8px, 19.4px 15.8px);
+  -webkit-backdrop-filter: blur(2.5px) saturate(160%) brightness(.55); backdrop-filter: blur(2.5px) saturate(160%) brightness(.55);
+  background: linear-gradient(155deg, rgba(255,255,255,.28), rgba(40,40,48,.45) 30%, rgba(5,5,8,.78) 75%, rgba(30,30,38,.6)); }
+.gc.hot .glass { background: linear-gradient(155deg, rgba(255,255,255,.42), rgba(60,60,70,.45) 30%, rgba(8,8,12,.72) 75%, rgba(50,50,60,.55)); }
+.gc.hot > * { transform: scale(1.14); }
+.gc.down > * { transform: scale(.9); }

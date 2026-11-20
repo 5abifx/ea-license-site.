@@ -52,6 +52,7 @@ ${seo.headTags(req, opts)}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@200;300;400&family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/cine/${name}.css?v=${v}">
+<link rel="stylesheet" href="/a11y.css"><script src="/a11y.js"></script>
 </head><body>
 ${page}
 <p class="risk">${RISK}</p>

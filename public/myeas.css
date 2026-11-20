@@ -2,7 +2,7 @@
 .mx-amb { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; animation: none !important; }
 .mx-amb i { position: absolute; border-radius: 50%; filter: blur(90px); animation: mxDrift 22s ease-in-out infinite alternate; }
 .mx-amb i:nth-child(1) { width: 530px; height: 530px; background: #ff5a1f; left: -40vw; top: 22vh; opacity: .12; }
-.mx-amb i:nth-child(2) { width: 420px; height: 420px; background: #26c6a0; left: 80vw; top: 10vh; opacity: .10; animation-duration: 28s; }
+.mx-amb i:nth-child(2) { width: 420px; height: 420px; background: var(--ok); left: 80vw; top: 10vh; opacity: .10; animation-duration: 28s; }
 .mx-amb i:nth-child(3) { width: 360px; height: 360px; background: #6a6a80; left: 45vw; top: 80vh; opacity: .14; animation-duration: 34s; }
 @keyframes mxDrift { to { transform: translate(80px, -60px) scale(1.15); } }
 .app-body > :not(.mx-amb) { position: relative; z-index: 1; }
@@ -40,7 +40,7 @@
 .mx-st:hover { background: rgba(255,255,255,.04); color: #f2f2f4; }
 .mx-st.cur { background: rgba(255,255,255,.07); color: #f2f2f4; }
 .mx-st i { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 600 13px "Sora", sans-serif; font-style: normal; border: 1px solid rgba(255,255,255,.14); }
-.mx-st.done i { background: #26c6a0; border-color: #26c6a0; color: #03140f; }
+.mx-st.done i { background: var(--ok); border-color: var(--ok); color: #03140f; }
 .mx-st.cur:not(.done) i { background: #fff; color: #000; border-color: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,.08); }
 .mx-st.opt i { border-style: dashed; }
 .mx-st small { display: block; font-size: 12px; color: #4a4a54; }
@@ -66,8 +66,8 @@
 
 .mx-done { display: flex; align-items: center; gap: 14px; padding: 14px 18px; flex-wrap: wrap; margin: 0 0 22px; }
 .mx-done .mx-ghost { margin-left: auto; }
-.mx-live { width: 9px; height: 9px; border-radius: 50%; background: #26c6a0; box-shadow: 0 0 12px #26c6a0; animation: mxPulse 2s infinite; }
-@keyframes mxPulse { 50% { box-shadow: 0 0 2px #26c6a0; } }
+.mx-live { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 12px var(--ok); animation: mxPulse 2s infinite; }
+@keyframes mxPulse { 50% { box-shadow: 0 0 2px var(--ok); } }
 
 .mx-sec { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .mx-sec h2 { font: 700 20px "Sora", sans-serif; letter-spacing: -.02em; margin: 0; }

@@ -104,7 +104,7 @@ html.lk .app-body .btn:not(.secondary):not(.link), html.lk .app-body button[type
 .ap-dot.metal::before { content: ""; position: absolute; inset: 2px 5px auto; height: 40%; border-radius: 50% 50% 45% 45%; background: linear-gradient(rgba(255,255,255,.75), rgba(255,255,255,0)); opacity: .8; }
 .ap-dot[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--lk-eff, #111), 0 0 0 4px var(--accent-2); }
 .ap-dot[aria-pressed="true"]::after { content: ""; position: absolute; left: 50%; top: 50%; width: 9px; height: 5px; border-left: 2px solid var(--ck, #fff); border-bottom: 2px solid var(--ck, #fff); transform: translate(-50%, -70%) rotate(-45deg); }
-.ap-dot.pick { background: conic-gradient(#ff5a1f, #f5a524, #26c6a0, #3b82f6, #a855f7, #f0464b, #ff5a1f); }
+.ap-dot.pick { background: conic-gradient(#ff5a1f, #f5a524, var(--ok), #3b82f6, #a855f7, var(--danger), #ff5a1f); }
 .ap-dot.pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; padding: 0; }
 
 .ap-read { display: flex; gap: 12px; align-items: center; padding: 12px 14px; }

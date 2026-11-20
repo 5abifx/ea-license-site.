@@ -1,0 +1,94 @@
+/* Side columns (wide PC only, public/side.js). Dark glass so they read on every Appearance background.
+   >= 2360px wide: both columns stay fixed in the empty side space and only the middle scrolls.
+   1200-2359px: there is no side space, so the same columns hide past the screen edge and slide in when the mouse touches it. */
+.sc, .sc-col, .fr { display: none; }
+@media (min-width: 1200px) and (pointer: fine) {
+  .sc-col { display: flex; flex-direction: column; gap: 12px; position: fixed; top: 76px; bottom: 14px; width: 400px; z-index: 40;
+    color: #f4f4f5; font: 600 14px/1.4 var(--body, Manrope, system-ui, sans-serif); overflow-y: auto; scrollbar-width: none; }
+  .sc-col::-webkit-scrollbar { display: none; }
+  .sc-l { left: 16px; } .sc-r { right: 16px; bottom: 86px; }
+  html:not(.sc-wide) .sc-col { transition: transform .38s cubic-bezier(.2,.8,.2,1), opacity .25s; opacity: 0; pointer-events: none; }
+  html:not(.sc-wide) .sc-l { transform: translateX(calc(-100% - 30px)); }
+  html:not(.sc-wide) .sc-r { transform: translateX(calc(100% + 30px)); }
+  html:not(.sc-wide) .sc-col.open { transform: none; opacity: 1; pointer-events: auto; }
+  .sc-tab { display: block; position: fixed; top: 50%; width: 4px; height: 60px; margin-top: -30px; border-radius: 4px; background: rgba(255,255,255,.25); z-index: 39; pointer-events: none; }
+  .sc-tab.l { left: 3px; } .sc-tab.r { right: 3px; }
+  html.sc-wide .sc-tab { display: none; }
+
+  .sc-card { flex: none; padding: 18px 20px; border-radius: 22px; background: rgba(12,12,16,.8); -webkit-backdrop-filter: blur(26px) saturate(150%); backdrop-filter: blur(26px) saturate(150%);
+    border: 1px solid rgba(255,255,255,.1); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 24px 60px rgba(0,0,0,.45); }
+  .sc-lbl { font: 500 10.5px/1 var(--mono, ui-monospace, monospace); letter-spacing: .14em; text-transform: uppercase; color: #a1a1aa; }
+  .sc-h { font: 600 18px/1.25 var(--display, Sora, sans-serif); margin: 6px 0 12px; }
+  .sc-sub { color: #a1a1aa; font-size: 12.5px; font-weight: 600; }
+  .sc-card button { min-height: 0; letter-spacing: 0; text-transform: none; box-shadow: none; }
+
+  /* focus */
+  .sc-rings { display: flex; align-items: center; gap: 18px; margin-bottom: 10px; }
+  .sc-rings svg { width: 104px; height: 104px; flex: none; }
+  .sc-rings circle { transition: stroke-dashoffset .6s cubic-bezier(.2,.8,.2,1); }
+  .sc-leg div { display: flex; align-items: baseline; gap: 8px; margin: 4px 0; font-size: 12.5px; color: #d4d4d8; }
+  .sc-leg b { font: 700 16px var(--display, Sora, sans-serif); color: #fff; }
+  .sc-leg i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .sc-row { display: flex; align-items: center; gap: 11px; padding: 6px 0; }
+  .sc-ck { width: 24px; height: 24px; padding: 0; border-radius: 50%; border: 2px solid #52525b; background: transparent; flex: none; display: grid; place-items: center; cursor: pointer; }
+  .sc-ck[aria-checked="true"] { background: var(--accent, #ff5a1f); border-color: var(--accent, #ff5a1f); }
+  .sc-ck[aria-checked="true"]::after { content: ""; width: 9px; height: 5px; border: 2.5px solid var(--accent-ink, #fff); border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); }
+  .sc-row .t { flex: 1; min-width: 0; font-size: 13.5px; overflow-wrap: anywhere; }
+  .sc-dots { display: flex; gap: 4px; } .sc-dots span { width: 9px; height: 9px; border-radius: 3px; background: rgba(255,255,255,.12); }
+  .sc-dots .y { background: var(--accent, #ff5a1f); }
+  .sc-x { width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #71717a; font-size: 15px; line-height: 1; cursor: pointer; opacity: 0; }
+  .sc-row:hover .sc-x, .sc-goal:hover .sc-x { opacity: 1; } .sc-x:hover { color: #fff; }
+  .sc-add { display: flex; gap: 6px; margin-top: 4px; }
+  .sc-add input { flex: 1; min-width: 0; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); border-radius: 10px; color: #f4f4f5; font: 500 13px var(--body, inherit); padding: 7px 10px; }
+  .sc-add input::placeholder { color: #8a8a93; }
+  .sc-sec { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
+  .sc-goal { margin: 8px 0 10px; } .sc-goal .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13.5px; }
+  .sc-bar { height: 8px; border-radius: 5px; background: rgba(255,255,255,.1); margin-top: 7px; overflow: hidden; cursor: pointer; }
+  .sc-bar i { display: block; height: 100%; border-radius: 5px; background: var(--accent, #ff5a1f); transition: width .3s; }
+  .sc-note { width: 100%; min-height: 64px; resize: vertical; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 10px; color: #e4e4e7; font: 500 13px/1.45 var(--body, inherit); }
+  .sc-save { margin-top: 12px; width: 100%; padding: 10px; border-radius: 999px; border: 0; background: #fff; color: #0a0a0b; font: 800 13.5px var(--body, inherit); cursor: pointer; }
+  .sc-save.ok { background: var(--ok, #26c6a0); color: #04130e; }
+
+  /* sessions */
+  .sc-globe { display: block; width: 250px; height: 250px; margin: 8px auto 6px; cursor: grab; }
+  .sc-ses { display: grid; grid-template-columns: 1fr 1fr; column-gap: 20px; }
+  .sc-ses div { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+  .sc-ses small { font: 500 11.5px var(--mono, ui-monospace, monospace); color: #a1a1aa; }
+  .sc-ses i { width: 8px; height: 8px; border-radius: 50%; background: #52525b; display: inline-block; margin-right: 7px; }
+  .sc-ses .on i { background: var(--accent, #ff5a1f); box-shadow: 0 0 10px var(--accent, #ff5a1f); }
+
+  /* right column */
+  .sc-quote { font: 600 19px/1.38 var(--display, Sora, sans-serif); letter-spacing: -.01em; margin: 8px 0 10px; }
+  .sc-quote em { font-style: normal; color: var(--accent, #ff5a1f); }
+  .sc-pl { font: 700 32px var(--display, Sora, sans-serif); margin: 4px 0 2px; }
+  .sc-pos { color: var(--ok, #26c6a0); } .sc-neg { color: var(--danger, #f0464b); }
+  .sc-mini { display: flex; gap: 6px; margin-top: 10px; } .sc-mini span { flex: 1; height: 28px; border-radius: 7px; background: rgba(255,255,255,.07); display: grid; place-items: center; font: 600 11.5px var(--body, inherit); }
+  .sc-top { border-radius: 16px; padding: 14px; margin: 10px 0 8px; background: linear-gradient(135deg, rgba(255,90,31,.2), rgba(255,90,31,.05)); border: 1px solid rgba(255,90,31,.42); }
+  .sc-top .h { font: 700 15.5px/1.3 var(--display, Sora, sans-serif); margin: 6px 0 4px; } .sc-top p { margin: 0; font-weight: 500; font-size: 12.5px; color: #e4e4e7; }
+  .sc-top .fix { margin-top: 8px; color: #fff; font-weight: 700; }
+  .sc-mis { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,.07); font-size: 13px; }
+  .sc-mis small { display: block; color: #a1a1aa; font-weight: 500; font-size: 12px; }
+  .sc-mis b { flex: none; font: 700 12.5px var(--display, Sora, sans-serif); color: var(--danger, #f0464b); }
+
+  /* garage */
+  .sc-garage { position: relative; padding: 0; overflow: hidden; flex: 1 0 300px; }
+  .sc-garage .sc-lbl { position: absolute; left: 20px; top: 18px; z-index: 2; pointer-events: none; }
+  .sc-garage canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; cursor: grab; }
+  .sc-garage canvas:active { cursor: grabbing; }
+  .sc-paint { position: absolute; left: 16px; bottom: 14px; z-index: 2; display: flex; gap: 7px; }
+  .sc-paint button { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); cursor: pointer; }
+  .sc-paint button[aria-pressed="true"] { border-color: #fff; transform: scale(1.15); }
+  .sc-hint { position: absolute; right: 16px; bottom: 14px; z-index: 2; font-size: 11.5px; color: #a1a1aa; pointer-events: none; }
+
+  /* small "request a feature" button + popover */
+  .fr { display: grid; place-items: center; position: fixed; right: 84px; bottom: 29px; z-index: 45; width: 34px; height: 34px; padding: 0; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.18); background: rgba(12,12,16,.8); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); color: #e4e4e7;
+    font: 600 18px/1 var(--display, Sora, sans-serif); letter-spacing: 0; text-transform: none; min-height: 0; box-shadow: 0 6px 18px rgba(0,0,0,.5); cursor: pointer; }
+  .fr:hover { color: #fff; border-color: rgba(255,255,255,.4); }
+  .fr-pop { position: fixed; right: 84px; bottom: 66px; z-index: 46; width: 300px; padding: 16px; border-radius: 18px; color: #f4f4f5; font: 600 13.5px/1.4 var(--body, inherit);
+    background: rgba(12,12,16,.92); -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 24px 60px rgba(0,0,0,.6); }
+  .fr-pop textarea { width: 100%; min-height: 80px; margin: 10px 0; resize: vertical; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: 9px; color: #f4f4f5; font: 500 13px/1.4 var(--body, inherit); }
+  .fr-pop button { width: 100%; padding: 9px; border: 0; border-radius: 999px; background: #fff; color: #0a0a0b; font: 800 13px var(--body, inherit); letter-spacing: 0; text-transform: none; min-height: 0; cursor: pointer; }
+}
+/* the "install the app" card would sit on top of the garage: move it beside the right column */
+@media (min-width: 2360px) and (pointer: fine) { html.sc-wide .ia-card { right: 440px !important; } }

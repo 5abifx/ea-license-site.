@@ -67,8 +67,8 @@
   background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.045); }
 .app-body .cal-grid.cx .day.off, .app-body .cal-grid.cx .day.fut { background: rgba(255,255,255,.015); border-color: rgba(255,255,255,.03); }
 .app-body .cal-grid.cx button.day { cursor: pointer; border-color: rgba(255,255,255,.08); background: rgba(255,255,255,.035); transition: border-color .15s, transform .15s; }
-.app-body .cal-grid.cx button.day.win { background: rgba(45,212,191,var(--a, .12)); border-color: rgba(45,212,191,calc(var(--a, .12) + .06)); }
-.app-body .cal-grid.cx button.day.loss { background: rgba(242,103,107,var(--a, .12)); border-color: rgba(242,103,107,calc(var(--a, .12) + .06)); }
+.app-body .cal-grid.cx button.day.win { background: rgba(var(--ok-rgb), var(--a, .12)); border-color: rgba(var(--ok-rgb), calc(var(--a, .12) + .06)); }
+.app-body .cal-grid.cx button.day.loss { background: rgba(var(--danger-rgb), var(--a, .12)); border-color: rgba(var(--danger-rgb), calc(var(--a, .12) + .06)); }
 .app-body .cal-grid.cx button.day:hover { transform: none; border-color: rgba(255,255,255,.24); }
 .app-body .cal-grid.cx .day[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 1px #fff; }
 .app-body .cal-grid.cx .cd { position: absolute; top: 6px; left: 7px; right: auto; font-size: 10.5px; font-weight: 600; color: #6b6b74; }
@@ -85,7 +85,7 @@
 .app-body .cal-grid.cx .wk { padding: 6px 8px; align-items: flex-end; justify-content: space-between; gap: 0; background: rgba(255,255,255,.015); border: 1px dashed rgba(255,255,255,.08); }
 .app-body .cal-grid.cx .wk .wl { font-size: 10px; font-weight: 600; letter-spacing: 0; text-transform: none; color: #6b6b74; }
 .app-body .cal-grid.cx .wk .cv { font-size: 12.5px; }
-.app-body .cal-grid.cx .wk .cv span { color: var(--ok, #2dd4bf); } .app-body .cal-grid.cx .wk .cv span.neg { color: #f2676b; }
+.app-body .cal-grid.cx .wk .cv span { color: var(--ok, var(--ok)); } .app-body .cal-grid.cx .wk .cv span.neg { color: var(--danger); }
 .app-body .cal-grid.cx .wk .wn { font-size: 10px; font-weight: 500; color: #6b6b74; }
 .app-body .cal-note { margin: 10px 2px 0; font-size: 11.5px; }
 .app-body .cal-note b { color: #e7e7ea; font-weight: 700; }
@@ -112,7 +112,7 @@
   .app-body .cal-wks div { flex: 1 0 auto; min-width: 70px; background: rgba(255,255,255,.035); border-radius: 8px; padding: 5px 8px; }
   .app-body .cal-wks small { display: block; font-size: 9.5px; color: #6b6b74; }
   .app-body .cal-wks b { font-size: 11.5px; }
-  .app-body .cal-wks .pos { color: var(--ok, #2dd4bf); } .app-body .cal-wks .neg { color: #f2676b; }
+  .app-body .cal-wks .pos { color: var(--ok, var(--ok)); } .app-body .cal-wks .neg { color: var(--danger); }
 }
 
 /* My EAs welcome line and "What we found" cards: same smaller scale */
@@ -120,3 +120,12 @@ html body .app-body .mx-hero h1 { font-size: clamp(24px, 2.6vw, 34px); line-heig
 .app-body .fq-a { font-size: clamp(18px, 1.7vw, 22px); }
 .app-body .fq-q, .app-body .fq-s, .app-body .fq-fix { font-size: 12px; }
 .app-body .fq-grid { gap: 10px; }
+
+/* footer: one quiet centred block (links, then the risk line), clear of the chat button; dark glass so it reads on any background */
+html body .app-main > .app-foot { flex-direction: column; justify-content: center; align-items: center; gap: 6px; text-align: center;
+  width: calc(100% - 2 * clamp(10px, 1.6vw, 24px)); margin: 6px auto 18px; padding: 12px 20px; border: 1px solid rgba(255,255,255,.06); border-radius: 18px;
+  background: rgba(10,10,13,.8); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); font-size: 11.5px; }
+html body .app-foot .foot-links { display: flex; gap: 18px; }
+html body .app-foot .muted { max-width: 760px; color: #8b8b93; text-shadow: none; line-height: 1.45; }
+html body .app-foot a { color: #c4c4ca; text-shadow: none; }
+@media (max-width: 900px) { html body .app-main > .app-foot { width: calc(100% - 16px); margin-bottom: 8px; } }

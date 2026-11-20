@@ -44,7 +44,7 @@ function client(base, ip) {
   try {
     const admin = client(base);
     let r = await admin.post('/login', { email: 'admin@test.com', password: 'adminpass123' });
-    assert.match(r.text, /Users/);
+    assert.match(r.text, /Share Studio/);   // signed-in members with the journal land on the Share Studio
 
     const fd = new FormData();
     fd.append('name', 'Gold Scalper'); fd.append('code', 'GOLD_SCALPER'); fd.append('version', '1.2');
@@ -827,7 +827,7 @@ function client(base, ip) {
       r = await guess.post('/login', { email: 'bob@test.com', password: 'bobpass123', 'cf-turnstile-response': 'bad' });
       assert.match(r.text, /complete the quick check/);
       r = await guess.post('/login', { email: 'bob@test.com', password: 'bobpass123', 'cf-turnstile-response': 'good' });
-      assert.match(r.text, /Gold Scalper/);                                               // passed: signed in, counter reset
+      assert.match(r.text, /Gold Scalper|Share Studio/);                                               // passed: signed in, counter reset
       assert.doesNotMatch((await client(base, '10.9.0.3').get('/login')).text, /cf-turnstile/);
       ts.close();
       for (const k of ['TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY', 'TURNSTILE_API']) delete process.env[k];
@@ -881,7 +881,7 @@ function client(base, ip) {
       r = await a2.post('/login/code', { code: totp(secret, step()) });          // same code as set-up: already used
       assert.match(r.text, /That code is not right/);
       r = await a2.post('/login/code', { code: totp(secret, step() + 1) });
-      assert.match(r.text, /Users/);
+      assert.match(r.text, /Share Studio/);
 
       const a3 = client(base, '10.8.0.2');
       await a3.post('/login', { email: 'admin@test.com', password: 'adminpass123' });

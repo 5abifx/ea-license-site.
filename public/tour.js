@@ -11,16 +11,16 @@
   // sel = what to light up (first visible match); path = page it lives on; need = only for members who have it
   var BEGIN = [
     { t: 'Welcome to your desk', p: 'Five quick cards and you know where everything is. Takes under a minute.' },
-    { sel: '.tb-bar a[href="/dashboard"], .tb-mbtn', path: '/dashboard', t: 'My EAs', p: 'Download KATANA and the Journal EA here, then add your MT5 account number so they unlock on it.' },
-    { need: 'j', sel: '.tb-bar [data-tbp="j"], .tb-mbtn', t: 'Journal', p: 'Every MT5 trade lands here by itself, day by day and account by account. Tap a day to see its trades.' },
-    { need: 'j', sel: '.tb-bar [data-tbp="j"], .tb-mbtn', t: 'Plan a trade', p: 'Write the plan before you click. We match it to the real trade and show you where you followed it and where you did not.' },
-    { need: 'j', sel: '.tb-bar [data-tbp="j"], .tb-mbtn', t: 'Insights', p: 'Your edge score and the habits that cost you money, each with one line on how to fix it.' },
-    { sel: '.tb-bar [data-tbp="a"], .tb-mbtn, .sup-btn, [data-support]', t: 'Stuck? Ask us', p: 'Help & FAQ answers the common questions. The chat button opens a message to us.' },
+    { sel: '.tb-bar a[href="/dashboard"], .tb-dock [data-tbp="m"]', path: '/dashboard', t: 'My EAs', p: 'Download KATANA and the Journal EA here, then add your MT5 account number so they unlock on it.' },
+    { need: 'j', sel: '.tb-bar [data-tbp="j"], .tb-dock a[href="/journal"]', t: 'Journal', p: 'Every MT5 trade lands here by itself, day by day and account by account. Tap a day to see its trades.' },
+    { need: 'j', sel: '.tb-bar [data-tbp="j"], .tb-dock [data-tbp="m"]', t: 'Plan a trade', p: 'Write the plan before you click. We match it to the real trade and show you where you followed it and where you did not.' },
+    { need: 'j', sel: '.tb-bar [data-tbp="j"], .tb-dock a[href="/journal/insights"]', t: 'Insights', p: 'Your edge score and the habits that cost you money, each with one line on how to fix it.' },
+    { sel: '.tb-bar [data-tbp="a"], .tb-dock [data-tbp="m"], .sup-btn, [data-support]', t: 'Stuck? Ask us', p: 'Help & FAQ answers the common questions. The chat button opens a message to us.' },
     { end: 1, t: 'You are set', p: 'Connect your first account and your trades start filling in.' }
   ];
   var ADV = [
     { t: 'The full walkthrough', p: 'We will move page by page and point at each part. Use the arrow keys or the buttons. You can stop any time.' },
-    { path: '/dashboard', sel: '.tb-side .tb-plan, .tb-mbtn', t: 'Your plan', p: 'Shows your plan and whether it is active. Tap it to change plan or manage billing.' },
+    { path: '/dashboard', sel: '.tb-side .tb-plan, .tb-dock [data-tbp="m"]', t: 'Your plan', p: 'Shows your plan and whether it is active. Tap it to change plan or manage billing.' },
     { path: '/dashboard', sel: 'form[action="/accounts"]', t: 'Add your MT5 accounts', p: 'Type the account number here. Your EAs only run on accounts in this list.' },
     { path: '/dashboard', sel: '.ea-cards', t: 'Download your EAs', p: 'Each EA you own has its download here. Put the file in MT5 > File > Open data folder > MQL5 > Experts.', tip: 'Run the Journal EA on its own chart, next to KATANA. One EA per chart.' },
     { path: '/dashboard', sel: 'a[href*="/templates/"]', t: 'Chart themes', p: 'Our MT5 chart templates. Load one and your charts match the site.' },
@@ -34,7 +34,7 @@
     { need: 'j', path: '/journal/insights', sel: '.ins-grid', t: 'Leaks and fixes', p: 'What costs you the most, in money, with one fix for each.' },
     { need: 'j', path: '/journal/insights', sel: '.prop-form, .prop-rows', t: 'Prop firm guard', p: 'Enter your firm\'s daily and max loss once. We show how close you are and suggest a KATANA daily limit.' },
     { need: 'm', path: '/journal/mentor', sel: '.app-body h1', t: 'Mentor review', p: 'Share your journal with your mentor and ask about any trade. Replies show up here.' },
-    { sel: '.tb-bar [data-tbp="a"], .tb-mbtn', t: 'Rewatch any time', p: 'This tour lives in the Account menu at the top. Pick Beginner or Advanced again whenever you like.' },
+    { sel: '.tb-bar [data-tbp="a"], .tb-dock [data-tbp="m"]', t: 'Rewatch any time', p: 'This tour lives in the Account menu at the top. Pick Beginner or Advanced again whenever you like.' },
     { end: 1, t: 'That is everything', p: 'Start with one account and a few days of trades. Insights get sharper with every trade.' }
   ];
   var LIST = { beginner: BEGIN, advanced: ADV };

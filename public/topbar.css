@@ -48,7 +48,7 @@
   padding: 7px 12px; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); }
 .tb-plan:hover { border-color: rgba(255,255,255,.22); filter: none; }
 .tb-plan i { font-style: normal; font-size: 11.5px; }
-.tb-plan i.ok { color: var(--ok, #2dd4bf); } .tb-plan i.warn { color: var(--warn, #fbbf24); } .tb-plan i.bad { color: var(--danger, #f87171); }
+.tb-plan i.ok { color: var(--ok, var(--ok)); } .tb-plan i.warn { color: var(--warn, #fbbf24); } .tb-plan i.bad { color: var(--danger, var(--danger)); }
 .tb-round { position: relative; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: #e4e4e7; border: 0; cursor: pointer;
   background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.03) 55%, rgba(0,0,0,.15));
   box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 -2px 0 rgba(0,0,0,.45), 0 3px 0 rgba(0,0,0,.35), 0 6px 14px rgba(0,0,0,.35); }
