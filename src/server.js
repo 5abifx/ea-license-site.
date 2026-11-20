@@ -249,7 +249,8 @@ const onboard = require('./onboard')(app, { db, page, flash, requireUser, trialD
 require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, onboard, setJournalAccess: (f) => { journalAccess = f; } });
 require('./welcome')(app, { db, requireUser });   // student welcome + journal result reveal
 require('./tour')(app, { db, requireUser });
-require('./look')(app, { db, page, requireUser });   // Appearance: members pick their own background (public/look.js)
+require('./look')(app, { db, page, requireUser });
+require('./side')(app, { db, page, requireUser, requireAdmin, esc });   // wide-PC side columns: Focus, sessions, watch out, garage, feature requests (public/side.js)   // Appearance: members pick their own background (public/look.js)
 require('./whatsnew')(app, { db, page, flash, requireUser, requireAdmin });   // What's new popup + Admin > What's new (public/whatsnew.js)      // "How should we show you around?" guided tour (public/tour.js)
 
 // ---------- auth ----------

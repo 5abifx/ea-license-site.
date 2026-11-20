@@ -101,7 +101,7 @@ ${require('./seo').headTags(req, opts)}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@200;300;400;600&family=Manrope:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/style.css">
-${u && !opts.wide ? '<link rel="stylesheet" href="/look.css"><link rel="stylesheet" href="/topbar.css"><link rel="stylesheet" href="/compact.css"><link rel="stylesheet" href="/dock.css"><link rel="stylesheet" href="/edge.css"><script src="/edge.js" defer></script>' : ''}
+${u && !opts.wide ? '<link rel="stylesheet" href="/look.css"><link rel="stylesheet" href="/topbar.css"><link rel="stylesheet" href="/compact.css"><link rel="stylesheet" href="/dock.css"><link rel="stylesheet" href="/side.css"><script src="/side.js" defer></script>' : ''}
 <link rel="stylesheet" href="/guards.css">
 ${require('./look').a11yHead(u)}
 </head><body>
@@ -156,9 +156,10 @@ function appShell(req, u, flashHtml, body, title) {
       <form method="post" action="/logout" class="tb-out"><button class="tb-tile">${cap('out')}<b>Sign out</b></button></form>`;
   const ownerTiles = u.is_admin ? `${tile('/admin/sales', 'insights', 'Sales', 'Revenue and sign-ups', on('/admin/sales'))}
       ${tile('/admin/usage', 'pulse', 'Feature usage', 'What members use', on('/admin/usage'))}
-      ${tile('/admin', 'shield', 'Admin', 'Members and licences', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/affiliates') && !on('/admin/usage') && !on('/admin/whatsnew'))}
+      ${tile('/admin', 'shield', 'Admin', 'Members and licences', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/affiliates') && !on('/admin/usage') && !on('/admin/whatsnew') && !on('/admin/requests'))}
       ${tile('/admin/eas', 'upload', 'EAs', 'Upload builds', on('/admin/eas'))}
       ${tile('/admin/whatsnew', 'star', "What's new", 'Post updates', on('/admin/whatsnew'))}
+      ${tile('/admin/requests', 'chat', 'Requests', 'Features members asked for', on('/admin/requests'))}
       ${tile('/admin/affiliates', 'gift', 'Affiliates', 'Partners and payouts', on('/admin/affiliates'))}
       ${tile('/mentor', 'cap', 'Mentor', 'Student questions', on('/mentor'), req.mentorWaiting)}` : '';
   const mentorTile = mentor ? tile('/journal/mentor', 'chat', 'Mentor review', 'Questions on your trades', jOn.mentor, req.mentorNew) : '';
@@ -205,9 +206,7 @@ function appShell(req, u, flashHtml, body, title) {
     <button type="button" class="tb-dk" data-tbp="m" aria-expanded="false" aria-controls="tbp-m"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg><span>More</span></button>
   </nav>
   <div class="tb-scrim" data-tb-close></div>
-  ${req.hasJournal ? `<aside class="edge edge-l" aria-label="Quick actions"><span class="edge-tab" aria-hidden="true"></span><div class="edge-card tb-glass"><b>Quick</b>
-    <a href="/journal/log">Log a trade</a><a href="/journal/desk">Today's plan</a><a href="/journal/studio">Share card</a><a href="/journal/insights">Insights</a><a href="/journal">Calendar</a></div></aside>
-  <aside class="edge edge-r" aria-label="Market sessions"><span class="edge-tab" aria-hidden="true"></span><div class="edge-card tb-glass"><b>Sessions</b><div class="edge-ses"></div></div></aside>` : ''}
+  ${req.hasJournal ? '<div class="sc" data-sc hidden></div>' : ''}
 </header>
 <div class="app-main">
   <main class="app-body">${flashHtml}${body}</main>
