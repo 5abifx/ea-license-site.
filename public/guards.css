@@ -1,0 +1,24 @@
+/* LAYOUT GUARDS - loaded LAST on every page. Each rule fixes a bug that came back after a redesign.
+   Do not delete or weaken these; if a new design needs something different, change it here on purpose.
+   Rules are listed in CLAUDE.md ("Standing UI rules"). */
+
+/* 1. Wide PC screens (1920, 2560+): members content is capped at 1680px and CENTRED, never stuck to the left.
+      (Regressed in PR #100 when the side menu became a top bar.) width uses calc so auto margins can centre it
+      inside the flex column without shrinking it to fit its content. */
+html body .app-main > .app-body { width: 100%; max-width: 1680px; margin-left: auto; margin-right: auto; }
+html.lk body .app-main > .app-body { width: calc(100% - 2 * clamp(10px, 1.6vw, 24px)); }
+html body .app-main > .app-foot { width: 100%; max-width: 1680px; margin-left: auto; margin-right: auto; }
+@media (max-width: 900px) { html.lk body .app-main > .app-body { width: calc(100% - 16px); } }
+
+/* 2. Round icon buttons (☰ menu, What's new): the icon sits in the exact centre of the circle.
+      Site-wide button styles add padding 11px 18px, uppercase and letter-spacing; on a 30-42px circle that padding
+      leaves no room and pushes the three bars off-centre. */
+html body .tb-round, html body .menu-btn { padding: 0; letter-spacing: 0; text-transform: none; line-height: 0; font-size: 0; min-height: 0; box-sizing: border-box; }
+html body .tb-mbtn { display: inline-flex; }
+html body .tb-mbtn, html body .menu-btn { flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+html body .tb-mbtn i, html body .menu-btn i { flex: none; margin: 0; }
+@media (min-width: 761px) { html body header .menu-btn { display: none; } }
+@media (max-width: 760px) { html body header .menu-btn { display: inline-flex; } }
+
+/* 3. Phones: nothing may scroll sideways. */
+@media (max-width: 900px) { html, body { overflow-x: clip; } }
