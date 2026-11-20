@@ -404,17 +404,17 @@ function client(base, ip) {
     assert.match(r.text, /Waiting for your mentor/);
     r = await admin.get('/mentor');
     assert.match(r.text, /Was my &lt;stop&gt; too tight\?/);
-    assert.match(r.text, /<em class="count">1<\/em>/);
+    assert.match(r.text, /<em class="[^"]*\bcount">1<\/em>/);
     r = await admin.get(`/mentor/trade/${tid}`);
     assert.match(r.text, /London breakout/);
     assert.match(r.text, /Account ••01/);
     assert.doesNotMatch(r.text, /Account 1001/);
     r = await admin.post(`/mentor/trade/${tid}/note`, { body: 'Stop was fine, entry was early.' });
     assert.match(r.text, /Sent\. The student sees it/);
-    assert.doesNotMatch((await admin.get('/mentor')).text, /<em class="count">/);
+    assert.doesNotMatch((await admin.get('/mentor')).text, /<em class="[^"]*\bcount">/);
     r = await bob.get('/journal/mentor');
     assert.match(r.text, /1 new from mentor/);
-    assert.match(r.text, /<em class="count">1<\/em>/);
+    assert.match(r.text, /<em class="[^"]*\bcount">1<\/em>/);
     r = await bob.get(`/journal/${tid}`);
     assert.match(r.text, /Stop was fine, entry was early\./);
     assert.doesNotMatch((await bob.get('/journal/mentor')).text, /new from mentor/);   // read now

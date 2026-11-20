@@ -48,15 +48,14 @@ const ICONS = {
 };
 const icon = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
 
-// plan box at the top of the members menu
-function planBox(u) {
+// the plan as a small pill in the top bar
+function planPill(u) {
   const expired = u.expires_at && new Date(u.expires_at + 'Z') < new Date();
   const plan = require('./plans').getPlan(u.plan);
-  const name = u.is_admin && !u.plan ? 'Owner' : u.trial ? 'Free trial' : plan ? `${plan.name} · ${u.billing === 'annual' ? 'annual' : 'monthly'}` : 'Member';
-  // signed up but no card yet: the free trial has not started (same rule as stripe.needsCardTrial, loaded late to avoid a require loop)
+  const name = u.is_admin && !u.plan ? 'Owner' : u.trial ? 'Free trial' : plan ? plan.name : 'Member';
   const noCard = require('./stripe').needsCardTrial(u);
   const state = u.status === 'pending' ? ['warn', 'Waiting'] : noCard ? ['warn', 'Add card'] : expired ? ['bad', 'Expired'] : ['ok', 'Active'];
-  return `<a class="plan-box" href="/pricing"><span>Plan</span><b>${esc(name)}</b><i class="${state[0]}">${state[1]}</i></a>`;
+  return `<a class="tb-plan" href="/pricing" title="Your plan">${esc(name)} <i class="${state[0]}">${state[1]}</i></a>`;
 }
 
 // opts.wide: full-width main for the landing page (sections bring their own .wrap)
@@ -101,7 +100,7 @@ ${require('./seo').headTags(req, opts)}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@200;300;400;600&family=Manrope:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/style.css">
-${u && !opts.wide ? '<link rel="stylesheet" href="/look.css">' : ''}
+${u && !opts.wide ? '<link rel="stylesheet" href="/look.css"><link rel="stylesheet" href="/topbar.css">' : ''}
 </head><body>
 ${u && !opts.wide ? appShell(req, u, flashHtml, body, title) : `<header><div class="wrap bar"><a class="brand" href="/">${brandMark()}${pill}</a><button type="button" class="menu-btn" data-menu aria-controls="site-nav" aria-expanded="false" aria-label="Menu"><i></i><i></i><i></i></button><nav id="site-nav">${nav}</nav></div></header>
 ${opts.wide
@@ -114,48 +113,88 @@ ${opts.wide
 </div></footer>`}
 <script src="/menu.js"></script>
 <script src="/app/install.js" defer></script>
-${u && !opts.wide ? '<script src="/ignite.js"></script>' : ''}
+${u && !opts.wide ? '<script src="/ignite.js"></script><script src="/topbar.js"></script>' : ''}
 ${require('./support').supportWidget(req)}
 </body></html>`;
 }
 
 const RISK = 'Trading forex and CFDs carries a high level of risk and may not be suitable for every investor. Past performance does not guarantee future results.';
 
-// signed-in pages: side menu on the left (a top bar on phones), the page fills the rest of the screen
+// signed-in pages: a floating glass bar on top (Journal / Account / Owner open 3D panels), a slim bar + menu panel on phones
 function appShell(req, u, flashHtml, body, title) {
   const on = (href) => req.path === href || req.path.startsWith(href + '/');
-  const item = (href, ic, text, active = on(href)) => `<a href="${href}" title="${text.replace(/<[^>]*>.*$/, '')}"${active ? ' class="on" aria-current="page"' : ''}>${icon(ic)}<span>${text}</span></a>`;
-  const group = (label, items) => (items.trim() ? `<div class="side-group"><div class="side-label">${label}</div>${items}</div>` : '');
+  const cap = (ic, n) => `<span class="tb-key">${icon(ic)}${n ? `<em class="tb-n count">${n}</em>` : ''}</span>`;
+  // one page as a 3D tile (PC panels and the phone menu)
+  const tile = (href, ic, text, desc, active, n) => `<a class="tb-tile${active ? ' on' : ''}" href="${href}"${active ? ' aria-current="page"' : ''}>${cap(ic, n)}<b>${text}</b>${desc ? `<small>${desc}</small>` : ''}</a>`;
+  const sect = (label, tiles) => (tiles.trim() ? `<div class="tb-sect"><div class="tb-label">${label}</div><div class="tb-grid">${tiles}</div></div>` : '');
   const adminPage = req.path.startsWith('/admin');
   const wnNew = require('./whatsnew').count(u);   // What's new lines this member has not seen (orange dot)
   const wnDot = wnNew ? '<em class="wn-dot" aria-label="new"></em>' : '';
-  return `${require('./look').tags(u)}<script>try{if(localStorage.getItem('sideFold')==='1')document.documentElement.classList.add('side-fold')}catch(e){}</script>
-<div class="app">
-<aside class="side">
-  <div class="side-top">
-    <a class="brand" href="/dashboard">${brandMark()}</a>
-    ${planBox(u)}
-    <a class="wn-top${wnNew ? ' on' : ''}" href="/whats-new" data-wn-open aria-label="What's new">${icon('star')}${wnDot}</a>
-    <button type="button" class="menu-btn" data-menu aria-controls="side-nav" aria-expanded="false" aria-label="Menu"><i></i><i></i><i></i></button>
-  </div>
-  <nav class="side-nav" id="side-nav" aria-label="Members menu">
-    ${group('Main menu', `${item('/dashboard', 'eas', 'My EAs')}
-      ${req.hasJournal ? item('/journal/desk', 'desk', 'Desk') + item('/journal', 'journal', 'Journal', on('/journal') && !on('/journal/insights') && !on('/journal/studio') && !on('/journal/mentor') && !on('/journal/desk') && !on('/journal/plan')) + item('/journal/plan', 'plan', 'Plan a trade') + item('/journal/insights', 'insights', 'Insights') + item('/journal/studio', 'studio', 'Share Studio') : ''}
-      ${req.mentorEligible && (req.hasJournal || u.mentor_share) ? item('/journal/mentor', 'chat', `Mentor review${req.mentorNew ? `<em class="count">${req.mentorNew}</em>` : ''}`, on('/journal/mentor')) : ''}`)}
-    ${group('Account', `${item('/settings', 'user', 'Trading profile')}${item('/appearance', 'paint', 'Appearance')}${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}${item('/profile', 'user', 'My page')}${item('/affiliate', 'gift', 'Affiliate')}
-      ${u.google_sub ? '' : item('/password', 'lock', 'Password')}`)}
-    ${u.is_admin ? group('Owner', `${item('/admin/sales', 'insights', 'Sales')}${item('/admin/usage', 'pulse', 'Feature usage')}${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/affiliates') && !on('/admin/usage') && !on('/admin/whatsnew'))}${item('/admin/eas', 'upload', 'EAs')}${item('/admin/whatsnew', 'star', "What's new")}${item('/admin/affiliates', 'gift', 'Affiliates')}${item('/mentor', 'cap', `Mentor${req.mentorWaiting ? `<em class="count">${req.mentorWaiting}</em>` : ''}`)}`) : ''}
-    <div class="side-group side-end">
-      <a href="/?install=1" data-install style="display:none" title="Get the app">${icon('app')}<span>Get the app</span></a>
-      <a href="/whats-new" data-wn-open title="What's new"${on('/whats-new') ? ' class="on" aria-current="page"' : wnNew ? ' class="wn-has"' : ''}>${icon('star')}<span>What's new${wnNew ? `<em class="count">${wnNew}</em>` : ''}</span>${wnDot}</a>
-      ${item('/faq', 'help', 'Help &amp; FAQ')}
-      <a href="#tour" data-tour-open title="Show me around">${icon('tour')}<span>Show me around</span></a>
-      <form method="post" action="/logout"><button class="link" title="Sign out">${icon('out')}<span>Sign out</span></button></form>
-    </div>
+  const jOn = { desk: on('/journal/desk'), plan: on('/journal/plan'), ins: on('/journal/insights'), studio: on('/journal/studio'), mentor: on('/journal/mentor') };
+  const journalOn = on('/journal') && !jOn.desk && !jOn.plan && !jOn.ins && !jOn.studio && !jOn.mentor;
+  const mentor = req.mentorEligible && (req.hasJournal || u.mentor_share);
+  const journalTiles = req.hasJournal ? `${tile('/journal/desk', 'desk', 'Desk', 'Today: plan, live trades, clock', jOn.desk)}
+      ${tile('/journal', 'journal', 'Journal', 'Calendar and every trade', journalOn)}
+      ${tile('/journal/plan', 'plan', 'Plan a trade', 'Entry, stop and size before you click', jOn.plan)}
+      ${tile('/journal/insights', 'insights', 'Insights', 'Edge score, leaks, what works', jOn.ins)}
+      ${tile('/journal/studio', 'studio', 'Share Studio', 'Cards and clips for socials', jOn.studio)}` : '';
+  const accountTiles = `${tile('/settings', 'user', 'Trading profile', 'Accounts and prop firm rules', on('/settings'))}
+      ${tile('/appearance', 'paint', 'Appearance', 'Background, panels, accent', on('/appearance'))}
+      ${tile('/mentorship', 'cap', 'Mentorship', 'The live programme', on('/mentorship'))}
+      ${tile('/pricing', 'plans', 'Plans', 'Your plan and billing', on('/pricing'))}
+      ${tile('/profile', 'user', 'My page', 'Your public trader page', on('/profile'))}
+      ${tile('/affiliate', 'gift', 'Affiliate', 'Share and earn', on('/affiliate'))}
+      ${u.google_sub ? '' : tile('/password', 'lock', 'Password', 'Change your password', on('/password'))}`;
+  const helpTiles = `<a class="tb-tile" href="/?install=1" data-install style="display:none">${cap('app')}<b>Get the app</b><small>Add 5ABI.FX to your phone</small></a>
+      <a class="tb-tile${on('/whats-new') ? ' on' : ''}" href="/whats-new" data-wn-open>${cap('star', wnNew)}<b>What's new</b><small>${wnNew ? `${wnNew} new for you` : 'Latest updates'}</small></a>
+      ${tile('/faq', 'help', 'Help &amp; FAQ', 'Answers and guides', on('/faq'))}
+      <a class="tb-tile" href="#tour" data-tour-open>${cap('tour')}<b>Show me around</b><small>A quick tour</small></a>
+      <form method="post" action="/logout" class="tb-out"><button class="tb-tile">${cap('out')}<b>Sign out</b></button></form>`;
+  const ownerTiles = u.is_admin ? `${tile('/admin/sales', 'insights', 'Sales', 'Revenue and sign-ups', on('/admin/sales'))}
+      ${tile('/admin/usage', 'pulse', 'Feature usage', 'What members use', on('/admin/usage'))}
+      ${tile('/admin', 'shield', 'Admin', 'Members and licences', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/affiliates') && !on('/admin/usage') && !on('/admin/whatsnew'))}
+      ${tile('/admin/eas', 'upload', 'EAs', 'Upload builds', on('/admin/eas'))}
+      ${tile('/admin/whatsnew', 'star', "What's new", 'Post updates', on('/admin/whatsnew'))}
+      ${tile('/admin/affiliates', 'gift', 'Affiliates', 'Partners and payouts', on('/admin/affiliates'))}
+      ${tile('/mentor', 'cap', 'Mentor', 'Student questions', on('/mentor'), req.mentorWaiting)}` : '';
+  const mentorTile = mentor ? tile('/journal/mentor', 'chat', 'Mentor review', 'Questions on your trades', jOn.mentor, req.mentorNew) : '';
+  const acctOn = ['/settings', '/appearance', '/mentorship', '/pricing', '/profile', '/affiliate', '/password', '/faq', '/whats-new'].some(on);
+  const ownOn = adminPage || on('/mentor');
+  const btn = (k, ic, text, active) => `<button type="button" class="tb-it${active ? ' on' : ''}" data-tbp="${k}" aria-expanded="false" aria-controls="tbp-${k}">${icon(ic)}<span>${text}</span><i class="tb-cv" aria-hidden="true"></i></button>`;
+  const link = (href, ic, text, active, n) => `<a class="tb-it${active ? ' on' : ''}" href="${href}"${active ? ' aria-current="page"' : ''}>${icon(ic)}<span>${text}</span>${n ? `<em class="tb-c count">${n}</em>` : ''}</a>`;
+  return `${require('./look').tags(u)}
+<div class="app tb-app">
+<header class="tb" id="tb">
+  <nav class="tb-bar tb-glass" aria-label="Members menu">
+    <a class="tb-orb" href="/dashboard" aria-label="5ABI.FX home"><img src="/logo.png" alt="" width="30" height="18"></a>
+    ${link('/dashboard', 'eas', 'My EAs', on('/dashboard'))}
+    ${req.hasJournal ? btn('j', 'journal', 'Journal', on('/journal') && !jOn.mentor) : ''}
+    ${mentor ? link('/journal/mentor', 'chat', 'Mentor review', jOn.mentor, req.mentorNew) : ''}
+    ${btn('a', 'user', 'Account', acctOn)}
+    ${u.is_admin ? btn('o', 'shield', 'Owner', ownOn) : ''}
   </nav>
-</aside>
+  <div class="tb-side tb-glass">
+    ${planPill(u)}
+    <a class="tb-round wn-top${wnNew ? ' on' : ''}" href="/whats-new" data-wn-open aria-label="What's new" title="What's new">${icon('star')}${wnDot}</a>
+    <span class="tb-av" title="Signed in">${esc(((u.name || u.email || 'M').trim()[0] || 'M').toUpperCase())}</span>
+  </div>
+  <div class="tb-m tb-glass">
+    <a class="tb-orb" href="/dashboard" aria-label="5ABI.FX home"><img src="/logo.png" alt="" width="30" height="18"></a>
+    <b class="tb-title">${esc(title)}</b>
+    <a class="tb-round wn-top${wnNew ? ' on' : ''}" href="/whats-new" data-wn-open aria-label="What's new">${icon('star')}${wnDot}</a>
+    <button type="button" class="tb-round tb-mbtn" data-tbp="m" aria-expanded="false" aria-controls="tbp-m" aria-label="Menu"><i></i><i></i><i></i></button>
+  </div>
+  ${req.hasJournal ? `<div class="tb-panel tb-glass tb-p-j" id="tbp-j"><div class="tb-grid">${journalTiles}</div></div>` : ''}
+  <div class="tb-panel tb-glass tb-p-a" id="tbp-a">${sect('Account', accountTiles)}${sect('Help', helpTiles)}</div>
+  ${u.is_admin ? `<div class="tb-panel tb-glass tb-p-o" id="tbp-o">${sect('Owner', ownerTiles)}</div>` : ''}
+  <div class="tb-panel tb-glass tb-p-m" id="tbp-m">
+    ${planPill(u)}
+    ${sect('Trading', `${tile('/dashboard', 'eas', 'My EAs', 'Downloads', on('/dashboard'))}${journalTiles}${mentorTile}`)}
+    ${sect('Account', accountTiles)}${sect('Help', helpTiles)}${sect('Owner', ownerTiles)}
+  </div>
+  <div class="tb-scrim" data-tb-close></div>
+</header>
 <div class="app-main">
-  <div class="app-top"><button type="button" class="fold-btn" data-fold aria-label="Hide the menu" title="Hide the menu (full screen)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/><path d="M15.5 10l-2 2 2 2"/></svg></button><span class="crumb"><a href="/dashboard">Home</a><i>›</i><b>${esc(title)}</b></span>${u.name ? `<span class="who priv-hide">${esc(u.name)}</span>` : ''}</div>
   <main class="app-body">${flashHtml}${body}</main>
   ${(u.student || u.mentor_plan || u.is_admin) && (u.intro_welcome !== 0 || (req.path === '/journal' && req.hasJournal && u.intro_reveal !== 'never'))
     ? `<script src="/intro.js" defer data-w="${u.intro_welcome === 0 || req.path === '/journal' ? 0 : 1}" data-ws="${process.env.WELCOME_STYLE === 'boot' ? 'boot' : 'name'}" data-r="${req.path === '/journal' && req.hasJournal ? esc(u.intro_reveal || 'always') : ''}"></script>` : ''}
