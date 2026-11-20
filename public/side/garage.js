@@ -5,9 +5,14 @@
 import * as THREE from '/vendor/three/three.module.min.js';
 import { GLTFLoader } from '/vendor/three/loaders/GLTFLoader.js';
 import { OrbitControls } from '/vendor/three/controls/OrbitControls.js';
-import { RoomEnvironment } from '/vendor/three/environments/RoomEnvironment.js';
 
-const PAINTS = { original: '#ffffff', ember: '#ff7a45', chrome: '#d8dde6', teal: '#38d6b4', royal: '#6f8bff', gold: '#f2c14e' };
+// paint: [colour over the model's texture, finish]. 'original' keeps the photo texture; the rest use a grey copy of it
+// (keeps windows, lights and wheels, drops the photo's baked orange glare) under real car paint: a clear coat over the
+// colour, or a satin finish for matte black.
+const PAINTS = {
+  original: ['#ffffff', 'gloss'], obsidian: ['#2b2b30', 'gloss'], matte: ['#3a3a3f', 'matte'], ember: ['#ff6a2c', 'gloss'],
+  chrome: ['#e6e9ef', 'chrome'], teal: ['#2fc9a8', 'gloss'], royal: ['#5f7dff', 'gloss'], gold: ['#f0b83e', 'gloss'],
+};
 // the canvas is bigger than the card (this much extra left/above, as a share of the card's size), so a zoomed-in car
 // can come out over the page; at normal zoom it sits inside the card exactly as before
 const OUT = { l: 0.9, t: 0.45 };   // right and bottom run to the window edge
@@ -22,12 +27,22 @@ export default function garage(card) {
   r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
   const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
   cam.position.set(4.4, 1.9, 4.8);
+  const accent = () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#ff5a1f';
   const pm = new THREE.PMREMGenerator(r);
-  sc.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; sc.environmentIntensity = 0.55;
+  // studio reflections: a soft grey sky with long light strips above, like a car photo studio (much better on gloss
+  // and chrome than a plain room)
+  const sky = document.createElement('canvas'); sky.width = 1024; sky.height = 512;
+  { const x = sky.getContext('2d'), g = x.createLinearGradient(0, 0, 0, 512);
+    g.addColorStop(0, '#d4d6dc'); g.addColorStop(0.4, '#7a7c84'); g.addColorStop(0.5, '#34353a'); g.addColorStop(0.62, '#141416'); g.addColorStop(1, '#070708');
+    x.fillStyle = g; x.fillRect(0, 0, 1024, 512);
+    x.filter = 'blur(6px)'; x.fillStyle = '#ffffff';
+    [[60, 70, 260, 26], [420, 54, 300, 22], [780, 80, 200, 30], [200, 150, 520, 10]].forEach(([l, t, w, h]) => x.fillRect(l, t, w, h));
+    x.fillStyle = accent(); x.globalAlpha = 0.5; x.fillRect(0, 225, 1024, 6); }
+  const skyTex = new THREE.CanvasTexture(sky); skyTex.mapping = THREE.EquirectangularReflectionMapping; skyTex.colorSpace = THREE.SRGBColorSpace;
+  sc.environment = pm.fromEquirectangular(skyTex).texture; sc.environmentIntensity = 1.15; r.toneMappingExposure = 1.15;
   const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(3, 6, 2); key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024); key.shadow.radius = 6; Object.assign(key.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4 }); sc.add(key);
-  const accent = () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#ff5a1f';
-  const rim = new THREE.DirectionalLight(new THREE.Color(accent()), 1.4); rim.position.set(-4, 2, -3); sc.add(rim);
+  const rim = new THREE.DirectionalLight(new THREE.Color(accent()), 0.8); rim.position.set(-4, 2, -3); sc.add(rim);
   const floor = new THREE.Mesh(new THREE.CircleGeometry(3.2, 64), new THREE.ShadowMaterial({ opacity: 0.55 }));
   floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; sc.add(floor);
   // soft glow on the floor in the theme colour
@@ -56,7 +71,17 @@ export default function garage(card) {
     car.scale.setScalar(2.5 / Math.max(s.x, s.z));
     const b2 = new THREE.Box3().setFromObject(car), c = new THREE.Vector3(); b2.getCenter(c);
     car.position.x -= c.x; car.position.z -= c.z; car.position.y -= b2.min.y;
-    car.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; mats.push(o.material); } });
+    car.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = true; o.receiveShadow = true;
+      // swap the plain scanned material for car paint (clear coat over the colour)
+      // the scan's normal map and hard normals make it look faceted / plastic: use smooth normals instead
+      smoothNormals(o.geometry);
+      const old = o.material, m = new THREE.MeshPhysicalMaterial({ map: old.map, side: old.side });
+      if (m.map) m.map.anisotropy = r.capabilities.getMaxAnisotropy();
+      m.userData.photo = old.map; m.userData.grey = greyMap(old.map);
+      old.dispose(); o.material = m; mats.push(m);
+    });
     holder.add(car);
     // headlights sit at the long end of the car
     const B = new THREE.Box3().setFromObject(car), long = (B.max.x - B.min.x) > (B.max.z - B.min.z);
@@ -68,11 +93,41 @@ export default function garage(card) {
     requestAnimationFrame(() => { card.classList.add('on'); cv.classList.add('on'); });
   });
 
+  // smooth normals shared by every copy of a point (the scan splits points at texture seams, which shows as facets)
+  function smoothNormals(geo) {
+    const pos = geo.attributes.position, n = pos.count, idx = geo.index, key = new Array(n), acc = new Map();
+    const p = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), f = new THREE.Vector3();
+    for (let i = 0; i < n; i++) { p.fromBufferAttribute(pos, i); key[i] = `${Math.round(p.x * 2e3)},${Math.round(p.y * 2e3)},${Math.round(p.z * 2e3)}`; }
+    const tri = idx ? idx.count / 3 : n / 3, at = (k) => (idx ? idx.getX(k) : k);
+    for (let t = 0; t < tri; t++) {
+      const i0 = at(t * 3), i1 = at(t * 3 + 1), i2 = at(t * 3 + 2);
+      a.fromBufferAttribute(pos, i0); b.fromBufferAttribute(pos, i1); c.fromBufferAttribute(pos, i2);
+      f.subVectors(c, b).cross(a.clone().sub(b));             // area-weighted face normal
+      [i0, i1, i2].forEach((i) => { const v = acc.get(key[i]); if (v) v.add(f); else acc.set(key[i], f.clone()); });
+    }
+    const out = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { const v = acc.get(key[i]); if (v) { p.copy(v).normalize(); out[i * 3] = p.x; out[i * 3 + 1] = p.y; out[i * 3 + 2] = p.z; } }
+    geo.setAttribute('normal', new THREE.BufferAttribute(out, 3));
+  }
+  // a grey copy of the photo texture, with a little extra contrast
+  function greyMap(tex) {
+    if (!tex || !tex.image) return tex;
+    try {
+      const im = tex.image, c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+      const x = c.getContext('2d'); x.filter = 'grayscale(1) contrast(1.25) brightness(1.15)'; x.drawImage(im, 0, 0);
+      const t = new THREE.CanvasTexture(c); t.flipY = tex.flipY; t.colorSpace = tex.colorSpace; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT;
+      t.anisotropy = r.capabilities.getMaxAnisotropy(); return t;
+    } catch (e) { return tex; }
+  }
   function setPaint(name) {
-    const hex = PAINTS[name] || PAINTS.original;
+    const [hex, fin] = PAINTS[name] || PAINTS.original;
     mats.forEach((m) => {
-      if (m.userData.m === undefined) { m.userData.m = m.metalness; m.userData.r = m.roughness; }
-      m.color.set(hex); m.metalness = name === 'chrome' ? 1 : m.userData.m; m.roughness = name === 'chrome' ? 0.18 : m.userData.r;
+      m.map = name === 'original' ? m.userData.photo : m.userData.grey;
+      m.color.set(hex);
+      if (fin === 'chrome') Object.assign(m, { metalness: 1, roughness: 0.08, clearcoat: 0, envMapIntensity: 1.8 });
+      else if (fin === 'matte') Object.assign(m, { metalness: 0.35, roughness: 0.62, clearcoat: 0.15, clearcoatRoughness: 0.5, envMapIntensity: 0.9 });
+      else Object.assign(m, { metalness: 0.55, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.04, envMapIntensity: 1.25 });
+      m.needsUpdate = true;
     });
   }
   const paint = () => (window.__LOOK && window.__LOOK.paint) || 'original';

@@ -6,7 +6,7 @@ const express = require('express');
 
 const BG = new Set(['none', 'colour', 'grad', 'upload', 'ember', 'rivers', 'heat', 'grid', 'aurora', 'candles', 'gold', 'lagoon', 'porcelain',
   'ph-hyper', 'ph-gt', 'ph-chromecar', 'ph-coupe', 'ph-nightrun', 'ph-katana', 'ph-rivers', 'ph-ridge', 'ph-chrome', 'ph-still']);
-const PAINT = new Set(['original', 'ember', 'chrome', 'teal', 'royal', 'gold']);
+const PAINT = new Set(['original', 'obsidian', 'matte', 'ember', 'chrome', 'teal', 'royal', 'gold']);
 const PANEL = new Set(['auto', 'midnight', 'onyx', 'graphite']);
 const HEX = /^#[0-9a-f]{6}$/i;
 const num = (v, lo, hi, d) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
@@ -90,6 +90,8 @@ module.exports = function setup(app, { db, page, requireUser }) {
       <div class="ap-sec-h"><b>Garage car</b><small>The 3D car on wide computer screens</small></div>
       <div class="ap-well ap-seg" id="apPaint">
         <button type="button" data-v="original"><i style="background:conic-gradient(#333,#ff5a1f,#333)"></i>Original</button>
+        <button type="button" data-v="obsidian"><i style="background:radial-gradient(circle at 35% 30%,#8a8a92,#111114 60%)"></i>Gloss black</button>
+        <button type="button" data-v="matte"><i style="background:#2a2a2e"></i>Matte black</button>
         <button type="button" data-v="ember"><i style="background:#ff7a45"></i>Ember</button>
         <button type="button" data-v="chrome"><i style="background:#d8dde6"></i>Chrome</button>
         <button type="button" data-v="teal"><i style="background:#38d6b4"></i>Teal</button>
