@@ -25,10 +25,15 @@ process.env.RATE_LIMIT_PER_MIN = '100000';
 const app = require('../src/server');
 const { db } = require('../src/db');
 
-if (look) db.prepare('UPDATE users SET look = ? WHERE id = ?').run(JSON.stringify({ bg: look }), db.prepare("SELECT id FROM users WHERE email = 'admin@test.com'").get().id);
+const uid = db.prepare("SELECT id FROM users WHERE email = 'admin@test.com'").get().id;
+if (look) db.prepare('UPDATE users SET look = ? WHERE id = ?').run(JSON.stringify({ bg: look }), uid);
+// clean shots: an MT5 account for the demo trades, no welcome screen or tour on top
+db.prepare("INSERT INTO accounts (user_id, account_number, label) VALUES (?, '1234567', 'Demo')").run(uid);
+for (const sql of ["UPDATE users SET intro_welcome = 0, intro_reveal = 'never' WHERE id = ?", "UPDATE users SET tour = 'done' WHERE id = ?"]) {
+  try { db.prepare(sql).run(uid); } catch (e) { /* column not in this version */ }
+}
 
 // demo trades so the journal, calendar and insights have something to show
-const uid = db.prepare("SELECT id FROM users WHERE email = 'admin@test.com'").get().id;
 const ins = db.prepare(`INSERT INTO journal_trades (user_id, account_number, position_id, symbol, side, lots, entry, exit, sl, tp, digits,
   open_time, close_time, profit, net, r, currency, broker) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
 let n = 0, seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -51,6 +56,7 @@ const server = app.listen(0, async () => {
     for (const [name, w, h] of SIZES) {
       const phone = w < 500;
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, isMobile: phone, hasTouch: phone });
+      await ctx.addInitScript(() => { try { sessionStorage.setItem('plx', '1'); } catch (e) {} });   // skip the journal's profit loading screen
       const p = await ctx.newPage();
       if (!pub) {
         await p.goto(base + '/login');

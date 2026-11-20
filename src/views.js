@@ -100,7 +100,7 @@ ${require('./seo').headTags(req, opts)}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@200;300;400;600&family=Manrope:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/style.css">
-${u && !opts.wide ? '<link rel="stylesheet" href="/look.css"><link rel="stylesheet" href="/topbar.css"><link rel="stylesheet" href="/compact.css">' : ''}
+${u && !opts.wide ? '<link rel="stylesheet" href="/look.css"><link rel="stylesheet" href="/topbar.css"><link rel="stylesheet" href="/compact.css"><link rel="stylesheet" href="/dock.css">' : ''}
 <link rel="stylesheet" href="/guards.css">
 </head><body>
 ${u && !opts.wide ? appShell(req, u, flashHtml, body, title) : `<header><div class="wrap bar"><a class="brand" href="/">${brandMark()}${pill}</a><button type="button" class="menu-btn" data-menu aria-controls="site-nav" aria-expanded="false" aria-label="Menu"><i></i><i></i><i></i></button><nav id="site-nav">${nav}</nav></div></header>
@@ -161,6 +161,8 @@ function appShell(req, u, flashHtml, body, title) {
   const mentorTile = mentor ? tile('/journal/mentor', 'chat', 'Mentor review', 'Questions on your trades', jOn.mentor, req.mentorNew) : '';
   const acctOn = ['/settings', '/appearance', '/mentorship', '/pricing', '/profile', '/affiliate', '/password', '/faq', '/whats-new'].some(on);
   const ownOn = adminPage || on('/mentor');
+  // phone dock tab (iPhone style): icon over a short label
+  const dock = (href, ic, text, active) => `<a class="tb-dk${active ? ' on' : ''}" href="${href}"${active ? ' aria-current="page"' : ''}>${icon(ic)}<span>${text}</span></a>`;
   const btn = (k, ic, text, active) => `<button type="button" class="tb-it${active ? ' on' : ''}" data-tbp="${k}" aria-expanded="false" aria-controls="tbp-${k}">${icon(ic)}<span>${text}</span><i class="tb-cv" aria-hidden="true"></i></button>`;
   const link = (href, ic, text, active, n) => `<a class="tb-it${active ? ' on' : ''}" href="${href}"${active ? ' aria-current="page"' : ''}>${icon(ic)}<span>${text}</span>${n ? `<em class="tb-c count">${n}</em>` : ''}</a>`;
   return `${require('./look').tags(u)}
@@ -183,7 +185,7 @@ function appShell(req, u, flashHtml, body, title) {
     <a class="tb-orb" href="/dashboard" aria-label="5ABI.FX home"><img src="/logo.png" alt="" width="30" height="18"></a>
     <b class="tb-title">${esc(title)}</b>
     <a class="tb-round wn-top${wnNew ? ' on' : ''}" href="/whats-new" data-wn-open aria-label="What's new">${icon('star')}${wnDot}</a>
-    <button type="button" class="tb-round tb-mbtn" data-tbp="m" aria-expanded="false" aria-controls="tbp-m" aria-label="Menu"><i></i><i></i><i></i></button>
+    <button type="button" class="tb-av tb-avb" data-tbp="m" aria-expanded="false" aria-controls="tbp-m" aria-label="Menu">${esc(((u.name || u.email || 'M').trim()[0] || 'M').toUpperCase())}</button>
   </div>
   ${req.hasJournal ? `<div class="tb-panel tb-glass tb-p-j" id="tbp-j"><div class="tb-grid">${journalTiles}</div></div>` : ''}
   <div class="tb-panel tb-glass tb-p-a" id="tbp-a">${sect('Account', accountTiles)}${sect('Help', helpTiles)}</div>
@@ -193,6 +195,12 @@ function appShell(req, u, flashHtml, body, title) {
     ${sect('Trading', `${tile('/dashboard', 'eas', 'My EAs', 'Downloads', on('/dashboard'))}${journalTiles}${mentorTile}`)}
     ${sect('Account', accountTiles)}${sect('Help', helpTiles)}${sect('Owner', ownerTiles)}
   </div>
+  <nav class="tb-dock tb-glass" aria-label="Phone menu">
+    ${req.hasJournal ? `${dock('/journal', 'journal', 'Journal', journalOn && !on('/journal/log'))}${dock('/journal/insights', 'insights', 'Insights', jOn.ins)}
+    <a class="tb-plus${on('/journal/log') ? ' on' : ''}" href="/journal/log" aria-label="Log a trade"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></a>
+    ${dock('/journal/desk', 'desk', 'Desk', jOn.desk)}` : `${dock('/dashboard', 'eas', 'My EAs', on('/dashboard'))}${dock('/appearance', 'paint', 'Appearance', on('/appearance'))}`}
+    <button type="button" class="tb-dk" data-tbp="m" aria-expanded="false" aria-controls="tbp-m"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg><span>More</span></button>
+  </nav>
   <div class="tb-scrim" data-tb-close></div>
 </header>
 <div class="app-main">
