@@ -3,9 +3,9 @@
    tint look.js sets from the background; text that sits straight on the background flips dark or light. */
 html.lk { background: #050507; }
 html.lk body, html.lk .app, html.lk .app-main { background: transparent !important; }
-#lk-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
-#lk-bg canvas { position: absolute; inset: -4%; width: 108%; height: 108%; display: block; will-change: transform; }
-#lk-bg i { position: absolute; inset: 0; background: #000; opacity: 0; }
+#lk-bg { position: fixed; top:0;right:0;bottom:0;left:0; z-index: -1; overflow: hidden; pointer-events: none; }
+#lk-bg canvas { position: absolute; top:-4%;right:-4%;bottom:-4%;left:-4%; width: 108%; height: 108%; display: block; will-change: transform; }
+#lk-bg i { position: absolute; top:0;right:0;bottom:0;left:0; background: #000; opacity: 0; }
 html:not(.lk) #lk-bg { display: none; }
 
 /* menu + top bar */
@@ -22,7 +22,7 @@ html.lk .app-foot { border-top-color: transparent; }
 /* the page content sits on one frosted sheet whose darkness look.js sets from the background (clear on dark pictures) */
 /* (a pseudo-element, so fixed pop-ups inside the page are not trapped by the blur) */
 html.lk .app-body { position: relative; margin: 0 clamp(10px, 1.6vw, 24px) 18px; width: auto; }
-html.lk .app-body::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: 26px; background: var(--lk-sheet);
+html.lk .app-body::before { content: ""; position: absolute; top:0;right:0;bottom:0;left:0; z-index: -1; pointer-events: none; border-radius: 26px; background: var(--lk-sheet);
   -webkit-backdrop-filter: blur(var(--lk-sheet-blur)) saturate(140%); backdrop-filter: blur(var(--lk-sheet-blur)) saturate(140%);
   border: 1px solid rgba(255,255,255,.06); box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 30px 80px -40px rgba(0,0,0,.6); }
 @media (max-width: 900px) { html.lk .app-body { margin: 8px 8px 14px; } html.lk .app-body::before { border-radius: 20px; } }
@@ -89,7 +89,7 @@ html.lk .app-body .btn:not(.secondary):not(.link), html.lk .app-body button[type
 .ap-tile.on .nm { color: var(--text); }
 .ap-tile .th.add { display: grid; place-items: center; background: rgba(255,255,255,.05); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.1); }
 .ap-tile .th.add svg { width: 22px; height: 22px; color: var(--muted); }
-.ap-tile input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; padding: 0; margin: 0; }
+.ap-tile input { position: absolute; top:0;right:0;bottom:0;left:0; width: 100%; height: 100%; opacity: 0; cursor: pointer; padding: 0; margin: 0; }
 .ap-tile .th.classic { background: radial-gradient(120% 90% at 10% 40%, rgba(255,90,31,.25), transparent 60%), #0a0a0b; display: grid; place-items: center; }
 .ap-tile .th.classic img { width: 46%; height: auto; object-fit: contain; }
 
@@ -101,11 +101,11 @@ html.lk .app-body .btn:not(.secondary):not(.link), html.lk .app-body button[type
 .ap-dots { display: flex; flex-wrap: wrap; gap: 9px; }
 .ap-dot { position: relative; width: 30px; height: 30px; min-height: 0; border-radius: 50%; border: 0; cursor: pointer; padding: 0;
   box-shadow: 0 1px 2px rgba(0,0,0,.35), 0 4px 10px -4px rgba(0,0,0,.45), inset 0 0 0 1px rgba(0,0,0,.18); }
-.ap-dot.metal::before { content: ""; position: absolute; inset: 2px 5px auto; height: 40%; border-radius: 50% 50% 45% 45%; background: linear-gradient(rgba(255,255,255,.75), rgba(255,255,255,0)); opacity: .8; }
+.ap-dot.metal::before { content: ""; position: absolute; top:2px;right:5px;bottom:auto;left:5px; height: 40%; border-radius: 50% 50% 45% 45%; background: linear-gradient(rgba(255,255,255,.75), rgba(255,255,255,0)); opacity: .8; }
 .ap-dot[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--lk-eff, #111), 0 0 0 4px var(--accent-2); }
 .ap-dot[aria-pressed="true"]::after { content: ""; position: absolute; left: 50%; top: 50%; width: 9px; height: 5px; border-left: 2px solid var(--ck, #fff); border-bottom: 2px solid var(--ck, #fff); transform: translate(-50%, -70%) rotate(-45deg); }
 .ap-dot.pick { background: conic-gradient(#ff5a1f, #f5a524, var(--ok), #3b82f6, #a855f7, var(--danger), #ff5a1f); }
-.ap-dot.pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; padding: 0; }
+.ap-dot.pick input { position: absolute; top:0;right:0;bottom:0;left:0; opacity: 0; cursor: pointer; width: 100%; height: 100%; padding: 0; }
 
 .ap-read { display: flex; gap: 12px; align-items: center; padding: 12px 14px; }
 .ap-read .sc { font: 700 20px Sora, system-ui, sans-serif; letter-spacing: -.02em; min-width: 72px; font-variant-numeric: tabular-nums; }

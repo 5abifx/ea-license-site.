@@ -1,9 +1,9 @@
 /* Guided tour of the members area (public/tour.js): liquid glass on black, same look as the guided sign-up */
-.tr-scrim{position:fixed;inset:0;z-index:9000;background:rgba(3,3,5,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;transition:opacity .35s}
+.tr-scrim{position:fixed;top:0;right:0;bottom:0;left:0;z-index:9000;background:rgba(3,3,5,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;transition:opacity .35s}
 .tr-scrim.in{opacity:1}
 .tr-scrim.clear{background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}
 .tr-hole{position:fixed;z-index:9001;border-radius:14px;pointer-events:none;box-shadow:0 0 0 9999px rgba(3,3,5,.66),0 0 0 1px rgba(255,176,122,.9),0 0 26px rgba(255,90,31,.55);transition:all .45s cubic-bezier(.6,0,.2,1)}
-.tr-hole:after{content:"";position:absolute;inset:-6px;border-radius:18px;border:1px solid rgba(255,176,122,.5);animation:tr-ping 1.8s ease-out infinite}
+.tr-hole:after{content:"";position:absolute;top:-6px;right:-6px;bottom:-6px;left:-6px;border-radius:18px;border:1px solid rgba(255,176,122,.5);animation:tr-ping 1.8s ease-out infinite}
 @keyframes tr-ping{from{opacity:.9;transform:scale(.97)}to{opacity:0;transform:scale(1.06)}}
 
 .tr-glass{position:relative;color:#f2f2f4;font:15px/1.5 Manrope,system-ui,sans-serif;background:linear-gradient(180deg,rgba(28,28,32,.86),rgba(12,12,15,.9));backdrop-filter:blur(22px) saturate(170%);-webkit-backdrop-filter:blur(22px) saturate(170%);border:1px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 30px 80px rgba(0,0,0,.6)}
@@ -23,7 +23,7 @@
 .tr-opts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .tr-opt{position:relative;overflow:hidden;display:flex;flex-direction:column;gap:12px;padding:20px;border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.09);box-shadow:inset 0 1px 0 rgba(255,255,255,.12);transition:transform .2s,border-color .2s}
 .tr-opt:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.2)}
-.tr-opt:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.12) 50%,transparent 70%);transform:translateX(-120%);transition:transform .8s ease}
+.tr-opt:after{content:"";position:absolute;top:0;right:0;bottom:0;left:0;pointer-events:none;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.12) 50%,transparent 70%);transform:translateX(-120%);transition:transform .8s ease}
 .tr-opt:hover:after{transform:translateX(120%)}
 .tr-opt.adv{background:linear-gradient(160deg,rgba(255,90,31,.14),rgba(255,255,255,.025) 60%);border-color:rgba(255,90,31,.28)}
 .tr-opt h3{font-size:19px;display:flex;align-items:center;gap:8px}
@@ -78,7 +78,7 @@
 .tr-glass .tr-pill:focus-visible{box-shadow:0 0 0 2px #050507,0 0 0 4px #ffb07a!important}
 
 /* ---- liquid glass (same recipe as the guided sign-up) ---- */
-.tr-amb{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.tr-amb{position:absolute;top:0;right:0;bottom:0;left:0;overflow:hidden;pointer-events:none}
 .tr-amb i{position:absolute;border-radius:50%;filter:blur(90px);animation:tr-drift 22s ease-in-out infinite alternate}
 .tr-amb i:nth-child(1){width:560px;height:560px;background:#ff5a1f;left:8vw;top:30vh;opacity:.07}
 .tr-amb i:nth-child(2){width:440px;height:440px;background:var(--ok);left:62vw;top:6vh;opacity:.05;animation-duration:28s}
@@ -87,7 +87,7 @@
 .tr-scrim.clear .tr-amb{display:none}
 .tr-glass{background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.035) 45%,rgba(255,255,255,.02));backdrop-filter:blur(28px) saturate(190%);-webkit-backdrop-filter:blur(28px) saturate(190%);border:1px solid rgba(255,255,255,.13);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 -1px 0 rgba(0,0,0,.35),inset 0 0 30px rgba(255,255,255,.03),0 30px 90px rgba(0,0,0,.55);overflow:hidden}
 /* bright rim fading down the sides */
-.tr-glass:before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;background:linear-gradient(160deg,rgba(255,255,255,.55),rgba(255,255,255,.08) 30%,rgba(255,255,255,0) 60%,rgba(255,176,122,.25));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.tr-glass:before{content:"";position:absolute;top:0;right:0;bottom:0;left:0;border-radius:inherit;padding:1px;pointer-events:none;background:linear-gradient(160deg,rgba(255,255,255,.55),rgba(255,255,255,.08) 30%,rgba(255,255,255,0) 60%,rgba(255,176,122,.25));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
 /* light streak across the card each time it appears */
 .tr-glass:after{content:"";position:absolute;top:0;bottom:0;left:0;width:60%;pointer-events:none;background:linear-gradient(110deg,transparent 20%,rgba(255,255,255,.16) 50%,transparent 80%);transform:translateX(-130%)}
 .tr-pick.in:after,.tr-card.in:after{animation:tr-sweep 1.2s .15s cubic-bezier(.3,.7,.2,1) both}
