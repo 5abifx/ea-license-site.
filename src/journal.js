@@ -399,7 +399,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   // ?period=YYYY-MM (a month) | 30 | 90 | all, ?account= as on the journal. Account numbers are always masked.
   // Share Studio: motion share cards for a trade, day, session, week, month or quarter.
   // The page gets a compact list of recent trades; candles load per trade when a trade card is picked.
-  const stock = require('./stock-clips')(app, { requireUser });
+  const stock = require('./stock-clips')(app, { requireUser, requireJournal });
   app.get('/journal/studio', requireUser, requireJournal, (req, res) => {
     const u = req.user;
     const { liveAccts, sel, where, args } = scope(req);
@@ -412,8 +412,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       id: t.id, s: t.symbol, side: t.side, o: t.open_time, c: t.close_time, net: t.net, r: t.r, pips: num(t.pips), pct: num(t.pct),
       entry: num(t.entry), exit: num(t.exit), lots: num(t.lots), risk: num(t.risk_pct), sess: desk.sessionOf(t, off), m: t.manual ? 1 : 0,
     }));
-    // owner-only extras (clip studio): Shuffle clips, quote, photo, layout, length
-    const owner = !!u.is_admin;
+    // the full Share panel (clip Shuffle, quote, photo, layout, length, GIF, no trade day) is open to every member with the Journal
+    const owner = true;
     const json = JSON.stringify({ trades, owner, stock: owner && stock.enabled(), cur, handle: u.card_handle || u.name || '' }).replace(/</g, '\\u003c');
     const acctOpts = [...(liveAccts.length > 1 ? [['', 'All accounts']] : []), ...liveAccts.map((a) => [a.account_number, `Account ••${String(a.account_number).slice(-2)}`])];
     page(req, res, 'Share Studio', `

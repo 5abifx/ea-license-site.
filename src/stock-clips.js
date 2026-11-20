@@ -18,9 +18,9 @@ const TOPICS = {
 };
 const cache = new Map();   // query -> { at, list }, an hour, so a busy evening does not hit the API limit
 
-// Owner only for now (requireAdmin): the clip studio is the owner's own tool.
-module.exports = function registerStockClips(app, { requireUser }) {
-  const ownerOnly = (req, res, next) => (req.user && req.user.is_admin ? next() : res.status(404).end());
+// Every member with the Journal (requireJournal). Searches are cached an hour per query, so the API limit holds.
+module.exports = function registerStockClips(app, { requireUser, requireJournal }) {
+  const ownerOnly = requireJournal;
   const pexels = () => process.env.PEXELS_API_KEY || '', pixabay = () => process.env.PIXABAY_API_KEY || '';
   const key = () => pexels() || pixabay();
   async function fromPexels(q, portrait) {
