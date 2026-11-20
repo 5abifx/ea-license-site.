@@ -186,7 +186,7 @@
     // Content sheet: every members page has white titles and numbers sitting straight on the page, so on a light or
     // busy background a dark frosted sheet goes behind the page content until white text reaches 7:1 on it.
     // On dark backgrounds it stays almost clear and the picture shows crisp.
-    let sa = 0.12 + busy * 0.25, sheetEff = mix(bgEff, [8, 8, 10], sa);
+    let sa = 0.08 + busy * 0.2, sheetEff = mix(bgEff, [8, 8, 10], sa);
     while (CR(W_, sheetEff) < 7 && sa < 0.9) { sa += 0.03; sheetEff = mix(bgEff, [8, 8, 10], sa); }
     let a = S.panel === 'onyx' ? 0.94 : 0.5 + busy * 0.3; if (S.panel === 'graphite') a += 0.08;
     let eff = mix(sheetEff, surf, a);
@@ -206,7 +206,7 @@
     set('--accent-soft', rgba(A, 0.14)); set('--lk-acc-fill', ac.metal ? metalFill(ac.hex) : ac.hex);
     set('--lk-head', headDark ? '#0c0c10' : '#f4f4f6'); set('--lk-head-2', headDark ? 'rgba(12,12,16,.68)' : 'rgba(244,244,246,.72)');
     set('--lk-head-shadow', busy > 0.25 ? (headDark ? '0 1px 12px rgba(255,255,255,.75)' : '0 2px 16px rgba(0,0,0,.7)') : 'none');
-    set('--lk-blur', Math.round(14 + busy * 18) + 'px'); set('--lk-sheet', `rgba(8,8,10,${sa.toFixed(2)})`); set('--lk-sheet-blur', Math.round(sa * 40) + 'px');
+    set('--lk-blur', Math.round(14 + busy * 18) + 'px'); set('--lk-sheet', `rgba(8,8,10,${sa.toFixed(2)})`); set('--lk-sheet-blur', Math.round(sa * 6) + 'px');   // a little frost only: the car and scene stay sharp behind the page
     root.classList.toggle('lk-lightbg', headDark);
     last_ = { contrast: CR(W_, eff), muted: CR(muted, eff), headDark, shifted: CR(A, eff) < 3.4, lb, sheet: sa };
     document.dispatchEvent(new CustomEvent('look:measured', { detail: last_ }));

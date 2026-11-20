@@ -230,7 +230,8 @@ function finishSignIn(req, res, u, codeDone = false) {
   }
   req.session.pv = null;
   req.session.uid = u.id;
-  res.redirect(takeNext(req, u.is_admin ? '/admin' : '/dashboard'));
+  // Journal members (owner included) land on the Share Studio after sign-in; others on My EAs (admins without a journal: Admin)
+  res.redirect(takeNext(req, journalAccess(u) ? '/journal/studio' : u.is_admin ? '/admin' : '/dashboard'));
 }
 const backup = require('./backup')(db, DATA_DIR);
 require('./security')(app, { db, page, flash, requireAdmin, rateLimit, finishSignIn, backup, SITE_NAME });
