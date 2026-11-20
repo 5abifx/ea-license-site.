@@ -191,7 +191,8 @@ function create(canvas, data, opts) {
       const upto = Math.max(1, Math.floor(pr * (n - 1)));
       for (let i = 0; i <= upto; i++) i ? c.lineTo(X(i), Y(k[i])) : c.moveTo(X(i), Y(k[i]));
       c.stroke();
-      const tag = (i, s) => { if (i <= upto && i >= 0) { c.globalAlpha = A(tm, 0.3 + i / n * 2.3, 0.6 + i / n * 2.3); pill(c, s, X(i), Y(k[i]) - 34, false); c.fillStyle = '#fff'; c.beginPath(); c.arc(X(i), Y(k[i]), 7, 0, 7); c.fill(); } };
+      // the pill pops the moment the line reaches its candle (the line eases, so undo the ease to find that time)
+      const tag = (i, s) => { if (i <= upto && i >= 0) { const at = 0.3 + 2.3 * (1 - Math.pow(1 - i / (n - 1), 0.25)); c.globalAlpha = A(tm, at, at + 0.18); pill(c, s, X(i), Y(k[i]) - 34, false); c.fillStyle = '#fff'; c.beginPath(); c.arc(X(i), Y(k[i]), 7, 0, 7); c.fill(); } };
       tag(data.iEntry, 'Entry'); tag(data.iExit, 'Exit');
       return;
     }
