@@ -93,8 +93,10 @@
   let PX = 0, PY = 0, TX = 0, TY = 0;
   function loadPhoto(p) {
     if (p.img) return;
-    p.img = new Image(); p.img.onload = () => { need = true; resample = true; }; p.img.src = p.src;
-    if (p.cut) { p.cimg = new Image(); p.cimg.onload = () => { need = true; resample = true; }; p.cimg.src = p.cut; }
+    // big or sharp screens (1440p and up, 4K, OLED laptops) get the 3840px AI-upscaled copy in /look/4k/
+    const hd = (s) => (Math.max(screen.width, screen.height) * (devicePixelRatio || 1) > 2200 ? s.replace('/look/', '/look/4k/') : s);
+    p.img = new Image(); p.img.onload = () => { need = true; resample = true; }; p.img.src = hd(p.src);
+    if (p.cut) { p.cimg = new Image(); p.cimg.onload = () => { need = true; resample = true; }; p.cimg.src = hd(p.cut); }
   }
   const hasCut = (p) => p && p.cimg && p.cimg.naturalWidth;
   function cover(ctx, el, w, h) { const iw = el.videoWidth || el.naturalWidth, ih = el.videoHeight || el.naturalHeight; if (!iw) return; const s = Math.max(w / iw, h / ih); ctx.drawImage(el, (w - iw * s) / 2, (h - ih * s) / 2, iw * s, ih * s); }
@@ -140,7 +142,7 @@
     const wrap = document.createElement('div'); wrap.id = 'lk-bg'; wrap.setAttribute('aria-hidden', 'true');
     cv = document.createElement('canvas'); scrim = document.createElement('i'); wrap.append(cv, scrim);
     document.body.prepend(wrap); cx = cv.getContext('2d');
-    const size = () => { const d = Math.min(1.5, window.devicePixelRatio || 1) * 0.75; W = Math.max(2, Math.round(cv.clientWidth * d)); H = Math.max(2, Math.round(cv.clientHeight * d)); cv.width = W; cv.height = H; need = true; };
+    const size = () => { const d = Math.min(2, window.devicePixelRatio || 1); /* full sharpness: was 0.75x, soft on big and OLED screens */ W = Math.max(2, Math.round(cv.clientWidth * d)); H = Math.max(2, Math.round(cv.clientHeight * d)); cv.width = W; cv.height = H; need = true; };
     addEventListener('resize', size); size();
     addEventListener('pointermove', (e) => { TX = e.clientX / innerWidth - 0.5; TY = e.clientY / innerHeight - 0.5; }, { passive: true });
   }
