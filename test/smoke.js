@@ -44,7 +44,7 @@ function client(base, ip) {
   try {
     const admin = client(base);
     let r = await admin.post('/login', { email: 'admin@test.com', password: 'adminpass123' });
-    assert.match(r.text, /Users/);
+    assert.match(r.text, /Share Studio/);   // signed-in members with the journal land on the Share Studio
 
     const fd = new FormData();
     fd.append('name', 'Gold Scalper'); fd.append('code', 'GOLD_SCALPER'); fd.append('version', '1.2');
