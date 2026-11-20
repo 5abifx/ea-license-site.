@@ -185,15 +185,21 @@ function create(canvas, data, opts) {
   function drawChart(tm, x0, chartTop, chartW, chartH) {
     const unit = o.unit;
     if (o.kind === 'trade') {
-      const k = data.closes, lo = Math.min(...k), hi = Math.max(...k), n = k.length, pr = ease(seg(tm, 0.3, 2.6));
+      const k = data.closes, lo = Math.min(...k), hi = Math.max(...k), n = k.length, pr = 1 - Math.pow(1 - seg(tm, 0.3, 2.1), 2);   // gentle ease-out: no long slow crawl before the Exit
       const X = i => x0 + i / (n - 1) * chartW, Y = v => chartTop + (hi - v) / (hi - lo || 1) * chartH;
-      c.globalAlpha = 0.95; c.strokeStyle = '#fff'; c.lineWidth = 4; c.lineJoin = 'round'; c.beginPath();
-      const upto = Math.max(1, Math.floor(pr * (n - 1)));
-      for (let i = 0; i <= upto; i++) i ? c.lineTo(X(i), Y(k[i])) : c.moveTo(X(i), Y(k[i]));
-      c.stroke();
-      // the pill pops the moment the line reaches its candle (the line eases, so undo the ease to find that time)
-      const tag = (i, s) => { if (i <= upto && i >= 0) { const at = 0.3 + 2.3 * (1 - Math.pow(1 - i / (n - 1), 0.25)); c.globalAlpha = A(tm, at, at + 0.18); pill(c, s, X(i), Y(k[i]) - 34, false); c.fillStyle = '#fff'; c.beginPath(); c.arc(X(i), Y(k[i]), 7, 0, 7); c.fill(); } };
+      // no canvas blur here: a blurred shadow on a long line (and on the pills) every frame made phones stutter.
+      // A soft dark under-stroke keeps it readable on bright clips for almost no cost.
+      c.save(); c.shadowBlur = 0;
+      const f = pr * (n - 1), upto = Math.max(1, Math.floor(f)), fr = f - Math.floor(f);
+      const path = () => { c.beginPath(); for (let i = 0; i <= upto; i++) i ? c.lineTo(X(i), Y(k[i])) : c.moveTo(X(i), Y(k[i]));
+        if (upto < n - 1 && fr > 0) c.lineTo(X(upto + fr), Y(k[upto] + (k[upto + 1] - k[upto]) * fr)); };   // smooth tip between candles
+      c.lineJoin = 'round'; c.lineCap = 'round';
+      c.globalAlpha = 0.35; c.strokeStyle = '#000'; c.lineWidth = 12; path(); c.stroke();
+      c.globalAlpha = 0.95; c.strokeStyle = '#fff'; c.lineWidth = 4; path(); c.stroke();
+      // the pill pops the moment the line reaches its candle (undo the line's ease to find that time)
+      const tag = (i, s) => { if (i <= upto && i >= 0) { const at = 0.3 + 1.8 * (1 - Math.sqrt(1 - i / (n - 1))); c.globalAlpha = A(tm, at, at + 0.18); pill(c, s, X(i), Y(k[i]) - 34, false); c.fillStyle = '#fff'; c.beginPath(); c.arc(X(i), Y(k[i]), 7, 0, 7); c.fill(); } };
       tag(data.iEntry, 'Entry'); tag(data.iExit, 'Exit');
+      c.restore();
       return;
     }
     const it = data.items, vs = it.map(x => val(x, unit)), mx = Math.max(1e-9, ...vs.map(v => Math.abs(fin(v) ? v : 0)));
