@@ -24,6 +24,7 @@ function brandMark() {
 
 // small stroke icons for the members menu
 const ICONS = {
+  paint: '<circle cx="12" cy="12" r="9"/><circle cx="8" cy="10" r="1.3"/><circle cx="12" cy="7.5" r="1.3"/><circle cx="16" cy="10" r="1.3"/><path d="M12 21a3 3 0 010-6h2a3 3 0 003-3"/>',
   desk: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4M6 13l3-3 3 2 5-5"/>',
   eas: '<path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/>',
   journal: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
@@ -100,6 +101,7 @@ ${require('./seo').headTags(req, opts)}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@200;300;400;600&family=Manrope:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/style.css">
+${u && !opts.wide ? '<link rel="stylesheet" href="/look.css">' : ''}
 </head><body>
 ${u && !opts.wide ? appShell(req, u, flashHtml, body, title) : `<header><div class="wrap bar"><a class="brand" href="/">${brandMark()}${pill}</a><button type="button" class="menu-btn" data-menu aria-controls="site-nav" aria-expanded="false" aria-label="Menu"><i></i><i></i><i></i></button><nav id="site-nav">${nav}</nav></div></header>
 ${opts.wide
@@ -127,7 +129,7 @@ function appShell(req, u, flashHtml, body, title) {
   const adminPage = req.path.startsWith('/admin');
   const wnNew = require('./whatsnew').count(u);   // What's new lines this member has not seen (orange dot)
   const wnDot = wnNew ? '<em class="wn-dot" aria-label="new"></em>' : '';
-  return `<script>try{if(localStorage.getItem('sideFold')==='1')document.documentElement.classList.add('side-fold')}catch(e){}</script>
+  return `${require('./look').tags(u)}<script>try{if(localStorage.getItem('sideFold')==='1')document.documentElement.classList.add('side-fold')}catch(e){}</script>
 <div class="app">
 <aside class="side">
   <div class="side-top">
@@ -140,7 +142,7 @@ function appShell(req, u, flashHtml, body, title) {
     ${group('Main menu', `${item('/dashboard', 'eas', 'My EAs')}
       ${req.hasJournal ? item('/journal/desk', 'desk', 'Desk') + item('/journal', 'journal', 'Journal', on('/journal') && !on('/journal/insights') && !on('/journal/studio') && !on('/journal/mentor') && !on('/journal/desk') && !on('/journal/plan')) + item('/journal/plan', 'plan', 'Plan a trade') + item('/journal/insights', 'insights', 'Insights') + item('/journal/studio', 'studio', 'Share Studio') : ''}
       ${req.mentorEligible && (req.hasJournal || u.mentor_share) ? item('/journal/mentor', 'chat', `Mentor review${req.mentorNew ? `<em class="count">${req.mentorNew}</em>` : ''}`, on('/journal/mentor')) : ''}`)}
-    ${group('Account', `${item('/settings', 'user', 'Trading profile')}${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}${item('/profile', 'user', 'My page')}${item('/affiliate', 'gift', 'Affiliate')}
+    ${group('Account', `${item('/settings', 'user', 'Trading profile')}${item('/appearance', 'paint', 'Appearance')}${item('/mentorship', 'cap', 'Mentorship')}${item('/pricing', 'plans', 'Plans')}${item('/profile', 'user', 'My page')}${item('/affiliate', 'gift', 'Affiliate')}
       ${u.google_sub ? '' : item('/password', 'lock', 'Password')}`)}
     ${u.is_admin ? group('Owner', `${item('/admin/sales', 'insights', 'Sales')}${item('/admin/usage', 'pulse', 'Feature usage')}${item('/admin', 'shield', 'Admin', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/affiliates') && !on('/admin/usage') && !on('/admin/whatsnew'))}${item('/admin/eas', 'upload', 'EAs')}${item('/admin/whatsnew', 'star', "What's new")}${item('/admin/affiliates', 'gift', 'Affiliates')}${item('/mentor', 'cap', `Mentor${req.mentorWaiting ? `<em class="count">${req.mentorWaiting}</em>` : ''}`)}`) : ''}
     <div class="side-group side-end">
