@@ -142,20 +142,24 @@
     const wrap = document.createElement('div'); wrap.id = 'lk-bg'; wrap.setAttribute('aria-hidden', 'true');
     cv = document.createElement('canvas'); scrim = document.createElement('i'); wrap.append(cv, scrim);
     document.body.prepend(wrap); cx = cv.getContext('2d');
-    const size = () => { const d = Math.min(2, window.devicePixelRatio || 1); /* full sharpness: was 0.75x, soft on big and OLED screens */ W = Math.max(2, Math.round(cv.clientWidth * d)); H = Math.max(2, Math.round(cv.clientHeight * d)); cv.width = W; cv.height = H; need = true; };
+    const size = () => { const area = Math.max(1, cv.clientWidth * cv.clientHeight), d = Math.min(2, window.devicePixelRatio || 1, Math.sqrt(8.3e6 / area)); /* full sharpness: was 0.75x, soft on big and OLED screens */ W = Math.max(2, Math.round(cv.clientWidth * d)); H = Math.max(2, Math.round(cv.clientHeight * d)); cv.width = W; cv.height = H; need = true; };
     addEventListener('resize', size); size();
     addEventListener('pointermove', (e) => { TX = e.clientX / innerWidth - 0.5; TY = e.clientY / innerHeight - 0.5; }, { passive: true });
   }
+  const FINE = matchMedia('(pointer:fine)');
   function frame(n) {
     if (!running) return;
     requestAnimationFrame(frame);
     if (document.hidden) return;
-    const d = S.depth / 100, fine = matchMedia('(pointer:fine)').matches;
-    if (!fine && S.motion) { TX = Math.sin(n / 4000) * 0.35; TY = Math.cos(n / 5200) * 0.25; }
-    PX += (TX - PX) * 0.06; PY += (TY - PY) * 0.06;
-    const cut = hasCut(PHOTO.find((p) => p.id === S.bg));
+    const d = S.depth / 100, fine = FINE.matches, cut = hasCut(PHOTO.find((p) => p.id === S.bg));
+    // phones drift slowly on their own; the cut-out car pictures stay still there (redrawing a full-screen picture every
+    // frame is what made pages feel laggy on phones)
+    if (!fine && S.motion && !cut) { TX = Math.sin(n / 4000) * 0.35; TY = Math.cos(n / 5200) * 0.25; }
+    const dx = TX - PX, dy = TY - PY, settling = Math.abs(dx) + Math.abs(dy) > 0.002;
+    PX += dx * 0.06; PY += dy * 0.06;
     cv.style.transform = cut || !S.motion ? '' : `perspective(1200px) rotateY(${PX * d * 3}deg) rotateX(${-PY * d * 2}deg) translate(${-PX * d * 40}px,${-PY * d * 28}px) scale(${1 + d * 0.05})`;
-    const mv = moving();
+    // the cut-out car only moves with the mouse: redraw while it is still easing, not every frame forever
+    const mv = moving() && (!cut || (fine && settling));
     if (!mv && !need) return;
     if (mv && n - last < 33) return;
     last = n; need = false;
@@ -177,6 +181,7 @@
   }
   // Panels stay dark glass (every members page is built light-on-dark); how see-through they are depends on the
   // background, so white text keeps at least 7:1 on them. Text that sits straight on the background flips dark/light.
+  const SHEET = [82, 83, 88];
   const PANELS = { auto: [12, 12, 16], midnight: [14, 18, 32], onyx: [6, 6, 8], graphite: [30, 31, 36] };
   let last_ = {};
   function tokens() {
@@ -188,8 +193,11 @@
     // Content sheet: every members page has white titles and numbers sitting straight on the page, so on a light or
     // busy background a dark frosted sheet goes behind the page content until white text reaches 7:1 on it.
     // On dark backgrounds it stays almost clear and the picture shows crisp.
-    let sa = 0.08 + busy * 0.2, sheetEff = mix(bgEff, [8, 8, 10], sa);
-    while (CR(W_, sheetEff) < 7 && sa < 0.9) { sa += 0.03; sheetEff = mix(bgEff, [8, 8, 10], sa); }
+    let sa = 0.08 + busy * 0.2, sheetCol = [8, 8, 10], sheetEff = mix(bgEff, sheetCol, sa);
+    while (CR(W_, sheetEff) < 7 && sa < 0.9) { sa += 0.03; sheetEff = mix(bgEff, sheetCol, sa); }
+    // Every background gets the graphite glass sheet the Hyper picture gives (owner's pick, Nov 20): on darker pictures
+    // the sheet is lifted to the same grey instead of staying clear, so the dark panels stand out the same way everywhere.
+    if (L(sheetEff) < L(SHEET)) { sheetCol = SHEET; sa = 0.82; sheetEff = mix(bgEff, SHEET, sa); }
     let a = S.panel === 'onyx' ? 0.94 : 0.5 + busy * 0.3; if (S.panel === 'graphite') a += 0.08;
     let eff = mix(sheetEff, surf, a);
     while (CR(W_, eff) < 7.5 && a < 0.97) { a += 0.03; eff = mix(sheetEff, surf, a); }
@@ -208,7 +216,7 @@
     set('--accent-soft', rgba(A, 0.14)); set('--lk-acc-fill', ac.metal ? metalFill(ac.hex) : ac.hex);
     set('--lk-head', headDark ? '#0c0c10' : '#f4f4f6'); set('--lk-head-2', headDark ? 'rgba(12,12,16,.68)' : 'rgba(244,244,246,.72)');
     set('--lk-head-shadow', busy > 0.25 ? (headDark ? '0 1px 12px rgba(255,255,255,.75)' : '0 2px 16px rgba(0,0,0,.7)') : 'none');
-    set('--lk-blur', Math.round(14 + busy * 18) + 'px'); set('--lk-sheet', `rgba(8,8,10,${sa.toFixed(2)})`); set('--lk-sheet-blur', Math.round(sa * 6) + 'px');   // a little frost only: the car and scene stay sharp behind the page
+    set('--lk-blur', Math.round(14 + busy * 18) + 'px'); set('--lk-sheet', `rgba(${sheetCol.join(',')},${sa.toFixed(2)})`); set('--lk-sheet-blur', Math.round(sa * 6) + 'px');   // a little frost only: the car and scene stay sharp behind the page
     root.classList.toggle('lk-lightbg', headDark);
     last_ = { contrast: CR(W_, eff), muted: CR(muted, eff), headDark, shifted: CR(A, eff) < 3.4, lb, sheet: sa };
     document.dispatchEvent(new CustomEvent('look:measured', { detail: last_ }));

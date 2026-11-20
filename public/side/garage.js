@@ -22,7 +22,7 @@ export default function garage(card) {
   // the canvas lives on <body> (fixed) so the card's glass and the column's scrolling can't clip the car
   cv.classList.add('sc-car3d'); document.body.appendChild(cv);
   const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
-  r.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+  r.setPixelRatio(Math.min(1.5, devicePixelRatio || 1));   // 1.5x is sharp on a small card and far cheaper than 2x
   r.toneMapping = THREE.ACESFilmicToneMapping; r.outputColorSpace = THREE.SRGBColorSpace;
   r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
   const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
@@ -126,7 +126,10 @@ export default function garage(card) {
     car.traverse((o) => { if (o.isMesh && !pivot.lengthSq() && o.geometry.index) { pivot.copy(o.localToWorld(new THREE.Vector3(AXLES[1][0] * 0.6, 0, 0))); pivot.y = 0; } });
     setPaint(paint());
     idleHint();
-    requestAnimationFrame(() => { card.classList.add('on'); cv.classList.add('on'); });
+    // compile the shaders before the first frame (off the main thread where the browser can): the first render used to
+    // freeze the page for up to a second right after it loaded
+    const show = () => { ready = true; requestAnimationFrame(() => { card.classList.add('on'); cv.classList.add('on'); }); };
+    (r.compileAsync ? r.compileAsync(sc, cam) : Promise.resolve(r.compile(sc, cam))).then(show, show);
   });
 
   // smooth normals shared by every copy of a point (the scan splits points at texture seams, which shows as facets)
@@ -343,10 +346,16 @@ export default function garage(card) {
     cam.updateProjectionMatrix();
     return true;
   }
-  let last = performance.now();
+  let last = performance.now(), lastR = 0, ready = false, busyCtl = false;
+  ctl.addEventListener('start', () => (busyCtl = true)); ctl.addEventListener('end', () => (busyCtl = false));
   (function loop(t) {
     requestAnimationFrame(loop);
     if (document.hidden || !place()) return;
+    // just turning slowly on its own: 30 frames a second is enough and halves the work; full rate while you drag,
+    // zoom, rev or burn out
+    const active = busyCtl || rev > 0 || burn > 0 || puffs.length;
+    if (!ready || (!active && t - lastR < 32)) return;
+    lastR = t;
     const dt = Math.min(0.05, (t - last) / 1000); last = t;
     // burnout: spin the rear tyres on the spot, then a full doughnut around the front axle with the tail sliding out,
     // body leaning, front wheels on opposite lock and smoke pouring off the rear tyres
@@ -379,7 +388,7 @@ export default function garage(card) {
     holder.position.x += (Math.random() - 0.5) * shake; holder.position.y = Math.abs(Math.sin(t / 30)) * shake * 0.6; holder.position.z += (Math.random() - 0.5) * shake;
     if (car) car.rotation.x = roll;
     if (puffs.length) smoke(dt);
-    ctl.update(); r.render(sc, cam);
+    ctl.update(dt); r.render(sc, cam);
   })(performance.now());
   // the car-theme intro (public/hero.js) parks the car here: give it a rev on arrival
   addEventListener('garage:arrive', () => { rev = 1; revT = performance.now(); });

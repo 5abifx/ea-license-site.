@@ -26,6 +26,11 @@ html.lk .app-body::before { content: ""; position: absolute; top:0;right:0;botto
   -webkit-backdrop-filter: blur(var(--lk-sheet-blur)) saturate(140%); backdrop-filter: blur(var(--lk-sheet-blur)) saturate(140%);
   border: 1px solid rgba(255,255,255,.06); box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 30px 80px -40px rgba(0,0,0,.6); }
 @media (max-width: 900px) { html.lk .app-body { margin: 8px 8px 14px; } html.lk .app-body::before { border-radius: 20px; } }
+/* classic (no background picked): the same graphite glass sheet as the Hyper look, so every theme feels the same */
+html:not(.lk) .app-body { position: relative; isolation: isolate; margin: 0 clamp(10px, 1.6vw, 24px) 18px; width: auto; }
+html:not(.lk) .app-body::before { content: ""; position: absolute; top:0;right:0;bottom:0;left:0; z-index: -1; pointer-events: none; border-radius: 26px;
+  background: rgba(82,83,88,.82); border: 1px solid rgba(255,255,255,.06); box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 30px 80px -40px rgba(0,0,0,.6); }
+@media (max-width: 900px) { html:not(.lk) .app-body { margin: 8px 8px 14px; } html:not(.lk) .app-body::before { border-radius: 20px; } }
 
 /* frosted panels: soft layered shadow + thin top highlight */
 html.lk .app-body .card, html.lk .app-body .pl-tile, html.lk .app-body .dk-card, html.lk .app-body .stats div, html.lk .app-body .flash {

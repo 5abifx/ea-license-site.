@@ -167,7 +167,14 @@
       var y2 = Y * Math.cos(t) - Z * Math.sin(t), z2 = Y * Math.sin(t) + Z * Math.cos(t);
       return [C + X * R0, C - y2 * R0, z2];
     }
-    function frame() {
+    // 30 frames a second is plenty for a slow spin; skip frames while the globe is off screen or the tab is hidden
+    var seen = true, lastF = 0, acc = '';
+    if (window.IntersectionObserver) new IntersectionObserver(function (e) { seen = e[0].isIntersecting; }).observe(cv);
+    function frame(now) {
+      requestAnimationFrame(frame);
+      if (!seen || document.hidden || (now && now - lastF < 32)) return;
+      lastF = now || 0;
+      if (!acc) acc = getComputedStyle(root).getPropertyValue('--accent').trim() || '#ff5a1f';
       x.clearRect(0, 0, 250, 250);
       var g = x.createRadialGradient(C - 40, C - 50, 10, C, C, R0);
       g.addColorStop(0, '#26262c'); g.addColorStop(1, '#060608');
@@ -179,20 +186,19 @@
         x.fillStyle = 'rgba(255,255,255,' + ((lit > 0 ? 0.55 : 0.2) * (0.35 + 0.65 * q[2])).toFixed(3) + ')';
         x.fillRect(q[0] - 0.9, q[1] - 0.9, 1.8, 1.8);
       }
-      var acc = getComputedStyle(root).getPropertyValue('--accent').trim() || '#ff5a1f', tnow = Date.now() / 600;
+      var tnow = Date.now() / 600;
       S.forEach(function (s) {
         var q = proj(s.lon, s.lat); if (q[2] <= 0) return;
         if (s.on) { var rr = 10 + 6 * (0.5 + 0.5 * Math.sin(tnow)); x.globalAlpha = 0.35; x.fillStyle = acc; x.beginPath(); x.arc(q[0], q[1], rr, 0, 7); x.fill(); x.globalAlpha = 1; }
         x.fillStyle = s.on ? acc : '#71717a'; x.beginPath(); x.arc(q[0], q[1], s.on ? 3.6 : 2.6, 0, 7); x.fill();
       });
       x.strokeStyle = 'rgba(255,255,255,.16)'; x.lineWidth = 1; x.beginPath(); x.arc(C, C, R0, 0, 7); x.stroke();
-      if (!drag) rot += 0.04;
-      requestAnimationFrame(frame);
+      if (!drag) rot += 0.08;
     }
     cv.addEventListener('pointerdown', function (e) { drag = { x: e.clientX, y: e.clientY, r: rot, t: tilt }; cv.setPointerCapture(e.pointerId); });
     cv.addEventListener('pointermove', function (e) { if (drag) { rot = drag.r + (e.clientX - drag.x) * 0.5; tilt = Math.max(-60, Math.min(60, drag.t + (e.clientY - drag.y) * 0.4)); } });
     cv.addEventListener('pointerup', function () { drag = null; });
-    setInterval(function () { S = sessions(); }, 30000);
+    setInterval(function () { S = sessions(); acc = ''; }, 30000);
     frame();
   }
 
@@ -224,7 +230,9 @@
     var g = R.querySelector('.sc-garage canvas');
     // the 3D car is the heaviest thing on the page: start it only after the page has loaded and gone quiet,
     // so switching pages stays smooth, then fade it in
-    var go = function () { import('/side/garage.js').then(function (m) { m.default(R.querySelector('.sc-garage')); }).catch(function () { R.querySelector('.sc-garage').remove(); }); };
+    // wait while the journal intro (Night run) is on screen: two 3D scenes starting at once made the intro stutter
+    var go = function () { if (document.querySelector('.plx')) { setTimeout(go, 400); return; } go2(); };
+    var go2 = function () { import('/side/garage.js').then(function (m) { m.default(R.querySelector('.sc-garage')); }).catch(function () { R.querySelector('.sc-garage').remove(); }); };
     var idle = function () { setTimeout(function () { (window.requestIdleCallback || function (f) { setTimeout(f, 1); })(go, { timeout: 2500 }); }, 700); };
     var start = function () { if (document.readyState === 'complete') idle(); else addEventListener('load', idle, { once: true }); };
     if ('IntersectionObserver' in window) { var io = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting; })) { io.disconnect(); start(); } }); io.observe(g); } else start();
