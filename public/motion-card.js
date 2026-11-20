@@ -139,8 +139,7 @@ function create(canvas, trade, opts) {
     const mw = media.videoWidth || media.naturalWidth || media.width, mh = media.videoHeight || media.naturalHeight || media.height;
     if (!mw || !mh) return;
     const z = media.tagName === 'VIDEO' ? 1 : 1.04 + 0.08 * (tm / LEN); // slow zoom on photos
-    const s = Math.max(W / mw, H / mh) * z;
-    c.drawImage(media, (W - mw * s) / 2, (H - mh * s) / 2, mw * s, mh * s);
+    K.photoBg(c, media, o.dim, W, H, z);   // colour drains as Darken goes up: no muddy tint behind the text
   }
   /* ---------- trade replay: the trade plays out candle by candle, from the entry to the exit ---------- */
   const RP = replayOf(trade);

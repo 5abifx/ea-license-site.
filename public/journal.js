@@ -13,23 +13,24 @@
   // ---------- what the member picked (remembered in this browser) ----------
   const A = {
     card: store.get('ts.card') || 'replay', tpl: store.get('cardStyle') || 'a', mode: store.get('ts.mode') || 'money', rm: store.get('ts.rm') !== '0',
-    rstyle: store.get('ts.rstyle') || 'candles', hide: store.get('ts.hide') === '1', scene: store.get('motionScene') || 'ember', size: store.get('motionSize') || 'story', dim: 55,
+    rstyle: store.get('ts.rstyle') || 'candles', bg: 'built', hide: store.get('ts.hide') === '1', scene: store.get('motionScene') || 'ember', size: store.get('motionSize') || 'story', dim: 55,
     ovStyle: window.StoryOverlay ? window.StoryOverlay.suggest(trade) : 'trend', ovShow: 'pct', ovAd: true, ovCandles: true, ovScrim: false, ovBake: false, quote: 0,
   };
   if (!['result', 'chart', 'replay', 'motion', 'overlay'].includes(A.card) || (A.card === 'overlay' && !isAdmin)) A.card = 'replay';
   if (!['ember', 'candles', 'bars'].includes(A.scene)) A.scene = 'ember';
-  if (!['candles', 'line', 'terminal', 'minimal'].includes(A.rstyle)) A.rstyle = 'candles';   // "my photo" needs a new pick each visit
+  if (!['candles', 'line', 'terminal', 'minimal'].includes(A.rstyle)) A.rstyle = 'candles';   // "my photo" is a background choice now, picked each visit
   if (!['a', 'b', 'c'].includes(A.tpl)) A.tpl = 'a';
   if (!['story', 'post'].includes(A.size)) A.size = 'story';
-  let photo = null, mediaFile = null, step = 0;
+  let photo = null, mediaFile = null, still = null, step = 0;
+  const OWN = () => A.bg === 'own' && !!mediaFile;   // replay, result and chart cards: member's photo or clip behind
   const VIDEO = () => A.card === 'replay' || A.card === 'motion';
 
   // ---------- the engines ----------
   const c1 = $('c1'), c2 = $('c2'), mv = $('mv'), ov = $('ov');
-  const drawPics = () => window.TradeCards.render(c1, c2, trade, { tpl: A.tpl, mode: A.mode, rm: A.rm });
+  const drawPics = () => window.TradeCards.render(c1, c2, trade, { tpl: A.tpl, mode: A.mode, rm: A.rm, photo: OWN() ? still : null, dim: A.dim / 100 });
   const mc = window.MotionCard.create(mv, trade, { scene: 'replay', size: A.size, mode: A.mode, rm: A.rm });
   const mopts = () => (A.card === 'replay'
-    ? { scene: 'replay', rstyle: A.rstyle === 'photo' ? 'line' : A.rstyle, rphoto: A.rstyle === 'photo', hide: A.hide, size: A.size, mode: A.mode, rm: A.rm, dim: A.dim / 100 }
+    ? { scene: 'replay', rstyle: A.rstyle, rphoto: OWN(), hide: A.hide, size: A.size, mode: A.mode, rm: A.rm, dim: A.dim / 100 }
     : { scene: A.scene, rphoto: false, hide: false, size: A.size, mode: A.mode, rm: A.rm, dim: A.dim / 100 });
   const drawOv = (forSave) => ov && window.StoryOverlay.render(ov, trade, {
     style: A.ovStyle, quote: A.quote, show: A.ovShow, ad: A.ovAd, scrim: A.ovScrim, candles: A.ovCandles,
@@ -66,15 +67,16 @@
 
   const sizeChips = () => `<p class="ss-sub">SIZE</p><div class="ss-chips big" data-key="size">${[['story', 'Story', '9:16 Reels, Stories'], ['post', 'Post', '4:5 feed']].map(([v, l, s]) => chip(v, l, s, A.size === v, ic(v))).join('')}</div>`;
   const photoPick = () => `<div class="ss-act" style="margin-top:14px"><button type="button" class="ss-pill" data-own>${mediaFile ? 'Change photo or clip' : 'Choose photo or clip'}</button>
-      <label class="ss-dim">Darken <input type="range" id="tdim" min="0" max="90" value="${A.dim}"></label></div><p class="ss-note">Your photo or clip stays on this device. It is only drawn into the video, never uploaded.</p>`;
+      <label class="ss-dim">Darken <input type="range" id="tdim" min="0" max="90" value="${A.dim}"></label></div><p class="ss-note">Your photo or clip stays on this device. It is only drawn into the card, never uploaded.</p>`;
+  const bgChips = (pic) => `<p class="ss-sub">BACKGROUND</p><div class="ss-chips" data-key="bg">${chip('built', 'Built-in', '', A.bg !== 'own')}${chip('own', pic ? 'My photo' : 'My photo or clip', pic ? 'A clip gives its first frame' : 'From your device', A.bg === 'own')}</div>${A.bg === 'own' ? photoPick() : ''}`;
   function lookBody() {
-    if (A.card === 'replay') return `<div class="ss-chips big" data-key="rstyle">${[['candles', 'Candles', 'Real candles form one by one'], ['line', 'Line', 'One glowing price line'], ['terminal', 'Terminal', 'Desk look, trade clock'], ['minimal', 'Minimal', 'Big number, small line'], ['photo', 'My photo behind', 'Your picture, darkened']].map(([v, l, s]) => chip(v, l, s, A.rstyle === v, ic(v))).join('')}</div>
-      ${A.rstyle === 'photo' ? photoPick() : ''}
+    if (A.card === 'replay') return `<div class="ss-chips big" data-key="rstyle">${[['candles', 'Candles', 'Real candles form one by one'], ['line', 'Line', 'One glowing price line'], ['terminal', 'Terminal', 'Desk look, trade clock'], ['minimal', 'Minimal', 'Big number, small line']].map(([v, l, s]) => chip(v, l, s, A.rstyle === v, ic(v))).join('')}</div>
+      ${bgChips(false)}
       <p class="ss-sub">PRICES</p><div class="ss-chips" data-key="hide">${chip('0', 'Show prices', '', !A.hide)}${chip('1', 'Hide prices', 'No entry, stop or target numbers', A.hide)}</div>${sizeChips()}`;
     if (A.card === 'motion') return `<div class="ss-chips big" data-key="scene">${[['ember', 'Ember glow', 'Our orange glow'], ['candles', 'Trade candles', 'Behind the number'], ['bars', 'Volume bars', 'Moving bars'], ['own', 'My photo or clip', 'From your device']].map(([v, l, s]) => chip(v, l, s, A.scene === v, ic(v))).join('')}</div>
       ${A.scene === 'own' ? photoPick() : ''}${sizeChips()}`;
-    if (A.card === 'result') return `<div class="ss-chips big" data-key="tpl">${Object.entries(window.TradeCards.styles).map(([v, l]) => chip(v, l, { a: 'Big number, price line', b: 'Chart on top', c: 'Ring and ticket' }[v], A.tpl === v)).join('')}</div>`;
-    return '<p class="ss-note" style="margin-top:0">The chart picture always shows the real candles with your entry, stop, target and exit. Nothing to pick here.</p>';
+    if (A.card === 'result') return `<div class="ss-chips big" data-key="tpl">${Object.entries(window.TradeCards.styles).map(([v, l]) => chip(v, l, { a: 'Big number, price line', b: 'Chart on top', c: 'Ring and ticket' }[v], A.tpl === v)).join('')}</div>${bgChips(true)}`;
+    return `<p class="ss-note" style="margin-top:0">The chart picture always shows the real candles with your entry, stop, target and exit.</p>${bgChips(true)}`;
   }
   function overlayBody() {
     return `<div class="ss-chips big" data-key="ovStyle">${Object.entries({ scalper: 'Scalper', trend: 'Trend following', counter: 'Counter trend', swing: 'Swing' }).map(([v, l]) => chip(v, l, '', A.ovStyle === v)).join('')}</div>
@@ -113,13 +115,25 @@
     const extra = $('taff');   // "show this trade on my public page" box, under the last step
     if (extra) { extra.hidden = s.k !== 'Share'; if (s.k === 'Share') q.appendChild(extra); }
     q.classList.remove('ss-in'); void q.offsetWidth; q.classList.add('ss-in');
-    const d = $('tdim'); if (d) d.oninput = () => { A.dim = Number(d.value); mc.set({ dim: A.dim / 100 }); };
+    const d = $('tdim'); if (d) d.oninput = () => { A.dim = Number(d.value); mc.set({ dim: A.dim / 100 }); if (A.card === 'result' || A.card === 'chart') drawPics(); };
   }
 
   const pickFile = $('tfile'), ovFile = $('tovfile');
+  // the picture cards need a still: the photo itself, or an early frame of a clip
+  function stillOf(f) {
+    return new Promise((ok) => {
+      if (!f) return ok(null);
+      const url = URL.createObjectURL(f);
+      if (!/^video\//.test(f.type)) { const img = new Image(); img.onload = () => ok(img); img.onerror = () => ok(null); img.src = url; return; }
+      const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto';
+      v.onloadeddata = () => { v.currentTime = Math.min(0.5, (v.duration || 1) / 2); };
+      v.onseeked = () => { const cv = document.createElement('canvas'); cv.width = v.videoWidth; cv.height = v.videoHeight; cv.getContext('2d').drawImage(v, 0, 0); ok(cv); };
+      v.onerror = () => ok(null); v.src = url;
+    });
+  }
   pickFile.addEventListener('change', (e) => {
     mediaFile = e.target.files[0] || null;
-    mc.setBackground(mediaFile).then(() => { preview(); render(); }).catch((err) => { const n = q.querySelector('.ss-hint'); if (n) n.textContent = err.message; });
+    Promise.all([mc.setBackground(mediaFile), stillOf(mediaFile).then((x) => { still = x; })]).then(() => { preview(); render(); }).catch((err) => { const n = q.querySelector('.ss-hint'); if (n) n.textContent = err.message; });
   });
   if (ovFile) ovFile.addEventListener('change', (e) => {
     const f = e.target.files[0]; if (!f) { photo = null; drawOv(); return; }
@@ -172,10 +186,11 @@
     if (key === 'rm') { A.rm = v === '1'; store.set('ts.rm', v); }
     if (key === 'hide') { A.hide = v === '1'; store.set('ts.hide', v); }
     if (key === 'size') { A.size = v; store.set('motionSize', v); }
-    if (key === 'rstyle') { A.rstyle = v; if (v !== 'photo') store.set('ts.rstyle', v); else if (!mediaFile) pickFile.click(); }
+    if (key === 'rstyle') { A.rstyle = v; store.set('ts.rstyle', v); }
+    if (key === 'bg') { A.bg = v; if (v === 'own' && !mediaFile) pickFile.click(); }
     if (key === 'scene') { A.scene = v; if (v !== 'own') store.set('motionScene', v); else if (!mediaFile) pickFile.click(); }
     preview();
-    if (['card', 'rstyle', 'scene'].includes(key)) render();
+    if (['card', 'rstyle', 'scene', 'bg'].includes(key)) render();
   });
 
   preview(); render();
