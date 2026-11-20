@@ -254,31 +254,49 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const qs = (o) => '?' + new URLSearchParams(Object.entries({ account: sel ? sel.account_number : '', month, ...o }).filter(([, v]) => v)).toString();
     const pickDay = dayKeys[dayKeys.length - 1] || '';
 
+    // R of a list of trades (only trades with a stop have R)
+    const rOf = (l) => { const r = l.filter((t) => t.r !== null && t.r !== undefined); return r.length ? r.reduce((a, t) => a + Number(t.r), 0) : null; };
+    const fmtR = (v) => (v === null ? '' : `${v < 0 ? '−' : '+'}${Math.abs(v).toFixed(1)}R`);
+    // each value comes in R and in money; the R / $ switch shows one
+    const both = (l, big) => { const s = sum(l), r = rOf(l);
+      return `<span class="cv-r ${r === null ? '' : cls(r)}">${r === null ? '—' : fmtR(r)}</span><span class="cv-m ${cls(s)}">${big ? money(s, cur) : short(s)}</span>`; };
+    const today = new Date().toISOString().slice(0, 10);
     let grid = DOW.map((d) => `<div class="dow">${d}</div>`).join('') + '<div class="dow">Week</div>';
     let cell = 0, week = [];
-    const weekCell = () => { const l = week.flat(); grid += `<div class="wk"><span>Week</span><b class="${cls(sum(l))}">${l.length ? short(sum(l)) : '-'}</b></div>`; week = []; };
+    const weekCell = () => { const l = week.flat(), nd = week.filter((x) => x.length).length;
+      grid += `<div class="wk${l.length ? '' : ' none'}"><span class="wl">Week</span><b class="cv">${l.length ? both(l) : '—'}</b><span class="wn">${nd ? `${nd} day${nd > 1 ? 's' : ''}` : 'No trades'}</span></div>`; week = []; };
     for (let i = 0; i < lead; i++, cell++) grid += '<div class="day out"></div>';
     for (let d = 1; d <= nDays; d++, cell++) {
-      const l = days[iso(d)] || [], s = sum(l), weekend = cell % 7 >= 5;
-      grid += l.length
-        ? `<button type="button" class="day ${s >= 0 ? 'win' : 'loss'}" data-day="${iso(d)}" aria-pressed="${iso(d) === pickDay}"><span class="d">${d}</span><span class="v ${cls(s)}">${short(s)}</span><span class="n" title="${l.length} trade${l.length > 1 ? 's' : ''}">${l.length}<span class="w"> trade${l.length > 1 ? 's' : ''}</span></span></button>`
-        : `<div class="day${weekend ? ' off' : ''}${noTrade[iso(d)] !== undefined ? ' lt-nt' : ''}"${noTrade[iso(d)] ? ` title="${esc(noTrade[iso(d)])}"` : ''}><span class="d">${d}</span>${noTrade[iso(d)] !== undefined ? '<span class="n">No trade</span>' : ''}</div>`;
+      const l = days[iso(d)] || [], s = sum(l), weekend = cell % 7 >= 5, k = iso(d);
+      const dt = `<span class="cd${k === today ? ' now' : ''}">${d}</span>`;
+      if (l.length) {
+        const w = l.filter((t) => t.net > 0).length, pc = Math.round((w / l.length) * 100);
+        grid += `<button type="button" class="day ${s > 0 ? 'win' : s < 0 ? 'loss' : 'flat'}" data-day="${k}" aria-pressed="${k === pickDay}">${dt}
+          <span class="cv">${both(l)}</span>
+          <span class="cf"><span>${l.length}<span class="w"> trade${l.length > 1 ? 's' : ''}</span></span><span>${pc}%</span></span>
+          ${s > 0 ? `<span class="cb"><i style="width:${pc}%"></i></span>` : ''}</button>`;
+      } else {
+        const nt = noTrade[k] !== undefined;
+        grid += `<div class="day${weekend ? ' off' : ''}${k > today ? ' fut' : ''}${nt ? ' lt-nt' : ''}"${noTrade[k] ? ` title="${esc(noTrade[k])}"` : ''}>${dt}${nt ? '<span class="cnt">No trade</span>' : ''}</div>`;
+      }
       week.push(l);
       if ((cell + 1) % 7 === 0) weekCell();
     }
     if (cell % 7) { for (; cell % 7; cell++) grid += '<div class="day out"></div>'; weekCell(); }
+    const withR = trades.filter((t) => t.r !== null && t.r !== undefined).length;
+    const calNote = trades.length ? `${dayKeys.length} trading day${dayKeys.length === 1 ? '' : 's'} this month · R from ${withR} of ${trades.length} trade${trades.length === 1 ? '' : 's'}; a trade with no stop has no R` : '';
 
     // phone: days with trades, newest first, grouped by week
     const weeks = {};
     [...dayKeys].reverse().forEach((d) => { const w = Math.floor((Number(d.slice(8)) + lead - 1) / 7); (weeks[w] ||= []).push(d); });
     const list = Object.keys(weeks).map(Number).sort((a, b) => b - a).map((w) => {
-      const ws = sum(weeks[w].flatMap((d) => days[d]));
-      return `<div class="wkhead"><span>Week ${w + 1}</span><span class="${cls(ws)}">${money(ws, cur)}</span></div>` + weeks[w].map((d) => {
+      return `<div class="wkhead"><span>Week ${w + 1} · ${weeks[w].length} day${weeks[w].length > 1 ? 's' : ''}</span><span class="cv">${both(weeks[w].flatMap((d) => days[d]), true)}</span></div>` + weeks[w].map((d) => {
         const l = days[d], s = sum(l), mx = Math.max(...l.map((t) => Math.abs(t.net || 0)), 1);
         const wd = DOW[(new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7];
-        return `<button type="button" class="arow" data-day="${d}" aria-pressed="${d === pickDay}"><span class="dt">${wd} ${Number(d.slice(8))}<small>${l.length} trade${l.length > 1 ? 's' : ''}</small></span>
+        const pc = Math.round((l.filter((t) => t.net > 0).length / l.length) * 100);
+        return `<button type="button" class="arow" data-day="${d}" aria-pressed="${d === pickDay}"><span class="dt">${wd} ${Number(d.slice(8))}<small>${l.length} trade${l.length > 1 ? 's' : ''} · ${pc}%</small></span>
           <span class="bars">${l.map((t) => `<i class="${(t.net || 0) >= 0 ? 'up' : 'down'}" style="height:${Math.max(4, Math.round(Math.abs(t.net || 0) / mx * 22))}px"></i>`).join('')}</span>
-          <span class="v ${cls(s)}">${money(s, cur)}</span></button>`;
+          <span class="v cv">${both(l, true)}</span>${s > 0 ? `<span class="cb"><i style="width:${pc}%"></i></span>` : ''}</button>`;
       }).join('');
     }).join('');
 
@@ -367,10 +385,11 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <div class="cal-split" id="cal">
       <section class="card">
         <div class="row between cal-head"><h2>${esc(monthName)}</h2>
-          <span><a class="btn small secondary" href="/journal${qs({ month: shift(-1) })}" aria-label="Previous month">‹</a>
+          <span>${accts.length ? '<span class="cal-unit" role="group" aria-label="Show results in"><button type="button" data-unit="r" aria-pressed="true">R</button><button type="button" data-unit="m" aria-pressed="false">$</button></span>' : ''}<a class="btn small secondary" href="/journal${qs({ month: shift(-1) })}" aria-label="Previous month">‹</a>
           <a class="btn small secondary" href="/journal${qs({ month: shift(1) })}" aria-label="Next month">›</a></span></div>
-        ${accts.length ? `<div class="cal-grid">${grid}</div>
-        <div class="cal-list">${list || '<p class="muted">No trades this month.</p>'}</div>`
+        ${accts.length ? `<div class="cal-grid cx" data-unit="r">${grid}</div>
+        <div class="cal-list cx" data-unit="r">${list || '<p class="muted">No trades this month.</p>'}</div>
+        ${calNote ? `<p class="cal-note">${calNote}</p>` : ''}`
         : '<p class="muted">No trades yet. Connect the Trade Journal EA below; every trade you close will appear here.</p>'}
       </section>
       <aside class="card day-panel" aria-live="polite">${panels || `<p class="muted">${accts.length ? 'No trades this month. Use ‹ › to change month.' : 'Tap a day to see its trades.'}</p>`}</aside>

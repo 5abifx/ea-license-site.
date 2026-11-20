@@ -2363,3 +2363,70 @@ details.tdet[open] > summary { margin-bottom: 14px; }
 #review.tr-rev{scroll-margin-top:90px}
 .rv-mark{display:table;margin-top:7px}
 .rv-sk{margin-top:22px!important}
+
+/* ===== Journal calendar: frosted tiles (date top-right, big result, trades + win % and a thin bar, week tile) ===== */
+.cx[data-unit="r"] .cv-m, .cx[data-unit="m"] .cv-r { display: none; }
+.cal-head > span { align-items: center; }
+.cal-unit { display: inline-flex; padding: 3px; margin-right: 6px; border-radius: 999px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); }
+.app-body .cal-unit button { padding: 4px 12px; min-width: 34px; border: 0; border-radius: 999px; background: transparent; color: var(--q-label, var(--muted)); font-size: 12.5px; box-shadow: none; }
+.app-body .cal-unit button[aria-pressed="true"] { background: rgba(255,255,255,.12); color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.12); }
+.app-body .cal-grid.cx { gap: 10px; grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(0, 1.05fr); }
+.app-body .cal-grid.cx .dow { padding: 0 4px 2px; text-align: center; font-size: 12px; color: #6f6f78; }
+.app-body .cal-grid.cx .day, .app-body .cal-grid.cx .wk {
+  position: relative; display: block; min-height: 104px; padding: 0; border-radius: 16px; overflow: hidden; text-align: left; font-family: var(--body);
+  background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
+  border: 1px solid rgba(255,255,255,.055); box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+  -webkit-font-smoothing: antialiased; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.app-body .cal-grid.cx .day.off { background: rgba(255,255,255,.012); border-color: rgba(255,255,255,.035); border-style: solid; }
+.app-body .cal-grid.cx .day.fut { background: rgba(255,255,255,.008); border-color: rgba(255,255,255,.03); }
+.app-body .cal-grid.cx .day.out { visibility: hidden; }
+/* traded days sit raised, like a pressed glass key */
+.app-body .cal-grid.cx button.day {
+  cursor: pointer; color: var(--text);
+  background: linear-gradient(180deg, rgba(255,255,255,.1), rgba(255,255,255,.04));
+  border-color: rgba(255,255,255,.1);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 1px 1px rgba(0,0,0,.35), 0 8px 22px -10px rgba(0,0,0,.8); }
+.app-body .cal-grid.cx button.day.loss { background: linear-gradient(180deg, rgba(240,70,75,.12), rgba(255,255,255,.03)); border-color: rgba(240,70,75,.2); }
+.app-body .cal-grid.cx button.day:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.18); }
+.app-body .cal-grid.cx .day[aria-pressed="true"] { border-color: rgba(255,90,31,.75); box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 0 0 1px rgba(255,90,31,.45), 0 10px 28px -10px rgba(255,90,31,.35); }
+.app-body .cal-grid.cx .cd { position: absolute; top: 9px; right: 11px; font-size: 13px; font-weight: 700; color: #6c6c75; font-variant-numeric: tabular-nums; }
+.app-body .cal-grid.cx button.day .cd { color: #d9d9de; }
+.app-body .cal-grid.cx .day.fut .cd, .app-body .cal-grid.cx .day.off .cd { color: #4a4a52; }
+.app-body .cal-grid.cx .cd.now { color: #fff; background: var(--accent); border-radius: 999px; padding: 1px 7px; right: 7px; top: 7px; }
+.app-body .cal-grid.cx .cv { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-62%); text-align: center; font-size: clamp(14px, 1.45vw, 21px);
+  font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: #fff; white-space: nowrap; }
+.app-body .cal-grid.cx .cv .pos { color: #fff; } .app-body .cal-grid.cx .cv .neg { color: #ff7a7e; }
+.app-body .cal-grid.cx button.day.flat .cv, .app-body .cal-grid.cx .cv-r:not(.pos):not(.neg) { color: #8a8a94; }
+.app-body .cal-grid.cx .cf { position: absolute; left: 10px; right: 10px; bottom: 11px; display: flex; justify-content: space-between; gap: 6px;
+  font-size: 12px; font-weight: 600; color: #9a9aa3; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.app-body .cal-grid.cx .cb { position: absolute; left: 10px; right: 10px; bottom: 6px; height: 3px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; }
+.app-body .cal-grid.cx .cb i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, rgba(255,255,255,.65), #fff); box-shadow: 0 0 8px rgba(255,255,255,.35); }
+.app-body .cal-grid.cx .cnt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; font-weight: 600; color: #b4b4bc; }
+.app-body .cal-grid.cx .day.lt-nt { border-style: dashed; border-color: rgba(255,255,255,.12); }
+/* week summary */
+.app-body .cal-grid.cx .wk { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  background: linear-gradient(180deg, rgba(255,90,31,.10), rgba(255,255,255,.025)); border-color: rgba(255,90,31,.16); }
+.app-body .cal-grid.cx .wk.none { background: rgba(255,255,255,.012); border-color: rgba(255,255,255,.035); }
+.app-body .cal-grid.cx .wk .wl { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: #9a9aa3; }
+.app-body .cal-grid.cx .wk .cv { position: static; transform: none; font-size: clamp(15px, 1.55vw, 22px); }
+.app-body .cal-grid.cx .wk .wn { font-size: 12px; font-weight: 600; color: #c4c4cb; }
+.app-body .cal-grid.cx .wk.none .cv, .app-body .cal-grid.cx .wk.none .wn { color: #55555d; }
+.cal-note { margin: 16px 2px 0; font-size: 13px; color: var(--q-label, var(--muted)); }
+/* narrow PCs and tablets: hide the word "trades", keep the count */
+@media (max-width: 1180px) { .app-body .cal-grid.cx .cf .w { display: none; } .app-body .cal-grid.cx { gap: 7px; } .app-body .cal-grid.cx .day, .app-body .cal-grid.cx .wk { min-height: 90px; border-radius: 13px; } }
+/* phone list: same values, R or $ */
+.cal-list.cx .arow .v { text-align: right; } .cal-list.cx .neg { color: #ff7a7e; } .cal-list.cx .pos { color: #fff; }
+.cal-list.cx .arow { border-radius: 14px; }
+.app-body .cal-grid.cx .wk .cv span { font-size: inherit; font-weight: inherit; letter-spacing: inherit; color: #fff; }
+.app-body .cal-grid.cx .wk .cv span.neg { color: #ff7a7e; } .app-body .cal-grid.cx .wk .cv .cv-r:not(.pos):not(.neg) { color: #8a8a94; }
+/* phone: each traded day is a frosted tile too, with the same thin win-rate bar */
+.app-body .cal-list.cx .wkhead { margin: 14px 0 8px; padding: 10px 14px; border: 1px solid rgba(255,90,31,.16); border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,90,31,.10), rgba(255,255,255,.02)), #121214; text-transform: none; letter-spacing: 0; font-size: 13px; color: #c4c4cb; }
+.app-body .cal-list.cx .wkhead:first-child { margin-top: 0; }
+.app-body .cal-list.cx .wkhead .cv { font-weight: 700; color: #fff; }
+.app-body .cal-list.cx .arow { position: relative; margin-bottom: 8px; padding: 12px 14px 14px; overflow: hidden; border: 1px solid rgba(255,255,255,.1); border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03)); box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 8px 20px -12px rgba(0,0,0,.8); }
+.app-body .cal-list.cx .arow[aria-pressed="true"] { border-color: rgba(255,90,31,.75); box-shadow: 0 0 0 1px rgba(255,90,31,.4); }
+.app-body .cal-list.cx .arow .v { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+.app-body .cal-list.cx .cb { position: absolute; left: 14px; right: 14px; bottom: 6px; height: 3px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; }
+.app-body .cal-list.cx .cb i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, rgba(255,255,255,.65), #fff); }
