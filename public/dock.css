@@ -32,6 +32,10 @@
 
   /* things that float at the bottom sit above the dock: support chat button, install-app card */
   html body .sup { bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+  /* the chat button is smaller on phones and slides away while you scroll down, so it never sits on content */
+  html body .sup { transition: transform .3s, opacity .3s; }
+  html body .sup .sup-btn { height: 46px; min-width: 46px; padding: 0 11px; }
+  html body .sup.away:not(.open) { transform: translateX(80px); opacity: 0; pointer-events: none; }
   html body .sup-panel { bottom: calc(env(safe-area-inset-bottom, 0px) + 156px); }
   html body .ia-card { bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
   html body:has(.tb.open) .ia-card, html body:has(.tb.open) .sup { visibility: hidden; }

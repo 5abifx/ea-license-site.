@@ -31,18 +31,25 @@
     <i class="plx-bar"><i></i></i><span class="plx-s">Syncing your trades</span></div>`;
   document.body.appendChild(ov);
   num.textContent = fmt(0);
-  let closed = false;
+  let closed = false, stopRun = null;
   const close = () => {
     if (closed) return; closed = true;
     ov.classList.add('out');
-    setTimeout(() => ov.remove(), 700);
+    setTimeout(() => { ov.remove(); if (stopRun) stopRun(); }, 700);
     count(num, 900);
   };
   ov.addEventListener('click', close);
   requestAnimationFrame(() => ov.classList.add('go'));
-  // (a car drive-in for car backgrounds lived here; taken out for now at the owner's request, see git history)
-  count(ov.querySelector('.plx-n'), 1500, () => {
-    ov.querySelector('.plx-s').textContent = target >= 0 ? 'In profit' : 'Review the leaks';
-    setTimeout(close, 650);
-  });
+  const nEl = ov.querySelector('.plx-n'), sEl = ov.querySelector('.plx-s'), bar = ov.querySelector('.plx-bar i');
+  const landed = () => { sEl.textContent = target >= 0 ? 'In profit' : 'Review the leaks'; setTimeout(close, 650); };
+  // Night run: the car crosses the screen as the number counts (3D, loaded only for this intro). If it is not ready
+  // in time (slow phone or connection, no WebGL) the plain count runs instead and the car is dropped.
+  let started = false;
+  const plain = () => { if (started) return; started = true; count(nEl, 1500, landed); };
+  const wait = setTimeout(plain, 1300);
+  import('/nightrun.js').then((m) => m.prepare(ov, nEl)).then((play) => {
+    if (started || closed) { const c = ov.querySelector('.plx-cv'); if (c) c.remove(); return; }
+    clearTimeout(wait); started = true; ov.classList.add('run');
+    stopRun = play((p) => { nEl.textContent = fmt(target * p); bar.style.transform = `scaleX(${p})`; }, landed);
+  }).catch(() => { clearTimeout(wait); plain(); });
 })();
