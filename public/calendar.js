@@ -24,3 +24,18 @@
   window.addEventListener('resize', sync);
   sync();
 })();
+
+// Calendar R / $ switch (remembered on this device)
+(function () {
+  const btns = document.querySelectorAll('.cal-unit button');
+  if (!btns.length) return;
+  const set = (u) => {
+    document.querySelectorAll('.cx[data-unit]').forEach((g) => { g.dataset.unit = u; });
+    btns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.unit === u)));
+    try { localStorage.setItem('calUnit', u); } catch (e) { /* private mode */ }
+  };
+  btns.forEach((b) => b.addEventListener('click', () => set(b.dataset.unit)));
+  let u = 'r';
+  try { u = localStorage.getItem('calUnit') || 'r'; } catch (e) { /* private mode */ }
+  set(u === 'm' ? 'm' : 'r');
+})();
