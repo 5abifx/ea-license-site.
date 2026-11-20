@@ -389,6 +389,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
           <button type="button" class="small secondary key-show">Show</button><button type="button" class="small secondary key-copy">Copy</button></span></li>
         <li>Make sure the account number is on <a href="/dashboard">My EAs</a>, and that MT5 allows <code>${esc(site)}</code> under Tools → Options → Expert Advisors → Allow WebRequest.</li>
       </ol>
+      <p class="muted small">Older trades missing? Open the EA's inputs (double-click the EA name on the chart, or the small face top-right → Inputs), set <strong>On start, also send trades closed in the last N days</strong> to <strong>365</strong> and press OK. The EA then sends the past year a few trades at a time. If some still don't show, also set <strong>Send those days again</strong> to <strong>true</strong> once, then back to false.</p>
       <form method="post" action="/journal/key" onsubmit="return confirm('Make a new key? The old key stops working and you must paste the new one into the EA.')">
         <button class="small secondary">Make a new key</button></form>
     </details>`);

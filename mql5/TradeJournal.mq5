@@ -8,7 +8,7 @@
 //| symbols and all EAs on that account.                             |
 //+------------------------------------------------------------------+
 #property copyright "5ABI.FX"
-#property version   "1.32"
+#property version   "1.33"
 #property description "Trade Journal: logs closed trades, partials and candles to your journal,"
 #property description "and sends MT5's economic calendar for the Desk's news catalysts."
 
@@ -22,13 +22,15 @@ input string          JournalKey     = "";          // Journal key (from your da
 input ENUM_TIMEFRAMES ChartTimeframe = PERIOD_M1;   // Candles saved with each trade (M1 = smooth replay)
 input int             BarsBefore     = 90;          // Candles before entry
 input int             BarsAfter      = 45;          // Candles after exit
-input int             CatchUpDays    = 7;           // On start, also send trades closed in the last N days
+input int             CatchUpDays    = 365;         // On start, also send trades closed in the last N days
+input bool            ResendHistory  = false;       // Send those days again, even trades already sent (use once)
 input double          PipSize        = 0;           // Pip size (0 = automatic)
 input bool            ShowPanel      = true;        // Show the journal panel on the chart
 input bool            SendNews       = true;        // Send the MT5 economic calendar (news on your Desk)
 
 #define JOURNAL_DIR    "TradeJournal\\"
 #define MAX_CANDLES    1500
+#define SEND_PER_TIMER 15         // old trades go out a few at a time, so MT5 never freezes
 
 struct QueueItem
   {
@@ -284,6 +286,18 @@ bool BuildTrade(const ulong id, string &json, datetime &closeTime)
    string candles = "";
    MqlRates rates[];
    int got = CopyRates(symbol, tf, from, to, rates);
+   // old trades: MT5 keeps only a few months of M1, so step up until the candles are there
+   for(int k = 0; k < ArraySize(steps) && got < (BarsBefore + BarsAfter) / 3; k++)
+     {
+      if(PeriodSeconds(steps[k]) <= sec) continue;
+      tf = steps[k];
+      sec = PeriodSeconds(tf);
+      from = openTime - BarsBefore * sec;
+      to = closeTime + BarsAfter * sec;
+      if(to > TimeCurrent()) to = TimeCurrent();
+      got = CopyRates(symbol, tf, from, to, rates);
+     }
+   if(got < 0) got = 0;
    int start = MathMax(0, got - MAX_CANDLES);
    for(int i = start; i < got; i++)
      {
@@ -323,7 +337,8 @@ void LogLocally(const string json, const ulong id)
   }
 
 //--- send to the website ---------------------------------------------------
-// 1 = stored, 0 = rejected (do not retry), -1 = network problem (retry later)
+// 1 = stored, 0 = rejected (do not retry), 2 = not allowed yet (key / licence / account: retry later),
+// -1 = network problem (retry later)
 int Send(const string json, string &msg) { return PostJson("/api/journal/trades", json, msg); }
 
 int PostJson(const string path, const string json, string &msg)
@@ -346,6 +361,7 @@ int PostJson(const string path, const string json, string &msg)
    msg = LicJsonString(body, "message");
    if(http == 200) return 1;
    if(http >= 500) return -1;
+   if(http == 401 || http == 403) return 2;
    return 0;
   }
 
@@ -356,9 +372,12 @@ void ProcessQueue()
    if(JournalKey == "") { g_lastSync = "enter your Journal key in the EA inputs"; return; }
 
    datetime now = TimeCurrent();
+   int sends = 0;
    for(int i = ArraySize(g_queue) - 1; i >= 0; i--)
      {
       if(g_queue[i].due > now) continue;
+      if(sends >= SEND_PER_TIMER) break;     // the rest go on the next timer (10 s)
+      sends++;
       ulong id = g_queue[i].position_id;
       string json, msg;
       datetime closeTime;
@@ -378,6 +397,13 @@ void ProcessQueue()
            }
          else
             g_queue[i].due = complete + 30;   // send once more when the candles after the exit exist
+        }
+      else if(r == 2)
+        {
+         // key, licence or account not set up yet: keep the trade and try again in 5 minutes,
+         // so trades closed before the account was added are not lost
+         g_lastSync = "waiting: " + msg;
+         g_queue[i].due = now + 300;
         }
       else if(r == 0)
         {
@@ -399,7 +425,7 @@ void CatchUp()
   {
    if(CatchUpDays <= 0) return;
    datetime now = TimeCurrent();
-   if(!HistorySelect(now - CatchUpDays * 86400, now)) return;
+   if(!HistorySelect(now - (datetime)CatchUpDays * 86400, now)) return;
    ulong ids[];
    for(int i = 0; i < HistoryDealsTotal(); i++)
      {
@@ -412,7 +438,7 @@ void CatchUp()
       if(!dup) { int n = ArraySize(ids); ArrayResize(ids, n + 1); ids[n] = id; }
      }
    for(int k = 0; k < ArraySize(ids); k++)
-      if(!IsPositionOpen(ids[k]) && !WasSent(ids[k])) Enqueue(ids[k], now);
+      if(!IsPositionOpen(ids[k]) && (ResendHistory || !WasSent(ids[k]))) Enqueue(ids[k], now);
   }
 
 
@@ -505,7 +531,7 @@ int CalSend(const datetime from, const datetime to, const int minImportance, con
          string json = "{" + J("key", JournalKey) + "," + J("account", Login()) + ",\"events\":[" + batch + "]}";
          int r = PostJson("/api/journal/calendar", json, msg);
          if(r == -1) { g_calStatus = "waiting: " + msg; return -1; }
-         if(r == 0) { g_calStatus = "rejected: " + msg; return sent; }
+         if(r == 0 || r == 2) { g_calStatus = "rejected: " + msg; return sent; }
          sent += inBatch;
          batch = ""; inBatch = 0;
         }
