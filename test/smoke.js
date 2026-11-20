@@ -881,7 +881,7 @@ function client(base, ip) {
       r = await a2.post('/login/code', { code: totp(secret, step()) });          // same code as set-up: already used
       assert.match(r.text, /That code is not right/);
       r = await a2.post('/login/code', { code: totp(secret, step() + 1) });
-      assert.match(r.text, /Users/);
+      assert.match(r.text, /Share Studio/);
 
       const a3 = client(base, '10.8.0.2');
       await a3.post('/login', { email: 'admin@test.com', password: 'adminpass123' });
