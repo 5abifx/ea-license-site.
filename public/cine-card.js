@@ -13,13 +13,14 @@ const GRADE_COL = { ember: '#ff6a2a', blood: '#c3141d', teal: '#13a88a', gold: '
 const ARTS = { smoke: 'Smoke', ember: 'Ember glow', floor: 'Trading floor' };
 /* every line on the card is optional; members pick what they are happy to show */
 const FIELDS = {
-  trade: { title: 'Symbol and side', date: 'Date', line: 'Price line', quote: 'Quote', alt: 'Second unit', entry: 'Entry', exit: 'Exit', size: 'Size', held: 'Time held', risk: 'Risk %', handle: 'Name tag' },
-  period: { title: 'Period name', quote: 'Quote', alt: 'Second unit', bars: 'Day-by-day bars', trades: 'Trades', winrate: 'Win rate', green: 'Green days', best: 'Best day / trade', handle: 'Name tag' },
+  trade: { title: 'Symbol and side', date: 'Date', line: 'Price line', quote: 'Quote', alt: 'Second unit', entry: 'Entry', exit: 'Exit', size: 'Size', held: 'Time held', risk: 'Risk %', handle: 'Name tag', synced: 'MT5 synced tick' },
+  period: { title: 'Period name', quote: 'Quote', alt: 'Second unit', bars: 'Day-by-day bars', trades: 'Trades', winrate: 'Win rate', green: 'Green days', best: 'Best day / trade', handle: 'Name tag', synced: 'MT5 synced tick' },
 };
 const DEFAULTS = {
-  trade: { title: true, date: true, line: true, quote: false, alt: false, entry: false, exit: false, size: false, held: false, risk: false, handle: true },
-  period: { title: true, quote: false, alt: false, bars: true, trades: false, winrate: false, green: false, best: false, handle: true },
+  trade: { title: true, date: true, line: true, quote: true, alt: false, entry: false, exit: false, size: false, held: false, risk: false, handle: true, synced: true },
+  period: { title: true, quote: true, alt: false, bars: true, trades: false, winrate: false, green: false, best: false, handle: true, synced: true },
 };
+const kindOf = d => (d && d.kind === 'trade' ? 'trade' : 'period');
 
 const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const ease = x => 1 - Math.pow(1 - clamp(x), 4);
@@ -94,15 +95,18 @@ function pill(c, s, x, y, dark) {
 }
 
 function create(canvas, data, opts) {
-  const o = Object.assign({ kind: data.kind === 'trade' ? 'trade' : 'period', unit: 'money', size: 'story', art: 'smoke', grade: 'bw', quote: '', color: false, layout: 'center', dim: 0.45 }, opts || {});
+  // len: video seconds (8, 12 or 15; the card is built by about 4 s, the rest is the hold over moving art)
+  // poster (owner only for now): the first 3 frames show the finished card, so the preview in Instagram / WhatsApp shows the result
+  const o = Object.assign({ kind: kindOf(data), unit: 'money', size: 'story', art: 'smoke', grade: 'bw', quote: '', color: false, layout: 'center', dim: 0.45, len: 8, poster: false }, opts || {});
   o.show = Object.assign({}, DEFAULTS[o.kind], (opts || {}).show);
-  let W = 1080, H = 1920, media = null, raf = 0, t0 = 0, frozen = null;
+  let W = 1080, H = 1920, SC = 1, media = null, avatar = null, raf = 0, t0 = 0, frozen = null;
+  const len = () => Math.max(6, Number(o.len) || 8);
   const c = canvas.getContext('2d');
   const art = document.createElement('canvas'), ac = art.getContext('2d');
   const glow = document.createElement('canvas'); glow.width = 1080; glow.height = 1920; K.bg(glow.getContext('2d'), 1.3);
   const grain = document.createElement('canvas'); grain.width = grain.height = 256;
   { const g = grain.getContext('2d'), im = g.createImageData(256, 256); for (let i = 0; i < im.data.length; i += 4) { const v = Math.random() * 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 22; } g.putImageData(im, 0, 0); }
-  function size() { [W, H] = SIZES[o.size] || SIZES.story; canvas.width = W; canvas.height = H; art.width = W; art.height = H; }
+  function size() { [W, H] = SIZES[o.size] || SIZES.story; canvas.width = W * SC; canvas.height = H * SC; art.width = W * SC; art.height = H * SC; }
   size();
 
   /* ---------- art (drawn on its own layer, then colour graded) ---------- */
@@ -111,9 +115,9 @@ function create(canvas, data, opts) {
     a.fillStyle = '#0a0a0c'; a.fillRect(0, 0, W, H);
     if (o.art === 'own' && media) {
       const mw = media.videoWidth || media.naturalWidth, mh = media.videoHeight || media.naturalHeight;
-      if (mw && mh) { const s = Math.max(W / mw, H / mh) * (media.tagName === 'VIDEO' ? 1 : 1.04 + 0.06 * tm / LEN); a.drawImage(media, (W - mw * s) / 2, (H - mh * s) / 2, mw * s, mh * s); }
+      if (mw && mh) { const s = Math.max(W / mw, H / mh) * (media.tagName === 'VIDEO' ? 1 : 1.04 + 0.06 * tm / len()); a.drawImage(media, (W - mw * s) / 2, (H - mh * s) / 2, mw * s, mh * s); }
     } else if (o.art === 'ember') {
-      const z = 1.08 + 0.05 * Math.sin(tm / LEN * 6.28), s = Math.max(W / 1080, H / 1920) * z;
+      const z = 1.08 + 0.05 * Math.sin(tm / len() * 6.28), s = Math.max(W / 1080, H / 1920) * z;
       a.save(); a.translate(W / 2 + 30 * Math.sin(tm * 0.6), H / 2); a.scale(s, s); a.drawImage(glow, -540, -960);
       a.globalCompositeOperation = 'lighter'; a.globalAlpha = 0.7; a.drawImage(glow, -540, -960 + 40 * Math.sin(tm)); a.restore(); a.globalAlpha = 1;
     } else if (o.art === 'floor') {
@@ -138,7 +142,7 @@ function create(canvas, data, opts) {
       if (GRADE_COL[o.grade]) { a.globalCompositeOperation = 'color'; a.fillStyle = GRADE_COL[o.grade]; a.globalAlpha = 0.85; a.fillRect(0, 0, W, H); a.globalAlpha = 1; }
       a.globalCompositeOperation = 'source-over';
     }
-    c.drawImage(art, 0, 0);
+    c.drawImage(art, 0, 0, W, H);
     // readability: darken, more at the edges; film grain on top
     const d = o.art === 'own' ? o.dim : 0.25, v = c.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.2, W / 2, H / 2, Math.max(W, H) * 0.75);
     v.addColorStop(0, `rgba(0,0,0,${(d * 0.6).toFixed(2)})`); v.addColorStop(1, `rgba(0,0,0,${(0.5 + d * 0.4).toFixed(2)})`);
@@ -147,64 +151,40 @@ function create(canvas, data, opts) {
   }
 
   /* ---------- content ---------- */
-  function frame(tm) {
-    drawArt(tm);
-    const S = o.show, wide = W > H, post = !wide && H < 1900, cx = W / 2, A = (tm2, a, b) => ease(seg(tm2, a, b));
-    c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 18;
-    const unit = o.unit, total = o.kind === 'trade' ? val(data, unit) ?? val(data, 'money') : val(data.total, unit);
-    const win = !fin(total) || total >= 0;
-    const numCol = o.color ? (win ? K.WIN : '#e4e8f1') : '#f4f4f6';
-    // top: what this is
-    let top = wide ? 150 : post ? 170 : 250;
-    c.globalAlpha = A(tm, 0.1, 0.7);
-    // 5ABIFX: always on, small and faint in the top-left corner, cannot be hidden
-    text(c, '5ABIFX', wide ? 56 : 60, wide ? 64 : 76, { fam: BIG, size: 24, w: 700, ls: 6, color: 'rgba(255,255,255,.4)', align: 'left' });
-    if (S.title) {
-      if (o.kind === 'trade') {
-        const sub = [data.side, S.date ? data.dateTxt : ''].filter(Boolean).join(' · ').toUpperCase();
-        c.font = `700 64px ${BIG}`; const w1 = c.measureText(data.symbol || '').width; c.font = `600 30px ${TXT}`; const w2 = sub ? c.measureText(sub).width + 26 : 0;
-        const ins = instrument(data.symbol), br = 46, bw = ins ? br * 2 + 22 : 0;
-        const x0 = cx - (bw + w1 + w2) / 2 + bw;
-        if (ins) drawBadge(c, ins, x0 - 22 - br, top - 23, br);
-        text(c, data.symbol || '', x0, top, { fam: BIG, w: 700, size: 64, align: 'left' });
-        if (sub) text(c, sub, x0 + w1 + 26, top - 4, { size: 30, w: 600, color: 'rgba(255,255,255,.62)', align: 'left', ls: 2 });
-      } else {
-        text(c, data.kindTxt || '', cx, top - 62, { size: 28, w: 700, color: 'rgba(255,255,255,.6)', ls: 6 });
-        text(c, data.title || '', cx, top + 10, { fam: BIG, w: 700, size: fit(c, data.title || '', W - 200, 66, BIG, 700), });
-      }
-    }
-    // price line with entry / exit tags (trade) or day bars (period)
-    const hasChart = (o.kind === 'trade' && S.line && data.closes && data.closes.length > 3) || (o.kind === 'period' && S.bars && data.items && data.items.length);
-    // detail rows (only the ones switched on)
+  const A = (tm, a, b) => ease(seg(tm, a, b));
+  const unitVal = (u) => (o.kind === 'trade' ? val(data, u) : val(data.total, u));
+  function detailRows() {
     const rows = o.kind === 'trade'
       ? [['entry', 'Entry', data.entry], ['exit', 'Exit', data.exit], ['size', 'Size', data.sizeTxt], ['held', 'Held', data.heldTxt], ['risk', 'Risk', data.riskTxt]]
-      : [['trades', 'Trades', data.trades], ['winrate', 'Win rate', data.winRate], ['green', 'Green days', data.green], ['best', o.kind === 'period' && data.bestLabel ? data.bestLabel : 'Best', data.best]];
-    const on = rows.filter(r => S[r[0]] && r[2] !== undefined && r[2] !== null && r[2] !== '');
-    // story keeps the receipt list; post and wide show the stats as an even grid of columns
-    const grid = wide || post, perRow = !grid ? 1 : on.length <= (wide ? 5 : 4) ? on.length : Math.ceil(on.length / 2);
-    const gridRows = grid && on.length ? Math.ceil(on.length / perRow) : 0, ROWH = 112;
-    const statsH = !on.length ? 0 : grid ? (wide ? 50 : 60) + gridRows * ROWH : 90 + (on.length - 1) * 62 + 14;
-    // footer position, and the lowest line content may reach without touching it
-    const fy = H - (wide ? 110 : 170), limit = fy - 30 - (wide ? 40 : 50);
-    // the result size; it shrinks only if nothing else is left to give
-    const full = fmt(total, unit);
-    let ns = fit(c, full, W - (wide ? 400 : 140), wide ? 190 : post ? 170 : 200, BIG, 700, -6);
-    const quoteH = S.quote && o.quote ? 40 : 0;
-    const altOn = S.alt && ['money', 'pips', 'r', 'pct'].filter(u => u !== unit).some(u => fin(o.kind === 'trade' ? val(data, u) : val(data.total, u)));
-    const altH = altOn ? 50 : 0, gapAfter = o.kind === 'period' ? (grid ? 110 : 130) : 90;
-    const tail = () => quoteH + ns * 0.92 + altH + statsH + (altOn ? 30 : 0);
-    const chartTop = top + 80, chartDef = wide ? 300 : post ? 330 : 520;
-    let chartH = chartDef;
-    if (hasChart) {
-      chartH = Math.max(150, Math.min(chartDef, limit - chartTop - gapAfter - tail()));
-      const over = chartTop + chartH + gapAfter + tail() - limit;
-      if (over > 0) ns = Math.max(90, ns - over / 0.92);
+      : [['trades', 'Trades', data.trades], ['winrate', 'Win rate', data.winRate], ['green', 'Green days', data.green], ['best', data.bestLabel || 'Best', data.best]];
+    return rows.filter(r => o.show[r[0]] && r[2] !== undefined && r[2] !== null && r[2] !== '');
+  }
+  function altLine() {
+    if (!o.show.alt) return null;
+    const u2 = ['money', 'pips', 'r', 'pct'].filter(u => u !== o.unit).find(u => fin(unitVal(u)));
+    return u2 ? fmt(unitVal(u2), u2) : null;
+  }
+  // symbol + side (trade) or period name; align 'center' around x, or 'left' starting at x
+  function drawTitle(top, x, align) {
+    const S = o.show; if (!S.title) return;
+    if (o.kind === 'trade') {
+      const sub = [data.side, S.date ? data.dateTxt : ''].filter(Boolean).join(' · ').toUpperCase();
+      c.font = `700 64px ${BIG}`; const w1 = c.measureText(data.symbol || '').width; c.font = `600 30px ${TXT}`; const w2 = sub ? c.measureText(sub).width + 26 : 0;
+      const ins = instrument(data.symbol), br = 46, bw = ins ? br * 2 + 22 : 0;
+      const x0 = (align === 'left' ? x : x - (bw + w1 + w2) / 2) + bw;
+      if (ins) drawBadge(c, ins, x0 - 22 - br, top - 23, br);
+      text(c, data.symbol || '', x0, top, { fam: BIG, w: 700, size: 64, align: 'left' });
+      if (sub) text(c, sub, x0 + w1 + 26, top - 4, { size: 30, w: 600, color: 'rgba(255,255,255,.62)', align: 'left', ls: 2 });
     } else {
-      const over = top + 120 + tail() - limit;
-      if (over > 0) ns = Math.max(90, ns - over / 0.92);
+      text(c, data.kindTxt || '', x, top - 62, { size: 28, w: 700, color: 'rgba(255,255,255,.6)', ls: 6, align });
+      text(c, data.title || '', x, top + 10, { fam: BIG, w: 700, size: fit(c, data.title || '', align === 'left' ? 820 : W - 200, 66, BIG, 700), align });
     }
-    const chartW = Math.min(W - 160, wide ? 1200 : 900), x0 = cx - chartW / 2;
-    if (o.kind === 'trade' && S.line && data.closes && data.closes.length > 3) {
+  }
+  const hasChart = () => (o.kind === 'trade' && o.show.line && data.closes && data.closes.length > 3) || (o.kind === 'period' && o.show.bars && data.items && data.items.length);
+  // price line with entry / exit tags (trade) or bars (period) inside the box x0, top, w, h
+  function drawChart(tm, x0, chartTop, chartW, chartH) {
+    const unit = o.unit;
+    if (o.kind === 'trade') {
       const k = data.closes, lo = Math.min(...k), hi = Math.max(...k), n = k.length, pr = ease(seg(tm, 0.3, 2.6));
       const X = i => x0 + i / (n - 1) * chartW, Y = v => chartTop + (hi - v) / (hi - lo || 1) * chartH;
       c.globalAlpha = 0.95; c.strokeStyle = '#fff'; c.lineWidth = 4; c.lineJoin = 'round'; c.beginPath();
@@ -213,46 +193,125 @@ function create(canvas, data, opts) {
       c.stroke();
       const tag = (i, s) => { if (i <= upto && i >= 0) { c.globalAlpha = A(tm, 0.3 + i / n * 2.3, 0.6 + i / n * 2.3); pill(c, s, X(i), Y(k[i]) - 34, false); c.fillStyle = '#fff'; c.beginPath(); c.arc(X(i), Y(k[i]), 7, 0, 7); c.fill(); } };
       tag(data.iEntry, 'Entry'); tag(data.iExit, 'Exit');
-    } else if (o.kind === 'period' && S.bars && data.items && data.items.length) {
-      const it = data.items, vs = it.map(x => val(x, unit)), mx = Math.max(1e-9, ...vs.map(v => Math.abs(fin(v) ? v : 0)));
-      const hasNeg = vs.some(v => fin(v) && v < 0), zero = chartTop + (hasNeg ? chartH * 0.62 : chartH - 40), up = zero - chartTop - 50, dn = chartTop + chartH - zero - 30;
-      const slot = chartW / it.length, bw = Math.min(110, slot * 0.5), step = Math.min(0.4, 2.6 / it.length);
-      c.globalAlpha = A(tm, 0.4, 0.8); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(x0, zero, chartW, 2);
-      it.forEach((x, i) => {
-        const v = vs[i], g = ease(seg(tm, 0.6 + i * step, 1.1 + i * step)), px = x0 + slot * i + slot / 2, pos = !fin(v) || v >= 0;
-        const h = fin(v) ? (pos ? up : dn) * Math.abs(v) / mx * g : 0;
-        c.globalAlpha = 1; c.fillStyle = pos ? 'rgba(255,255,255,.92)' : 'rgba(255,255,255,.32)';
-        c.beginPath(); if (c.roundRect) c.roundRect(px - bw / 2, pos ? zero - h : zero, bw, Math.max(h, 3), 8); else c.rect(px - bw / 2, pos ? zero - h : zero, bw, Math.max(h, 3)); c.fill();
-        c.globalAlpha = A(tm, 0.9 + i * step, 1.3 + i * step);
-        const vt = fmt(v, unit, true); text(c, vt, px, pos ? zero - h - 18 : zero + h + 40, { size: fit(c, vt, slot - 8, 28, TXT, 700), w: 700 });
-        c.globalAlpha = A(tm, 0.4, 0.8); text(c, x.label, px, chartTop + chartH + 44, { size: fit(c, x.label, slot - 8, 24, TXT, 600, 3), w: 600, color: 'rgba(255,255,255,.55)', ls: 3 });
-      });
+      return;
     }
-    // quote
-    let y = hasChart ? chartTop + chartH + gapAfter : Math.max(top + 120, Math.min(wide ? H * 0.42 : H * 0.44, limit - tail()));
+    const it = data.items, vs = it.map(x => val(x, unit)), mx = Math.max(1e-9, ...vs.map(v => Math.abs(fin(v) ? v : 0)));
+    const hasNeg = vs.some(v => fin(v) && v < 0), zero = chartTop + (hasNeg ? chartH * 0.62 : chartH - 40), up = zero - chartTop - 50, dn = chartTop + chartH - zero - 30;
+    const slot = chartW / it.length, bw = Math.min(110, slot * 0.5), step = Math.min(0.4, 2.6 / it.length);
+    c.globalAlpha = A(tm, 0.4, 0.8); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(x0, zero, chartW, 2);
+    it.forEach((x, i) => {
+      const v = vs[i], g = ease(seg(tm, 0.6 + i * step, 1.1 + i * step)), px = x0 + slot * i + slot / 2, pos = !fin(v) || v >= 0;
+      const h = fin(v) ? (pos ? up : dn) * Math.abs(v) / mx * g : 0;
+      c.globalAlpha = 1; c.fillStyle = pos ? 'rgba(255,255,255,.92)' : 'rgba(255,255,255,.32)';
+      c.beginPath(); if (c.roundRect) c.roundRect(px - bw / 2, pos ? zero - h : zero, bw, Math.max(h, 3), 8); else c.rect(px - bw / 2, pos ? zero - h : zero, bw, Math.max(h, 3)); c.fill();
+      c.globalAlpha = A(tm, 0.9 + i * step, 1.3 + i * step);
+      const vt = fmt(v, unit, true); text(c, vt, px, pos ? zero - h - 18 : zero + h + 40, { size: fit(c, vt, slot - 8, 28, TXT, 700), w: 700 });
+      c.globalAlpha = A(tm, 0.4, 0.8); text(c, x.label, px, chartTop + chartH + 44, { size: fit(c, x.label, slot - 8, 24, TXT, 600, 3), w: 600, color: 'rgba(255,255,255,.55)', ls: 3 });
+    });
+  }
+  // the result: big, white, counts up, one light sweep
+  function drawNumber(tm, x, y, ns, align) {
+    const total = o.kind === 'trade' ? unitVal(o.unit) ?? val(data, 'money') : unitVal(o.unit);
+    const win = !fin(total) || total >= 0, col = o.color ? (win ? K.WIN : '#e4e8f1') : '#f4f4f6';
+    const p = expo(seg(tm, 0.6, 2.4)), tx = fmt(fin(total) ? total * (p >= 1 ? 1 : p) : null, o.unit);
+    c.globalAlpha = A(tm, 0.5, 0.9);
+    c.save(); c.shadowColor = 'rgba(255,255,255,.35)'; c.shadowBlur = 40; text(c, tx, x, y, { fam: BIG, w: 700, size: ns, color: col, ls: -6, align }); c.restore();
+    const sw = seg(tm, 3.0, 3.9);
+    if (sw > 0 && sw < 1) { const sx = -300 + sw * (W + 600), g = c.createLinearGradient(sx - 140, 0, sx + 140, 0); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.save(); c.shadowBlur = 0; text(c, tx, x, y, { fam: BIG, w: 700, size: ns, color: g, ls: -6, align }); c.restore(); }
+  }
+  // the corner mark: always on, small and faint, cannot be hidden
+  function corner() { text(c, '5ABIFX', W > H ? 56 : 60, W > H ? 64 : 76, { fam: BIG, size: 24, w: 700, ls: 6, color: 'rgba(255,255,255,.4)', align: 'left' }); }
+  // footer: logo, KATANA, × name, optional photo and the MT5 synced tick (only when every trade came from the EA)
+  function footer(tm, x, fy, align, noName) {
+    c.globalAlpha = A(tm, 0.1, 0.6); // brand shows at first glance
+    const lw2 = 60, brand = o.brand || 'KATANA', S = o.show;
+    const hd = !noName && S.handle ? String(o.tag || data.handle || '').trim() : '';
+    const av = hd && avatar && S.avatar !== false ? 52 : 0, tick = hd && S.synced && data.synced ? 40 : 0;
+    const wOf = (s) => { c.font = `700 38px ${BIG}`; if ('letterSpacing' in c) c.letterSpacing = '4px'; const m = c.measureText(s).width; if ('letterSpacing' in c) c.letterSpacing = '0px'; return m; };
+    const bwid = wOf(brand), hw = hd ? wOf(hd) + 64 + (av ? av + 14 : 0) : 0;
+    const total = lw2 + 14 + bwid + hw + tick;
+    const fx = align === 'left' ? x : x - total / 2;
+    drawLogo(fx, fy - 30, lw2);
+    text(c, brand, fx + lw2 + 14, fy, { fam: BIG, w: 700, size: 38, align: 'left', ls: 4 });
+    let nx = fx + lw2 + 14 + bwid;
+    if (hd) {
+      text(c, '×', nx + 30, fy - 2, { size: 34, w: 500, color: 'rgba(255,255,255,.6)' }); nx += 60;
+      if (av) {
+        const r = av / 2, ay = fy - 13;
+        c.save(); c.shadowBlur = 0; c.beginPath(); c.arc(nx + r, ay, r, 0, 7); c.clip();
+        const aw = avatar.naturalWidth, ah = avatar.naturalHeight, s = Math.max(av / aw, av / ah);
+        c.drawImage(avatar, nx + r - aw * s / 2, ay - ah * s / 2, aw * s, ah * s); c.restore();
+        c.save(); c.shadowBlur = 0; c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 2; c.beginPath(); c.arc(nx + r, ay, r, 0, 7); c.stroke(); c.restore();
+        nx += av + 14;
+      }
+      text(c, hd, nx, fy, { fam: BIG, size: 38, w: 700, align: 'left', ls: 4 }); nx += wOf(hd);
+    }
+    if (tick) syncedTick(nx + 26, fy - 13, 15);
+    c.globalAlpha = 1; c.shadowBlur = 0;
+  }
+  // teal seal with a check: "these trades came straight from MT5, not typed in"
+  function syncedTick(x, y, r) {
+    c.save(); c.shadowBlur = 0;
+    c.beginPath(); for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, rr = i % 2 ? r * 0.86 : r * 1.06; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.closePath();
+    c.fillStyle = K.WIN || '#26c6a0'; c.fill();
+    c.strokeStyle = '#06110e'; c.lineWidth = r * 0.24; c.lineCap = 'round'; c.lineJoin = 'round';
+    c.beginPath(); c.moveTo(x - r * 0.42, y + r * 0.02); c.lineTo(x - r * 0.1, y + r * 0.34); c.lineTo(x + r * 0.46, y - r * 0.3); c.stroke();
+    c.restore();
+  }
+
+  function frame(tm) {
+    if (SC !== 1) { c.setTransform(SC, 0, 0, SC, 0, 0); ac.setTransform(SC, 0, 0, SC, 0, 0); }
+    drawArt(tm);
+    c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 18;
+    c.globalAlpha = A(tm, 0.1, 0.7); corner();
+    if (W > H && o.layout === 'split') frameSplit(tm);
+    else frameCenter(tm);
+    c.globalAlpha = 1; c.shadowBlur = 0;
+    if (SC !== 1) { c.setTransform(1, 0, 0, 1, 0, 0); ac.setTransform(1, 0, 0, 1, 0, 0); }
+  }
+
+  /* everything centred (story, post, wide) */
+  function frameCenter(tm) {
+    const S = o.show, wide = W > H, post = !wide && H < 1900, cx = W / 2;
+    const top = wide ? 150 : post ? 170 : 250;
+    c.globalAlpha = A(tm, 0.1, 0.7); drawTitle(top, cx, 'center');
+    const chart = hasChart(), on = detailRows();
+    // story keeps the receipt list; post and wide show the stats as an even grid of columns
+    const grid = wide || post, perRow = !grid ? 1 : on.length <= (wide ? 5 : 4) ? on.length : Math.ceil(on.length / 2);
+    const gridRows = grid && on.length ? Math.ceil(on.length / perRow) : 0, ROWH = 112;
+    const statsH = !on.length ? 0 : grid ? (wide ? 50 : 60) + gridRows * ROWH : 90 + (on.length - 1) * 62 + 14;
+    // footer position, and the lowest line content may reach without touching it
+    const fy = H - (wide ? 110 : 170), limit = fy - 30 - (wide ? 40 : 50);
+    // the result size; it shrinks only if nothing else is left to give
+    const full = fmt(o.kind === 'trade' ? unitVal(o.unit) ?? val(data, 'money') : unitVal(o.unit), o.unit);
+    let ns = fit(c, full, W - (wide ? 400 : 140), wide ? 190 : post ? 170 : 200, BIG, 700, -6);
+    const quoteH = S.quote && o.quote ? 40 : 0, alt = altLine();
+    const altH = alt ? 50 : 0, gapAfter = o.kind === 'period' ? (grid ? 110 : 130) : 90;
+    const tail = () => quoteH + ns * 0.92 + altH + statsH + (alt ? 30 : 0);
+    const chartTop = top + 80, chartDef = wide ? 300 : post ? 330 : 520;
+    let chartH = chartDef;
+    if (chart) {
+      chartH = Math.max(150, Math.min(chartDef, limit - chartTop - gapAfter - tail()));
+      const over = chartTop + chartH + gapAfter + tail() - limit;
+      if (over > 0) ns = Math.max(90, ns - over / 0.92);
+    } else {
+      const over = top + 120 + tail() - limit;
+      if (over > 0) ns = Math.max(90, ns - over / 0.92);
+    }
+    const chartW = Math.min(W - 160, wide ? 1200 : 900);
+    if (chart) drawChart(tm, cx - chartW / 2, chartTop, chartW, chartH);
+    let y = chart ? chartTop + chartH + gapAfter : Math.max(top + 120, Math.min(wide ? H * 0.42 : H * 0.44, limit - tail()));
     if (S.quote && o.quote) {
       c.globalAlpha = A(tm, 1.2, 1.9);
       const q = o.quote.toUpperCase();
       text(c, q, cx, y, { size: fit(c, q, W - 220, 26, TXT, 700, 5), w: 700, color: 'rgba(255,255,255,.75)', ls: 5 });
       y += 40;
     }
-    // the result, big and white, counts up
-    const p = expo(seg(tm, 0.6, 2.4)), tx = fmt(fin(total) ? total * (p >= 1 ? 1 : p) : null, unit);
     y += ns * 0.92;
-    c.globalAlpha = A(tm, 0.5, 0.9);
-    c.save(); c.shadowColor = 'rgba(255,255,255,.35)'; c.shadowBlur = 40; text(c, tx, cx, y, { fam: BIG, w: 700, size: ns, color: numCol, ls: -6 }); c.restore();
-    const sw = seg(tm, 3.0, 3.9);
-    if (sw > 0 && sw < 1) { const sx = -300 + sw * (W + 600), g = c.createLinearGradient(sx - 140, 0, sx + 140, 0); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.save(); c.shadowBlur = 0; text(c, tx, cx, y, { fam: BIG, w: 700, size: ns, color: g, ls: -6 }); c.restore(); }
-    // second unit
-    if (S.alt) {
-      const alt = ['money', 'pips', 'r', 'pct'].filter(u => u !== unit).map(u => (o.kind === 'trade' ? val(data, u) : val(data.total, u))).find(fin);
-      const u2 = ['money', 'pips', 'r', 'pct'].filter(u => u !== unit).find(u => fin(o.kind === 'trade' ? val(data, u) : val(data.total, u)));
-      if (fin(alt)) { c.globalAlpha = A(tm, 2.2, 2.8); text(c, fmt(alt, u2), cx, y + 62, { size: 36, w: 600, color: 'rgba(255,255,255,.8)' }); y += 50; }
-    }
+    drawNumber(tm, cx, y, ns, 'center');
+    if (alt) { c.globalAlpha = A(tm, 2.2, 2.8); text(c, alt, cx, y + 62, { size: 36, w: 600, color: 'rgba(255,255,255,.8)' }); y += 50; }
     if (on.length && !grid) {
-      // story: receipt list, label left, value right
-      let ry = y + 90;
-      const lw = 360;
+      let ry = y + 90; const lw = 360;
       on.forEach(([, l, v], i) => {
         c.globalAlpha = A(tm, 2.4 + i * 0.15, 2.9 + i * 0.15);
         text(c, l, cx - lw / 2 - 20, ry, { size: 38, w: 500, color: 'rgba(255,255,255,.6)', align: 'left' });
@@ -260,7 +319,6 @@ function create(canvas, data, opts) {
         ry += 62;
       });
     } else if (on.length) {
-      // post / wide: even columns, value on top, small label under it, thin dividers
       const colW = Math.min(wide ? 300 : 250, (W - 160) / perRow), top0 = y + (wide ? 50 : 60);
       on.forEach(([, l, v], i) => {
         const r = Math.floor(i / perRow), inRow = Math.min(perRow, on.length - r * perRow), k = i - r * perRow;
@@ -272,22 +330,39 @@ function create(canvas, data, opts) {
         if (k > 0) { c.save(); c.shadowBlur = 0; c.fillStyle = 'rgba(255,255,255,.16)'; c.fillRect(left + colW * k - 1, ty + 12, 2, 80); c.restore(); }
       });
     }
-    // footer: "KATANA × name" tag only
-    c.globalAlpha = A(tm, 0.1, 0.6); // brand shows at first glance
-    const lw2 = 60, brand = o.brand || 'KATANA';
-    const hd = S.handle ? String(o.tag || data.handle || '').trim() : '';
-    c.font = `700 38px ${BIG}`; if ('letterSpacing' in c) c.letterSpacing = '4px'; const bwid = c.measureText(brand).width; if ('letterSpacing' in c) c.letterSpacing = '0px';
-    c.font = `700 38px ${BIG}`; if ('letterSpacing' in c) c.letterSpacing = '4px'; const hw = hd ? c.measureText(hd).width + 64 : 0; if ('letterSpacing' in c) c.letterSpacing = '0px';
-    const fx = cx - (lw2 + 14 + bwid + hw) / 2;
-    drawLogo(fx, fy - 30, lw2);
-    text(c, brand, fx + lw2 + 14, fy, { fam: BIG, w: 700, size: 38, align: 'left', ls: 4 });
-    if (hd) { text(c, '×', fx + lw2 + 14 + bwid + 30, fy - 2, { size: 34, w: 500, color: 'rgba(255,255,255,.6)' }); text(c, hd, fx + lw2 + 14 + bwid + 60, fy, { fam: BIG, size: 38, w: 700, align: 'left', ls: 4 }); }
-    c.globalAlpha = 1; c.shadowBlur = 0;
+    footer(tm, cx, fy, 'center');
   }
+
+  /* wide, split: words on the left, chart on the right, signature bottom-left */
+  function frameSplit(tm) {
+    const S = o.show, L = 110, top = 160, chart = hasChart(), on = detailRows();
+    const colW = chart ? 860 : W - 2 * L;
+    c.globalAlpha = A(tm, 0.1, 0.7); drawTitle(o.kind === 'trade' ? top : top + 40, L, 'left');
+    let y = o.kind === 'trade' ? top + 90 : top + 130;
+    if (S.quote && o.quote) {
+      c.globalAlpha = A(tm, 1.2, 1.9); const q = o.quote.toUpperCase();
+      text(c, q, L, y + 20, { size: fit(c, q, colW, 26, TXT, 700, 5), w: 700, color: 'rgba(255,255,255,.75)', ls: 5, align: 'left' }); y += 50;
+    }
+    const full = fmt(o.kind === 'trade' ? unitVal(o.unit) ?? val(data, 'money') : unitVal(o.unit), o.unit);
+    const alt = altLine(), fy = H - 100, room = fy - 70 - y - (alt ? 54 : 0) - (on.length ? 40 + on.length * 56 : 0);
+    const ns = Math.max(90, Math.min(fit(c, full, colW, 200, BIG, 700, -6), room / 0.92));
+    y += ns * 0.92; drawNumber(tm, L - 6, y, ns, 'left');
+    if (alt) { c.globalAlpha = A(tm, 2.2, 2.8); text(c, alt, L, y + 58, { size: 36, w: 600, color: 'rgba(255,255,255,.8)', align: 'left' }); y += 54; }
+    let ry = y + 74;
+    on.forEach(([, l, v], i) => {
+      c.globalAlpha = A(tm, 2.4 + i * 0.15, 2.9 + i * 0.15);
+      text(c, l, L, ry, { size: 34, w: 500, color: 'rgba(255,255,255,.6)', align: 'left' });
+      text(c, v, L + 220, ry, { size: 34, w: 700, align: 'left' }); ry += 56;
+    });
+    if (chart) drawChart(tm, 1060, o.kind === 'trade' ? 210 : 230, 760, o.kind === 'trade' ? 560 : 520);
+    footer(tm, L, fy, 'left');
+  }
+
+
   const logo = new Image(); logo.src = (window.CineCardLogo || '/logo.png');
   function drawLogo(x, y, w) { if (logo.complete && logo.width) c.drawImage(logo, x, y, w, w * logo.height / logo.width); }
 
-  function loop(now) { if (!t0) t0 = now; frame(frozen ?? ((now - t0) / 1000) % (LEN + 2)); raf = requestAnimationFrame(loop); }
+  function loop(now) { if (!t0) t0 = now; frame(frozen ?? ((now - t0) / 1000) % (Math.min(len(), 9) + 1)); raf = requestAnimationFrame(loop); }
   function play() { cancelAnimationFrame(raf); t0 = 0; if (media && media.play) { media.currentTime = 0; media.play().catch(() => {}); } raf = requestAnimationFrame(loop); }
   function setBackground(file) {
     if (media && media.pause) media.pause();
@@ -304,13 +379,28 @@ function create(canvas, data, opts) {
       }
     });
   }
+  // a clip from a link (the Shuffle stock clips): straight from the source, or through `fallback` (same site) if the
+  // source does not allow drawing it into a video
+  function setBackgroundUrl(url, fallback) {
+    if (media && media.pause) media.pause();
+    if (media && media.src && media.src.startsWith('blob:')) URL.revokeObjectURL(media.src);
+    media = null;
+    const tryLoad = (src, cors) => new Promise((res, rej) => {
+      const v = document.createElement('video'); Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'auto' }); v.setAttribute('playsinline', ''); v.setAttribute('muted', '');
+      if (cors) v.crossOrigin = 'anonymous';
+      v.onloadeddata = () => res(v); v.onerror = () => rej(new Error('This clip could not be loaded. Try Shuffle again.')); v.src = src;
+    });
+    return tryLoad(url, true).catch((e) => (fallback ? tryLoad(fallback, false) : Promise.reject(e)))
+      .then((v) => { media = v; o.art = 'own'; play(); });
+  }
   function format() { const l = ['video/mp4;codecs=avc1.42E01F', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm']; return window.MediaRecorder ? l.find(m => MediaRecorder.isTypeSupported(m)) || '' : null; }
   /* frame by frame through VideoOut (exact start, no lag, sharp MP4); the live recorder only where that is missing */
   function record(onProgress) {
     if (!(window.VideoOut && VideoOut.supported())) return recordLive(onProgress);
     cancelAnimationFrame(raf); raf = 0;
     if (media && media.pause) media.pause();
-    return VideoOut.render({ canvas, seconds: LEN + 1, fps: FPS, onProgress, draw: (t) => VideoOut.seek(media, t).then(() => frame(t)) })
+    const done = 5.5, posterT = o.poster ? 0.1 : 0;
+    return VideoOut.render({ canvas, seconds: len(), fps: FPS, onProgress, draw: (t) => VideoOut.seek(media, t).then(() => frame(t < posterT ? done : t - posterT)) })
       .catch(() => null)
       .then((r) => { play(); return r || recordLive(onProgress); });
   }
@@ -322,15 +412,26 @@ function create(canvas, data, opts) {
     return new Promise((res) => {
       rec.onstop = () => { stream.getTracks().forEach(t => t.stop()); const type = rec.mimeType || mime || 'video/webm'; res({ blob: new Blob(parts, { type }), ext: type.includes('mp4') ? 'mp4' : 'webm' }); };
       play(); rec.start(250);
-      const st = performance.now(), tick = () => { const p = (performance.now() - st) / 1000 / (LEN + 1); if (onProgress) onProgress(clamp(p)); if (p >= 1) return rec.stop(); setTimeout(tick, 100); };
+      const st = performance.now(), tick = () => { const p = (performance.now() - st) / 1000 / len(); if (onProgress) onProgress(clamp(p)); if (p >= 1) return rec.stop(); setTimeout(tick, 100); };
       tick();
     });
   }
-  function still() { const keep = frozen; frozen = LEN + 0.5; frame(frozen); return new Promise(r => canvas.toBlob(b => { frozen = keep; r(b); }, 'image/png')); }
+  // hd: twice the size (2160 x 3840 for a story) so it stays sharp after Instagram / X shrink it
+  function still(hd) {
+    const keep = frozen; frozen = 5.5;
+    if (hd) { SC = 2; size(); }
+    frame(frozen);
+    return new Promise(r => canvas.toBlob(b => { frozen = keep; if (SC !== 1) { SC = 1; size(); frame(frozen ?? 5.5); } r(b); }, 'image/png'));
+  }
+  function setAvatar(file) {
+    if (avatar && avatar.src) URL.revokeObjectURL(avatar.src);
+    avatar = null; if (!file) return Promise.resolve();
+    return new Promise((res, rej) => { const im = new Image(); im.onload = () => { avatar = im; res(); }; im.onerror = () => rej(new Error('This picture cannot be opened. Try a JPG or PNG.')); im.src = URL.createObjectURL(file); });
+  }
   return {
     set(next) { const s0 = o.size; Object.assign(o, next || {}, next && next.show ? { show: Object.assign(o.show, next.show) } : {}); if (o.size !== s0) size(); },
     data(d, kind) { data = d; if (kind && kind !== o.kind) { o.kind = kind; o.show = Object.assign({}, DEFAULTS[kind]); } },
-    get: () => o, setBackground, play, record, still, freeze(s) { frozen = s; }, canRecord: () => format() !== null && !!canvas.captureStream,
+    get: () => o, setBackground, setBackgroundUrl, setAvatar, hasAvatar: () => !!avatar, play, record, still, freeze(s) { frozen = s; }, canRecord: () => format() !== null && !!canvas.captureStream,
   };
 }
 

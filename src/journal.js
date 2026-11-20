@@ -399,19 +399,22 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   // ?period=YYYY-MM (a month) | 30 | 90 | all, ?account= as on the journal. Account numbers are always masked.
   // Share Studio: motion share cards for a trade, day, session, week, month or quarter.
   // The page gets a compact list of recent trades; candles load per trade when a trade card is picked.
+  const stock = require('./stock-clips')(app, { requireUser });
   app.get('/journal/studio', requireUser, requireJournal, (req, res) => {
     const u = req.user;
     const { liveAccts, sel, where, args } = scope(req);
     const cur = (sel ? sel.cur : liveAccts[0]?.cur) || '';
-    const rows = db.prepare(`SELECT id, symbol, side, lots, entry, exit, open_time, close_time, net, r, risk_pct, pips, pct FROM journal_trades
+    const rows = db.prepare(`SELECT id, symbol, side, lots, entry, exit, open_time, close_time, net, r, risk_pct, pips, pct, manual FROM journal_trades
       WHERE ${where} AND close_time >= date('now', '-400 days') ORDER BY close_time DESC LIMIT 2000`).all(...args);
     const off = u.ny_offset ?? desk.NY_DEFAULT;
     const num = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
     const trades = prep(rows).map((t) => ({
       id: t.id, s: t.symbol, side: t.side, o: t.open_time, c: t.close_time, net: t.net, r: t.r, pips: num(t.pips), pct: num(t.pct),
-      entry: num(t.entry), exit: num(t.exit), lots: num(t.lots), risk: num(t.risk_pct), sess: desk.sessionOf(t, off),
+      entry: num(t.entry), exit: num(t.exit), lots: num(t.lots), risk: num(t.risk_pct), sess: desk.sessionOf(t, off), m: t.manual ? 1 : 0,
     }));
-    const json = JSON.stringify({ trades, cur, handle: u.card_handle || u.name || '' }).replace(/</g, '\\u003c');
+    // owner-only extras (clip studio): Shuffle clips, quote, photo, layout, length
+    const owner = !!u.is_admin;
+    const json = JSON.stringify({ trades, owner, stock: owner && stock.enabled(), cur, handle: u.card_handle || u.name || '' }).replace(/</g, '\\u003c');
     const acctOpts = [...(liveAccts.length > 1 ? [['', 'All accounts']] : []), ...liveAccts.map((a) => [a.account_number, `Account ••${String(a.account_number).slice(-2)}`])];
     page(req, res, 'Share Studio', `
     <link rel="stylesheet" href="/studio.css">
