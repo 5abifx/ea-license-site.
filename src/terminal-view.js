@@ -3,8 +3,6 @@
 // (clock, session, countdowns, the news panel and the trade check).
 const { esc } = require('./views');
 
-const X0 = 96, X1 = 1180;                       // day map drawing area (viewBox 0 0 1200 236)
-const xm = (min) => X0 + ((X1 - X0) * min) / 1440;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 function gauge(score, level) {
@@ -19,67 +17,71 @@ function gauge(score, level) {
     <div class="tm-gc"><b>${score}</b><span class="tm-lvl ${level}">${level} risk</span></div></div>`;
 }
 
-// ---------- ticker strip ----------
-function kpis(T, N, money) {
-  const tile = (k, label, body, cls = '') => `<div class="tm-k ${cls}" data-k="${k}"><span class="tm-kl">${label}</span>${body}</div>`;
-  const u = T.today.u, usual = Math.max(1, Math.round(T.usualTrades));
-  const dots = Array.from({ length: Math.max(usual, T.today.n) }, (_, i) => {
-    const v = T.today.list[i];
-    return `<i class="${v === undefined ? '' : v >= 0 ? 'up' : 'dn'}${i >= usual ? ' over' : ''}"></i>`;
+
+// ---------- top tiles: your day (one bar per hour), today, mistake risk, up next, today's rule ----------
+// Plain HTML with fixed heights, so the tiles keep their size on any screen width.
+const SESS_BANDS = [['Asia', 0, 3], ['London', 3, 8], ['NY AM', 8, 12], ['NY PM', 12, 17], ['Asia', 19, 24]];
+function dayTile(T, N) {
+  const hrs = Array.from({ length: 24 }, (_, h) => {
+    const a = T.halves[h * 2] || { n: 0, u: 0 }, b = T.halves[h * 2 + 1] || { n: 0, u: 0 };
+    const today = T.todayTrades.filter((t) => Math.floor(t.min / 60) === h);
+    const inWin = T.best && (() => { const f = T.best.from, to = T.best.to > f ? T.best.to : 1440; return h * 60 < to && (h + 1) * 60 > f; })();
+    const red = T.avoid.includes(h * 60) || T.avoid.includes(h * 60 + 30);
+    const news = N && N.has ? N.events.filter((e) => e.day === 0 && Math.floor(e.nyMin / 60) === h) : [];
+    return { h, n: a.n + b.n, u: a.u + b.u, today, inWin, red, news };
+  });
+  const mx = Math.max(0.5, ...hrs.map((x) => Math.abs(x.u)));
+  const cols = hrs.map((x) => {
+    const net = x.today.reduce((s, t) => s + t.net, 0);
+    const tip = `${String(x.h).padStart(2, '0')}:00 · usually ${x.n} trades, ${T.fmtU(x.u)}${x.today.length ? ` · today ${x.today.length}` : ''}${x.red ? ' · red hour' : ''}${x.inWin ? ' · your window' : ''}${x.news.length ? ' · news: ' + x.news.map((e) => `${T.hhmm(e.nyMin)} ${e.cur} ${e.name}`).join(', ') : ''}`;
+    const ht = x.n ? 10 + (Math.abs(x.u) / mx) * 90 : 0;
+    return `<div class="tm-hc" title="${esc(tip)}"><span class="tm-hn ${x.today.length ? (net >= 0 ? 'pos' : 'neg') : ''}">${x.today.length || ''}</span>
+      <span class="tm-hb${x.inWin ? ' win' : ''}${x.red ? ' red' : ''}">${x.n ? `<i class="${x.u >= 0 ? 'up' : 'dn'}" style="height:${ht.toFixed(0)}%;opacity:${(0.35 + (Math.abs(x.u) / mx) * 0.65).toFixed(2)}"></i>` : ''}</span>
+      <span class="tm-hl">${x.news.length ? `<i class="tm-hnw i${Math.max(...x.news.map((e) => e.imp))}"></i>` : x.h % 3 ? '' : String(x.h).padStart(2, '0')}</span></div>`;
   }).join('');
-  const segs = ['Low', 'Medium', 'High'].map((l) => `<i class="${l === T.level ? 'on ' + l : ''}"></i>`).join('');
-  const d = T.daily, used = d ? clamp(d.used / d.allow, 0, 1) : 0;
-  const fut = N && N.has ? N.events.filter((e) => e.t > Date.now()) : [];
-  const nx = fut.find((e) => e.imp === 3) || fut[0] || null;
-  const G = T.ghost, sp = G.curve.length > 1 ? spark(G.curve.map((p) => p[1] - p[0])) : '';
-  return `<div class="tm-kpis">
-    ${tile('sess', 'Session · NY', `<b class="tm-kv" id="tm-sess">${esc(T.sessNow)}</b><div class="tm-bar"><i id="tm-sessbar" style="width:0%"></i></div><small id="tm-sessnext">&nbsp;</small>`)}
-    ${tile('today', 'Today', `<b class="tm-kv ${u > 0 ? 'pos' : u < 0 ? 'neg' : ''}">${T.fmtU(u)}</b>${usual <= 12 && T.today.n <= 16
-      ? `<div class="tm-dots" title="${T.today.n} trades today, you usually take ${usual}">${dots}</div>`
-      : `<div class="tm-bar tm-count${T.today.n > usual ? ' warn' : ''}" title="${T.today.n} trades today, you usually take ${usual}"><i style="width:${Math.min(100, (T.today.n / Math.max(usual, T.today.n)) * 100).toFixed(0)}%"></i><b style="left:${Math.min(100, (usual / Math.max(usual, T.today.n)) * 100).toFixed(0)}%"></b></div>`}<small>${T.today.n} of usual ${usual} trades${T.today.n ? ` · ${T.today.list.filter((v) => v >= 0).length} won` : ''}</small>`)}
-    ${tile('risk', 'Mistake risk', `<b class="tm-kv">${T.score}<em>/100</em></b><div class="tm-segs">${segs}</div><small>${T.level} today</small>`)}
-    ${tile('room', 'Daily loss used', d ? `<b class="tm-kv ${used >= 0.8 ? 'neg' : ''}">${Math.round(used * 100)}%</b><div class="tm-bar ${used >= 0.8 ? 'bad' : used >= 0.5 ? 'warn' : ''}"><i style="width:${(used * 100).toFixed(0)}%"></i></div><small>${money(d.left).replace(/^[+−]/, '')} left today</small>`
-      : `<b class="tm-kv muted">--</b><div class="tm-bar"><i style="width:0"></i></div><small>Add firm rules in Insights</small>`)}
-    ${tile('news', 'Next news', nx ? `<b class="tm-kv" data-cd="${nx.t}">--</b><div class="tm-imp i${nx.imp}"><i></i><i></i><i></i><span>${esc(nx.cur)} ${esc(nx.name)}</span></div><small>${nx.move !== null ? `gold moves ±$${nx.move.toFixed(1)}` : `${T.hhmm(nx.nyMin)} NY`}</small>`
-      : `<b class="tm-kv muted">--</b><div class="tm-imp"><i></i><i></i><i></i><span>${N && N.has ? 'Quiet for your symbols' : 'Waiting for news'}</span></div><small>${N && N.has ? 'next 7 days' : 'Journal EA 1.30 sends it'}</small>`)}
-    ${tile('gap', 'Rules would add', `<b class="tm-kv ${G.gap > 0 ? 'pos' : ''}">${T.fmtU(G.gap)}</b>${sp}<small>last ${G.days} trading days</small>`)}
-  </div>`;
+  const bands = SESS_BANDS.map(([n, a, b]) => `<span style="left:${((a / 24) * 100).toFixed(2)}%;width:${(((b - a) / 24) * 100).toFixed(2)}%">${n}</span>`).join('');
+  return `<section class="card tp tm-day" aria-label="Your day">
+    <div class="tp-h"><span class="tp-l"><span class="tm-live"></span>Your day · New York time</span>
+      <span class="tm-sessn"><b id="tm-sess">${esc(T.sessNow)}</b> <span id="tm-sessnext" class="muted">&nbsp;</span><span class="tm-sessbar"><i id="tm-sessbar" style="width:0%"></i></span></span></div>
+    <div class="tm-ss" aria-hidden="true">${bands}</div>
+    <div class="tm-hrs">${cols}<i class="tm-hnow" aria-hidden="true"></i></div>
+    <div class="tm-leg"><span><i class="up"></i>usual win hour</span><span><i class="dn"></i>usual losing hour</span><span><i class="bl"></i>red hour</span><span><i class="wn"></i>your window</span><span><i class="nw"></i>news</span><span class="muted">number = trades today</span></div>
+  </section>`;
 }
 
-function spark(vals) {
-  const mn = Math.min(0, ...vals), mx = Math.max(0.1, ...vals), W = 120, H = 22;
-  const pts = vals.map((v, i) => `${((W * i) / (vals.length - 1)).toFixed(1)},${(H - ((H - 2) * (v - mn)) / (mx - mn) - 1).toFixed(1)}`).join(' ');
-  return `<svg class="tm-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}"/></svg>`;
+function todayTile(T, money) {
+  const u = T.today.u, usual = Math.max(1, Math.round(T.usualTrades)), n = T.today.n, won = T.today.list.filter((v) => v >= 0).length;
+  const top = Math.max(usual, n), d = T.daily, used = d ? clamp(d.used / d.allow, 0, 1) : 0;
+  return `<section class="card tp tm-tdy"><span class="tp-l">Today</span>
+    <b class="tm-big ${u > 0 ? 'pos' : u < 0 ? 'neg' : ''}">${T.fmtU(u)}</b>
+    <small class="muted">${n} trade${n === 1 ? '' : 's'} · usual ${usual}${n ? ` · ${won} won` : ''}</small>
+    <div class="tm-bar tm-count${n > usual ? ' warn' : ''}" title="${n} trades today, you usually take ${usual}"><i style="width:${((n / top) * 100).toFixed(0)}%"></i><b style="left:${((usual / top) * 100).toFixed(0)}%"></b></div>
+    <small class="${n > usual ? 'tm-warn' : 'muted'}">${n > usual ? 'Above your usual count' : n === usual ? 'At your usual count' : `${usual - n} left before your usual count`}</small>
+    <div class="tm-dl"><span>Daily loss used</span>${d ? `<b class="${used >= 0.8 ? 'neg' : ''}">${Math.round(used * 100)}% · ${money(d.left).replace(/^[+−]/, '')} left</b>` : '<a href="/journal/insights">Add firm rules</a>'}</div>
+  </section>`;
 }
 
-// ---------- day map ----------
-function dayMap(T, N) {
-  const lane = (y, label) => `<text x="0" y="${y + 19}" class="tm-lane">${label}</text>`;
-  let s = `<svg class="tm-map" viewBox="0 0 1200 236" role="img" aria-label="Today in New York time: sessions, news, your history and your plan">`;
-  s += lane(28, 'Market') + lane(88, 'Your history') + lane(148, 'Your plan') + lane(200, 'Today');
-  for (let h = 0; h <= 24; h += 3) s += `<line x1="${xm(h * 60)}" x2="${xm(h * 60)}" y1="20" y2="226" class="tm-grid"/><text x="${xm(h * 60)}" y="12" class="tm-tick" text-anchor="middle">${String(h % 24).padStart(2, '0')}:00</text>`;
-  const sess = [['Asia', 19 * 60, 1440], ['Asia', 0, 180], ['London', 180, 480], ['NY AM', 480, 720], ['NY PM', 720, 1020]];
-  sess.forEach(([n, a, b]) => {
-    s += `<rect x="${xm(a) + 1}" y="28" width="${xm(b) - xm(a) - 2}" height="28" rx="6" class="tm-sess"/>`;
-    if (b - a >= 180) s += `<text x="${(xm(a) + xm(b)) / 2}" y="47" class="tm-sl" text-anchor="middle">${n}</text>`;
-  });
-  s += `<rect x="${xm(570) - 2}" y="24" width="4" height="36" rx="2" class="tm-open"><title>09:30 cash open</title></rect>`;
-  if (N && N.has) N.events.filter((e) => e.day === 0).forEach((e) => {
-    const x = xm(e.nyMin);
-    s += `<g class="tm-nm i${e.imp}"><line x1="${x}" x2="${x}" y1="60" y2="226"/><path d="M${x} 58 l6 -8 l-6 -8 l-6 8z"/><title>${T.hhmm(e.nyMin)} ${esc(e.cur)} ${esc(e.name)}</title></g>`;
-  });
-  T.halves.forEach((h) => {
-    const a = Math.min(1, Math.abs(h.u) / T.maxAbs);
-    s += `<rect x="${xm(h.from) + 1}" y="88" width="${xm(30) - xm(0) - 2}" height="28" rx="4" class="${h.n ? (h.u >= 0 ? 'tm-up' : 'tm-dn') : 'tm-none'}" style="opacity:${h.n ? (0.2 + a * 0.8).toFixed(2) : 1}"><title>${T.hhmm(h.from)} · ${h.n} trades · ${T.fmtU(h.u)}</title></rect>`;
-  });
-  T.avoid.forEach((m) => { s += `<rect x="${xm(m) + 1}" y="148" width="${xm(30) - xm(0) - 2}" height="28" rx="5" class="tm-block"><title>Red hour for you: no new trades</title></rect>`; });
-  if (T.best) {
-    const a = T.best.from, b = T.best.to > a ? T.best.to : 1440;
-    s += `<rect x="${xm(a) + 1}" y="148" width="${xm(b) - xm(a) - 2}" height="28" rx="6" class="tm-win"/><text x="${xm(a) + 6}" y="166" class="tm-wl">Your window</text>`;
-  }
-  T.todayTrades.forEach((t) => { s += `<circle cx="${xm(t.min)}" cy="214" r="7" class="${t.net >= 0 ? 'tm-tu' : 'tm-td'}"><title>${esc(t.sym)} ${T.fmtU(t.u)}</title></circle>`; });
-  s += `<g class="tm-now" data-x0="${X0}" data-x1="${X1}"><line y1="20" y2="228" x1="0" x2="0"/><text y="234" x="0" text-anchor="middle">now</text></g></svg>`;
-  return s;
+function riskTile(T) {
+  const t = T.level === 'High' ? 'Today looks like your bad days' : T.level === 'Medium' ? 'Today needs some care' : 'Today looks like your good days';
+  const top = T.drivers[0];
+  return `<section class="card tp tm-rsk"><span class="tp-l">Mistake risk</span>
+    <div class="tm-rskb">${gauge(T.score, T.level)}<div><b class="tm-rt">${t}</b>${top ? `<small class="muted">${esc(top.title.replace(/\.$/, ''))}</small>` : ''}<a class="small" href="#tm-fcp">Why ↓</a></div></div>
+  </section>`;
+}
+
+function upNext(N, T) {
+  const fut = N && N.has ? N.events.filter((e) => e.t > Date.now()).sort((a, b) => b.imp - a.imp || a.t - b.t).slice(0, 4).sort((a, b) => a.t - b.t) : [];
+  const day = (e) => new Date(e.t).toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'short' });
+  const rows = fut.length ? fut.map((e) => `<div class="tm-ux"><span class="tm-un"><i class="tm-hnw i${e.imp}"></i>${esc(e.cur)} ${esc(e.name)}</span><small class="muted">${e.day === 0 ? 'Today' : esc(day(e))} ${T.hhmm(e.nyMin)} · <em data-cd="${e.t}">--</em></small></div>`).join('')
+    : `<div class="tm-empty"><i class="ok"></i>${N && N.has ? 'No medium or high impact news this week.' : 'News switches on with Trade Journal EA 1.30.'}</div>`;
+  return `<section class="card tp tm-upn"><div class="tp-h"><span class="tp-l">Coming up</span><a class="small" href="#tm-newsp">All news ↓</a></div>${rows}</section>`;
+}
+
+function ruleTile(T, money) {
+  const r = T.rules[0];
+  return `<section class="card tp tm-rl1"><div class="tp-h"><span class="tp-l">Today's rule</span>${T.rules.length > 1 ? `<a class="small" href="#tm-rulesp">All ${T.rules.length} ↓</a>` : ''}</div>
+    ${r ? `<b class="tm-rt">${esc(r.rule)}</b>${r.saved ? `<small class="neg">${esc(r.tag)}: ${money(-r.saved).replace(/^[+]/, '')}</small>` : `<small class="muted">${esc(r.tag)}</small>`}` : '<div class="tm-empty"><i class="ok"></i>No leaks found yet.</div>'}
+  </section>`;
 }
 
 // ---------- you vs your rules ----------
@@ -134,18 +136,19 @@ function html(T, { news: N, money, cur, acctNote, market }) {
       <div class="tm-rb"><b>${esc(r.rule)}</b><div class="tm-cost"><i style="width:${Math.round((Math.abs(r.saved) / maxCost) * 100)}%"></i></div></div>
       <div class="tm-rc"><span class="neg">${r.saved ? money(-r.saved).replace(/^[+]/, '') : '-'}</span><small>${esc(r.tag)}</small></div></div>`).join('')
     : '<div class="tm-empty"><i class="ok"></i>No leaks found yet.</div>';
-  const G = T.ghost;
-  const leg = (items) => `<div class="tm-leg">${items.map(([c, t]) => `<span><i class="${c}"></i>${t}</span>`).join('')}</div>`;
+  const G = T.ghost, mk = marketPanel(market || []);
   return `
-<div class="tm">
-  ${kpis(T, N, money)}
-  ${panel('tm-wide', '<span class="tm-live"></span>Your day · New York time', '', `<div class="tm-scroll">${dayMap(T, N)}</div>`,
-    leg([['up', 'you win'], ['dn', 'you lose'], ['bl', 'red hour'], ['wn', 'your window'], ['nw', 'news']]))}
-  ${marketPanel(market || [])}
-  ${panel('tm-fc', 'Mistake forecast', T.level === 'High' ? 'Today looks like your bad days' : T.level === 'Medium' ? 'Today needs some care' : 'Today looks like your good days',
+<div class="tm${mk ? '' : ' nomkt'}">
+  ${dayTile(T, N)}
+  ${todayTile(T, money)}
+  ${riskTile(T)}
+  ${mk}
+  ${upNext(N, T)}
+  ${ruleTile(T, money)}
+  ${panel('tm-fc" id="tm-fcp', 'Mistake forecast', T.level === 'High' ? 'Today looks like your bad days' : T.level === 'Medium' ? 'Today needs some care' : 'Today looks like your good days',
     `<div class="tm-fcb">${gauge(T.score, T.level)}<div class="tm-drvs">${drivers}</div></div>${recent(T)}`, `<span class="tp-r">${esc(acctNote)}</span>`)}
-  ${panel('tm-rules', "Today's rules", 'From your own leaks', `<div class="tm-rl">${rules}</div>`, '<span class="tp-r" title="KATANA can enforce these after its next update">reminders</span>')}
-  ${panel('tm-wide tm-news', 'News catalysts', '', `<div id="tm-news"></div><script id="tm-ndata" type="application/json">${ndata}</script>`,
+  ${panel('tm-rules" id="tm-rulesp', "Today's rules", 'From your own leaks', `<div class="tm-rl">${rules}</div>`, '<span class="tp-r" title="KATANA can enforce these after its next update">reminders</span>')}
+  ${panel('tm-wide tm-news" id="tm-newsp', 'News catalysts', '', `<div id="tm-news"></div><script id="tm-ndata" type="application/json">${ndata}</script>`,
     `<div class="seg tm-days" id="tm-days"><button type="button" data-d="0" aria-pressed="true">Today</button><button type="button" data-d="1" aria-pressed="false">Tomorrow</button><button type="button" data-d="w" aria-pressed="false">This week</button></div>`)}
   ${panel('tm-ckp', 'Next trade check', '', `<div class="tm-ck" id="tm-ck"><noscript><p class="muted">Turn on JavaScript to use the trade check.</p></noscript></div>
     <script id="tm-data" type="application/json">${data}</script>`)}
@@ -178,7 +181,7 @@ function marketPanel(syms) {
   const list = syms.map((x) => ({ ...x, tv: tvSymbol(x.sym) })).filter((x) => x.tv).filter((x, i, l) => l.findIndex((y) => y.tv === x.tv) === i).slice(0, 4);
   if (!list.length) return '';
   const chips = list.map((x, i) => `<button type="button" data-tv="${esc(x.tv)}" aria-pressed="${i === 0}">${esc(x.sym)}<small>${x.n} trades</small></button>`).join('');
-  return `<section class="card tp tm-wide tm-mkt">
+  return `<section class="card tp tm-mkt">
     <div class="tp-h"><span class="tp-l">Live market · your most traded</span><span class="seg tm-mkts" id="tm-mkts">${chips}</span></div>
     <div class="tm-tv" id="tm-tv" data-tv="${esc(list[0].tv)}"></div>
     <p class="small muted tm-tvnote">Live prices from TradingView. Your broker's price can differ slightly.</p>

@@ -22,6 +22,8 @@
       now.querySelector('line').setAttribute('x1', x); now.querySelector('line').setAttribute('x2', x);
       const t = now.querySelector('text'); t.setAttribute('x', x); t.textContent = 'now ' + hhmm(m);
     }
+    const hn = document.querySelector('.tm-hnow');
+    if (hn) hn.style.left = `${((m / 1440) * 100).toFixed(2)}%`;
     const s = SESS.find(([, a, b]) => (m >= a && m < b) || (m + 1440 >= a && m + 1440 < b));
     const mm = s && m < s[1] ? m + 1440 : m;
     if ($('tm-sess')) {
