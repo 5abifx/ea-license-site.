@@ -76,6 +76,9 @@
       const l = byQ.get(k) || [], g = groupBy(l, (t) => t.c.slice(0, 7));
       return period('QUARTERLY', k.replace(/(\d{4})-(Q\d)/, '$2 $1'), [...g.keys()].sort().map((m) => it(dt(m + '-01').toLocaleString('en-US', { month: 'short', timeZone: 'UTC' }).toUpperCase(), g.get(m))), l, 'Best month');
     },
+    notrade(k) {   // owner panel: a weekday with no trades
+      return { kind: 'period', noTrade: true, kindTxt: 'DAILY', title: md(k, { weekday: 'short' }), items: [], total: { money: 0, pips: null, r: null, pct: null }, trades: '0', winRate: '', green: '', best: '', bestLabel: '', handle: '', synced: true };
+    },
     session(k) {
       const [m, s] = k.split('|'), l = (byMonth.get(m) || []).filter((t) => t.sess === s), g = groupBy(l, day);
       return period(s.toUpperCase() + ' SESSION', monthName(m), [...g.keys()].sort().map((d) => it(String(Number(d.slice(8))), g.get(d))), l, 'Best day');
@@ -123,6 +126,9 @@
       else fetch('/journal/studio/line/' + id, { credentials: 'same-origin' }).then((r) => r.json()).then((x) => { lineCache[id] = x; put(x); }).catch(() => {});
     }
   }
+
+  // the owner gets the one-panel studio (public/studio-owner.js) instead of the steps
+  if (OWN && window.StudioOwner) { window.StudioOwner({ D, cc, A, OPTS, DEF, build, load, store, show, noTick, md, byDay, dataFor }); return; }
 
   // ---------- steps ----------
   const I = {

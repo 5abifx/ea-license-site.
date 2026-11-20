@@ -264,10 +264,36 @@ function create(canvas, data, opts) {
     drawArt(tm);
     c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 18;
     c.globalAlpha = A(tm, 0.1, 0.7); corner();
-    if (W > H && o.layout === 'split') frameSplit(tm);
+    if (data.noTrade) frameNoTrade(tm);
+    else if (W > H && o.layout === 'split') frameSplit(tm);
     else frameCenter(tm);
     c.globalAlpha = 1; c.shadowBlur = 0;
     if (SC !== 1) { c.setTransform(1, 0, 0, 1, 0, 0); ac.setTransform(1, 0, 0, 1, 0, 0); }
+  }
+
+  /* a day with no trades: the date, NO TRADE DAY, and the member's own note in an orange tag between brackets */
+  function frameNoTrade(tm) {
+    const wide = W > H, cx = W / 2, mid = H * (wide ? 0.46 : 0.5);
+    c.globalAlpha = A(tm, 0.1, 0.7);
+    if (o.show.title !== false) text(c, data.title || '', cx, wide ? 170 : 300, { fam: BIG, w: 700, size: 46 });
+    const big = 'NO TRADE DAY', bs = fit(c, big, W - 160, wide ? 120 : 112, BIG, 800, 2);
+    const k = A(tm, 0.4, 1.1);
+    c.globalAlpha = k; c.save(); c.translate(cx, mid); c.scale(0.92 + 0.08 * k, 0.92 + 0.08 * k);
+    text(c, big, 0, 0, { fam: BIG, w: 800, size: bs, ls: 2 }); c.restore();
+    const note = String(o.quote || data.note || 'Protecting my capital today').trim();
+    if (note && o.show.quote !== false) {
+      c.font = `700 40px ${TXT}`; const nw = Math.min(W - 240, c.measureText(note).width + 36), nh = 62, ny = mid + 70;
+      const g = A(tm, 1.0, 1.6), br = A(tm, 1.3, 1.9);
+      c.globalAlpha = g; c.save(); c.shadowBlur = 0; c.fillStyle = '#ff5a1f';
+      c.fillRect(cx - nw / 2, ny, nw, nh); c.restore();
+      text(c, note, cx, ny + 44, { size: fit(c, note, nw - 30, 40, TXT, 700), w: 700, color: '#fff' });
+      // the brackets slide in from the sides
+      c.globalAlpha = br; c.save(); c.shadowBlur = 0; c.strokeStyle = '#ff5a1f'; c.lineWidth = 7; c.lineCap = 'round';
+      const off = 34 + 40 * (1 - br);
+      [[-1, cx - nw / 2 - off], [1, cx + nw / 2 + off]].forEach(([d, x]) => { c.beginPath(); c.arc(x - d * 40, ny + nh / 2, 52, d < 0 ? Math.PI * 0.7 : -Math.PI * 0.3, d < 0 ? Math.PI * 1.3 : Math.PI * 0.3); c.stroke(); });
+      c.restore();
+    }
+    footer(tm, cx, H - (wide ? 110 : 170), 'center');
   }
 
   /* everything centred (story, post, wide) */
@@ -423,6 +449,26 @@ function create(canvas, data, opts) {
     frame(frozen);
     return new Promise(r => canvas.toBlob(b => { frozen = keep; if (SC !== 1) { SC = 1; size(); frame(frozen ?? 5.5); } r(b); }, 'image/png'));
   }
+  // GIF: 540 wide, 15 fps, up to 6 s (GIFs get big fast); needs /vendor/gifenc.js
+  function gif(onProgress) {
+    const load = window.GifEnc ? Promise.resolve() : new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = '/vendor/gifenc.js'; sc.onload = ok; sc.onerror = () => no(new Error('GIF maker could not load.')); document.head.appendChild(sc); });
+    return load.then(async () => {
+      const { GIFEncoder, quantize, applyPalette } = window.GifEnc;
+      cancelAnimationFrame(raf); raf = 0; if (media && media.pause) media.pause();
+      const gw = W > H ? 720 : 540, gh = Math.round(gw * H / W / 2) * 2, sm = document.createElement('canvas'); sm.width = gw; sm.height = gh;
+      const sc = sm.getContext('2d', { willReadFrequently: true }), enc = GIFEncoder(), fps = 15, secs = Math.min(6, len()), n = Math.round(secs * fps);
+      for (let i = 0; i < n; i++) {
+        const t = i / fps; if (window.VideoOut) await VideoOut.seek(media, t);
+        frame(t); sc.drawImage(canvas, 0, 0, gw, gh);
+        const px = sc.getImageData(0, 0, gw, gh).data, pal = quantize(px, 256), idx = applyPalette(px, pal);
+        enc.writeFrame(idx, gw, gh, { palette: pal, delay: 1000 / fps });
+        if (onProgress) onProgress((i + 1) / n);
+        if (i % 3 === 0) await new Promise((ok) => setTimeout(ok, 0));
+      }
+      enc.finish(); play();
+      return { blob: new Blob([enc.bytes()], { type: 'image/gif' }), ext: 'gif' };
+    });
+  }
   function setAvatar(file) {
     if (avatar && avatar.src) URL.revokeObjectURL(avatar.src);
     avatar = null; if (!file) return Promise.resolve();
@@ -431,7 +477,7 @@ function create(canvas, data, opts) {
   return {
     set(next) { const s0 = o.size; Object.assign(o, next || {}, next && next.show ? { show: Object.assign(o.show, next.show) } : {}); if (o.size !== s0) size(); },
     data(d, kind) { data = d; if (kind && kind !== o.kind) { o.kind = kind; o.show = Object.assign({}, DEFAULTS[kind]); } },
-    get: () => o, setBackground, setBackgroundUrl, setAvatar, hasAvatar: () => !!avatar, play, record, still, freeze(s) { frozen = s; }, canRecord: () => format() !== null && !!canvas.captureStream,
+    get: () => o, setBackground, setBackgroundUrl, setAvatar, hasAvatar: () => !!avatar, play, record, still, gif, hasMedia: () => !!media, clearMedia() { if (media && media.pause) media.pause(); media = null; }, freeze(s) { frozen = s; }, canRecord: () => format() !== null && !!canvas.captureStream,
   };
 }
 
