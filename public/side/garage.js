@@ -68,6 +68,14 @@ export default function garage(card) {
   // [centre x, centre y, radius] in the model's own units; +x is the rear (big wheels, wing), -x the nose
   const AXLES = [[0.627, -0.08, 0.162, true], [-0.563, -0.09, 0.152, false]];
   const wheels = [], pivot = new THREE.Vector3(), nose = new THREE.Vector3();
+  let blurT = null;
+  const blurTex = () => blurT || (blurT = (() => { const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d'), m = S / 2;
+    const g = x.createRadialGradient(m, m, 0, m, m, m);
+    [[0, '#0d0d0f'], [0.12, '#26272b'], [0.18, '#121214'], [0.3, '#4a4b51'], [0.42, '#2c2d32'], [0.52, '#5a5b62'], [0.6, '#303136'], [0.7, '#1a1a1d'], [0.74, '#0a0a0b'], [0.95, '#141416'], [1, '#050506']].forEach(([k, col]) => g.addColorStop(k, col));
+    x.fillStyle = g; x.beginPath(); x.arc(m, m, m, 0, 7); x.fill(); x.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 70; i++) { const r0 = m * (0.2 + Math.random() * 0.5), a0 = Math.random() * 6.283; x.strokeStyle = `rgba(255,255,255,${0.02 + Math.random() * 0.04})`; x.lineWidth = 1 + Math.random() * 2; x.beginPath(); x.arc(m, m, r0, a0, a0 + 0.6 + Math.random() * 1.6); x.stroke(); }
+    x.strokeStyle = 'rgba(255,90,31,.10)'; x.lineWidth = m * 0.08; x.beginPath(); x.arc(m, m, m * 0.62, 0, 7); x.stroke();
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })());
   function splitWheels(o) {
     const g = o.geometry, pos = g.attributes.position, idx = g.index; if (!idx) return;
     const parts = []; AXLES.forEach(([x, y, rad, rear]) => [1, -1].forEach((sd) => parts.push({ x, y, rad, rear, sd, tri: [] })));
@@ -84,7 +92,10 @@ export default function garage(card) {
       const steer = new THREE.Group(), spin = new THREE.Group(), m = new THREE.Mesh(wg, o.material), cz = 0.36 * p.sd;
       steer.position.set(p.x, p.y, cz); m.position.set(-p.x, -p.y, -cz); m.castShadow = true;
       spin.add(m); steer.add(spin); o.add(steer);
-      wheels.push({ steer, spin, rear: p.rear });
+      // motion-blur disc over the outer face, faded in with wheel speed (fast spokes otherwise look frozen or backwards)
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(p.rad * 0.97, 64), new THREE.MeshStandardMaterial({ map: blurTex(), metalness: 0.7, roughness: 0.42, transparent: true, opacity: 0, depthWrite: false }));
+      disc.position.z = (0.452 - 0.36) * p.sd; if (p.sd < 0) disc.rotation.y = Math.PI; spin.add(disc);
+      wheels.push({ steer, spin, rear: p.rear, disc });
     });
   }
   const holder = new THREE.Group(); sc.add(holder);
@@ -352,7 +363,10 @@ export default function garage(card) {
       if (k < 0.9) { emit += dt * 26 * Math.min(1, ms / 300); while (emit >= 1) { emit--; wheels.forEach((w) => { if (w.rear) puff(w); }); } }
       if (k >= 1) { burn = 0; steerA = 0; rearW = 0; }
     }
-    wheels.forEach((w) => { w.spin.rotation.z += (w.rear ? rearW : frontW) * dt; if (!w.rear) w.steer.rotation.y = steerA; });
+    wheels.forEach((w) => { const om = w.rear ? rearW : frontW;
+      w.spin.rotation.z += Math.min(om * dt, 0.3);                                      // spokes never strobe
+      w.disc.material.opacity = Math.min(0.94, Math.max(0, (om - 6) / 18));
+      if (!w.rear) w.steer.rotation.y = steerA; });
     if (rev > 0) {
       const k = (t - revT) / (burn ? 3300 : 1300); rev = Math.max(0, 1 - k);
       lights.forEach((l) => (l.intensity = 6 * rev * (0.75 + 0.25 * Math.sin(t / 60))));
