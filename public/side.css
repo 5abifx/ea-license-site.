@@ -75,6 +75,12 @@
   .sc-garage .sc-lbl { position: absolute; left: 20px; top: 18px; z-index: 2; pointer-events: none; }
   .sc-garage canvas { position: absolute; top:0;right:0;bottom:0;left:0; display: block; width: 100%; height: 100%; cursor: grab; }
   .sc-garage canvas { opacity: 0; transition: opacity .6s ease; } .sc-garage.on canvas { opacity: 1; }
+  /* the car's canvas sits on top of the page around the card, so a zoomed-in car comes out of it; clicks go through */
+  .sc-car3d { position: fixed; z-index: 41; pointer-events: none; opacity: 0; transition: opacity .6s ease; }
+  .sc-car3d.on { opacity: 1; }
+  .sc-mute { position: absolute; right: 12px; top: 12px; z-index: 3; width: 30px; height: 30px; padding: 0 !important; border-radius: 50%; border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.06); font-size: 13px; line-height: 1; display: grid; place-items: center; cursor: pointer; }
+  .sc-mute:hover { background: rgba(255,255,255,.12); }
   .sc-garage canvas:active { cursor: grabbing; }
   .sc-paint { position: absolute; left: 16px; bottom: 14px; z-index: 2; display: flex; gap: 7px; }
   .sc-paint button { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); cursor: pointer; }

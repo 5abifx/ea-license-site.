@@ -1769,8 +1769,8 @@ a.tp-st.done { color: var(--text); display: inline-flex; align-items: center; ga
 .recap { margin-bottom: 18px; }
 @media (max-width: 1100px) { .recap { grid-template-columns: 1fr; } .rc-recent { grid-column: auto; } }
 @media (max-width: 620px) { .rc-split { grid-template-columns: 1fr; } .rc-curve, .rc-seq { min-height: 70px; } }
-.fq-thumb { height: 92px; border-radius: 10px; background: rgba(0,0,0,.35); overflow: hidden; margin: 2px 0; }
-.fq-thumb svg { width: 100%; height: 100%; display: block; }
+.fq-thumb { height: 92px; background: none; overflow: visible; margin: 6px 4px; }
+.fq-thumb svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .fq-thumb line { stroke-width: 1; vector-effect: non-scaling-stroke; }
 .fq-thumb line.u { stroke: var(--ok); } .fq-thumb line.d { stroke: var(--danger); }
 .fq-thumb rect.u { fill: var(--ok); } .fq-thumb rect.d { fill: var(--danger); }
