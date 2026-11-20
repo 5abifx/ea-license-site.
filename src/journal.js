@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { analyze, propGuard, prep, numbers, score, MIN_TRADES } = require('./insights');
 const insightsView = require('./insights-view');
 const desk = require('./desk');
+const { milestones } = require('./milestones');
 const deskView = require('./desk-view');
 const terminal = require('./terminal');
 const news = require('./news');
@@ -398,19 +399,26 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   // ?period=YYYY-MM (a month) | 30 | 90 | all, ?account= as on the journal. Account numbers are always masked.
   // Share Studio: motion share cards for a trade, day, session, week, month or quarter.
   // The page gets a compact list of recent trades; candles load per trade when a trade card is picked.
+  const stock = require('./stock-clips')(app, { requireUser });
   app.get('/journal/studio', requireUser, requireJournal, (req, res) => {
     const u = req.user;
     const { liveAccts, sel, where, args } = scope(req);
     const cur = (sel ? sel.cur : liveAccts[0]?.cur) || '';
-    const rows = db.prepare(`SELECT id, symbol, side, lots, entry, exit, open_time, close_time, net, r, risk_pct, pips, pct FROM journal_trades
+    const rows = db.prepare(`SELECT id, symbol, side, lots, entry, exit, open_time, close_time, net, r, risk_pct, pips, pct, manual FROM journal_trades
       WHERE ${where} AND close_time >= date('now', '-400 days') ORDER BY close_time DESC LIMIT 2000`).all(...args);
     const off = u.ny_offset ?? desk.NY_DEFAULT;
     const num = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
     const trades = prep(rows).map((t) => ({
       id: t.id, s: t.symbol, side: t.side, o: t.open_time, c: t.close_time, net: t.net, r: t.r, pips: num(t.pips), pct: num(t.pct),
-      entry: num(t.entry), exit: num(t.exit), lots: num(t.lots), risk: num(t.risk_pct), sess: desk.sessionOf(t, off),
+      entry: num(t.entry), exit: num(t.exit), lots: num(t.lots), risk: num(t.risk_pct), sess: desk.sessionOf(t, off), m: t.manual ? 1 : 0,
     }));
-    const json = JSON.stringify({ trades, cur, handle: u.card_handle || u.name || '' }).replace(/</g, '\\u003c');
+    // milestone certificates: from every trade in scope (all time), oldest first
+    const all = db.prepare(`SELECT close_time, net, symbol, manual, account_number, balance_after FROM journal_trades WHERE ${where} AND net IS NOT NULL ORDER BY close_time ASC, id ASC`).all(...args);
+    const accLimits = (sel ? [sel] : liveAccts).map((a) => ({ account_number: a.account_number, limits: limitsOf(db.prepare(`SELECT ${PROP_COLS} FROM accounts WHERE user_id = ? AND account_number = ?`).get(u.id, a.account_number) || {}) }));
+    const cs = { USD: '$', EUR: '€', GBP: '£', JPY: '¥', AUD: 'A$', CAD: 'C$', NZD: 'N$', CHF: 'Fr ', INR: '₹' }[cur] || '$';
+    const mny = (v) => `${v < 0 ? '−' : '+'}${cs}${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const miles = milestones(all, accLimits, mny);
+    const json = JSON.stringify({ trades, miles, stock: stock.enabled(), cur, handle: u.card_handle || u.name || '' }).replace(/</g, '\\u003c');
     const acctOpts = [...(liveAccts.length > 1 ? [['', 'All accounts']] : []), ...liveAccts.map((a) => [a.account_number, `Account ••${String(a.account_number).slice(-2)}`])];
     page(req, res, 'Share Studio', `
     <link rel="stylesheet" href="/studio.css">

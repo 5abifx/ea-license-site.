@@ -33,13 +33,17 @@ const META = {
     title: `Pricing: Journal, KATANA & Pro Plans · ${BRAND}`,
     desc: `${priceLine().replace(/, ([^,]*)$/, ', $1')} a month, less on annual.${trialBit(' Every plan starts with a free trial.')} Cancel anytime.`,
   }),
+  '/studio': () => ({
+    title: `Share Studio: Trade Videos & Cards for Reels · ${BRAND}`,
+    desc: 'Turn real MT5 trades into cinematic share videos and pictures: trades, days, weeks and milestone certificates, synced from MT5. Story, Post and Wide.',
+  }),
   '/faq': () => ({
     title: `FAQ: KATANA, Trade Journal & Prop Firms · ${BRAND}`,
     desc: 'Install KATANA on MT5, prop firm rules, news lock, phone alerts, payments and accounts, answered in plain words.',
   }),
 };
 // pages listed in /sitemap.xml and opened to crawlers in robots.txt (/why ships with its own page)
-const PUBLIC = ['/', '/katana', '/trade-journal', '/mentorship', '/pricing', '/why', '/faq', '/help/ea-blocked', '/terms', '/privacy'];
+const PUBLIC = ['/', '/katana', '/trade-journal', '/studio', '/mentorship', '/pricing', '/why', '/faq', '/help/ea-blocked', '/terms', '/privacy'];
 
 const metaFor = (path) => (META[path] ? META[path]() : null);
 const canonical = (path) => `${SITE_URL}${path === '/' ? '/' : path}`;

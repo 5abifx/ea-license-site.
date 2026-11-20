@@ -42,3 +42,5 @@
 @keyframes ss-up{from{opacity:0;transform:translateY(12px);filter:blur(4px)}to{opacity:1;transform:none;filter:none}}
 .ss .ss-h{font:700 clamp(26px,4vw,42px)/1.05 Sora,system-ui,sans-serif;letter-spacing:-.035em;margin:0 0 20px}
 .ss [hidden]{display:none!important}
+.ss-wrap.is-wide{grid-template-columns:minmax(0,560px) minmax(0,1fr)}
+.ss-wrap.is-wide #pv{max-width:560px}

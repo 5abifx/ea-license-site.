@@ -1063,6 +1063,7 @@ const mentor = require('./mentorship')(app, { db, page, flash, requireUser, requ
 const stripe = require('./stripe')(app, { db, flash, requireUser, applyPaid, startTrial, refs, mentor });
 sales.routes(app, { db, page, requireAdmin, stripe, backup, mentorPlans: require('./mentorship').MENTOR_PLANS });
 require('./pricing')(app, { db, page, requireUser, trialDays, PAYMENT_URL, CONTACT_URL: process.env.CONTACT_URL || '', refs, stripe });
+require('./studio-page')(app, { page });
 require('./pages')(app, { page, trialDays, PRICE_TEXT, PAID_DAYS, TRIAL_ACCOUNTS, MAX_ACCOUNTS_DEFAULT });
 
 app.use((err, req, res, next) => {
