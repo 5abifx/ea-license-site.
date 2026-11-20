@@ -240,7 +240,7 @@
     cc.setBackground(f).then(() => { A.art = 'own'; cc.set({ art: 'own' }); cc.play(); render(); });
   };
 
-  // Shuffle: a random free stock clip (Pexels) for the picked topic; played from their servers, never stored here
+  // Shuffle: a random free stock clip (Pixabay or Pexels) for the picked topic; played from their servers, never stored here
   let clip = null;
   function shuffle() {
     const n = $('credit'); render(); const n2 = $('credit'); if (n2) n2.textContent = 'Finding a clip…';
@@ -255,7 +255,7 @@
       .catch((e) => { const c2 = $('credit'); if (c2) c2.textContent = e.message || 'Could not load a clip. Try again.'; });
     void n;
   }
-  function showCredit() { const c2 = $('credit'); if (c2 && clip) c2.innerHTML = `Clip by ${esc(clip.by || 'a Pexels creator')} on <a href="${esc(clip.page)}" target="_blank" rel="noopener">Pexels</a> · <button type="button" class="ss-ghost" id="again">Shuffle again</button>`; const ag = $('again'); if (ag) ag.onclick = shuffle; }
+  function showCredit() { const c2 = $('credit'); if (c2 && clip) c2.innerHTML = `Clip by ${esc(clip.by || 'a ' + (clip.src || 'Pexels') + ' creator')} on <a href="${esc(clip.page)}" target="_blank" rel="noopener">${esc(clip.src || 'Pexels')}</a> · <button type="button" class="ss-ghost" id="again">Shuffle again</button>`; const ag = $('again'); if (ag) ag.onclick = shuffle; }
   function alertLine(m) { const c2 = q.querySelector('.ss-hint'); if (c2) c2.textContent = m; }
 
   load(); render();
