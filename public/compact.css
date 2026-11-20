@@ -1,0 +1,122 @@
+/* Compact members area (loaded last on signed-in pages): smaller text, tighter cards and a calendar that fits the page,
+   in the spirit of LiquidJournal's quiet, small UI. Sizes: body 13px, titles 22px, card numbers 16-20px, card padding 10-16px. */
+
+/* ---------- top bar, one size smaller ---------- */
+.tb-app .app-main { padding-top: 68px; }
+.tb-bar { top: 12px; padding: 4px; }
+.tb-orb { width: 34px; height: 34px; margin-right: 4px; }
+.tb-orb img { width: 22px; }
+.tb-it { padding: 8px 12px; font-size: 13px; gap: 7px; }
+.tb-it svg { width: 15px; height: 15px; }
+.tb-side { top: 12px; padding: 4px 4px 4px 6px; gap: 6px; }
+.tb-plan { font-size: 11.5px; padding: 5px 10px; }
+.tb-round, .tb-av { width: 30px; height: 30px; }
+.tb-av { font-size: 11.5px; }
+.tb-round svg { width: 14px; height: 14px; }
+.tb-panel { top: 66px; padding: 14px; border-radius: 20px; }
+.tb-tile { padding: 10px; border-radius: 13px; gap: 6px; }
+.tb-tile b { font-size: 12.5px; }
+.tb-tile small { font-size: 11px; }
+.tb-key { width: 32px; height: 32px; border-radius: 9px; }
+.tb-key svg { width: 16px; height: 16px; }
+.tb-label { font-size: 10.5px; }
+@media (max-width: 900px) {
+  .tb-app .app-main { padding-top: 64px; }
+  .tb-m { height: 48px; padding: 0 5px; }
+  .tb-m .tb-orb, .tb-m .tb-round { width: 36px; height: 36px; }
+  .tb-title { font-size: 14.5px; }
+  .tb-p-m { top: calc(max(10px, env(safe-area-inset-top, 0px)) + 56px); }
+}
+
+/* ---------- page text and cards ---------- */
+.app-body { font-size: 13px; line-height: 1.5; padding-top: 16px; padding-bottom: 36px; }
+.app-body h1 { font-size: 22px; line-height: 1.2; letter-spacing: -.015em; }
+.app-body .page-head h1 { margin: 4px 0; }
+.app-body h2 { font-size: 14.5px; font-weight: 600; }
+.app-body h3 { font-size: 13.5px; }
+.app-body .card { padding: 14px 16px; border-radius: 14px; margin-bottom: 12px; }
+.app-body .small, .app-body small, .app-body .muted.small { font-size: 11.5px; }
+.app-body .btn.small, .app-body button.small, .app-body a.btn.small { font-size: 12px; padding: 6px 11px; }
+.app-body .page-head .head-btns { gap: 6px; }
+.app-body table { font-size: 12.5px; }
+.app-body th, .app-body td { padding-top: 7px; padding-bottom: 7px; }
+.app-body input, .app-body select, .app-body textarea { font-size: 13px; }
+
+/* journal hero: the month's P&L as a heading, not a billboard */
+.app-body .pl-hero { padding: 4px 8px 6px; margin-bottom: 6px; }
+.app-body .pl-hero .kicker { font-size: 11.5px; }
+.app-body .pl-big { font-size: clamp(30px, 3.4vw, 44px); margin: 4px 0 2px; }
+.app-body .pl-sub { font-size: 12px; margin: 0; }
+.app-body .pl-tiles, .app-body .recap, .app-body .dk-grid { gap: 10px; margin-bottom: 12px; }
+.app-body .pl-tile { padding: 10px 12px; border-radius: 12px; }
+.app-body .pl-tile span { font-size: 11px; }
+.app-body .pl-tile strong { font-size: clamp(16px, 1.5vw, 20px); margin: 2px 0; }
+.app-body .pl-tile small { font-size: 11px; }
+.app-body .pl-tile .tl-spark { height: 30px; }
+.app-body .stats strong { font-size: 18px; }
+.app-body .stats span { font-size: 11px; }
+
+/* ---------- journal calendar: compact month ---------- */
+.app-body .cal-split { grid-template-columns: minmax(0, 1fr) 290px; gap: 12px; }
+.app-body .cal-head h2 { font-size: 14px; }
+.app-body .cal-grid.cx { gap: 5px; grid-template-columns: repeat(7, minmax(0, 1fr)) 92px; }
+.app-body .cal-grid.cx .dow { font-size: 10.5px; font-weight: 600; text-align: left; padding: 0 2px 2px; color: #6b6b74; }
+.app-body .cal-grid.cx .dow:nth-child(8) { text-align: right; }
+.app-body .cal-grid.cx .day, .app-body .cal-grid.cx .wk { min-height: 0; height: 62px; border-radius: 9px; box-shadow: none; }
+.app-body .cal-grid.cx .day { position: relative; display: flex; flex-direction: column; justify-content: flex-end; padding: 6px 7px; text-align: left;
+  background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.045); }
+.app-body .cal-grid.cx .day.off, .app-body .cal-grid.cx .day.fut { background: rgba(255,255,255,.015); border-color: rgba(255,255,255,.03); }
+.app-body .cal-grid.cx button.day { cursor: pointer; border-color: rgba(255,255,255,.08); background: rgba(255,255,255,.035); transition: border-color .15s, transform .15s; }
+.app-body .cal-grid.cx button.day.win { background: rgba(45,212,191,var(--a, .12)); border-color: rgba(45,212,191,calc(var(--a, .12) + .06)); }
+.app-body .cal-grid.cx button.day.loss { background: rgba(242,103,107,var(--a, .12)); border-color: rgba(242,103,107,calc(var(--a, .12) + .06)); }
+.app-body .cal-grid.cx button.day:hover { transform: none; border-color: rgba(255,255,255,.24); }
+.app-body .cal-grid.cx .day[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 1px #fff; }
+.app-body .cal-grid.cx .cd { position: absolute; top: 6px; left: 7px; right: auto; font-size: 10.5px; font-weight: 600; color: #6b6b74; }
+.app-body .cal-grid.cx button.day .cd { color: #c9c9cf; }
+.app-body .cal-grid.cx .day.fut .cd, .app-body .cal-grid.cx .day.off .cd { color: #45454c; }
+.app-body .cal-grid.cx .cd.now { color: #fff; background: var(--accent); border-radius: 999px; padding: 0 6px; left: 4px; right: auto; top: 4px; }
+.app-body .cal-grid.cx .day:has(.cd.now) { border-color: var(--accent); }
+.app-body .cal-grid.cx .cn { position: absolute; top: 8px; right: 7px; display: flex; gap: 2px; }
+.app-body .cal-grid.cx .cn i { width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,.5); }
+.app-body .cal-grid.cx .cv { position: static; transform: none; text-align: left; font-size: 13px; font-weight: 700; letter-spacing: -.01em; line-height: 1.1; }
+.app-body .cal-grid.cx .cv .pos, .app-body .cal-grid.cx button.day.win .cv span { color: #c4f7ee; }
+.app-body .cal-grid.cx .cv .neg, .app-body .cal-grid.cx button.day.loss .cv span { color: #ffc6c8; }
+.app-body .cal-grid.cx .cnt { font-size: 10.5px; place-items: end start; padding: 0 0 6px 7px; color: #8a8a94; }
+.app-body .cal-grid.cx .wk { padding: 6px 8px; align-items: flex-end; justify-content: space-between; gap: 0; background: rgba(255,255,255,.015); border: 1px dashed rgba(255,255,255,.08); }
+.app-body .cal-grid.cx .wk .wl { font-size: 10px; font-weight: 600; letter-spacing: 0; text-transform: none; color: #6b6b74; }
+.app-body .cal-grid.cx .wk .cv { font-size: 12.5px; }
+.app-body .cal-grid.cx .wk .cv span { color: var(--ok, #2dd4bf); } .app-body .cal-grid.cx .wk .cv span.neg { color: #f2676b; }
+.app-body .cal-grid.cx .wk .wn { font-size: 10px; font-weight: 500; color: #6b6b74; }
+.app-body .cal-note { margin: 10px 2px 0; font-size: 11.5px; }
+.app-body .cal-note b { color: #e7e7ea; font-weight: 700; }
+.app-body .cal-wks { display: none; }
+.app-body .day-panel h3 { font-size: 13.5px; }
+.app-body .day-panel p { font-size: 12px; }
+.app-body .day-panel td { font-size: 12px; padding-top: 6px; padding-bottom: 6px; }
+
+@media (max-width: 1180px) { .app-body .cal-split { grid-template-columns: minmax(0, 1fr) 260px; } }
+@media (max-width: 860px) { .app-body .cal-split { grid-template-columns: minmax(0, 1fr); } }
+/* phones: the same month as a small 7-column grid; week totals in a row under it */
+@media (max-width: 640px) {
+  .app-body h1 { font-size: 20px; }
+  .app-body .cal-grid.cx { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .app-body .cal-grid.cx .dow:nth-child(8), .app-body .cal-grid.cx .wk { display: none; }
+  .app-body .cal-grid.cx .day { height: 48px; padding: 4px 5px; border-radius: 8px; }
+  .app-body .cal-grid.cx .cd { top: 4px; left: 5px; font-size: 9.5px; }
+  .app-body .cal-grid.cx .cn { top: 6px; right: 5px; }
+  .app-body .cal-grid.cx .cn i { width: 3px; height: 3px; }
+  .app-body .cal-grid.cx .cv { font-size: 10.5px; }
+  .app-body .cal-grid.cx .cnt { font-size: 8.5px; padding: 0 0 4px 5px; }
+  .app-body .cal-list.cx { display: none; }
+  .app-body .cal-wks { display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; }
+  .app-body .cal-wks div { flex: 1 0 auto; min-width: 70px; background: rgba(255,255,255,.035); border-radius: 8px; padding: 5px 8px; }
+  .app-body .cal-wks small { display: block; font-size: 9.5px; color: #6b6b74; }
+  .app-body .cal-wks b { font-size: 11.5px; }
+  .app-body .cal-wks .pos { color: var(--ok, #2dd4bf); } .app-body .cal-wks .neg { color: #f2676b; }
+}
+
+/* My EAs welcome line and "What we found" cards: same smaller scale */
+html body .app-body .mx-hero h1 { font-size: clamp(24px, 2.6vw, 34px); line-height: 1.12; }
+.app-body .fq-a { font-size: clamp(18px, 1.7vw, 22px); }
+.app-body .fq-q, .app-body .fq-s, .app-body .fq-fix { font-size: 12px; }
+.app-body .fq-grid { gap: 10px; }
