@@ -26,7 +26,7 @@
   .tb-plus:active { transform: scale(.94); }
 
   /* the menu opens as a sheet just above the dock */
-  .tb-p-m { position: fixed; top: auto; bottom: calc(88px + env(safe-area-inset-bottom, 0px)); max-height: calc(100vh - 160px); max-height: calc(100dvh - 160px);
+  .tb-p-m { position: fixed; top: auto; bottom: calc(88px + env(safe-area-inset-bottom, 0px)); max-height: calc(100vh - 160px); max-height: calc(100vh - 160px); max-height: calc(100dvh - 160px);
     transform-origin: bottom center; transform: translateY(14px) scale(.98); }
   .tb-p-m.open { transform: none; }
 

@@ -75,7 +75,7 @@ input.t:focus{border-color:#555}
 
 /* ---- v3: liquid glass + motion ---- */
 body{overflow-x:hidden}
-.amb{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.amb{position:fixed;top:0;right:0;bottom:0;left:0;z-index:-1;overflow:hidden;pointer-events:none}
 .amb i{position:absolute;border-radius:50%;filter:blur(90px);opacity:.32;animation:drift 22s ease-in-out infinite alternate}
 .amb i:nth-child(1){width:530px;height:530px;background:#ff5a1f;left:-40vw;top:22vh;opacity:.12}
 .amb i:nth-child(2){width:420px;height:420px;background:var(--ok);left:80vw;top:10vh;opacity:.10;animation-duration:28s}
@@ -84,7 +84,7 @@ body{overflow-x:hidden}
 .brand{display:flex;align-items:center;gap:10px}.brand img{height:24px;width:auto;filter:drop-shadow(0 0 8px rgba(255,255,255,.15))}
 .chip,.side,.f,.cardbox,.pf,input.t{position:relative;background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.025));backdrop-filter:blur(18px) saturate(170%);-webkit-backdrop-filter:blur(18px) saturate(170%);border:1px solid rgba(255,255,255,.09);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -1px 0 rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35)}
 .chip{overflow:hidden}
-.chip:after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.18) 50%,transparent 70%);transform:translateX(-120%);transition:transform .7s ease}
+.chip:after{content:"";position:absolute;top:0;right:0;bottom:0;left:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.18) 50%,transparent 70%);transform:translateX(-120%);transition:transform .7s ease}
 .chip:hover:after{transform:translateX(120%)}
 .chip:hover{background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));transform:translateY(-1px)}
 .chip.on{background:linear-gradient(180deg,#fff,#e6e6ea);color:#000;border-color:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.06),0 8px 30px rgba(255,255,255,.15);animation:pop .35s cubic-bezier(.3,1.6,.5,1)}
@@ -96,7 +96,7 @@ body{overflow-x:hidden}
 /* progress line */
 .bar{height:3px;background:rgba(255,255,255,.06);overflow:visible;position:relative}
 .bar i{position:relative;background:linear-gradient(90deg,#ff5a1f,#ff7a3d 70%,#ffb07a);box-shadow:0 0 12px rgba(255,90,31,.7),0 0 28px rgba(255,90,31,.35);transition:width .8s cubic-bezier(.6,0,.2,1);overflow:hidden;border-radius:3px}
-.bar i:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.65),transparent);width:40%;animation:shim 2.4s linear infinite}
+.bar i:before{content:"";position:absolute;top:0;right:0;bottom:0;left:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.65),transparent);width:40%;animation:shim 2.4s linear infinite}
 @keyframes shim{from{transform:translateX(-100%)}to{transform:translateX(260%)}}
 .bar b{position:absolute;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;background:#fff;box-shadow:0 0 10px #ffb07a,0 0 22px #ff5a1f;transition:left .8s cubic-bezier(.6,0,.2,1);animation:tip 1.6s ease-in-out infinite}
 @keyframes tip{50%{box-shadow:0 0 16px #ffb07a,0 0 40px #ff5a1f}}

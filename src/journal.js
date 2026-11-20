@@ -373,7 +373,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       <span class="tx"><b>Untitled trade</b><span class="muted small">Draft saved on this device</span></span>
       <a class="btn small secondary" href="/journal/log">Continue</a><button type="button" class="small secondary" data-lt-del aria-label="Delete draft">✕</button></div>
     ${(() => { const n = LTR.untagged(u); return n ? `<div class="lt-strip"><span class="ic" aria-hidden="true">◎</span>
-      <span class="tx"><b>${n} trade${n > 1 ? 's' : ''} from the EA ${n > 1 ? 'are' : 'is'} waiting for a tag</b><span class="muted small">How you felt and a grade take 10 seconds each</span></span>
+      <span class="tx"><b>${n} trade${n > 1 ? 's' : ''} from today ${n > 1 ? 'are' : 'is'} waiting for a tag</b><span class="muted small">How you felt and a grade take 10 seconds each</span></span>
       <a class="btn small lt-tagbtn" href="/journal/tag">Tag now</a></div>` : ''; })()}
     <script src="/logtrade.js" defer></script>
 

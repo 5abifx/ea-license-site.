@@ -56,12 +56,32 @@ function html(trades, accounts, opts) {
   const week = trades.filter((t) => day(t) >= monIso && day(t) <= today);
   const weekR = week.some((t) => t.r !== null) ? rSum(week) : null;
   const chip = (v) => (v === null ? '' : `<span class="ov-chip${v < 0 ? ' dn' : ''}"><i>${v < 0 ? '↓' : '↑'}</i>${sg(v)}${Math.abs(v).toFixed(1)}%</span>`);
-  const hero = `<section class="ov-hero">
+  // hero stats for the month + the month's equity line drawn faintly behind the big number
+  const wins = mTrades.filter((t) => t.net > 0), losses = mTrades.filter((t) => t.net < 0);
+  const gw = sum(wins), gl = -sum(losses);
+  const hDay = {}; mTrades.forEach((t) => { hDay[day(t)] = (hDay[day(t)] || 0) + t.net; });
+  const dayNets = Object.keys(hDay).sort().map((k) => hDay[k]);
+  let streak = 0; for (let i = dayNets.length - 1; i >= 0 && dayNets[i] > 0; i--) streak++;
+  const withR = mTrades.filter((t) => t.r !== null && t.r !== undefined);
+  const stats = mTrades.length ? [
+    ['Win rate', `${Math.round((wins.length / mTrades.length) * 100)}%`],
+    ['Profit factor', gl > 0 ? (gw / gl).toFixed(2) : gw > 0 ? '∞' : '–'],
+    ['Best day', dayNets.length ? money(Math.max(...dayNets)) : '–'],
+    ['Avg R', withR.length ? rx(rSum(withR) / withR.length) : '–'],
+    ['Green streak', streak ? `${streak} day${streak === 1 ? '' : 's'}` : '–'],
+    ['Trades', String(mTrades.length)],
+  ] : [];
+  let run = 0; const eq = [0, ...mTrades.map((t) => (run += t.net))];
+  const eMin = Math.min(...eq), eMax = Math.max(...eq), eSp = eMax - eMin || 1;
+  const eqPts = eq.length > 2 ? eq.map((v, i) => [+((i * 1000) / (eq.length - 1)).toFixed(1), +(10 + (1 - (v - eMin) / eSp) * 150).toFixed(1)]) : [];
+  const heroLine = eqPts.length ? `<svg class="ov-hline${monthNet < 0 ? ' dn' : ''}" viewBox="0 0 1000 170" preserveAspectRatio="none" aria-hidden="true"><path d="${smooth(eqPts)}"/></svg>` : '';
+  const hero = `<section class="ov-hero">${heroLine}
     <div class="ov-lbl">${withBal.length ? 'Total balance' : `${MON[+month.slice(5) - 1]} P&amp;L`}</div>
     <div class="ov-big"><span class="ov-num">${withBal.length ? plain(total) : money(monthNet)}</span>${chip(pct)}</div>
     <div class="ov-subl"><span>Today <b class="${todayList.length ? (sum(todayList) >= 0 ? '' : 'neg') : ''}">${todayList.length ? money(sum(todayList)) : 'no trades'}</b></span>
       ${weekR !== null ? `<span>This week <b>${rx(weekR)}</b></span>` : ''}
       <span>This month <b>${mTrades.length} trade${mTrades.length === 1 ? '' : 's'}</b></span></div>
+    ${stats.length ? `<dl class="ov-hstats">${stats.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>` : ''}
     <div class="ov-btns">
       <a class="ov-btn o" href="/journal/log">${ICON.plus}Log trade</a>
       <a class="ov-btn" href="/journal/studio">${ICON.share}Share</a>

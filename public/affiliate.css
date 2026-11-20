@@ -36,7 +36,7 @@
 .mp-col > .btn { justify-self: start; }
 /* affiliate */
 .af-hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 28px; align-items: center; overflow: hidden; padding: 30px; }
-.af-hero::before { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+.af-hero::before { content: ""; position: absolute; top:0;right:0;bottom:0;left:0; pointer-events: none; border-radius: inherit;
   background: radial-gradient(420px 260px at 0% 0%, rgba(255,90,31,.10), transparent 70%), radial-gradient(380px 260px at 100% 100%, rgba(var(--ok-rgb), .07), transparent 70%); }
 .af-hero h1 { font-size: clamp(28px, 4vw, 42px); line-height: 1.06; }
 .af-hero h1 em { font-style: normal; color: #ff5a1f; }

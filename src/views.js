@@ -83,7 +83,7 @@ function layout(req, title, body, opts = {}) {
   const pill = SITE_NAME !== BRAND ? `<span class="pill">${esc(SITE_NAME)}</span>` : '';
   return `<!doctype html>
 <html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><script src="/compat.js"></script>
 <title>${esc((seoMeta && seoMeta.title) || `${title} · ${SITE_NAME}`)}</title>
 <meta name="description" content="${esc((seoMeta && seoMeta.desc) || og.desc || desc)}">
 ${require('./seo').headTags(req, opts)}

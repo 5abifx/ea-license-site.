@@ -34,7 +34,7 @@ function cinePage(req, name, slots, opts = {}) {
   const meta = seo.metaFor(req.path) || {};
   return `<!doctype html>
 <html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><script src="/compat.js?v=${v}"></script>
 <title>${esc(meta.title || opts.title || SITE_NAME)}</title>
 <meta name="description" content="${esc(meta.desc || desc)}">
 ${seo.headTags(req, opts)}

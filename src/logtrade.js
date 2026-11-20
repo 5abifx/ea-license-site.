@@ -117,8 +117,9 @@ function routes(app, { db, page, flash, requireUser, requireJournal, money }) {
       LEFT JOIN journal_trades t ON t.user_id = a.user_id AND t.account_number = a.account_number WHERE a.user_id = ? GROUP BY a.account_number ORDER BY a.account_number`).all(u.id);
   const untaggedSql = `FROM journal_trades WHERE user_id = ? AND emotion = '' AND grade IS NULL AND followed = '' AND rating IS NULL
       AND account_number IN (SELECT account_number FROM accounts WHERE user_id = ?) AND close_time >= ?`;
-  const since30 = () => new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
-  const untagged = (u) => db.prepare(`SELECT COUNT(*) AS n ${untaggedSql}`).get(u.id, u.id, since30()).n;
+  // only today's trades ask for a tag (owner: a banner for hundreds of old trades is noise)
+  const sinceToday = () => new Date().toISOString().slice(0, 10);
+  const untagged = (u) => db.prepare(`SELECT COUNT(*) AS n ${untaggedSql}`).get(u.id, u.id, sinceToday()).n;
 
   // the Log trade page (also opened from the journal's "+ Log trade" button)
   app.get('/journal/log', requireUser, requireJournal, (req, res) => {
@@ -228,18 +229,18 @@ function routes(app, { db, page, flash, requireUser, requireJournal, money }) {
     res.redirect(`/journal/${info.lastInsertRowid}`);
   });
 
-  // quick tagging: untagged trades from the EA (last 30 days), one at a time, newest first
+  // quick tagging: today's untagged trades from the EA, one at a time, newest first
   app.get('/journal/tag', requireUser, requireJournal, (req, res) => {
     const u = req.user;
     const before = /^[\d .:T-]{10,25}$/.test(String(req.query.before || '')) ? String(req.query.before) : '9999';
     const total = untagged(u);
-    const t = db.prepare(`SELECT * ${untaggedSql} AND close_time < ? ORDER BY close_time DESC LIMIT 1`).get(u.id, u.id, since30(), before);
+    const t = db.prepare(`SELECT * ${untaggedSql} AND close_time < ? ORDER BY close_time DESC LIMIT 1`).get(u.id, u.id, sinceToday(), before);
     if (!t) {
       return page(req, res, 'Tag trades', `<p><a href="/journal">← Journal</a></p>
-        <section class="card lt-done"><h1>All caught up</h1><p class="muted">${total ? `You skipped ${total} trade${total > 1 ? 's' : ''}. <a href="/journal/tag">Start again</a>` : 'Every trade from the last 30 days has a tag. Nice work.'}</p>
+        <section class="card lt-done"><h1>All caught up</h1><p class="muted">${total ? `You skipped ${total} trade${total > 1 ? 's' : ''}. <a href="/journal/tag">Start again</a>` : 'Every trade from today has a tag. Nice work.'}</p>
         <p><a class="btn" href="/journal">Back to the journal</a> <a class="btn secondary" href="/journal/insights">See Insights</a></p></section>`);
     }
-    const left = db.prepare(`SELECT COUNT(*) AS n ${untaggedSql} AND close_time >= ?`).get(u.id, u.id, since30(), t.close_time).n;
+    const left = db.prepare(`SELECT COUNT(*) AS n ${untaggedSql} AND close_time >= ?`).get(u.id, u.id, sinceToday(), t.close_time).n;
     const d = t.digits ?? 5, fx = (v) => (v === null || v === undefined ? '-' : Number(v).toFixed(d));
     const th = TP.thumb(t);
     page(req, res, 'Tag trades', `
