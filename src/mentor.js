@@ -1,6 +1,6 @@
 // Mentor Mode: a mentorship student shares their Trade Journal with the mentor (the site owner / admins).
 // The student asks for a review on a trade; the mentor opens it, sees the chart and the student's notes,
-// and leaves a note. Each side sees a count of new notes in the side menu.
+// and leaves a note. Each side sees a count of new notes in the top menu.
 //  - Student: /journal/mentor (switch sharing on/off, see every trade with notes)
 //             a "Mentor review" box on each trade page (ask a question = asks for a review)
 //  - Mentor:  /mentor (students who share, with 30-day numbers), /mentor/:uid (their trades),
@@ -100,7 +100,7 @@ module.exports = function registerMentor(app, { db, page, flash, requireUser, re
     if (body) {
       db.prepare('INSERT INTO trade_notes (trade_id, student_id, author_id, by_mentor, body) VALUES (?, ?, ?, 0, ?)').run(t.id, u.id, u.id, body);
       db.prepare('UPDATE journal_trades SET review_req = 1 WHERE id = ?').run(t.id);
-      flash(req, 'ok', 'Sent to your mentor. You will see the reply here and in the side menu.');
+      flash(req, 'ok', 'Sent to your mentor. You will see the reply here and in the top menu.');
     }
     res.redirect(`/journal/${t.id}#mentor`);
   });
@@ -183,7 +183,7 @@ module.exports = function registerMentor(app, { db, page, flash, requireUser, re
         <td class="${cls(r.r30)}">${r.r30 === null ? '-' : (r.r30 >= 0 ? '+' : '−') + Math.abs(r.r30).toFixed(2) + 'R'}</td>
         <td class="muted small">${r.last ? esc(ago(r.last)) : '-'}</td>
         <td class="right"><a class="small" href="/mentor/${r.id}">Open ›</a></td></tr>`).join('')}
-      </tbody></table>` : `<p class="muted">No student shares their journal yet. Students turn it on from <strong>Mentor review</strong> in their side menu, or from any trade page.</p>`}
+      </tbody></table>` : `<p class="muted">No student shares their journal yet. Students turn it on from <strong>Mentor review</strong> in their top menu, or from any trade page.</p>`}
     </section>`);
   });
 
@@ -248,7 +248,7 @@ module.exports = function registerMentor(app, { db, page, flash, requireUser, re
         </section>
         <section class="card mentor-box" id="mentor">
           <h2>Review</h2>
-          ${thread(notes, s.name || 'Student') || '<p class="muted">No questions on this trade yet. You can still leave a note; the student sees it in their side menu.</p>'}
+          ${thread(notes, s.name || 'Student') || '<p class="muted">No questions on this trade yet. You can still leave a note; the student sees it in their top menu.</p>'}
           <form method="post" action="/mentor/trade/${t.id}/note" class="note-form">
             <textarea name="body" rows="4" maxlength="2000" placeholder="Your feedback: what was good, what to change next time"></textarea>
             <div class="row"><button class="small">Send to student</button>
@@ -271,7 +271,7 @@ module.exports = function registerMentor(app, { db, page, flash, requireUser, re
     const body = clean(req.body.body);
     if (body) db.prepare('INSERT INTO trade_notes (trade_id, student_id, author_id, by_mentor, body) VALUES (?, ?, ?, 1, ?)').run(t.id, t.user_id, req.user.id, body);
     if (body || req.body.done) db.prepare('UPDATE journal_trades SET review_req = 0 WHERE id = ?').run(t.id);
-    flash(req, 'ok', body ? 'Sent. The student sees it on the trade and in their side menu.' : req.body.done ? 'Marked as reviewed.' : 'Type a note first.');
+    flash(req, 'ok', body ? 'Sent. The student sees it on the trade and in their top menu.' : req.body.done ? 'Marked as reviewed.' : 'Type a note first.');
     // next waiting trade, so the queue can be worked through in a row
     const next = db.prepare(`SELECT t.id FROM journal_trades t JOIN users u ON u.id = t.user_id
       WHERE t.review_req = 1 AND u.mentor_share = 1 ORDER BY t.id LIMIT 1`).get();

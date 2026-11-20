@@ -1,6 +1,6 @@
 /* Guided tour of the members area.
    First visit after sign-up asks "How should we show you around?" (Beginner = a few cards, Advanced = full walkthrough).
-   Replay any time from the side menu ("Show me around"). Server side: src/tour.js. */
+   Replay any time from the Account menu ("Show me around"). Server side: src/tour.js. */
 (function () {
   var me = document.currentScript || document.querySelector('script[data-tour]');
   var D = (me && me.dataset) || {};
@@ -11,16 +11,16 @@
   // sel = what to light up (first visible match); path = page it lives on; need = only for members who have it
   var BEGIN = [
     { t: 'Welcome to your desk', p: 'Five quick cards and you know where everything is. Takes under a minute.' },
-    { sel: '.side-nav a[href="/dashboard"]', path: '/dashboard', t: 'My EAs', p: 'Download KATANA and the Journal EA here, then add your MT5 account number so they unlock on it.' },
-    { need: 'j', sel: '.side-nav a[href="/journal"]', t: 'Journal', p: 'Every MT5 trade lands here by itself, day by day and account by account. Tap a day to see its trades.' },
-    { need: 'j', sel: '.side-nav a[href="/journal/plan"]', t: 'Plan a trade', p: 'Write the plan before you click. We match it to the real trade and show you where you followed it and where you did not.' },
-    { need: 'j', sel: '.side-nav a[href="/journal/insights"]', t: 'Insights', p: 'Your edge score and the habits that cost you money, each with one line on how to fix it.' },
-    { sel: '.side-nav a[href="/faq"], .sup-btn, [data-support]', t: 'Stuck? Ask us', p: 'Help & FAQ answers the common questions. The chat button opens a message to us.' },
+    { sel: '.tb-bar a[href="/dashboard"], .tb-mbtn', path: '/dashboard', t: 'My EAs', p: 'Download KATANA and the Journal EA here, then add your MT5 account number so they unlock on it.' },
+    { need: 'j', sel: '.tb-bar [data-tbp="j"], .tb-mbtn', t: 'Journal', p: 'Every MT5 trade lands here by itself, day by day and account by account. Tap a day to see its trades.' },
+    { need: 'j', sel: '.tb-bar [data-tbp="j"], .tb-mbtn', t: 'Plan a trade', p: 'Write the plan before you click. We match it to the real trade and show you where you followed it and where you did not.' },
+    { need: 'j', sel: '.tb-bar [data-tbp="j"], .tb-mbtn', t: 'Insights', p: 'Your edge score and the habits that cost you money, each with one line on how to fix it.' },
+    { sel: '.tb-bar [data-tbp="a"], .tb-mbtn, .sup-btn, [data-support]', t: 'Stuck? Ask us', p: 'Help & FAQ answers the common questions. The chat button opens a message to us.' },
     { end: 1, t: 'You are set', p: 'Connect your first account and your trades start filling in.' }
   ];
   var ADV = [
     { t: 'The full walkthrough', p: 'We will move page by page and point at each part. Use the arrow keys or the buttons. You can stop any time.' },
-    { path: '/dashboard', sel: '.side-top .plan-box, .side-top .plan', t: 'Your plan', p: 'Shows your plan and whether it is active. Tap it to change plan or manage billing.' },
+    { path: '/dashboard', sel: '.tb-side .tb-plan, .tb-mbtn', t: 'Your plan', p: 'Shows your plan and whether it is active. Tap it to change plan or manage billing.' },
     { path: '/dashboard', sel: 'form[action="/accounts"]', t: 'Add your MT5 accounts', p: 'Type the account number here. Your EAs only run on accounts in this list.' },
     { path: '/dashboard', sel: '.ea-cards', t: 'Download your EAs', p: 'Each EA you own has its download here. Put the file in MT5 > File > Open data folder > MQL5 > Experts.', tip: 'Run the Journal EA on its own chart, next to KATANA. One EA per chart.' },
     { path: '/dashboard', sel: 'a[href*="/templates/"]', t: 'Chart themes', p: 'Our MT5 chart templates. Load one and your charts match the site.' },
@@ -34,8 +34,7 @@
     { need: 'j', path: '/journal/insights', sel: '.ins-grid', t: 'Leaks and fixes', p: 'What costs you the most, in money, with one fix for each.' },
     { need: 'j', path: '/journal/insights', sel: '.prop-form, .prop-rows', t: 'Prop firm guard', p: 'Enter your firm\'s daily and max loss once. We show how close you are and suggest a KATANA daily limit.' },
     { need: 'm', path: '/journal/mentor', sel: '.app-body h1', t: 'Mentor review', p: 'Share your journal with your mentor and ask about any trade. Replies show up here.' },
-    { path: '/dashboard', sel: '.fold-btn', t: 'Full screen', p: 'Hide the side menu for more room. Press it again to bring it back.' },
-    { sel: '.side-nav a[data-tour-open]', t: 'Rewatch any time', p: 'This tour lives here in the side menu. Pick Beginner or Advanced again whenever you like.' },
+    { sel: '.tb-bar [data-tbp="a"], .tb-mbtn', t: 'Rewatch any time', p: 'This tour lives in the Account menu at the top. Pick Beginner or Advanced again whenever you like.' },
     { end: 1, t: 'That is everything', p: 'Start with one account and a few days of trades. Insights get sharper with every trade.' }
   ];
   var LIST = { beginner: BEGIN, advanced: ADV };
@@ -61,15 +60,15 @@
     pick.setAttribute('role', 'dialog'); pick.setAttribute('aria-label', 'Choose a tour');
     pick.innerHTML = '<button class="tr-x" data-x aria-label="Close">×</button>' +
       '<div class="tr-k">Welcome to 5ABI.FX</div><h2>How should we <em>show you around?</em></h2>' +
-      '<p class="tr-sub">Pick one. You can switch or watch it again any time from the side menu.</p>' +
+      '<p class="tr-sub">Pick one. You can switch or watch it again any time from the Account menu.</p>' +
       '<div class="tr-opts">' +
       '<div class="tr-opt"><h3>Beginner</h3><div class="tr-n">' + count(BEGIN) + ' cards, the basics</div><ul>' +
         '<li>Get your EAs and add your MT5 account</li>' + (j ? '<li>Your journal and calendar</li><li>Plan a trade before you click</li><li>Insights in one line</li>' : '') + '<li>Where to get help</li></ul>' +
         '<button class="tr-pill" data-go="beginner">Start Beginner</button></div>' +
       '<div class="tr-opt adv"><h3>Advanced <small>Full</small></h3><div class="tr-n">' + count(ADV) + ' cards, every feature</div><ul>' +
-        '<li>Everything in Beginner</li><li>Downloads, chart themes, full screen</li>' + (j ? '<li>Desk, account tabs, hide private info</li><li>Trade pages and share cards</li><li>Edge score, leaks, prop firm guard</li>' : '') + (has.m ? '<li>Mentor review</li>' : '') + '</ul>' +
+        '<li>Everything in Beginner</li><li>Downloads and chart themes</li>' + (j ? '<li>Desk, account tabs, hide private info</li><li>Trade pages and share cards</li><li>Edge score, leaks, prop firm guard</li>' : '') + (has.m ? '<li>Mentor review</li>' : '') + '</ul>' +
         '<button class="tr-pill" data-go="advanced">Start Advanced</button></div>' +
-      '</div><div class="tr-later"><span>Find this again: side menu, Show me around.</span><button data-x>Not now</button></div>';
+      '</div><div class="tr-later"><span>Find this again: Account menu, Show me around.</span><button data-x>Not now</button></div>';
     document.body.appendChild(pick);
     requestAnimationFrame(function () { scrim.classList.add('in'); pick.classList.add('in'); });
     pick.addEventListener('click', function (e) {
