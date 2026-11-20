@@ -41,3 +41,4 @@
 .sp [hidden]{display:none!important}
 .sp-try.is-wide{grid-template-columns:minmax(0,1fr) minmax(0,620px)}
 .sp-try.is-wide canvas{max-width:620px}
+.sp{overflow-x:clip}
