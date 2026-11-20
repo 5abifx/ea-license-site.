@@ -55,6 +55,7 @@ export default function garage(card) {
     lights[1].position.set(long ? B.max.x + 0.2 : 0.4, 0.45, long ? 0.4 : B.max.z + 0.2);
     setPaint(paint());
     hint.textContent = 'Tap the car to rev';
+    requestAnimationFrame(() => card.classList.add('on'));
   });
 
   function setPaint(name) {

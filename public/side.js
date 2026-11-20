@@ -222,7 +222,11 @@
     h += '<div class="sc-card sc-garage"><div class="sc-lbl">Garage · drag, scroll, tap to rev</div><canvas aria-label="3D car you can turn"></canvas><span class="sc-hint"></span></div>';
     R.innerHTML = h;
     var g = R.querySelector('.sc-garage canvas');
-    var start = function () { import('/side/garage.js').then(function (m) { m.default(R.querySelector('.sc-garage')); }).catch(function () { R.querySelector('.sc-garage').remove(); }); };
+    // the 3D car is the heaviest thing on the page: start it only after the page has loaded and gone quiet,
+    // so switching pages stays smooth, then fade it in
+    var go = function () { import('/side/garage.js').then(function (m) { m.default(R.querySelector('.sc-garage')); }).catch(function () { R.querySelector('.sc-garage').remove(); }); };
+    var idle = function () { setTimeout(function () { (window.requestIdleCallback || function (f) { setTimeout(f, 1); })(go, { timeout: 2500 }); }, 700); };
+    var start = function () { if (document.readyState === 'complete') idle(); else addEventListener('load', idle, { once: true }); };
     if ('IntersectionObserver' in window) { var io = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting; })) { io.disconnect(); start(); } }); io.observe(g); } else start();
   }
 

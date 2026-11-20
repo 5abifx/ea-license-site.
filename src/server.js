@@ -86,6 +86,9 @@ app.use((req, res, next) => {
 });
 app.use(express.static(path.join(__dirname, '..', 'public'), {
   setHeaders: (res, file) => {
+    // pictures, 3D models and the vendored 3D library: keep a week, so page switches don't re-check each one
+    const asset = /\.(glb|webp|jpe?g|png|svg|woff2?)$/.test(file) || /[\\/]vendor[\\/]three[\\/]/.test(file);
+    if (asset) { res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400'); return; }
     if (!/\.(css|js)$/.test(file)) return;
     // versioned links can be kept for a year; plain ones must always be checked again
     res.setHeader('Cache-Control', res.req.query.v ? 'public, max-age=31536000, immutable' : 'no-cache');
