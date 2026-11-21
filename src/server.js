@@ -218,6 +218,8 @@ function rateLimit(key, max, windowMs) {
 // Where to go after sign in / sign up: /signup?next=mentorship brings people back to the mentorship prices
 const NEXT_PAGES = { mentorship: '/mentorship#price' };
 function rememberNext(req) { if (NEXT_PAGES[req.query.next]) req.session.next = req.query.next; }
+// where a signed-in member lands: the Desk for journal members, else My EAs
+const homeOf = (u) => (journalAccess(u) ? '/journal/desk' : '/dashboard');
 function takeNext(req, fallback) {
   const n = req.session && NEXT_PAGES[req.session.next];
   if (req.session) req.session.next = null;
@@ -318,7 +320,7 @@ app.get(['/', '/katana', '/trade-journal'], (req, res) => {
 
 app.get('/login', (req, res) => {
   rememberNext(req);
-  if (req.user) return res.redirect(takeNext(req, '/dashboard'));
+  if (req.user) return res.redirect(takeNext(req, homeOf(req.user)));
   page(req, res, 'Sign in', authShell('Secure sign-in', 'Welcome back', 'Sign in to download your EAs, manage your MT5 accounts and open your journal.', `
     ${googleOn() ? `${googleButton('Sign in with Google')}<p class="or">or with email and password</p>` : ''}
     <form method="post" action="/login">
@@ -367,7 +369,7 @@ app.post('/logout', (req, res) => { req.session = null; res.redirect('/login'); 
 app.get('/signup', (req, res) => {
   if (SIGNUP_MODE === 'closed') return res.redirect('/login');
   rememberNext(req);
-  if (req.user) return res.redirect(takeNext(req, '/dashboard'));
+  if (req.user) return res.redirect(takeNext(req, homeOf(req.user)));
   const trial = trialDays();
   if (req.session.next === 'mentorship') {
     // from the mentorship page: a free account to see the prices, no card needed
@@ -551,6 +553,8 @@ app.post('/password', requireUser, (req, res) => {
 // ---------- customer dashboard ----------
 app.get('/dashboard', requireUser, (req, res) => {
   const u = req.user;
+  // apps installed before the start page moved still open /dashboard?src=app: send them to the Desk too
+  if (req.query.src === 'app' && journalAccess(u)) return res.redirect('/journal/desk');
   if (u.status === 'pending') {
     return page(req, res, 'Waiting for approval', `
       <div class="card narrow"><h1>Almost there</h1>
