@@ -243,7 +243,7 @@
   fetch('/api/side', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
     D = d; F = d.focus || { fixes: [], goals: [], notes: '' };
     L.innerHTML = '<div class="sc-card sc-focus"></div><div class="sc-card"><div class="sc-lbl">Sessions · live</div><canvas class="sc-globe" aria-label="World map of the market sessions"></canvas><div class="sc-ses"></div></div>';
-    drawFocus(); focusEvents(); globe(); right();
+    drawFocus(); focusEvents(); (function g() { if (document.querySelector('.plx')) setTimeout(g, 400); else globe(); })(); right();
     window.dispatchEvent(new CustomEvent('side:ready'));
   }).catch(function () {});
 })();

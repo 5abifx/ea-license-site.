@@ -446,7 +446,7 @@ function client(base, ip) {
     assert.match((await bob.get('/journal/insights?tab=time')).text, /Session clock[\s\S]*Sessions, ranked[\s\S]*Candle clock[\s\S]*BEFORE THE OPEN[\s\S]*Hour by weekday/);
     assert.match((await bob.get('/journal/insights?tab=time&tz=mt5')).text, /MT5 server time/);
     assert.match((await bob.get('/journal/insights?tab=habits')).text, /Trade number of the day[\s\S]*After a win, after a loss/);
-    assert.match((await bob.get('/journal')).text, /class="pl-hero"[\s\S]*This week[\s\S]*Last session[\s\S]*Recent trades/);
+    assert.match((await bob.get('/journal')).text, /class="ov-hero jv-hero"[\s\S]*id="cal"[\s\S]*This week[\s\S]*Last session[\s\S]*Recent trades/);
     r = await bob.get('/journal/insights?account=1001&days=all&tab=prop');
     assert.match(r.text, /All time/);
     assert.match(r.text, /Your firm's rules/);
