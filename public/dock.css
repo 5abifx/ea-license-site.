@@ -16,6 +16,7 @@
   .tb .tb-dk { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; margin: 0;
     background: none; border: 0; border-radius: 14px; box-shadow: none; min-height: 0; cursor: pointer;
     color: #8e8e93; font: 600 10.5px/1 var(--body, inherit); letter-spacing: 0; text-transform: none; text-decoration: none; white-space: nowrap; }
+  .tb .tb-dk { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .tb-dk svg { width: 24px; height: 24px; flex: none; }
   .tb-dk circle { fill: currentColor; }
   .tb .tb-dk.on, .tb .tb-dk[aria-expanded="true"] { color: var(--tb-acc); }
@@ -24,6 +25,8 @@
     box-shadow: inset 0 1.5px 0 rgba(255,255,255,.45), inset 0 -2px 0 rgba(0,0,0,.25), 0 8px 20px color-mix(in srgb, var(--tb-acc) 45%, transparent); }
   .tb-plus svg { width: 24px; height: 24px; fill: none; stroke: #fff; stroke-width: 2.8; stroke-linecap: round; }
   .tb-plus:active { transform: scale(.94); }
+  /* instant feedback the moment a dock button is touched, before the next page arrives */
+  .tb .tb-dk:active { color: var(--tb-acc); background: rgba(255,255,255,.08); }
 
   /* the menu opens as a sheet just above the dock */
   .tb-p-m { position: fixed; top: auto; bottom: calc(88px + env(safe-area-inset-bottom, 0px)); max-height: calc(100vh - 160px); max-height: calc(100vh - 160px); max-height: calc(100dvh - 160px);

@@ -119,6 +119,9 @@
 /* Smooth page switches (Chrome/Edge 126+, Safari 18.2+): the old page fades into the new one instead of a blank flash,
    and the top bar stays put. Other browsers just load the page as before. */
 @view-transition { navigation: auto; }
+/* phones and tablets: no page-switch fade. While it plays the whole page (the bottom dock too) is a still picture,
+   so a tap on the dock in that moment was lost and the next page felt late on iPhone */
+@media (pointer: coarse) { @view-transition { navigation: none; } }
 .tb-bar { view-transition-name: tb-bar; }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .22s; }
 @media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }

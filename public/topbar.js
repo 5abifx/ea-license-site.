@@ -23,6 +23,7 @@
     if (e.target.closest('.tb-panel a')) close();
   });
   document.addEventListener('click', function (e) { if (cur && !tb.contains(e.target)) close(); });
+  document.addEventListener('touchstart', function () {}, { passive: true });   // lets iPhone show the pressed (:active) look on the dock
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
   // a panel opened on PC should not stay open when the window shrinks to the phone layout (and the other way)
   matchMedia('(max-width: 900px)').addEventListener('change', close);
