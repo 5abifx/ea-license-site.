@@ -16,6 +16,24 @@ const PAINTS = {
 // the canvas is bigger than the card (this much extra left/above, as a share of the card's size), so a zoomed-in car
 // can come out over the page; at normal zoom it sits inside the card exactly as before
 const OUT = { l: 0.9, t: 0.45 };   // right and bottom run to the window edge
+// The cars (picked in Appearance, look.car). Each model is one scanned mesh; the wheels are cut out of it by position:
+// axles [centre x, centre y, radius, rear?] in the model's own units (+x is the rear, -x the nose), zCut = how far out a
+// point must be to count as wheel, zMid = the wheel's centre plane, zFace = its outer face (for the speed blur disc).
+// No badges or logos on any model.
+const CARS = {
+  hyper: { glb: '/side/car.glb', len: 2.5, axles: [[0.627, -0.08, 0.162, true], [-0.563, -0.09, 0.152, false]], zCut: 0.26, zMid: 0.36, zFace: 0.452, engine: 'v8' },
+  gwagon: { glb: '/side/gwagon.glb', len: 2.35, axles: [[0.565, -0.219, 0.19, true], [-0.652, -0.231, 0.182, false]], zCut: 0.29, zMid: 0.36, zFace: 0.428, engine: 'g63' },
+};
+// Engine voices. res = exhaust resonances [Hz, bandwidth Hz, gain]; beat = firing strength pattern; fire = firings per
+// crank turn; pops = overrun bangs [rev, burnout]; turbo = whistle under boost + a blow-off hiss when lifting.
+const ENGINES = {
+  // flat-out mid-engine V8: bright, rev-happy
+  v8: { idle: 950, max: [6400, 7100], rate: [5.5, 3.2], fc: [2600, 1300], drive: 1.4, fire: 4, pops: [5, 7],
+    res: [[78, 26, 1.0], [156, 40, 0.75], [262, 60, 0.42], [430, 90, 0.22], [1150, 300, 0.07]], beat: [1, 0.72, 0.9, 0.66, 0.97, 0.7, 0.93, 0.76] },
+  // tuned twin-turbo 4.0 V8 in a heavy SUV with a big-bore exhaust: deep, slower to rev, loud crackle on lift-off
+  g63: { idle: 720, max: [5600, 6200], rate: [4.0, 2.5], fc: [1900, 950], drive: 1.8, fire: 4, pops: [11, 15], turbo: true,
+    res: [[58, 20, 1.0], [116, 30, 0.9], [196, 46, 0.55], [350, 80, 0.26], [900, 260, 0.08]], beat: [1, 0.64, 0.93, 0.6, 0.99, 0.66, 0.9, 0.7] },
+};
 
 export default function garage(card) {
   const cv = card.querySelector('canvas'), hint = card.querySelector('.sc-hint');
@@ -66,7 +84,7 @@ export default function garage(card) {
   let car = null, mats = [], rev = 0, revT = 0, burn = 0, burnT = 0, emit = 0;
   // the scan is one mesh: cut each wheel disc out of it (by position) so it can spin and steer.
   // [centre x, centre y, radius] in the model's own units; +x is the rear (big wheels, wing), -x the nose
-  const AXLES = [[0.627, -0.08, 0.162, true], [-0.563, -0.09, 0.152, false]];
+  const CAR = CARS[(window.__LOOK && window.__LOOK.car) || 'hyper'] || CARS.hyper, AXLES = CAR.axles;
   const wheels = [], pivot = new THREE.Vector3(), nose = new THREE.Vector3();
   let blurT = null;
   const blurTex = () => blurT || (blurT = (() => { const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d'), m = S / 2;
@@ -82,27 +100,27 @@ export default function garage(card) {
     const keep = [];
     for (let t = 0; t < idx.count; t += 3) {
       const v = [idx.getX(t), idx.getX(t + 1), idx.getX(t + 2)];
-      const hit = parts.find((p) => v.every((k) => pos.getZ(k) * p.sd > 0.26 && Math.hypot(pos.getX(k) - p.x, pos.getY(k) - p.y) < p.rad));
+      const hit = parts.find((p) => v.every((k) => pos.getZ(k) * p.sd > CAR.zCut && Math.hypot(pos.getX(k) - p.x, pos.getY(k) - p.y) < p.rad));
       (hit ? hit.tri : keep).push(v[0], v[1], v[2]);
     }
     g.setIndex(keep);
     parts.forEach((p) => {
       if (!p.tri.length) return;
       const wg = new THREE.BufferGeometry(); for (const k in g.attributes) wg.setAttribute(k, g.attributes[k]); wg.setIndex(p.tri);
-      const steer = new THREE.Group(), spin = new THREE.Group(), m = new THREE.Mesh(wg, o.material), cz = 0.36 * p.sd;
+      const steer = new THREE.Group(), spin = new THREE.Group(), m = new THREE.Mesh(wg, o.material), cz = CAR.zMid * p.sd;
       steer.position.set(p.x, p.y, cz); m.position.set(-p.x, -p.y, -cz); m.castShadow = true;
       spin.add(m); steer.add(spin); o.add(steer);
       // motion-blur disc over the outer face, faded in with wheel speed (fast spokes otherwise look frozen or backwards)
       const disc = new THREE.Mesh(new THREE.CircleGeometry(p.rad * 0.97, 64), new THREE.MeshStandardMaterial({ map: blurTex(), metalness: 0.7, roughness: 0.42, transparent: true, opacity: 0, depthWrite: false }));
-      disc.position.z = (0.452 - 0.36) * p.sd; if (p.sd < 0) disc.rotation.y = Math.PI; spin.add(disc);
+      disc.position.z = (CAR.zFace - CAR.zMid) * p.sd; if (p.sd < 0) disc.rotation.y = Math.PI; spin.add(disc);
       wheels.push({ steer, spin, rear: p.rear, disc });
     });
   }
   const holder = new THREE.Group(); sc.add(holder);
-  new GLTFLoader().load('/side/car.glb', (g) => {
+  new GLTFLoader().load(CAR.glb, (g) => {
     car = g.scene;
     const b = new THREE.Box3().setFromObject(car), s = new THREE.Vector3(); b.getSize(s);
-    car.scale.setScalar(2.5 / Math.max(s.x, s.z));
+    car.scale.setScalar(CAR.len / Math.max(s.x, s.z));
     const b2 = new THREE.Box3().setFromObject(car), c = new THREE.Vector3(); b2.getCenter(c);
     car.position.x -= c.x; car.position.z -= c.z; car.position.y -= b2.min.y;
     // (collect the meshes first: cutting out the wheels adds new meshes to the car)
@@ -201,29 +219,29 @@ export default function garage(card) {
     if (engineBufs[kind]) return engineBufs[kind];
     const burnK = kind === 'burn', len = burnK ? 3.6 : 1.9, sr = a.sampleRate, N = Math.floor(sr * len);
     const buf = a.createBuffer(2, N, sr), L = buf.getChannelData(0), Rc = buf.getChannelData(1);
-    const onT = 0.06, offT = burnK ? 2.9 : 0.5, IDLE = 950, MAX = burnK ? 7100 : 6400;
-    // exhaust resonances: [Hz, bandwidth Hz, gain]
-    const RES = [[78, 26, 1.0], [156, 40, 0.75], [262, 60, 0.42], [430, 90, 0.22], [1150, 300, 0.07]].map(([f, bw, g]) => {
+    const E = ENGINES[CAR.engine] || ENGINES.v8, k = burnK ? 1 : 0;
+    const onT = 0.06, offT = burnK ? 2.9 : 0.5, IDLE = E.idle, MAX = E.max[k];
+    const RES = E.res.map(([f, bw, g]) => {
       const r = Math.exp(-Math.PI * bw / sr); return { c1: 2 * r * Math.cos(2 * Math.PI * f / sr), c2: -r * r, g: g * (1 - r) * 2, y1: 0, y2: 0 };
     });
     const POP = [[120, 30, 1], [1600, 900, 0.35]].map(([f, bw, g]) => { const r = Math.exp(-Math.PI * bw / sr); return { c1: 2 * r * Math.cos(2 * Math.PI * f / sr), c2: -r * r, g: g * (1 - r) * 2, y1: 0, y2: 0 }; });
-    const BEAT = [1, 0.72, 0.9, 0.66, 0.97, 0.7, 0.93, 0.76];          // cross-plane V8 burble
+    const BEAT = E.beat, NB = BEAT.length;
     let rpm = IDLE, ph = 0, cyl = 0, burst = 0, burstA = 0, cut = 0, lp = 0, hp = 0, hpx = 0, popBurst = 0, popA = 0, peak = 0;
     const pops = [];
-    const DRIVE = 1.4;
-    { let t = offT + 0.08; const n = burnK ? 7 : 5; for (let i = 0; i < n; i++) { t += 0.05 + Math.random() * 0.13; pops.push([Math.floor(t * sr), 0.5 + Math.random() * 0.9]); } }
+    const DRIVE = E.drive;
+    { let t = offT + 0.08; const n = E.pops[k]; for (let i = 0; i < n; i++) { t += 0.04 + Math.random() * (E.turbo ? 0.1 : 0.13); pops.push([Math.floor(t * sr), 0.5 + Math.random() * 0.9]); } }
+    let boost = 0, tw = 0, bov = 0;
     let pi = 0;
     for (let n = 0; n < N; n++) {
       const t = n / sr;
       let thr = t > onT && t < offT ? 1 : 0;
       if (thr && rpm > MAX) cut = Math.floor(sr * 0.035);                 // rev limiter
       if (cut > 0) { cut--; thr = 0; }
-      rpm += (thr ? (MAX * 1.08 - rpm) * (burnK ? 3.2 : 5.5) : -(rpm - IDLE) * 1.9) / sr;
-      // crank: 4 firings per turn
-      ph += (rpm / 60) * 4 / sr;
+      rpm += (thr ? (MAX * 1.08 - rpm) * E.rate[k] : -(rpm - IDLE) * 1.9) / sr;
+      ph += (rpm / 60) * E.fire / sr;
       let x = 0;
       if (ph >= 1) {
-        ph -= 1; const amp = BEAT[cyl++ & 7] * (0.9 + Math.random() * 0.2) * (0.28 + 0.72 * (thr ? 1 : 0.18 + 0.25 * (rpm / MAX)));
+        ph -= 1; const amp = BEAT[cyl++ % NB] * (0.9 + Math.random() * 0.2) * (0.28 + 0.72 * (thr ? 1 : 0.18 + 0.25 * (rpm / MAX)));
         x += amp; burst = Math.floor(sr * 0.0012); burstA = amp * 0.18;
       }
       if (burst > 0) { burst--; x += (Math.random() * 2 - 1) * burstA; burstA *= 0.997; }
@@ -236,6 +254,13 @@ export default function garage(card) {
       for (const q of POP) { const v = px + q.c1 * q.y1 + q.c2 * q.y2; q.y2 = q.y1; q.y1 = v; y += v * q.g * 0.6; }
       // air and mechanical hiss grows with revs
       y += (Math.random() * 2 - 1) * 0.04 * (rpm / MAX) * (thr ? 1 : 0.4);
+      if (E.turbo) {
+        // boost builds with revs under throttle; the turbos whistle, and lifting off dumps it with a hiss
+        const was = boost; boost += ((thr ? Math.max(0, rpm / MAX - 0.35) / 0.65 : 0) - boost) * (thr ? 2.2 : 9) / sr;
+        if (!thr && was > 0.4 && !bov) bov = Math.floor(sr * 0.32);
+        tw += (3200 + 5200 * boost) / sr; y += Math.sin(tw * 6.283) * 0.012 * boost * boost;
+        if (bov > 0) { bov--; y += (Math.random() * 2 - 1) * 0.07 * (bov / (sr * 0.32)); }
+      }
       // brighter with throttle, then a soft clip like a loud exhaust
       const fc = (thr ? 2600 : 1300) + rpm * 0.25, al = 1 - Math.exp(-2 * Math.PI * fc / sr);
       lp += (y - lp) * al;

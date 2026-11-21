@@ -70,6 +70,7 @@
   $$('#apPanel button').forEach((b) => { b.onclick = () => set({ panel: b.dataset.v }); });
   $('#apMotion').onclick = () => set({ motion: !S.motion });
   $$('#apPaint button').forEach((b) => { b.onclick = () => set({ paint: b.dataset.v }); });
+  $$('#apCar button').forEach((b) => { b.onclick = () => set({ car: b.dataset.v }); });
   [['apDepth', 'depth'], ['apDim', 'dim'], ['apBlur', 'blur']].forEach(([id, k]) => { const el = $('#' + id); el.value = S[k]; el.oninput = () => set({ [k]: +el.value }); });
 
   function sync() {
@@ -78,6 +79,7 @@
     $$('.ap-dot[data-acc]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.acc === S.accent));
     $('#apMotion').setAttribute('aria-checked', S.motion);
     $$('#apPaint button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === (S.paint || 'original')));
+    $$('#apCar button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === (S.car || 'hyper')));
     [['apDepth', 'depth'], ['apDim', 'dim'], ['apBlur', 'blur']].forEach(([id, k]) => { const el = $('#' + id); $('#' + id + 'O').textContent = S[k]; el.style.setProperty('--v', (S[k] - el.min) / (el.max - el.min) * 100 + '%'); });
     if (S.bg === 'colour') $('#apColourTh').style.background = S.colour;
     if (S.bg === 'none') { $('#apScore').textContent = '-'; $('#apOk').textContent = 'AAA'; $('#apReadTxt').textContent = 'Classic look: white text on near-black panels.'; }

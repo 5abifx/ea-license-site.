@@ -43,10 +43,10 @@
   const nEl = ov.querySelector('.plx-n'), sEl = ov.querySelector('.plx-s'), bar = ov.querySelector('.plx-bar i');
   const landed = () => { sEl.textContent = target >= 0 ? 'In profit' : 'Review the leaks'; setTimeout(close, 650); };
   // Night run: the car crosses the screen as the number counts (3D, loaded only for this intro). If it is not ready
-  // in time (slow phone or connection, no WebGL) the plain count runs instead and the car is dropped.
+  // within 3.5s (very slow connection, no WebGL) the plain count runs instead and the car is dropped.
   let started = false;
   const plain = () => { if (started) return; started = true; count(nEl, 1500, landed); };
-  const wait = setTimeout(plain, 1300);
+  const wait = setTimeout(plain, 3500);
   import('/nightrun.js').then((m) => m.prepare(ov, nEl)).then((play) => {
     if (started || closed) { const c = ov.querySelector('.plx-cv'); if (c) c.remove(); return; }
     clearTimeout(wait); started = true; ov.classList.add('run');
