@@ -49,6 +49,24 @@ app.disable('x-powered-by');
 // Render's health check: answers at once, before sessions, the database or the rate limit, so a busy moment on the
 // small (0.5 CPU) server is not mistaken for a dead one. Set Render > Settings > Health Check Path to /healthz.
 app.get('/healthz', (req, res) => res.type('text').send('ok'));
+// Freeze finder: logs any request slower than 1.5s and any moment the server stops answering for over a second,
+// with the requests that were running, so the next "health check failed" restart shows its cause in Render > Logs.
+const inFlight = new Map(); let reqSeq = 0;
+app.use((req, res, next) => {
+  const id = ++reqSeq, t0 = Date.now(); inFlight.set(id, `${req.method} ${req.path}`);
+  res.on('close', () => { inFlight.delete(id); const ms = Date.now() - t0; if (ms > 1500) console.warn(`[slow] ${req.method} ${req.path} ${ms}ms`); });
+  next();
+});
+// a promise that fails with nobody listening used to stop the whole server: log it and keep serving
+process.on('unhandledRejection', (e) => console.error('[unhandled]', e && e.stack || e));
+process.on('uncaughtException', (e) => { console.error('[crash]', e && e.stack || e); process.exit(1); });
+if (process.env.NODE_ENV !== 'test') {
+  let lastTick = Date.now();
+  setInterval(() => {
+    const now = Date.now(), lag = now - lastTick - 1000; lastTick = now;
+    if (lag > 1000) console.warn(`[freeze] server stopped answering for ${lag}ms; running: ${[...inFlight.values()].join(', ') || 'no requests'}; memory ${Math.round(process.memoryUsage().rss / 1048576)}MB`);
+  }, 1000).unref();
+}
 const rate = require('./ratelimit');
 app.use(rate.realIp);   // the visitor's own address, also behind Cloudflare
 
