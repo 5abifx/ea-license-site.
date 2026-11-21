@@ -24,8 +24,10 @@
     });
     return list;
   }
-  const fmt = (n, v) => (n.sign < 0 ? '−' : n.plus ? '+' : '') + n.pre
-    + v.toLocaleString('en-US', { minimumFractionDigits: n.dec, maximumFractionDigits: n.dec, useGrouping: n.comma }) + n.suf;
+  // one formatter per style, made once (toLocaleString builds a new one on every call: on iPhone that was the main cost)
+  const NF = {};
+  const nf = (dec, comma) => NF[dec + '' + comma] || (NF[dec + '' + comma] = new Intl.NumberFormat('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec, useGrouping: comma }));
+  const fmt = (n, v) => (n.sign < 0 ? '−' : n.plus ? '+' : '') + n.pre + nf(n.dec, n.comma).format(v) + n.suf;
 
   function bars() {
     return [...main.querySelectorAll('i[style*="width"], b[style*="width"]')].filter((el) => !el.closest('.pl-hero, table')).map((el) => ({ el, w: el.style.width }));
@@ -40,7 +42,9 @@
   }
 
   function run() {
-    const N = numbers(), B = bars(), A = arcs();
+    // only what is on screen sweeps; the rest already shows its real value when scrolled to
+    const onScreen = (el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; };
+    const N = numbers().filter((n) => onScreen(n.el)), B = bars().filter((b) => onScreen(b.el)), A = arcs().filter((c) => onScreen(c.el));
     if (!N.length && !B.length && !A.length) return;
     document.body.classList.add('ig');
     // hold each number's widest width while it counts, so the line never re-wraps and the page never jumps
@@ -56,7 +60,17 @@
     // up to full
     B.forEach((b) => { b.el.style.transition = `width ${UP}ms cubic-bezier(.5,0,.5,1)`; b.el.style.width = '100%'; });
     const t0 = performance.now();
+    // a touch, scroll or key ends the sweep at once: the page must answer the finger straight away
+    let stop = false;
+    const end = () => { stop = true; ['pointerdown', 'touchstart', 'wheel', 'keydown'].forEach((ev) => removeEventListener(ev, end, true)); };
+    ['pointerdown', 'touchstart', 'wheel', 'keydown'].forEach((ev) => addEventListener(ev, end, { passive: true, capture: true }));
+    const finish = () => {
+      N.forEach((n) => { n.el.textContent = n.t; });
+      A.forEach((c) => c.el.setAttribute('stroke-dasharray', `${c.a} ${c.b}`));
+      B.forEach((b) => { b.el.style.transition = 'none'; b.el.style.width = b.w; });
+    };
     (function step(now) {
+      if (stop) return finish();
       const e = now - t0;
       let k, phase;
       if (e < UP) { phase = 0; k = easeIn(e / UP); } else if (e < UP + HOLD) { phase = 1; k = 1; } else { phase = 2; k = easeOut(Math.min(1, (e - UP - HOLD) / DOWN)); }
@@ -67,12 +81,12 @@
       A.forEach((c) => { const v = phase < 2 ? c.max * k : c.max + (c.a - c.max) * k; c.el.setAttribute('stroke-dasharray', `${v.toFixed(2)} ${c.b}`); });
       if (phase === 2 && k >= 1) {
         A.forEach((c) => c.el.setAttribute('stroke-dasharray', `${c.a} ${c.b}`));
-        return;
+        return end();
       }
       requestAnimationFrame(step);
     })(t0);
     // back down to the real values
-    setTimeout(() => B.forEach((b) => { b.el.style.transition = `width ${DOWN}ms cubic-bezier(.2,.7,.2,1)`; b.el.style.width = b.w; }), UP + HOLD);
+    setTimeout(() => !stop && B.forEach((b) => { b.el.style.transition = `width ${DOWN}ms cubic-bezier(.2,.7,.2,1)`; b.el.style.width = b.w; }), UP + HOLD);
   }
 
   // wait for the journal's loading screen / welcome intro to close first
