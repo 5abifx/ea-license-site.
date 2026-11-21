@@ -1086,8 +1086,15 @@ select option:disabled { color: #6b6b73; }
 .plx.go .plx-in { opacity: 1; transform: none; }
 .plx-k { font-family: var(--mono); font-size: 11px; letter-spacing: .26em; color: var(--muted); }
 .plx-n { font-family: var(--display); font-weight: 600; font-size: clamp(48px, 11vw, 120px); letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
-.plx.pos .plx-n { color: var(--ok); text-shadow: 0 0 50px rgba(var(--ok-rgb), .45); }
-.plx.neg .plx-n { color: var(--danger); text-shadow: 0 0 50px rgba(var(--danger-rgb), .4); }
+/* the glow sits on its own layer behind the number: a blurred text-shadow had to be repainted on every count-up frame */
+.plx-n { position: relative; isolation: isolate; }
+.plx-n::after { content: ""; position: absolute; left: -20%; right: -20%; top: -80%; bottom: -80%; z-index: -1; pointer-events: none; background: radial-gradient(closest-side, rgba(var(--ok-rgb), .16), rgba(var(--ok-rgb), .05) 55%, rgba(var(--ok-rgb), 0)); }
+.plx.neg .plx-n::after { background: radial-gradient(closest-side, rgba(var(--danger-rgb), .15), rgba(var(--danger-rgb), .05) 55%, rgba(var(--danger-rgb), 0)); }
+.plx.pos .plx-n { color: var(--ok); }
+.plx.neg .plx-n { color: var(--danger); }
+/* headlight wash over the number: only its opacity changes (no filters on the text) */
+.plx-wash { position: absolute; left: 50%; width: 900px; max-width: 92vw; height: 260px; margin-left: -450px; pointer-events: none; opacity: 0; will-change: opacity; background: radial-gradient(closest-side, rgba(255,246,230,.3), rgba(255,246,230,0)); }
+@media (max-width: 978px) { .plx-wash { margin-left: -46vw; } }
 .plx-in small { font-family: var(--mono); color: var(--muted); margin-top: -6px; }
 .plx-bar { width: min(260px, 60vw); height: 2px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden; margin-top: 8px; }
 .plx-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--accent), #ffb07a); transform-origin: left; transform: scaleX(0); }

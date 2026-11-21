@@ -106,6 +106,10 @@ export async function prepare(box, num) {
   if (r.compileAsync) await r.compileAsync(sc, cam); else r.compile(sc, cam);
   r.render(sc, cam);
 
+  // headlight wash: a soft light layer over the number whose opacity follows the car (filters on the text itself
+  // made the browser repaint the big number every frame, which stuttered as the car passed)
+  const wash = document.createElement('i'); wash.className = 'plx-wash'; num.parentNode.appendChild(wash);
+  wash.style.top = (num.offsetTop + num.offsetHeight / 2 - 130) + 'px';
   const tmp = new THREE.Vector3(), proj = new THREE.Vector3(), W = (p) => mesh.localToWorld(tmp.copy(p)).clone();
   const onResize = () => { r.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); };
   addEventListener('resize', onResize);
@@ -137,7 +141,7 @@ export async function prepare(box, num) {
       progress(Math.min(1, Math.max(0, p)));
       // the headlights wash over the number as they pass
       proj.set(x, 0.5, 0).project(cam); const near = Math.max(0, 1 - Math.abs((proj.x + 1) / 2 - 0.5) * 3.2);
-      num.style.filter = near ? `brightness(${1 + near * 0.35}) drop-shadow(0 0 ${Math.round(near * 30)}px rgba(255,255,255,${(near * 0.35).toFixed(2)}))` : '';
+      wash.style.opacity = near.toFixed(3);
       r.render(sc, cam);
       if (t >= T1 && !finished) { finished = true; done(); }
       if (t < T1 + 1.2 && box.isConnected) raf = requestAnimationFrame(frame); else stop();
