@@ -134,8 +134,17 @@ function leaks(trades, { money, esc }) {
   }
 
   // L2 revenge trades: opened within REVENGE_MIN minutes after a losing trade closed on the same account
-  const rev = trades.filter((t) => Number.isFinite(t.o) && trades.some((p) => p !== t && p.account_number === t.account_number && p.net < 0
-    && Number.isFinite(p.c) && p.c <= t.o && t.o - p.c <= REVENGE_MIN * 60000));
+  // (per account, losses sorted by close time + a binary search: comparing every trade with every other trade took
+  // seconds for members with thousands of trades and froze the whole server)
+  const lossCloses = {};
+  Object.entries(byAcct).forEach(([k, l]) => { lossCloses[k] = l.filter((p) => p.net < 0 && Number.isFinite(p.c)).sort((a, b) => a.c - b.c); });
+  const lastAtOrBefore = (arr, x) => { let lo = 0, hi = arr.length - 1, r = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (arr[m].c <= x) { r = m; lo = m + 1; } else hi = m - 1; } return r; };
+  const rev = trades.filter((t) => {
+    if (!Number.isFinite(t.o)) return false;
+    const L = lossCloses[t.account_number] || [];
+    for (let i = lastAtOrBefore(L, t.o); i >= 0; i--) { if (L[i] === t) continue; return t.o - L[i].c <= REVENGE_MIN * 60000; }
+    return false;
+  });
   // shown when they lose money, or when they win less often than your other trades
   const revWin = winPct(rev);
   if (rev.length >= 2 && (sum(rev) < 0 || revWin < overallWin)) {
@@ -151,10 +160,14 @@ function leaks(trades, { money, esc }) {
   // L3 tilt: trades taken after 2+ losses in a row on the same account
   const tilt = [];
   Object.values(byAcct).forEach((l) => {
+    // closed trades newest first (same order as before: ties keep open order), sorted once per account
+    const cl = l.filter((p) => Number.isFinite(p.c)).sort((a, b) => b.c - a.c);
     l.forEach((t) => {
       const at = Number.isFinite(t.o) ? t.o : t.c;
-      const before = l.filter((p) => p !== t && Number.isFinite(p.c) && p.c <= at).sort((a, b) => b.c - a.c);
-      let k = 0; while (k < before.length && before[k].net < 0) k++;
+      let lo = 0, hi = cl.length;   // first trade that closed at or before `at`
+      while (lo < hi) { const m = (lo + hi) >> 1; if (cl[m].c <= at) hi = m; else lo = m + 1; }
+      let k = 0;
+      for (let i = lo; i < cl.length && k < 2; i++) { if (cl[i] === t) continue; if (cl[i].net < 0) k++; else break; }
       if (k >= 2) tilt.push(t);
     });
   });
