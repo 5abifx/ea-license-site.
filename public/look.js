@@ -98,8 +98,10 @@
     // for iPad Safari to reload the tab ("the website crashes")
     const TOUCH = matchMedia('(pointer: coarse)').matches;
     const hd = (s) => (!TOUCH && Math.max(screen.width, screen.height) * (devicePixelRatio || 1) > 2200 ? s.replace('/look/', '/look/4k/') : s);
-    p.img = new Image(); p.img.onload = () => { need = true; resample = true; }; p.img.src = hd(p.src);
-    if (p.cut) { p.cimg = new Image(); p.cimg.onload = () => { need = true; resample = true; }; p.cimg.src = hd(p.cut); }
+    // decode() unpacks the picture off the main thread, so the first draw does not freeze touches
+    const ready = (im) => () => { (im.decode ? im.decode() : Promise.resolve()).catch(() => {}).then(() => { need = true; resample = true; }); };
+    p.img = new Image(); p.img.decoding = 'async'; p.img.onload = ready(p.img); p.img.src = hd(p.src);
+    if (p.cut) { p.cimg = new Image(); p.cimg.decoding = 'async'; p.cimg.onload = ready(p.cimg); p.cimg.src = hd(p.cut); }
   }
   const hasCut = (p) => p && p.cimg && p.cimg.naturalWidth;
   function cover(ctx, el, w, h) { const iw = el.videoWidth || el.naturalWidth, ih = el.videoHeight || el.naturalHeight; if (!iw) return; const s = Math.max(w / iw, h / ih); ctx.drawImage(el, (w - iw * s) / 2, (h - ih * s) / 2, iw * s, ih * s); }

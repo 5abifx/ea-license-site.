@@ -7,7 +7,8 @@
   const num = hero.querySelector('.pl-num');
   const target = Number(num && num.dataset.count) || 0;
   const pre = (num && num.dataset.pre) || '';
-  const fmt = (v) => (v < 0 ? '−' : '+') + pre + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const NF = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });   // made once, not per frame
+  const fmt = (v) => (v < 0 ? '−' : '+') + pre + NF.format(Math.abs(v));
   const ease = (t) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t));
   function count(el, ms, done) {
     const t0 = performance.now();

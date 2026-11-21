@@ -11,7 +11,7 @@ const CAR = pickCar(), AXLES = CAR.axles;   // the car picked in Appearance (whe
 
 // smooth normals shared by every copy of a point (the scan splits points at texture seams, which shows as facets)
 function smoothNormals(geo) {
-  const pos = geo.attributes.position, n = pos.count, key = (i) => `${pos.getX(i).toFixed(4)},${pos.getY(i).toFixed(4)},${pos.getZ(i).toFixed(4)}`;
+  const pos = geo.attributes.position, n = pos.count, key = (i) => Math.round(pos.getX(i) * 1e4) + ',' + Math.round(pos.getY(i) * 1e4) + ',' + Math.round(pos.getZ(i) * 1e4);   // whole numbers: toFixed was most of the intro's start-up time on phones
   geo.computeVertexNormals(); const nrm = geo.attributes.normal, acc = new Map();
   for (let i = 0; i < n; i++) { const k = key(i), a = acc.get(k) || [0, 0, 0]; a[0] += nrm.getX(i); a[1] += nrm.getY(i); a[2] += nrm.getZ(i); acc.set(k, a); }
   const out = new Float32Array(n * 3);
@@ -21,6 +21,8 @@ function smoothNormals(geo) {
 
 // Prepares everything (model, wheels, shaders) and resolves with play(), or rejects so hero.js can fall back.
 export async function prepare(box, num) {
+  // hand the main thread back between the heavy steps so a tap (skip) still answers at once; stop if the intro closed
+  const breathe = () => new Promise((res, rej) => setTimeout(() => (box.isConnected ? res() : (r.dispose(), r.forceContextLoss(), rej(new Error('closed')))), 0));
   const cv = document.createElement('canvas'); cv.className = 'plx-cv'; box.prepend(cv);
   const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: 'high-performance' });
   r.setPixelRatio(Math.min(1.5, devicePixelRatio || 1, Math.sqrt(3.7e6 / (innerWidth * innerHeight))));   // a dark, moving scene: ~4 megapixels is plenty
@@ -66,10 +68,12 @@ export async function prepare(box, num) {
   { const b = new THREE.Box3().setFromObject(car), s = new THREE.Vector3(); b.getSize(s); car.scale.setScalar(2.15 * CAR.len / 2.5 / Math.max(s.x, s.z));
     const b2 = new THREE.Box3().setFromObject(car), c = new THREE.Vector3(); b2.getCenter(c); car.position.x -= c.x; car.position.z -= c.z; car.position.y -= b2.min.y; }
   const meshes = []; car.traverse((o) => { if (o.isMesh) meshes.push(o); });
-  meshes.forEach((o) => {
+  await breathe();
+  for (const o of meshes) {
     smoothNormals(o.geometry);
+    await breathe();
     const m = new THREE.MeshPhysicalMaterial({ map: o.material.map, metalness: 0.55, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.04 }); o.material.dispose(); o.material = m; mesh = o;
-    const g = o.geometry, pos = g.attributes.position, idx = g.index; if (!idx) return;
+    const g = o.geometry, pos = g.attributes.position, idx = g.index; if (!idx) continue;
     const parts = []; AXLES.forEach(([x, y, rad, rear]) => [1, -1].forEach((sd) => parts.push({ x, y, rad, rear, sd, tri: [] })));
     const keep = [];
     for (let t = 0; t < idx.count; t += 3) { const v0 = idx.getX(t), v1 = idx.getX(t + 1), v2 = idx.getX(t + 2);
@@ -82,7 +86,8 @@ export async function prepare(box, num) {
       const disc = new THREE.Mesh(new THREE.CircleGeometry(p.rad * 0.97, 48), new THREE.MeshStandardMaterial({ map: blurTex, metalness: 0.7, roughness: 0.42, transparent: true, opacity: 0, depthWrite: false }));
       disc.position.z = (CAR.zFace - CAR.zMid) * p.sd; if (p.sd < 0) disc.rotation.y = Math.PI; spin.add(disc);
       wheels.push({ spin, steer, rear: p.rear, disc }); });
-  });
+    await breathe();
+  }
   car.rotation.y = Math.PI;                    // nose (-x in the model) points +x: drives left to right
   const holder = new THREE.Group(); holder.add(car); sc.add(holder);
 
@@ -103,7 +108,9 @@ export async function prepare(box, num) {
 
   // compile every shader before the first frame (off the main thread where the browser can), so the run starts smooth
   holder.position.set(XS, 0, 0);
+  await breathe();
   if (r.compileAsync) await r.compileAsync(sc, cam); else r.compile(sc, cam);
+  await breathe();
   r.render(sc, cam);
 
   // headlight wash: a soft light layer over the number whose opacity follows the car (filters on the text itself
