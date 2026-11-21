@@ -181,7 +181,7 @@
   }
   // Panels stay dark glass (every members page is built light-on-dark); how see-through they are depends on the
   // background, so white text keeps at least 7:1 on them. Text that sits straight on the background flips dark/light.
-  const SHEET = [82, 83, 88];
+  const SHEET = [86, 86, 89];
   const PANELS = { auto: [12, 12, 16], midnight: [14, 18, 32], onyx: [6, 6, 8], graphite: [30, 31, 36] };
   let last_ = {};
   function tokens() {
@@ -197,7 +197,9 @@
     while (CR(W_, sheetEff) < 7 && sa < 0.9) { sa += 0.03; sheetEff = mix(bgEff, sheetCol, sa); }
     // Every background gets the graphite glass sheet the Hyper picture gives (owner's pick, Nov 20): on darker pictures
     // the sheet is lifted to the same grey instead of staying clear, so the dark panels stand out the same way everywhere.
-    if (L(sheetEff) < L(SHEET)) { sheetCol = SHEET; sa = 0.82; sheetEff = mix(bgEff, SHEET, sa); }
+    // Light pictures (Hyper and the like) already got a strong dark sheet above: keep that exactly. Dark pictures got an
+    // almost clear sheet, so lift them to the grey Hyper shows (SHEET = what the eye sees on Hyper, ~86 grey).
+    if (sa < 0.5 && L(sheetEff) < L(SHEET)) { sa = 0.82; sheetCol = SHEET.map((t, i) => Math.max(0, Math.min(255, Math.round((t - (1 - sa) * bgEff[i]) / sa)))); sheetEff = mix(bgEff, sheetCol, sa); }
     let a = S.panel === 'onyx' ? 0.94 : 0.5 + busy * 0.3; if (S.panel === 'graphite') a += 0.08;
     let eff = mix(sheetEff, surf, a);
     while (CR(W_, eff) < 7.5 && a < 0.97) { a += 0.03; eff = mix(sheetEff, surf, a); }
