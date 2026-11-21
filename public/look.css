@@ -122,3 +122,13 @@ html.lk .app-body .btn:not(.secondary):not(.link), html.lk .app-body button[type
 
 @media (max-width: 1100px) { .ap { grid-template-columns: minmax(0, 1fr); } .ap-panel { position: static; } }
 @media (max-width: 720px) { .ap-hero { grid-template-columns: 1fr; } .ap-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Readable text on the grey glass sheet (phone Desk report, 2026-11-21): the old greys were made for a black page
+   and dropped to ~2:1 on the sheet. Lift labels to a light grey and profit/loss text to brighter tints. */
+.app-body { --muted: #c2c2ca; --q-label: #c2c2ca; }
+.app-body .acct small, .app-body .ov-lbl, .app-body .ov-hstats dt, .app-body .ov-subl, .app-body .ov-t, .app-body .ov-s,
+.app-body .ov-leg, .app-body .cal-grid .dow, .app-body .cal-grid.cx .dow, .app-body .cal-note, .app-body .ins-tag,
+.app-body .pl-hero .kicker, .app-body .recap .kicker, .app-body .ov-hero .ov-lbl, .app-body .ov-hero .ov-hstats dt,
+.app-body .ov-sec, .app-body .ov-cmp, .app-body .ov-note, .app-body .ov-card small { color: #c2c2ca; }
+.app-body .pos, .app-body .acct b.pos { color: #3fdcb5; }
+.app-body .neg { color: #ff6f74; }

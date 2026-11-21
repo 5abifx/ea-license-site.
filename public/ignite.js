@@ -17,7 +17,9 @@
       if (!m || parseFloat(getComputedStyle(el).fontSize) < 18) return;
       const val = parseFloat(m[3].replace(/,/g, '') + (m[4] || '')), dec = m[4] ? m[4].length - 1 : 0, suf = (m[5] || '').trim();
       const sign = m[1] === '−' || m[1] === '-' ? -1 : 1;
-      const peak = suf === '%' || (!suf && !m[2] && !dec && val <= 100) ? 100 : nice(val * 1.6);
+      // big money figures (a balance) count straight up to their value: sweeping a $1.9M balance past $5M read as a glitch
+      const big = parseFloat(getComputedStyle(el).fontSize) >= 30 && m[2];
+      const peak = big ? val : suf === '%' || (!suf && !m[2] && !dec && val <= 100) ? 100 : nice(val * 1.6);
       list.push({ el, t, val, peak, dec, sign, plus: m[1] === '+', pre: m[2], suf: m[5] || '', comma: m[3].includes(',') || val >= 1000 });
     });
     return list;
@@ -41,6 +43,12 @@
     const N = numbers(), B = bars(), A = arcs();
     if (!N.length && !B.length && !A.length) return;
     document.body.classList.add('ig');
+    // hold each number's widest width while it counts, so the line never re-wraps and the page never jumps
+    N.forEach((n) => {
+      const cs = getComputedStyle(n.el); if (cs.display === 'inline') n.el.style.display = 'inline-block';
+      n.el.style.whiteSpace = 'nowrap'; n.el.textContent = fmt(n, n.peak); const wp = n.el.getBoundingClientRect().width;
+      n.el.textContent = n.t; const wf = n.el.getBoundingClientRect().width; n.el.style.minWidth = Math.ceil(Math.max(wp, wf)) + 'px';
+    });
     N.forEach((n) => { n.el.textContent = fmt(n, 0); });
     B.forEach((b) => { b.el.style.transition = 'none'; b.el.style.width = '0%'; });
     A.forEach((c) => c.el.setAttribute('stroke-dasharray', `0 ${c.b}`));
