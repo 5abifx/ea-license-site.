@@ -6,7 +6,8 @@ import * as THREE from '/vendor/three/three.module.min.js';
 import { GLTFLoader } from '/vendor/three/loaders/GLTFLoader.js';
 
 const T0 = 0.55, T1 = 2.05;                       // burnout until T0, then flat out until it leaves at T1 (seconds)
-const AXLES = [[0.627, -0.08, 0.162, true], [-0.563, -0.09, 0.152, false]];   // wheel centres in the model (+x = rear)
+import { pickCar } from '/side/cars.js';
+const CAR = pickCar(), AXLES = CAR.axles;   // the car picked in Appearance (wheel centres etc. in side/cars.js)
 
 // smooth normals shared by every copy of a point (the scan splits points at texture seams, which shows as facets)
 function smoothNormals(geo) {
@@ -59,9 +60,9 @@ export async function prepare(box, num) {
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
 
   // car: wheels cut out of the one-piece scan so they can spin
-  const gltf = await new Promise((res, rej) => new GLTFLoader().load('/side/car.glb', res, undefined, rej));
+  const gltf = await new Promise((res, rej) => new GLTFLoader().load(CAR.glb, res, undefined, rej));
   const car = gltf.scene, wheels = []; let mesh = null;
-  { const b = new THREE.Box3().setFromObject(car), s = new THREE.Vector3(); b.getSize(s); car.scale.setScalar(2.15 / Math.max(s.x, s.z));
+  { const b = new THREE.Box3().setFromObject(car), s = new THREE.Vector3(); b.getSize(s); car.scale.setScalar(2.15 * CAR.len / 2.5 / Math.max(s.x, s.z));
     const b2 = new THREE.Box3().setFromObject(car), c = new THREE.Vector3(); b2.getCenter(c); car.position.x -= c.x; car.position.z -= c.z; car.position.y -= b2.min.y; }
   const meshes = []; car.traverse((o) => { if (o.isMesh) meshes.push(o); });
   meshes.forEach((o) => {
@@ -71,14 +72,14 @@ export async function prepare(box, num) {
     const parts = []; AXLES.forEach(([x, y, rad, rear]) => [1, -1].forEach((sd) => parts.push({ x, y, rad, rear, sd, tri: [] })));
     const keep = [];
     for (let t = 0; t < idx.count; t += 3) { const v0 = idx.getX(t), v1 = idx.getX(t + 1), v2 = idx.getX(t + 2);
-      const hit = parts.find((p) => [v0, v1, v2].every((k) => pos.getZ(k) * p.sd > 0.26 && Math.hypot(pos.getX(k) - p.x, pos.getY(k) - p.y) < p.rad));
+      const hit = parts.find((p) => [v0, v1, v2].every((k) => pos.getZ(k) * p.sd > CAR.zCut && Math.hypot(pos.getX(k) - p.x, pos.getY(k) - p.y) < p.rad));
       (hit ? hit.tri : keep).push(v0, v1, v2); }
     g.setIndex(keep);
     parts.forEach((p) => { const wg = new THREE.BufferGeometry(); for (const k in g.attributes) wg.setAttribute(k, g.attributes[k]); wg.setIndex(p.tri);
-      const spin = new THREE.Group(), steer = new THREE.Group(), wm = new THREE.Mesh(wg, m), cz = 0.36 * p.sd;
+      const spin = new THREE.Group(), steer = new THREE.Group(), wm = new THREE.Mesh(wg, m), cz = CAR.zMid * p.sd;
       steer.position.set(p.x, p.y, cz); wm.position.set(-p.x, -p.y, -cz); spin.add(wm); steer.add(spin); o.add(steer);
       const disc = new THREE.Mesh(new THREE.CircleGeometry(p.rad * 0.97, 48), new THREE.MeshStandardMaterial({ map: blurTex, metalness: 0.7, roughness: 0.42, transparent: true, opacity: 0, depthWrite: false }));
-      disc.position.z = (0.452 - 0.36) * p.sd; if (p.sd < 0) disc.rotation.y = Math.PI; spin.add(disc);
+      disc.position.z = (CAR.zFace - CAR.zMid) * p.sd; if (p.sd < 0) disc.rotation.y = Math.PI; spin.add(disc);
       wheels.push({ spin, steer, rear: p.rear, disc }); });
   });
   car.rotation.y = Math.PI;                    // nose (-x in the model) points +x: drives left to right
@@ -88,7 +89,7 @@ export async function prepare(box, num) {
   const glow = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
     g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.25, 'rgba(255,255,255,.5)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
   const lamp = (col, s) => { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: col, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); m.scale.setScalar(s); sc.add(m); return m; };
-  const HEAD = [new THREE.Vector3(-0.97, -0.03, 0.3), new THREE.Vector3(-0.97, -0.03, -0.3)], TAIL = [new THREE.Vector3(0.99, 0.02, 0.3), new THREE.Vector3(0.99, 0.02, -0.3)];
+  const lamp2 = ([x, y, z]) => [new THREE.Vector3(x, y, z), new THREE.Vector3(x, y, -z)], HEAD = lamp2(CAR.head), TAIL = lamp2(CAR.tail);
   const headSpr = HEAD.map(() => lamp(0xfff4e6, 0.42)), tailSpr = TAIL.map(() => lamp(0xff2a1a, 0.55));
   const beams = HEAD.map(() => { const l = new THREE.SpotLight(0xfff2e0, 60, 14, 0.42, 0.6, 1.6), tg = new THREE.Object3D(); sc.add(tg); l.target = tg; sc.add(l); return [l, tg]; });
   const TR = 90, trails = TAIL.map(() => { const geo = new THREE.BufferGeometry(), idx = [];

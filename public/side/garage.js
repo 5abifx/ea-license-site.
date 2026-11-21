@@ -5,6 +5,7 @@
 import * as THREE from '/vendor/three/three.module.min.js';
 import { GLTFLoader } from '/vendor/three/loaders/GLTFLoader.js';
 import { OrbitControls } from '/vendor/three/controls/OrbitControls.js';
+import { pickCar } from '/side/cars.js';
 
 // paint: [colour over the model's texture, finish]. 'original' keeps the photo texture; the rest use a grey copy of it
 // (keeps windows, lights and wheels, drops the photo's baked orange glare) under real car paint: a clear coat over the
@@ -16,14 +17,6 @@ const PAINTS = {
 // the canvas is bigger than the card (this much extra left/above, as a share of the card's size), so a zoomed-in car
 // can come out over the page; at normal zoom it sits inside the card exactly as before
 const OUT = { l: 0.9, t: 0.45 };   // right and bottom run to the window edge
-// The cars (picked in Appearance, look.car). Each model is one scanned mesh; the wheels are cut out of it by position:
-// axles [centre x, centre y, radius, rear?] in the model's own units (+x is the rear, -x the nose), zCut = how far out a
-// point must be to count as wheel, zMid = the wheel's centre plane, zFace = its outer face (for the speed blur disc).
-// No badges or logos on any model.
-const CARS = {
-  hyper: { glb: '/side/car.glb', len: 2.5, axles: [[0.627, -0.08, 0.162, true], [-0.563, -0.09, 0.152, false]], zCut: 0.26, zMid: 0.36, zFace: 0.452, engine: 'hyper' },
-  gwagon: { glb: '/side/gwagon.glb', len: 2.35, axles: [[0.565, -0.219, 0.19, true], [-0.652, -0.231, 0.182, false]], zCut: 0.29, zMid: 0.36, zFace: 0.428, engine: 'g63' },
-};
 // Engine voices. res = exhaust resonances [Hz, bandwidth Hz, gain]; beat = firing strength pattern; fire = firings per
 // crank turn; pops = overrun bangs [rev, burnout]; turbo = whistle under boost + a blow-off hiss when lifting.
 const ENGINES = {
@@ -88,7 +81,7 @@ export default function garage(card) {
   let car = null, mats = [], rev = 0, revT = 0, burn = 0, burnT = 0, emit = 0;
   // the scan is one mesh: cut each wheel disc out of it (by position) so it can spin and steer.
   // [centre x, centre y, radius] in the model's own units; +x is the rear (big wheels, wing), -x the nose
-  const CAR = CARS[(window.__LOOK && window.__LOOK.car) || 'hyper'] || CARS.hyper, AXLES = CAR.axles;
+  const CAR = pickCar(), AXLES = CAR.axles;
   const wheels = [], pivot = new THREE.Vector3(), nose = new THREE.Vector3();
   let blurT = null;
   const blurTex = () => blurT || (blurT = (() => { const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d'), m = S / 2;
