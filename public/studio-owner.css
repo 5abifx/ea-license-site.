@@ -1,6 +1,6 @@
 /* Owner's Share Studio panel: one screen, card left, controls right (stacked on phones) */
-.ss-wrap.so{grid-template-columns:minmax(0,400px) minmax(0,1fr);gap:40px}
-.ss-wrap.so.is-wide{grid-template-columns:minmax(0,620px) minmax(0,1fr)}
+.ss-wrap.so{grid-template-columns:minmax(0,400px) minmax(0,680px);gap:40px;justify-content:center}
+.ss-wrap.so.is-wide{grid-template-columns:minmax(0,620px) minmax(0,680px)}
 .ss-wrap.so.is-wide #pv{max-width:620px}
 .so-stage{display:flex;flex-direction:column;gap:12px;position:sticky;top:16px}
 .so-stage #pv{max-width:400px;margin:0 auto}
@@ -46,3 +46,4 @@
   .so-seg button{font-size:12px;padding:8px 2px}
 }
 @media(max-width:420px){.so-grid{gap:6px}.so-tile span{font-size:9px;left:6px}}
+.ss{margin-left:auto;margin-right:auto}
