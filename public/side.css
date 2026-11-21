@@ -1,9 +1,12 @@
 /* Side columns (wide PC only, public/side.js). Dark glass so they read on every Appearance background.
-   >= 2360px wide: both columns stay fixed in the empty side space and only the middle scrolls.
-   1200-2359px: there is no side space, so the same columns hide past the screen edge and slide in when the mouse touches it. */
+   >= 1600px wide: both columns always stay on screen and only the middle scrolls; below 2360px the columns get a little
+   narrower (300-400px) and the middle narrows to fit between them (still centred, still max 1680px).
+   1200-1599px: no room, so the same columns hide past the screen edge and slide in when the mouse touches it. */
 .sc, .sc-col, .fr { display: none; }
 @media (min-width: 1200px) and (pointer: fine) {
-  .sc-col { display: flex; flex-direction: column; gap: 12px; position: fixed; top: 76px; bottom: 14px; width: 400px; z-index: 40;
+  :root { --scw: clamp(300px, calc((100vw - 1680px) / 2 - 32px), 400px); }
+  html.sc-wide body .app-main > .app-body { max-width: min(1680px, calc(100vw - 2 * var(--scw) - 64px)); }
+  .sc-col { display: flex; flex-direction: column; gap: 12px; position: fixed; top: 76px; bottom: 14px; width: var(--scw); z-index: 40;
     color: #f4f4f5; font: 600 14px/1.4 var(--body, Manrope, system-ui, sans-serif); overflow-y: auto; scrollbar-width: none; }
   .sc-col::-webkit-scrollbar { display: none; }
   .sc-l { left: 16px; } .sc-r { right: 16px; bottom: 86px; }
@@ -98,7 +101,7 @@
   .fr-pop button { width: 100%; padding: 9px; border: 0; border-radius: 999px; background: #fff; color: #0a0a0b; font: 800 13px var(--body, inherit); letter-spacing: 0; text-transform: none; min-height: 0; cursor: pointer; }
 }
 /* the "install the app" card would sit on top of the garage: move it beside the right column */
-@media (min-width: 2360px) and (pointer: fine) { html.sc-wide .ia-card { right: 440px !important; } }
+@media (min-width: 1600px) and (pointer: fine) { html.sc-wide .ia-card { right: calc(var(--scw) + 40px) !important; } }
 
 /* My gallery side card (public/side.js gallery()) */
 .sc-gal .sc-gh { display: flex; justify-content: space-between; }

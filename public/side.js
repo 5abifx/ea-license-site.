@@ -1,7 +1,7 @@
 // Side columns on PC (styles: public/side.css, data: GET /api/side, saves: POST /api/focus, POST /api/feature).
 // Left: Focus (this week's fixes ticked each day, goals, notes, Activity-style rings) + market sessions on a globe.
 // Right: a quote, the last session, "Watch out today" (repeat mistakes from Insights) and the 3D garage.
-// Wide screens (>= 2360px) keep both columns fixed in the empty side space; smaller PC screens slide them in from the edge.
+// PC screens >= 1600px keep both columns fixed on screen (the middle narrows to make room); smaller ones slide them in.
 (function () {
   // version tag of this script (?v=build), passed on to the 3D garage so a new build never plays an old copy
   var sc0 = document.currentScript, VER = sc0 && sc0.src.indexOf('?') > -1 ? sc0.src.slice(sc0.src.indexOf('?')) : '';
@@ -9,7 +9,7 @@
   var root = document.documentElement, host = document.querySelector('[data-sc]');
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
   var el = function (tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
-  var wide = matchMedia('(min-width: 2360px)');
+  var wide = matchMedia('(min-width: 1600px)');   // owner: the side cards stay on screen whenever there is room (was 2360px)
   function mode() { root.classList.toggle('sc-wide', wide.matches); }
   mode(); wide.addEventListener && wide.addEventListener('change', mode);
 
