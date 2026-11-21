@@ -21,7 +21,7 @@ const OUT = { l: 0.9, t: 0.45 };   // right and bottom run to the window edge
 // point must be to count as wheel, zMid = the wheel's centre plane, zFace = its outer face (for the speed blur disc).
 // No badges or logos on any model.
 const CARS = {
-  hyper: { glb: '/side/car.glb', len: 2.5, axles: [[0.627, -0.08, 0.162, true], [-0.563, -0.09, 0.152, false]], zCut: 0.26, zMid: 0.36, zFace: 0.452, engine: 'v8' },
+  hyper: { glb: '/side/car.glb', len: 2.5, axles: [[0.627, -0.08, 0.162, true], [-0.563, -0.09, 0.152, false]], zCut: 0.26, zMid: 0.36, zFace: 0.452, engine: 'hyper' },
   gwagon: { glb: '/side/gwagon.glb', len: 2.35, axles: [[0.565, -0.219, 0.19, true], [-0.652, -0.231, 0.182, false]], zCut: 0.29, zMid: 0.36, zFace: 0.428, engine: 'g63' },
 };
 // Engine voices. res = exhaust resonances [Hz, bandwidth Hz, gain]; beat = firing strength pattern; fire = firings per
@@ -30,6 +30,10 @@ const ENGINES = {
   // flat-out mid-engine V8: bright, rev-happy
   v8: { idle: 950, max: [6400, 7100], rate: [5.5, 3.2], fc: [2600, 1300], drive: 1.4, fire: 4, pops: [5, 7],
     res: [[78, 26, 1.0], [156, 40, 0.75], [262, 60, 0.42], [430, 90, 0.22], [1150, 300, 0.07]], beat: [1, 0.72, 0.9, 0.66, 0.97, 0.7, 0.93, 0.76] },
+  // hypercar: flat-plane V8 that revs to 9,000. Even firing gives a hard, raspy scream instead of a burble; it
+  // snaps up fast, with a few sharp cracks on lift-off
+  hyper: { idle: 1150, max: [8000, 8900], rate: [8.5, 4.6], fc: [4200, 2000], drive: 1.25, fire: 4, pops: [3, 5],
+    res: [[104, 32, 0.85], [208, 50, 0.9], [352, 70, 0.6], [620, 130, 0.36], [1500, 400, 0.14], [2900, 700, 0.05]], beat: [1, 0.94, 0.99, 0.92] },
   // tuned twin-turbo 4.0 V8 in a heavy SUV with a big-bore exhaust: deep, slower to rev, loud crackle on lift-off
   g63: { idle: 720, max: [5600, 6200], rate: [4.0, 2.5], fc: [1900, 950], drive: 1.8, fire: 4, pops: [11, 15], turbo: true,
     res: [[58, 20, 1.0], [116, 30, 0.9], [196, 46, 0.55], [350, 80, 0.26], [900, 260, 0.08]], beat: [1, 0.64, 0.93, 0.6, 0.99, 0.66, 0.9, 0.7] },

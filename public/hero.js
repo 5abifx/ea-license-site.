@@ -1,6 +1,7 @@
 // Journal hero: a short "profit loading" screen once per visit (the month's P&L counting up), then the
 // big number on the page counts up too. Tap to skip. Shown again after the browser tab is closed.
 (function () {
+  const sc = document.currentScript, VER = sc && sc.src.includes('?') ? sc.src.slice(sc.src.indexOf('?')) : '';
   const hero = document.querySelector('.pl-hero');
   if (!hero) return;
   const num = hero.querySelector('.pl-num');
@@ -47,7 +48,7 @@
   let started = false;
   const plain = () => { if (started) return; started = true; count(nEl, 1500, landed); };
   const wait = setTimeout(plain, 3500);
-  import('/nightrun.js').then((m) => m.prepare(ov, nEl)).then((play) => {
+  import('/nightrun.js' + VER).then((m) => m.prepare(ov, nEl)).then((play) => {
     if (started || closed) { const c = ov.querySelector('.plx-cv'); if (c) c.remove(); return; }
     clearTimeout(wait); started = true; ov.classList.add('run');
     stopRun = play((p) => { nEl.textContent = fmt(target * p); bar.style.transform = `scaleX(${p})`; }, landed);
