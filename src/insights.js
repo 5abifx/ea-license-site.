@@ -29,7 +29,7 @@ const ORD = ['1st', '2nd', '3rd'];
 // prep() is asked for several times per page: the parsed trades are remembered and each caller gets its own copies
 // (callers add fields such as t.nth to them)
 function prep(rows) {
-  return remember('p|' + fingerprint(rows), () => prepNow(rows)).map((t) => ({ ...t }));
+  return remember('p|' + fingerprint(rows), () => prepNow(rows), memoP, 1).map((t) => ({ ...t }));
 }
 function prepNow(rows) {
   return rows.filter((t) => t.close_time).map((t) => {
@@ -420,11 +420,13 @@ function fingerprint(rows) {
   }
   const fp = rows.length + ':' + (h >>> 0).toString(36); fpSeen.set(rows, fp); return fp;
 }
-const memo = new Map();
-function remember(key, make) {
-  if (memo.has(key)) { const v = memo.get(key); memo.delete(key); memo.set(key, v); return v; }
-  const v = make(); memo.set(key, v);
-  if (memo.size > 40) memo.delete(memo.keys().next().value);
+// Small on purpose: a big journal's parsed trades are tens of MB, and 40 kept copies ran the 512 MB server out of
+// memory (Nov 21). Analysis results are small; parsed trades are only kept for the page being built right now.
+const memoA = new Map(), memoP = new Map();
+function remember(key, make, store = memoA, max = 4) {
+  if (store.has(key)) { const v = store.get(key); store.delete(key); store.set(key, v); return v; }
+  const v = make(); store.set(key, v);
+  while (store.size > max) store.delete(store.keys().next().value);
   return v;
 }
 
