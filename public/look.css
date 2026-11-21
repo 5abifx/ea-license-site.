@@ -26,10 +26,10 @@ html.lk .app-body::before { content: ""; position: absolute; top:0;right:0;botto
   -webkit-backdrop-filter: blur(var(--lk-sheet-blur)) saturate(140%); backdrop-filter: blur(var(--lk-sheet-blur)) saturate(140%);
   border: 1px solid rgba(255,255,255,.06); box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 30px 80px -40px rgba(0,0,0,.6); }
 @media (max-width: 900px) { html.lk .app-body { margin: 8px 8px 14px; } html.lk .app-body::before { border-radius: 20px; } }
-/* classic (no background picked): the same graphite glass sheet as the Hyper look, so every theme feels the same */
+/* classic (no background picked): the same black glass as the side cards, like every other theme */
 html:not(.lk) .app-body { position: relative; isolation: isolate; margin: 0 clamp(10px, 1.6vw, 24px) 18px; width: auto; }
 html:not(.lk) .app-body::before { content: ""; position: absolute; top:0;right:0;bottom:0;left:0; z-index: -1; pointer-events: none; border-radius: 26px;
-  background: rgba(104,104,108,.82); border: 1px solid rgba(255,255,255,.06); box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 30px 80px -40px rgba(0,0,0,.6); }
+  background: rgba(10,10,13,.92); -webkit-backdrop-filter: blur(26px) saturate(150%); backdrop-filter: blur(26px) saturate(150%); border: 1px solid rgba(255,255,255,.06); box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 30px 80px -40px rgba(0,0,0,.6); }
 @media (max-width: 900px) { html:not(.lk) .app-body { margin: 8px 8px 14px; } html:not(.lk) .app-body::before { border-radius: 20px; } }
 
 /* frosted panels: soft layered shadow + thin top highlight */

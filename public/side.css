@@ -15,7 +15,7 @@
   .sc-tab.l { left: 3px; } .sc-tab.r { right: 3px; }
   html.sc-wide .sc-tab { display: none; }
 
-  .sc-card { flex: none; padding: 18px 20px; border-radius: 22px; background: rgba(12,12,16,.8); -webkit-backdrop-filter: blur(26px) saturate(150%); backdrop-filter: blur(26px) saturate(150%);
+  .sc-card { flex: none; padding: 18px 20px; border-radius: 22px; background: rgba(10,10,13,.92); -webkit-backdrop-filter: blur(26px) saturate(150%); backdrop-filter: blur(26px) saturate(150%);
     border: 1px solid rgba(255,255,255,.1); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 24px 60px rgba(0,0,0,.45); }
   .sc-lbl { font: 500 10.5px/1 var(--mono, ui-monospace, monospace); letter-spacing: .14em; text-transform: uppercase; color: #a1a1aa; }
   .sc-h { font: 600 18px/1.25 var(--display, Sora, sans-serif); margin: 6px 0 12px; }
@@ -99,3 +99,16 @@
 }
 /* the "install the app" card would sit on top of the garage: move it beside the right column */
 @media (min-width: 2360px) and (pointer: fine) { html.sc-wide .ia-card { right: 440px !important; } }
+
+/* My gallery side card (public/side.js gallery()) */
+.sc-gal .sc-gh { display: flex; justify-content: space-between; }
+.sc-fan { position: relative; display: block; height: 214px; margin: 14px 0 6px; }
+.sc-fan img { position: absolute; left: 50%; top: 6px; width: 112px; height: 199px; margin-left: -56px; object-fit: cover; border-radius: 12px; border: 1px solid rgba(255,255,255,.14); box-shadow: 0 14px 30px rgba(0,0,0,.5); transition: transform .25s; }
+.sc-fan .f0 { transform: translateX(-64px) rotate(-8deg) scale(.86); opacity: .8; }
+.sc-fan .f2 { transform: translateX(64px) rotate(8deg) scale(.86); opacity: .8; }
+.sc-fan .f1 { z-index: 1; top: 0; border: 2px solid #ff5a1f; }
+.sc-fan:hover .f0 { transform: translateX(-74px) rotate(-10deg) scale(.86); } .sc-fan:hover .f2 { transform: translateX(74px) rotate(10deg) scale(.86); }
+.sc-gcap { text-align: center; margin: 4px 0 12px; }
+.sc-gb { display: flex; gap: 8px; }
+.sc-gb a { flex: 1; display: block; padding: 9px 0; border-radius: 999px; text-align: center; font: 600 12.5px Manrope, system-ui, sans-serif; text-decoration: none; }
+.sc-gadd { background: #ff5a1f; color: #fff; } .sc-gall { border: 1px solid rgba(255,255,255,.16); color: #f2f2f4; }

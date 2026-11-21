@@ -147,14 +147,25 @@ window.StudioOwner = function (S) {
   // a picture on every topic tile: one quick search per topic (cached on the server for an hour)
   if (D.stock) TOPICS.forEach(([v]) => fetch('/journal/studio/clips?topic=' + v, { credentials: 'same-origin' }).then((r) => r.json()).then((j) => { const t = (j.clips || []).find((x) => x.thumb); if (t) { thumbs[v] = t.thumb; const el = q.querySelector(`.so-tile[data-bg="${v}"]`); if (el) el.style.backgroundImage = `url('${t.thumb}')`; } }).catch(() => {}));
 
-  // ---------- export ----------
-  const name = (ext) => `5abifx-${A.card}-${(A.pick[A.card] || '').replace(/[^\w-]+/g, '-')}.${ext}`;
   let last = null;
+  // ---------- export ----------
+  // Anything changed after a video was made (size, background, text, which trade...) makes that video old: drop it and
+  // its Save button, so Share / Save never hand over the previous version (a 4:5 video got cropped in a Story).
+  const stale = () => { const st = $('st'); if (!last || !st) return; last = null; if (window.SaveFile) window.SaveFile.clear(st); st.textContent = 'Changed. Tap Video, GIF or Photo to make the new version.'; };
+  ['set', 'data', 'setBackground', 'setBackgroundUrl', 'setAvatar', 'clearMedia'].forEach((k) => { const f = cc[k]; if (f) cc[k] = function () { stale(); return f.apply(cc, arguments); }; });
+  const name = (ext) => `5abifx-${A.card}-${(A.pick[A.card] || '').replace(/[^\w-]+/g, '-')}.${ext}`;
   function deliver(x) {
     const st = $('st'); last = x;
     if (!x || !x.blob || !x.blob.size) { st.textContent = 'It came out empty. Keep this page open while it is made and try again.'; return; }
+    toGallery(x.ext);
     if (window.SaveFile) { window.SaveFile.offer({ status: st, blob: x.blob, name: name(x.ext), kind: x.ext === 'png' ? 'picture' : 'video', btn: 'ss-pill or', alt: 'ss-pill' }); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(x.blob); a.download = name(x.ext); document.body.appendChild(a); a.click(); a.remove();
+  }
+  // every saved card also lands in "My gallery" (a small picture only)
+  function toGallery(ext) {
+    if (!cc.thumb || !window.CardGallery) return;
+    const o = $('soPick') && $('soPick').selectedOptions[0], label = ((o && o.text) || '').replace(/\s*★\s*$/, '').trim();
+    cc.thumb().then((t) => window.CardGallery.add(t.blob, { label, kind: ext === 'png' ? 'photo' : ext === 'gif' ? 'gif' : 'video', w: t.w, h: t.h })).catch(() => {});
   }
   const busy = (on) => ['soVid', 'soGif', 'soPng', 'soShare'].forEach((id) => { $(id).disabled = on; });
   const prog = (w) => (p) => { $('st').textContent = `Making your ${w}… ${Math.round(p * 100)}% (keep this page open)`; };
@@ -182,6 +193,7 @@ window.StudioOwner = function (S) {
   };
 
   wrap.classList.toggle('is-wide', cc.get().size === 'wide');
+  if (window.CardGallery) window.CardGallery.mount(wrap);
   if (D.stock && !BUILT.some(([k]) => k === bg)) setBg(bg); else { if (BUILT.some(([k]) => k === bg)) cc.set({ art: bg }); }
   paintTabs(); choose(tab === 'day' ? 'd:' + DEF.day : DEF[tab] || (OPTS[tab][0] || {}).k);
   (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => cc.play());

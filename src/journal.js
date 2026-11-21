@@ -453,7 +453,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <script src="/cards.js"></script>
     <script src="/video-out.js"></script><script src="/cine-card.js"></script>
     <script src="/save-file.js"></script>
-    ${owner ? '<link rel="stylesheet" href="/studio-owner.css"><script src="/studio-owner.js"></script>' : ''}
+    ${owner ? '<link rel="stylesheet" href="/studio-owner.css"><link rel="stylesheet" href="/gallery.css"><script src="/gallery.js"></script><script src="/studio-owner.js"></script>' : ''}
     <script src="/studio.js"></script>`);
   });
 

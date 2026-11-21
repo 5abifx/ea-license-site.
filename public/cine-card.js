@@ -102,6 +102,16 @@ function create(canvas, data, opts) {
   let W = 1080, H = 1920, SC = 1, media = null, avatar = null, raf = 0, t0 = 0, frozen = null;
   const len = () => Math.max(6, Number(o.len) || 8);
   const c = canvas.getContext('2d');
+  // The preview is drawn smaller than the export (it is shown ~400px wide anyway): a full 1080x1920 frame with blurred
+  // text and a colour grade 60 times a second lagged phones and iPads. Shadow blur is in screen pixels, so it is scaled
+  // with the canvas to keep the same look. Exports switch back to full size (SC 1, or 2 for the HD photo).
+  const SB = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'shadowBlur');
+  if (SB && SB.set) Object.defineProperty(c, 'shadowBlur', { configurable: true, get() { return SB.get.call(c) / SC; }, set(v) { SB.set.call(c, v * SC); } });
+  let exporting = false;
+  const prevScale = () => { const w = canvas.clientWidth || 420; return Math.min(1, Math.max(0.4, Math.round(w * (window.devicePixelRatio || 1) / W * 20) / 20)); };
+  const toPreview = () => { if (exporting) return; const p = prevScale(); if (p !== SC) { SC = p; size(); } };
+  const toFull = (s) => { exporting = true; if (SC !== s) { SC = s; size(); } };
+  const endFull = () => { exporting = false; toPreview(); };
   const art = document.createElement('canvas'), ac = art.getContext('2d');
   const glow = document.createElement('canvas'); glow.width = 1080; glow.height = 1920; K.bg(glow.getContext('2d'), 1.3);
   const grain = document.createElement('canvas'); grain.width = grain.height = 256;
@@ -396,7 +406,7 @@ function create(canvas, data, opts) {
   function drawLogo(x, y, w) { if (logo.complete && logo.width) c.drawImage(logo, x, y, w, w * logo.height / logo.width); }
 
   function loop(now) { if (!t0) t0 = now; frame(frozen ?? ((now - t0) / 1000) % (Math.min(len(), 9) + 1)); raf = requestAnimationFrame(loop); }
-  function play() { cancelAnimationFrame(raf); t0 = 0; if (media && media.play) { media.currentTime = 0; media.play().catch(() => {}); } raf = requestAnimationFrame(loop); }
+  function play() { toPreview(); cancelAnimationFrame(raf); t0 = 0; if (media && media.play) { media.currentTime = 0; media.play().catch(() => {}); } raf = requestAnimationFrame(loop); }
   function setBackground(file) {
     if (media && media.pause) media.pause();
     if (media && media.src) URL.revokeObjectURL(media.src);
@@ -432,18 +442,20 @@ function create(canvas, data, opts) {
     if (!(window.VideoOut && VideoOut.supported())) return recordLive(onProgress);
     cancelAnimationFrame(raf); raf = 0;
     if (media && media.pause) media.pause();
+    toFull(1);
     const done = 5.5, posterT = o.poster ? 0.1 : 0;
     return VideoOut.render({ canvas, seconds: len(), fps: FPS, onProgress, draw: (t) => VideoOut.seek(media, t).then(() => frame(t < posterT ? done : t - posterT)) })
       .catch(() => null)
-      .then((r) => { play(); return r || recordLive(onProgress); });
+      .then((r) => { if (r) { endFull(); play(); return r; } return recordLive(onProgress); });
   }
   function recordLive(onProgress) {
     const mime = format();
-    if (mime === null || !canvas.captureStream) return Promise.reject(new Error('This browser cannot record video. Try Chrome or Safari.'));
+    if (mime === null || !canvas.captureStream) { endFull(); return Promise.reject(new Error('This browser cannot record video. Try Chrome or Safari.')); }
+    toFull(1);
     const stream = canvas.captureStream(FPS), rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 12e6 } : undefined), parts = [];
     rec.ondataavailable = e => e.data.size && parts.push(e.data);
     return new Promise((res) => {
-      rec.onstop = () => { stream.getTracks().forEach(t => t.stop()); const type = rec.mimeType || mime || 'video/webm'; res({ blob: new Blob(parts, { type }), ext: type.includes('mp4') ? 'mp4' : 'webm' }); };
+      rec.onstop = () => { endFull(); play(); stream.getTracks().forEach(t => t.stop()); const type = rec.mimeType || mime || 'video/webm'; res({ blob: new Blob(parts, { type }), ext: type.includes('mp4') ? 'mp4' : 'webm' }); };
       play(); rec.start(250);
       const st = performance.now(), tick = () => { const p = (performance.now() - st) / 1000 / len(); if (onProgress) onProgress(clamp(p)); if (p >= 1) return rec.stop(); setTimeout(tick, 100); };
       tick();
@@ -452,16 +464,16 @@ function create(canvas, data, opts) {
   // hd: twice the size (2160 x 3840 for a story) so it stays sharp after Instagram / X shrink it
   function still(hd) {
     const keep = frozen; frozen = 5.5;
-    if (hd) { SC = 2; size(); }
+    toFull(hd ? 2 : 1);
     frame(frozen);
-    return new Promise(r => canvas.toBlob(b => { frozen = keep; if (SC !== 1) { SC = 1; size(); frame(frozen ?? 5.5); } r(b); }, 'image/png'));
+    return new Promise(r => canvas.toBlob(b => { frozen = keep; endFull(); frame(frozen ?? 5.5); r(b); }, 'image/png'));
   }
   // GIF: 540 wide, 15 fps, up to 6 s (GIFs get big fast); needs /vendor/gifenc.js
   function gif(onProgress) {
     const load = window.GifEnc ? Promise.resolve() : new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = '/vendor/gifenc.js'; sc.onload = ok; sc.onerror = () => no(new Error('GIF maker could not load.')); document.head.appendChild(sc); });
     return load.then(async () => {
       const { GIFEncoder, quantize, applyPalette } = window.GifEnc;
-      cancelAnimationFrame(raf); raf = 0; if (media && media.pause) media.pause();
+      cancelAnimationFrame(raf); raf = 0; if (media && media.pause) media.pause(); toFull(1);
       const gw = W > H ? 720 : 540, gh = Math.round(gw * H / W / 2) * 2, sm = document.createElement('canvas'); sm.width = gw; sm.height = gh;
       const sc = sm.getContext('2d', { willReadFrequently: true }), enc = GIFEncoder(), fps = 15, secs = Math.min(6, len()), n = Math.round(secs * fps);
       for (let i = 0; i < n; i++) {
@@ -472,9 +484,16 @@ function create(canvas, data, opts) {
         if (onProgress) onProgress((i + 1) / n);
         if (i % 3 === 0) await new Promise((ok) => setTimeout(ok, 0));
       }
-      enc.finish(); play();
+      enc.finish(); endFull(); play();
       return { blob: new Blob([enc.bytes()], { type: 'image/gif' }), ext: 'gif' };
     });
+  }
+  // small JPEG of the finished card for "My gallery" (432 wide for a story/post, 768 for wide)
+  function thumb() {
+    const keep = frozen; toFull(1); frame(5.5);
+    const tw = W > H ? 768 : 432, th = Math.round(tw * H / W), t = document.createElement('canvas'); t.width = tw; t.height = th;
+    t.getContext('2d').drawImage(canvas, 0, 0, tw, th); frozen = keep; endFull(); frame(frozen ?? 5.5);
+    return new Promise((r) => t.toBlob((b) => r({ blob: b, w: tw, h: th }), 'image/jpeg', 0.82));
   }
   function setAvatar(file) {
     if (avatar && avatar.src) URL.revokeObjectURL(avatar.src);
@@ -484,7 +503,7 @@ function create(canvas, data, opts) {
   return {
     set(next) { const s0 = o.size; Object.assign(o, next || {}, next && next.show ? { show: Object.assign(o.show, next.show) } : {}); if (o.size !== s0) size(); },
     data(d, kind) { data = d; if (kind && kind !== o.kind) { o.kind = kind; o.show = Object.assign({}, DEFAULTS[kind]); } },
-    get: () => o, setBackground, setBackgroundUrl, setAvatar, hasAvatar: () => !!avatar, play, record, still, gif, hasMedia: () => !!media, clearMedia() { if (media && media.pause) media.pause(); media = null; }, freeze(s) { frozen = s; }, canRecord: () => format() !== null && !!canvas.captureStream,
+    get: () => o, setBackground, setBackgroundUrl, setAvatar, hasAvatar: () => !!avatar, play, record, still, gif, thumb, hasMedia: () => !!media, clearMedia() { if (media && media.pause) media.pause(); media = null; }, freeze(s) { frozen = s; }, canRecord: () => format() !== null && !!canvas.captureStream,
   };
 }
 
