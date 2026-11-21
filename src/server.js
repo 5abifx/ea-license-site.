@@ -266,6 +266,9 @@ require('./security')(app, { db, page, flash, requireAdmin, rateLimit, finishSig
 // that are registered before the journal module (it fills in the check below).
 let journalAccess = () => false;
 app.use((req, res, next) => { req.hasJournal = journalAccess(req.user); next(); });
+// a page the visitor already left (fast taps on the phone dock) is not built at all: it waited in line behind the others
+// and nobody will see it
+app.use((req, res, next) => { if (req.method === 'GET' && (req.socket.destroyed || req.destroyed)) return; next(); });
 // feature usage tracking + Admin > Feature usage (src/features.js); before the members routes so it sees them
 require('./features').setup(app, { db, express, requireAdmin, page });
 const { studentBox: mentorBox } = require('./mentor')(app, { db, page, flash, requireUser, requireAdmin });

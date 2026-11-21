@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS journal_trades (
   UNIQUE (user_id, account_number, position_id)
 );
 CREATE INDEX IF NOT EXISTS idx_journal_user_close ON journal_trades(user_id, close_time);
+CREATE INDEX IF NOT EXISTS idx_journal_user_acct_close ON journal_trades(user_id, account_number, close_time);
 `);
 
 // Columns added after the first release
