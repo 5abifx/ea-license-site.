@@ -173,7 +173,7 @@ function appShell(req, u, flashHtml, body, title) {
 <div class="app tb-app">
 <header class="tb" id="tb">
   <nav class="tb-bar tb-glass" aria-label="Members menu">
-    <a class="tb-orb" href="/dashboard" aria-label="5ABI.FX home"><img src="/logo.png" alt="" width="30" height="18"></a>
+    <a class="tb-orb" href="/" aria-label="5ABI.FX home"><img src="/logo.png" alt="" width="30" height="18"></a>
     ${link('/dashboard', 'eas', 'My EAs', on('/dashboard'))}
     ${req.hasJournal ? btn('j', 'journal', 'Journal', on('/journal') && !jOn.mentor) : ''}
     ${mentor ? link('/journal/mentor', 'chat', 'Mentor review', jOn.mentor, req.mentorNew) : ''}
@@ -186,7 +186,7 @@ function appShell(req, u, flashHtml, body, title) {
     <span class="tb-av" title="Signed in">${esc(((u.name || u.email || 'M').trim()[0] || 'M').toUpperCase())}</span>
   </div>
   <div class="tb-m tb-glass">
-    <a class="tb-orb" href="/dashboard" aria-label="5ABI.FX home"><img src="/logo.png" alt="" width="30" height="18"></a>
+    <a class="tb-orb" href="/" aria-label="5ABI.FX home"><img src="/logo.png" alt="" width="30" height="18"></a>
     <b class="tb-title">${esc(title)}</b>
     <a class="tb-round wn-top${wnNew ? ' on' : ''}" href="/whats-new" data-wn-open aria-label="What's new">${icon('star')}${wnDot}</a>
     <button type="button" class="tb-av tb-avb" data-tbp="m" aria-expanded="false" aria-controls="tbp-m" aria-label="Menu">${esc(((u.name || u.email || 'M').trim()[0] || 'M').toUpperCase())}</button>

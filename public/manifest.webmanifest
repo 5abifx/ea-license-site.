@@ -3,7 +3,7 @@
   "name": "5ABI.FX",
   "short_name": "5ABI.FX",
   "description": "KATANA risk manager, trade journal and mentorship for traders.",
-  "start_url": "/dashboard?src=app",
+  "start_url": "/?src=app",
   "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone"],

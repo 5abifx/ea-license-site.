@@ -234,7 +234,7 @@ function finishSignIn(req, res, u, codeDone = false) {
   req.session.pv = null;
   req.session.uid = u.id;
   // Journal members (owner included) land on the Share Studio after sign-in; others on My EAs (admins without a journal: Admin)
-  res.redirect(takeNext(req, journalAccess(u) ? '/journal/studio' : u.is_admin ? '/admin' : '/dashboard'));
+  res.redirect(takeNext(req, journalAccess(u) ? '/journal/desk' : u.is_admin ? '/admin' : '/dashboard'));
 }
 const backup = require('./backup')(db, DATA_DIR);
 require('./security')(app, { db, page, flash, requireAdmin, rateLimit, finishSignIn, backup, SITE_NAME });
@@ -282,7 +282,7 @@ const PRODUCT_PAGES = {
   },
 };
 app.get(['/', '/katana', '/trade-journal'], (req, res) => {
-  if (req.user && req.path === '/') return res.redirect('/dashboard');
+  if (req.user && req.path === '/') return res.redirect(journalAccess(req.user) ? '/journal/desk' : '/dashboard');
   const pp = PRODUCT_PAGES[req.path];
   const signup = SIGNUP_MODE !== 'closed';
   const trial = signup ? trialDays() : 0;

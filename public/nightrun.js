@@ -23,7 +23,8 @@ function smoothNormals(geo) {
 export async function prepare(box, num) {
   const cv = document.createElement('canvas'); cv.className = 'plx-cv'; box.prepend(cv);
   const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: 'high-performance' });
-  r.setPixelRatio(Math.min(1.5, devicePixelRatio || 1, Math.sqrt(3.7e6 / (innerWidth * innerHeight))));   // a dark, moving scene: ~4 megapixels is plenty r.setSize(innerWidth, innerHeight, false);
+  r.setPixelRatio(Math.min(1.5, devicePixelRatio || 1, Math.sqrt(3.7e6 / (innerWidth * innerHeight))));   // a dark, moving scene: ~4 megapixels is plenty
+  r.setSize(innerWidth, innerHeight, false);
   r.toneMapping = THREE.ACESFilmicToneMapping; r.outputColorSpace = THREE.SRGBColorSpace; r.setClearColor(0x050507);
   const sc = new THREE.Scene(); sc.fog = new THREE.Fog(0x050507, 8, 16);
   const cam = new THREE.PerspectiveCamera(28, innerWidth / innerHeight, 0.1, 100);
