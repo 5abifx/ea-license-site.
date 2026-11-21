@@ -206,7 +206,7 @@
 
   // ---------- right column ----------
   function right() {
-    var h = '<div class="sc-card"><div class="sc-lbl">Today\'s thought</div><div class="sc-quote">“' + D.quote + '”</div><div class="sc-sub">5ABI.FX · a new one each visit</div></div>';
+    var h = '<div class="sc-card"><div class="sc-lbl">Today\'s thought</div><div class="sc-quote">“' + D.quote + '”</div></div>';
     if (D.last) {
       var dt = new Date(D.last.day + 'T12:00:00'), lab = dt.toLocaleString('en', { weekday: 'short' }) + ' ' + dt.getDate() + ' ' + dt.toLocaleString('en', { month: 'short' });
       var L0 = D.last, rr = L0.backR != null ? L0.backR : (L0.r != null && L0.r < 0 ? -L0.r : null);
@@ -240,10 +240,25 @@
     if ('IntersectionObserver' in window) { var io = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting; })) { io.disconnect(); start(); } }); io.observe(g); } else start();
   }
 
+  // ---------- My gallery: the last cards saved in Share Studio, fanned out ----------
+  function gallery() {
+    var g = L.querySelector('.sc-gal'); if (!g) return;
+    fetch('/journal/studio/gallery.json', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      if (!j) return;
+      var c = (j.cards || []).filter(function (x) { return !x.w || x.h > x.w; }).slice(0, 3), n = (j.cards || []).length;
+      var fan = c.length ? '<a class="sc-fan" href="/journal/studio#gallery" aria-label="Open my gallery">' + [c[1], c[0], c[2]].map(function (x, i) { return x ? '<img class="f' + i + '" src="' + esc(x.src) + '" alt="">' : ''; }).join('') + '</a>'
+        + '<div class="sc-sub sc-gcap">' + esc(c[0].label || 'Latest card') + '</div>'
+        : '<div class="sc-sub sc-gcap">Cards you save in Share Studio show up here.</div>';
+      g.innerHTML = '<div class="sc-gh"><span class="sc-lbl">My gallery</span><span class="sc-lbl">' + (n ? n + (n === 1 ? ' card' : ' cards') : '') + '</span></div>' + fan
+        + '<div class="sc-gb"><a class="sc-gadd" href="/journal/studio">+ Add a card</a>' + (n ? '<a class="sc-gall" href="/journal/studio#gallery">See all</a>' : '') + '</div>';
+      g.hidden = false;
+    }).catch(function () {});
+  }
+
   fetch('/api/side', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
     D = d; F = d.focus || { fixes: [], goals: [], notes: '' };
-    L.innerHTML = '<div class="sc-card sc-focus"></div><div class="sc-card"><div class="sc-lbl">Sessions · live</div><canvas class="sc-globe" aria-label="World map of the market sessions"></canvas><div class="sc-ses"></div></div>';
-    drawFocus(); focusEvents(); (function g() { if (document.querySelector('.plx')) setTimeout(g, 400); else globe(); })(); right();
+    L.innerHTML = '<div class="sc-card sc-focus"></div><div class="sc-card sc-gal" hidden></div><div class="sc-card"><div class="sc-lbl">Sessions · live</div><canvas class="sc-globe" aria-label="World map of the market sessions"></canvas><div class="sc-ses"></div></div>';
+    gallery(); addEventListener('gallery:change', gallery); drawFocus(); focusEvents(); (function g() { if (document.querySelector('.plx')) setTimeout(g, 400); else globe(); })(); right();
     window.dispatchEvent(new CustomEvent('side:ready'));
   }).catch(function () {});
 })();

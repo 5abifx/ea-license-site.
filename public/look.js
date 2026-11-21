@@ -94,7 +94,10 @@
   function loadPhoto(p) {
     if (p.img) return;
     // big or sharp screens (1440p and up, 4K, OLED laptops) get the 3840px AI-upscaled copy in /look/4k/
-    const hd = (s) => (Math.max(screen.width, screen.height) * (devicePixelRatio || 1) > 2200 ? s.replace('/look/', '/look/4k/') : s);
+    // touch devices (iPad, phones) keep the 2K pictures: a decoded 4K picture plus a full-size canvas used enough memory
+    // for iPad Safari to reload the tab ("the website crashes")
+    const TOUCH = matchMedia('(pointer: coarse)').matches;
+    const hd = (s) => (!TOUCH && Math.max(screen.width, screen.height) * (devicePixelRatio || 1) > 2200 ? s.replace('/look/', '/look/4k/') : s);
     p.img = new Image(); p.img.onload = () => { need = true; resample = true; }; p.img.src = hd(p.src);
     if (p.cut) { p.cimg = new Image(); p.cimg.onload = () => { need = true; resample = true; }; p.cimg.src = hd(p.cut); }
   }
@@ -142,7 +145,7 @@
     const wrap = document.createElement('div'); wrap.id = 'lk-bg'; wrap.setAttribute('aria-hidden', 'true');
     cv = document.createElement('canvas'); scrim = document.createElement('i'); wrap.append(cv, scrim);
     document.body.prepend(wrap); cx = cv.getContext('2d');
-    const size = () => { const area = Math.max(1, cv.clientWidth * cv.clientHeight), d = Math.min(2, window.devicePixelRatio || 1, Math.sqrt(8.3e6 / area)); /* full sharpness: was 0.75x, soft on big and OLED screens */ W = Math.max(2, Math.round(cv.clientWidth * d)); H = Math.max(2, Math.round(cv.clientHeight * d)); cv.width = W; cv.height = H; need = true; };
+    const size = () => { const area = Math.max(1, cv.clientWidth * cv.clientHeight), d = Math.min(2, window.devicePixelRatio || 1, Math.sqrt((matchMedia('(pointer: coarse)').matches ? 3.5e6 : 8.3e6) / area)); /* full sharpness: was 0.75x, soft on big and OLED screens */ W = Math.max(2, Math.round(cv.clientWidth * d)); H = Math.max(2, Math.round(cv.clientHeight * d)); cv.width = W; cv.height = H; need = true; };
     addEventListener('resize', size); size();
     addEventListener('pointermove', (e) => { TX = e.clientX / innerWidth - 0.5; TY = e.clientY / innerHeight - 0.5; }, { passive: true });
   }
@@ -181,7 +184,6 @@
   }
   // Panels stay dark glass (every members page is built light-on-dark); how see-through they are depends on the
   // background, so white text keeps at least 7:1 on them. Text that sits straight on the background flips dark/light.
-  const SHEET = [86, 86, 89];
   const PANELS = { auto: [12, 12, 16], midnight: [14, 18, 32], onyx: [6, 6, 8], graphite: [30, 31, 36] };
   let last_ = {};
   function tokens() {
@@ -195,11 +197,9 @@
     // On dark backgrounds it stays almost clear and the picture shows crisp.
     let sa = 0.08 + busy * 0.2, sheetCol = [8, 8, 10], sheetEff = mix(bgEff, sheetCol, sa);
     while (CR(W_, sheetEff) < 7 && sa < 0.9) { sa += 0.03; sheetEff = mix(bgEff, sheetCol, sa); }
-    // Every background gets the graphite glass sheet the Hyper picture gives (owner's pick, Nov 20): on darker pictures
-    // the sheet is lifted to the same grey instead of staying clear, so the dark panels stand out the same way everywhere.
-    // Light pictures (Hyper and the like) already got a strong dark sheet above: keep that exactly. Dark pictures got an
-    // almost clear sheet, so lift them to the grey Hyper shows (SHEET = what the eye sees on Hyper, ~86 grey).
-    if (sa < 0.5 && L(sheetEff) < L(SHEET)) { sa = 0.82; sheetCol = SHEET.map((t, i) => Math.max(0, Math.min(255, Math.round((t - (1 - sa) * bgEff[i]) / sa)))); sheetEff = mix(bgEff, sheetCol, sa); }
+    // owner (2026-11-21): the middle sheet is the same black glass as the side cards (Focus, notes) on every background,
+    // so it never looks light/silver on an iPad
+    sa = Math.max(sa, 0.92); sheetCol = [10, 10, 13]; sheetEff = mix(bgEff, sheetCol, sa);
     let a = S.panel === 'onyx' ? 0.94 : 0.5 + busy * 0.3; if (S.panel === 'graphite') a += 0.08;
     let eff = mix(sheetEff, surf, a);
     while (CR(W_, eff) < 7.5 && a < 0.97) { a += 0.03; eff = mix(sheetEff, surf, a); }
@@ -218,7 +218,7 @@
     set('--accent-soft', rgba(A, 0.14)); set('--lk-acc-fill', ac.metal ? metalFill(ac.hex) : ac.hex);
     set('--lk-head', headDark ? '#0c0c10' : '#f4f4f6'); set('--lk-head-2', headDark ? 'rgba(12,12,16,.68)' : 'rgba(244,244,246,.72)');
     set('--lk-head-shadow', busy > 0.25 ? (headDark ? '0 1px 12px rgba(255,255,255,.75)' : '0 2px 16px rgba(0,0,0,.7)') : 'none');
-    set('--lk-blur', Math.round(14 + busy * 18) + 'px'); set('--lk-sheet', `rgba(${sheetCol.join(',')},${sa.toFixed(2)})`); set('--lk-sheet-blur', Math.round(sa * 6) + 'px');   // a little frost only: the car and scene stay sharp behind the page
+    set('--lk-blur', Math.round(14 + busy * 18) + 'px'); set('--lk-sheet', `rgba(${sheetCol.join(',')},${sa.toFixed(2)})`); set('--lk-sheet-blur', '26px');   // a little frost only: the car and scene stay sharp behind the page
     root.classList.toggle('lk-lightbg', headDark);
     last_ = { contrast: CR(W_, eff), muted: CR(muted, eff), headDark, shifted: CR(A, eff) < 3.4, lb, sheet: sa };
     document.dispatchEvent(new CustomEvent('look:measured', { detail: last_ }));

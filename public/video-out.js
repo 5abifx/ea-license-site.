@@ -69,7 +69,7 @@
     if (Math.abs(v.currentTime - to) < 0.002) return Promise.resolve();
     return new Promise((res) => {
       const done = () => { v.removeEventListener('seeked', done); clearTimeout(k); res(); };
-      const k = setTimeout(done, 500);
+      const k = setTimeout(done, 2000);   // slow phones need longer; a short wait left the clip frozen in the video
       v.addEventListener('seeked', done); v.currentTime = to;
     });
   }
