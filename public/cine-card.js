@@ -166,7 +166,7 @@ function create(canvas, data, opts) {
   function detailRows() {
     const rows = o.kind === 'trade'
       ? [['entry', 'Entry', data.entry], ['exit', 'Exit', data.exit], ['size', 'Size', data.sizeTxt], ['held', 'Held', data.heldTxt], ['risk', 'Risk', data.riskTxt]]
-      : [['trades', 'Trades', data.trades], ['winrate', 'Win rate', data.winRate], ['green', 'Green days', data.green], ['best', data.bestLabel || 'Best', data.best]];
+      : [['trades', 'Trades', data.trades], ['winrate', 'Win rate', data.winRate], ['green', data.greenLabel || 'Green days', data.green], ['best', data.bestLabel || 'Best', data.best]];
     return rows.filter(r => o.show[r[0]] && r[2] !== undefined && r[2] !== null && r[2] !== '');
   }
   function altLine() {
@@ -222,8 +222,11 @@ function create(canvas, data, opts) {
       c.globalAlpha = 1; c.fillStyle = pos ? 'rgba(255,255,255,.92)' : 'rgba(255,255,255,.32)';
       c.beginPath(); if (c.roundRect) c.roundRect(px - bw / 2, pos ? zero - h : zero, bw, Math.max(h, 3), 8); else c.rect(px - bw / 2, pos ? zero - h : zero, bw, Math.max(h, 3)); c.fill();
       c.globalAlpha = A(tm, 0.9 + i * step, 1.3 + i * step);
-      const vt = fmt(v, unit, true); text(c, vt, px, pos ? zero - h - 18 : zero + h + 40, { size: fit(c, vt, slot - 8, 28, TXT, 700), w: 700 });
-      c.globalAlpha = A(tm, 0.4, 0.8); text(c, x.label, px, chartTop + chartH + 44, { size: fit(c, x.label, slot - 8, 24, TXT, 600, 3), w: 600, color: 'rgba(255,255,255,.55)', ls: 3 });
+      // narrow bars: numbers only on the best and worst bar, labels on every few bars, so nothing overlaps
+      const roomy = slot >= 70, vMax = Math.max(...vs.filter(fin)), vMin = Math.min(...vs.filter(fin));
+      if (roomy || v === vMax || (v === vMin && v < 0)) { const vt = fmt(v, unit, true); text(c, vt, px, pos ? zero - h - 18 : zero + h + 40, { size: fit(c, vt, Math.max(slot - 8, 120), 28, TXT, 700), w: 700 }); }
+      const every = Math.ceil(56 / slot);
+      c.globalAlpha = A(tm, 0.4, 0.8); if (i % every === 0) text(c, x.label, px, chartTop + chartH + 44, { size: fit(c, x.label, Math.max(slot, 56) * every - 8, 24, TXT, 600, 3), w: 600, color: 'rgba(255,255,255,.55)', ls: 3 });
     });
   }
   // the result: big, white, counts up, one light sweep

@@ -59,7 +59,19 @@
     },
     day(k) {
       const l = byDay.get(k) || [];
-      return period('DAILY', md(k, { weekday: 'short' }), l.map((t) => Object.assign(it(t.c.slice(11, 16), [t]), { sym: t.s })), l, 'Best trade');
+      // one bar per trade up to 10 trades; a busy day (all accounts, 100+ trades) is grouped by hour, or by 3 hours,
+      // so the bars and their numbers never pile on top of each other
+      let items;
+      if (l.length <= 10) items = l.map((t) => Object.assign(it(t.c.slice(11, 16), [t]), { sym: t.s }));
+      else {
+        const hrs = groupBy(l, (t) => Number(t.c.slice(11, 13))), step = hrs.size > 12 ? 3 : 1, g = groupBy(l, (t) => Math.floor(Number(t.c.slice(11, 13)) / step) * step);
+        items = [...g.keys()].sort((a, b) => a - b).map((h) => it(String(h).padStart(2, '0') + ':00', g.get(h)));
+      }
+      const p = period('DAILY', md(k, { weekday: 'short' }), items, l, 'Best trade');
+      const bt = l.reduce((a, b) => (!a || b.net > a.net ? b : a), null);
+      p.best = bt && bt.net > 0 ? money(bt.net) + ' ' + bt.s : '';
+      p.green = l.length > 1 ? `${l.filter((t) => t.net > 0).length} of ${l.length}` : ''; p.greenLabel = 'Winning trades';
+      return p;
     },
     week(k) {
       const l = byWeek.get(k) || [], g = groupBy(l, (t) => (dt(day(t)).getUTCDay() + 6) % 7);

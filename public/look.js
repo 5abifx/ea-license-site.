@@ -218,7 +218,7 @@
     set('--accent-soft', rgba(A, 0.14)); set('--lk-acc-fill', ac.metal ? metalFill(ac.hex) : ac.hex);
     set('--lk-head', headDark ? '#0c0c10' : '#f4f4f6'); set('--lk-head-2', headDark ? 'rgba(12,12,16,.68)' : 'rgba(244,244,246,.72)');
     set('--lk-head-shadow', busy > 0.25 ? (headDark ? '0 1px 12px rgba(255,255,255,.75)' : '0 2px 16px rgba(0,0,0,.7)') : 'none');
-    set('--lk-blur', Math.round(14 + busy * 18) + 'px'); set('--lk-sheet', `rgba(${sheetCol.join(',')},${sa.toFixed(2)})`); set('--lk-sheet-blur', '26px');   // a little frost only: the car and scene stay sharp behind the page
+    set('--lk-blur', Math.round(14 + busy * 18) + 'px'); set('--lk-sheet', `rgba(${sheetCol.join(',')},${sa.toFixed(2)})`); set('--lk-sheet-blur', '0px');   // the sheet is almost solid now: a full-page backdrop blur only cost frames (scroll and animations stuttered)   // a little frost only: the car and scene stay sharp behind the page
     root.classList.toggle('lk-lightbg', headDark);
     last_ = { contrast: CR(W_, eff), muted: CR(muted, eff), headDark, shifted: CR(A, eff) < 3.4, lb, sheet: sa };
     document.dispatchEvent(new CustomEvent('look:measured', { detail: last_ }));

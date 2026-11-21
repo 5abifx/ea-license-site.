@@ -6,12 +6,19 @@
   // version tag of this script (?v=build), passed on to the 3D garage so a new build never plays an old copy
   var sc0 = document.currentScript, VER = sc0 && sc0.src.indexOf('?') > -1 ? sc0.src.slice(sc0.src.indexOf('?')) : '';
   if (!matchMedia('(min-width: 1200px) and (pointer: fine)').matches) return;
+  // while the page is scrolling the slow globe / garage spins pause, so the scroll itself stays smooth
+  window.__scBusy = 0;
+  ['scroll', 'wheel'].forEach(function (ev) { addEventListener(ev, function () { window.__scBusy = performance.now(); }, { passive: true, capture: true }); });
+  var calm = function (now) { return now - window.__scBusy > 300; };
   var root = document.documentElement, host = document.querySelector('[data-sc]');
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
   var el = function (tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
-  var wide = matchMedia('(min-width: 1600px)');   // owner: the side cards stay on screen whenever there is room (was 2360px)
-  function mode() { root.classList.toggle('sc-wide', wide.matches); }
+  var wide = matchMedia('(min-width: 1280px)');   // owner: the side cards always stay on screen on a PC (was 2360px, then 1600px)
+  // Appearance > Layout: 'pin' keeps the cards on screen, 'slide' gives the middle the full width and the cards slide in
+  var sidePref = (window.__LOOK && window.__LOOK.side) || 'pin';
+  function mode() { root.classList.toggle('sc-wide', wide.matches && sidePref !== 'slide'); }
   mode(); wide.addEventListener && wide.addEventListener('change', mode);
+  addEventListener('look:side', function (e) { sidePref = e.detail; mode(); });
 
   // ---------- request a feature (every members page) ----------
   var fr = el('button', 'fr', '+'); fr.type = 'button'; fr.title = 'Request a feature'; fr.setAttribute('aria-label', 'Request a feature');
@@ -169,12 +176,12 @@
       var y2 = Y * Math.cos(t) - Z * Math.sin(t), z2 = Y * Math.sin(t) + Z * Math.cos(t);
       return [C + X * R0, C - y2 * R0, z2];
     }
-    // 30 frames a second is plenty for a slow spin; skip frames while the globe is off screen or the tab is hidden
+    // 20 frames a second is plenty for a slow spin; skip frames while the globe is off screen, the tab is hidden or the page scrolls
     var seen = true, lastF = 0, acc = '';
     if (window.IntersectionObserver) new IntersectionObserver(function (e) { seen = e[0].isIntersecting; }).observe(cv);
     function frame(now) {
       requestAnimationFrame(frame);
-      if (!seen || document.hidden || (now && now - lastF < 32)) return;
+      if (!seen || document.hidden || (now && now - lastF < 50) || !calm(now)) return;
       lastF = now || 0;
       if (!acc) acc = getComputedStyle(root).getPropertyValue('--accent').trim() || '#ff5a1f';
       x.clearRect(0, 0, 250, 250);
