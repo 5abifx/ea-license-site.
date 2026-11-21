@@ -376,7 +376,7 @@ export default function garage(card) {
     // just turning slowly on its own: 30 frames a second is enough and halves the work; full rate while you drag,
     // zoom, rev or burn out
     const active = busyCtl || rev > 0 || burn > 0 || puffs.length;
-    if (!ready || (!active && t - lastR < 32)) return;
+    if (!ready || (!active && (t - lastR < 40 || t - (window.__scBusy || 0) < 300))) return;   // idle spin pauses while the page scrolls
     lastR = t;
     const dt = Math.min(0.05, (t - last) / 1000); last = t;
     // burnout: spin the rear tyres on the spot, then a full doughnut around the front axle with the tail sliding out,

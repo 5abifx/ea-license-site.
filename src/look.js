@@ -7,6 +7,7 @@ const express = require('express');
 const BG = new Set(['none', 'colour', 'grad', 'upload', 'ember', 'rivers', 'heat', 'grid', 'aurora', 'candles', 'gold', 'lagoon', 'porcelain',
   'ph-hyper', 'ph-gt', 'ph-chromecar', 'ph-coupe', 'ph-nightrun', 'ph-katana', 'ph-rivers', 'ph-ridge', 'ph-chrome', 'ph-still']);
 const CAR = new Set(['hyper', 'gwagon']);
+const SIDE = new Set(['pin', 'slide']);
 const PAINT = new Set(['original', 'obsidian', 'matte', 'ember', 'chrome', 'teal', 'royal', 'gold']);
 const PANEL = new Set(['auto', 'midnight', 'onyx', 'graphite']);
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -29,6 +30,7 @@ function clean(raw) {
     g2: HEX.test(o.g2) ? o.g2 : '#1a1033',
     paint: PAINT.has(o.paint) ? o.paint : 'original',   // 3D garage car colour (wide PC side column)
     car: CAR.has(o.car) ? o.car : 'hyper',               // which garage car
+    side: SIDE.has(o.side) ? o.side : 'pin',              // PC side cards: always on screen, or hidden at the edges (full-width middle)
   };
 }
 
@@ -86,6 +88,13 @@ module.exports = function setup(app, { db, page, requireUser }) {
       <div class="ap-well ap-sl">
         <div class="row"><label for="apDim">Dim background</label><output id="apDimO">0</output></div><input type="range" id="apDim" min="0" max="80" value="0">
         <div class="row"><label for="apBlur">Soften (blur)</label><output id="apBlurO">0</output></div><input type="range" id="apBlur" min="0" max="24" value="0">
+      </div>
+    </div>
+    <div class="ap-sec">
+      <div class="ap-sec-h"><b>Layout</b><small>Computer: keep the Focus, gallery, quote and garage cards on the sides, or go full width (they slide in when the mouse touches the edge)</small></div>
+      <div class="ap-well ap-seg" id="apSide">
+        <button type="button" data-v="pin">Cards on sides</button>
+        <button type="button" data-v="slide">Full width</button>
       </div>
     </div>
     <div class="ap-sec">

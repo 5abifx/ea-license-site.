@@ -3,7 +3,7 @@
 .sx > .sx-native { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .sx-b { display: inline-flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 38px; margin: 0;
   padding: 0 12px 0 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(18,18,22,.78);
-  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); color: #f2f2f4; font: 600 13px/1.2 Manrope, system-ui, sans-serif;
+  color: #f2f2f4; font: 600 13px/1.2 Manrope, system-ui, sans-serif;
   text-transform: none; letter-spacing: 0; text-align: left; cursor: pointer; box-shadow: none; }
 .sx-b:hover { border-color: rgba(255,255,255,.22); }
 .sx-b:focus-visible { outline: 2px solid #ff5a1f; outline-offset: 2px; }
