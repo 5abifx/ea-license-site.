@@ -26,7 +26,12 @@ const sessionOf = (t) => SESSIONS.find((s) => hourOf(t) >= s.from && hourOf(t) <
 const rx = (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}R`;
 const ORD = ['1st', '2nd', '3rd'];
 
+// prep() is asked for several times per page: the parsed trades are remembered and each caller gets its own copies
+// (callers add fields such as t.nth to them)
 function prep(rows) {
+  return remember('p|' + fingerprint(rows), () => prepNow(rows)).map((t) => ({ ...t }));
+}
+function prepNow(rows) {
   return rows.filter((t) => t.close_time).map((t) => {
     const x = { ...t, net: Number(t.net) || 0, o: ts(t.open_time), c: ts(t.close_time) };
     x.r = fin(t.r) ? Number(t.r) : null;
@@ -401,7 +406,33 @@ function charts(trades, N) {
   return { equity: N.equity, heat, hist, edge: N.ratio !== null ? { win: N.winRate, ratio: N.ratio } : null };
 }
 
-function analyze(rows, { money, esc }) {
+// The journal pages run these over every trade on every page view; on the small server a big journal took 1-2s a page
+// and fast taps piled up until it stopped answering. Results only depend on the rows, so the last few are remembered,
+// keyed by a quick fingerprint of the rows (any new, edited or removed trade changes it).
+const fpSeen = new WeakMap();   // the same rows array asked again in one page: hash it once
+function fingerprint(rows) {
+  if (fpSeen.has(rows)) return fpSeen.get(rows);
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    for (const k in r) { const v = r[k]; const str = v == null ? '~' : String(v); for (let j = 0; j < str.length; j++) h = Math.imul(h ^ str.charCodeAt(j), 16777619); h = Math.imul(h ^ 124, 16777619); }
+    h = Math.imul(h ^ 10, 16777619);
+  }
+  const fp = rows.length + ':' + (h >>> 0).toString(36); fpSeen.set(rows, fp); return fp;
+}
+const memo = new Map();
+function remember(key, make) {
+  if (memo.has(key)) { const v = memo.get(key); memo.delete(key); memo.set(key, v); return v; }
+  const v = make(); memo.set(key, v);
+  if (memo.size > 40) memo.delete(memo.keys().next().value);
+  return v;
+}
+
+function analyze(rows, opts) {
+  // money() differs per currency: its output is part of the key
+  return remember('a|' + fingerprint(rows) + '|' + opts.money(-1234.5), () => analyzeNow(rows, opts));
+}
+function analyzeNow(rows, { money, esc }) {
   const trades = prep(rows);
   if (trades.length < MIN_TRADES) return { locked: true, need: MIN_TRADES, have: trades.length };
   const N = numbers(trades);
