@@ -5,6 +5,7 @@
 import * as THREE from '/vendor/three/three.module.min.js';
 import { GLTFLoader } from '/vendor/three/loaders/GLTFLoader.js';
 import { OrbitControls } from '/vendor/three/controls/OrbitControls.js';
+import { pickCar } from '/side/cars.js';
 
 // paint: [colour over the model's texture, finish]. 'original' keeps the photo texture; the rest use a grey copy of it
 // (keeps windows, lights and wheels, drops the photo's baked orange glare) under real car paint: a clear coat over the
@@ -16,20 +17,16 @@ const PAINTS = {
 // the canvas is bigger than the card (this much extra left/above, as a share of the card's size), so a zoomed-in car
 // can come out over the page; at normal zoom it sits inside the card exactly as before
 const OUT = { l: 0.9, t: 0.45 };   // right and bottom run to the window edge
-// The cars (picked in Appearance, look.car). Each model is one scanned mesh; the wheels are cut out of it by position:
-// axles [centre x, centre y, radius, rear?] in the model's own units (+x is the rear, -x the nose), zCut = how far out a
-// point must be to count as wheel, zMid = the wheel's centre plane, zFace = its outer face (for the speed blur disc).
-// No badges or logos on any model.
-const CARS = {
-  hyper: { glb: '/side/car.glb', len: 2.5, axles: [[0.627, -0.08, 0.162, true], [-0.563, -0.09, 0.152, false]], zCut: 0.26, zMid: 0.36, zFace: 0.452, engine: 'v8' },
-  gwagon: { glb: '/side/gwagon.glb', len: 2.35, axles: [[0.565, -0.219, 0.19, true], [-0.652, -0.231, 0.182, false]], zCut: 0.29, zMid: 0.36, zFace: 0.428, engine: 'g63' },
-};
 // Engine voices. res = exhaust resonances [Hz, bandwidth Hz, gain]; beat = firing strength pattern; fire = firings per
 // crank turn; pops = overrun bangs [rev, burnout]; turbo = whistle under boost + a blow-off hiss when lifting.
 const ENGINES = {
   // flat-out mid-engine V8: bright, rev-happy
   v8: { idle: 950, max: [6400, 7100], rate: [5.5, 3.2], fc: [2600, 1300], drive: 1.4, fire: 4, pops: [5, 7],
     res: [[78, 26, 1.0], [156, 40, 0.75], [262, 60, 0.42], [430, 90, 0.22], [1150, 300, 0.07]], beat: [1, 0.72, 0.9, 0.66, 0.97, 0.7, 0.93, 0.76] },
+  // hypercar: flat-plane V8 that revs to 9,000. Even firing gives a hard, raspy scream instead of a burble; it
+  // snaps up fast, with a few sharp cracks on lift-off
+  hyper: { idle: 1150, max: [8000, 8900], rate: [8.5, 4.6], fc: [4200, 2000], drive: 1.25, fire: 4, pops: [3, 5],
+    res: [[104, 32, 0.85], [208, 50, 0.9], [352, 70, 0.6], [620, 130, 0.36], [1500, 400, 0.14], [2900, 700, 0.05]], beat: [1, 0.94, 0.99, 0.92] },
   // tuned twin-turbo 4.0 V8 in a heavy SUV with a big-bore exhaust: deep, slower to rev, loud crackle on lift-off
   g63: { idle: 720, max: [5600, 6200], rate: [4.0, 2.5], fc: [1900, 950], drive: 1.8, fire: 4, pops: [11, 15], turbo: true,
     res: [[58, 20, 1.0], [116, 30, 0.9], [196, 46, 0.55], [350, 80, 0.26], [900, 260, 0.08]], beat: [1, 0.64, 0.93, 0.6, 0.99, 0.66, 0.9, 0.7] },
@@ -84,7 +81,7 @@ export default function garage(card) {
   let car = null, mats = [], rev = 0, revT = 0, burn = 0, burnT = 0, emit = 0;
   // the scan is one mesh: cut each wheel disc out of it (by position) so it can spin and steer.
   // [centre x, centre y, radius] in the model's own units; +x is the rear (big wheels, wing), -x the nose
-  const CAR = CARS[(window.__LOOK && window.__LOOK.car) || 'hyper'] || CARS.hyper, AXLES = CAR.axles;
+  const CAR = pickCar(), AXLES = CAR.axles;
   const wheels = [], pivot = new THREE.Vector3(), nose = new THREE.Vector3();
   let blurT = null;
   const blurTex = () => blurT || (blurT = (() => { const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d'), m = S / 2;

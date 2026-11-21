@@ -3,6 +3,8 @@
 // Right: a quote, the last session, "Watch out today" (repeat mistakes from Insights) and the 3D garage.
 // Wide screens (>= 2360px) keep both columns fixed in the empty side space; smaller PC screens slide them in from the edge.
 (function () {
+  // version tag of this script (?v=build), passed on to the 3D garage so a new build never plays an old copy
+  var sc0 = document.currentScript, VER = sc0 && sc0.src.indexOf('?') > -1 ? sc0.src.slice(sc0.src.indexOf('?')) : '';
   if (!matchMedia('(min-width: 1200px) and (pointer: fine)').matches) return;
   var root = document.documentElement, host = document.querySelector('[data-sc]');
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
@@ -232,7 +234,7 @@
     // so switching pages stays smooth, then fade it in
     // wait while the journal intro (Night run) is on screen: two 3D scenes starting at once made the intro stutter
     var go = function () { if (document.querySelector('.plx')) { setTimeout(go, 400); return; } go2(); };
-    var go2 = function () { import('/side/garage.js').then(function (m) { m.default(R.querySelector('.sc-garage')); }).catch(function () { R.querySelector('.sc-garage').remove(); }); };
+    var go2 = function () { import('/side/garage.js' + VER).then(function (m) { m.default(R.querySelector('.sc-garage')); }).catch(function () { R.querySelector('.sc-garage').remove(); }); };
     var idle = function () { setTimeout(function () { (window.requestIdleCallback || function (f) { setTimeout(f, 1); })(go, { timeout: 2500 }); }, 700); };
     var start = function () { if (document.readyState === 'complete') idle(); else addEventListener('load', idle, { once: true }); };
     if ('IntersectionObserver' in window) { var io = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting; })) { io.disconnect(); start(); } }); io.observe(g); } else start();
