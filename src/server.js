@@ -46,6 +46,9 @@ if (!db.prepare('SELECT 1 FROM users WHERE is_admin = 1').get()) {
 const app = express();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
+// Render's health check: answers at once, before sessions, the database or the rate limit, so a busy moment on the
+// small (0.5 CPU) server is not mistaken for a dead one. Set Render > Settings > Health Check Path to /healthz.
+app.get('/healthz', (req, res) => res.type('text').send('ok'));
 const rate = require('./ratelimit');
 app.use(rate.realIp);   // the visitor's own address, also behind Cloudflare
 
