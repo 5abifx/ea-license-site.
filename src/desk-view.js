@@ -317,4 +317,31 @@ function habitsHtml(H, { money }) {
   return `<div class="hab">${cards.map(([t, body, note]) => `<section class="card"><h2>${t}</h2>${body}${note ? `<p class="small hb-note">${note}</p>` : ''}</section>`).join('')}</div>`;
 }
 
-module.exports = { heroHtml, recapHtml, deskCard, deskForm, timeHtml, habitsHtml };
+// Journal hero in the Desk's style: big month P&L over a faint equity line, one sub-line, six stats in a row.
+// Keeps .pl-num/data-count and data-label so the opening animation (public/hero.js) still counts it up.
+function deskHeroHtml(h, { cur, smooth }) {
+  const pf = h.pf === null ? '-' : h.pf === Infinity ? '∞' : h.pf.toFixed(2);
+  const ratio = h.avgL ? (h.avgW / h.avgL).toFixed(2) + '×' : '-';
+  let run = 0; const eq = [0, ...(h.nets || []).map((v) => (run += v))];
+  const mn = Math.min(...eq), mx = Math.max(...eq), sp = mx - mn || 1;
+  const pts = eq.length > 2 ? eq.map((v, i) => [+((i * 1000) / (eq.length - 1)).toFixed(1), +(10 + (1 - (v - mn) / sp) * 150).toFixed(1)]) : [];
+  const line = pts.length ? `<svg class="ov-hline${h.net < 0 ? ' dn' : ''}" viewBox="0 0 1000 170" preserveAspectRatio="none" aria-hidden="true"><path d="${smooth(pts)}"/></svg>` : '';
+  const chip = h.pct !== null && h.n ? `<span class="ov-chip${h.pct < 0 ? ' dn' : ''}"><i>${h.pct < 0 ? '↓' : '↑'}</i>${sgn(h.pct)}${Math.abs(h.pct).toFixed(1)}%</span>` : '';
+  const money2 = (v) => (v === null ? '-' : sgn(v) + dol(cur) + f2(v));
+  const stats = [
+    ['Win rate', h.n ? Math.round(h.winRate * 100) + '%' : '-'],
+    ['Profit factor', pf],
+    ['Avg win / loss', ratio],
+    ['Best day', money2(h.bestDay), cls(h.bestDay)],
+    ['Worst day', money2(h.worstDay), h.worstDay !== null && h.worstDay < 0 ? 'neg' : ''],
+    ['Avg R', h.avgR !== null ? rTxt(h.avgR) : '-'],
+  ];
+  return `<section class="ov-hero jv-hero" data-net="${h.n ? h.net : 0}" data-label="${esc(h.label)}">${line}
+    <div class="ov-lbl">${esc(h.label)} · Net P&amp;L</div>
+    <div class="ov-big pl-big"><span class="ov-num pl-num ${cls(h.net)}" data-count="${h.n ? h.net : 0}" data-pre="${dol(cur)}">${h.n ? sgn(h.net) + dol(cur) + f2(h.net) : dol(cur) + '0.00'}</span>${chip}</div>
+    <div class="ov-subl"><span><b>${h.wins}W</b> / ${h.losses}L</span><span>${h.n} trade${h.n === 1 ? '' : 's'}</span>${h.days ? `<span><b>${h.greenDays}</b> of ${h.days} days green</span>` : ''}</div>
+    ${h.n ? `<dl class="ov-hstats">${stats.map(([k, v, c]) => `<div><dt>${k}</dt><dd${c ? ` class="${c}"` : ''}>${v}</dd></div>`).join('')}</dl>` : ''}
+  </section>`;
+}
+
+module.exports = { deskHeroHtml, heroHtml, recapHtml, deskCard, deskForm, timeHtml, habitsHtml };

@@ -345,7 +345,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const N = numbers(prep(trades));
     const rT = trades.filter((t) => t.r !== null && t.r !== undefined);
     const dayNets = dayKeys.map((d) => sum(days[d]));
-    const heroHtml = deskView.heroHtml({ label: monthName, n: trades.length, net, wins, losses: trades.filter((t) => t.net < 0).length,
+    const heroHtml = deskView.deskHeroHtml({ nets: trades.map((t) => t.net), label: monthName, n: trades.length, net, wins, losses: trades.filter((t) => t.net < 0).length,
       winRate: N.winRate, pf: N.pf, avgW: N.avgW, avgL: N.avgL, avgR: rT.length ? rT.reduce((a, t) => a + Number(t.r), 0) / rT.length : null,
       pct: N.start ? (net / N.start) * 100 : null, days: dayKeys.length, greenDays, bestDay, worstDay: dayNets.length ? Math.min(...dayNets) : null , spark: (() => {
       // running win rate, profit factor and win/loss size day by day through the month, plus each day's result
@@ -353,7 +353,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       dayKeys.forEach((d) => { days[d].forEach((t) => { n++; if (t.net > 0) { w++; gw += t.net; } else if (t.net < 0) { nl++; gl -= t.net; } });
         sp.win.push(n ? (w / n) * 100 : 0); if (gl) sp.pf.push(gw / gl); if (w && nl) sp.ratio.push((gw / w) / (gl / nl)); });
       return sp; })() },
-    { cur, shareHref: accts.length ? `/journal/report${qs({})}` : '' });
+    { cur, smooth: require('./overview').smooth });
     // recap: the week of the latest trade, the last session, recent trades
     const recent = latest ? desk.prepRows(db.prepare(`SELECT ${DESK_COLS} FROM journal_trades WHERE ${where} ORDER BY close_time DESC LIMIT 300`).all(...args).reverse()) : [];
     const multi = !sel && liveAccts.length > 1;
@@ -384,9 +384,6 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     </section>` : ''}
 
     ${heroHtml}
-    ${recapHtml}
-    ${foundHtml}
-    ${deskHtml}
     <div class="cal-split" id="cal">
       <section class="card">
         <div class="row between cal-head"><h2>${esc(monthName)}</h2>
@@ -402,6 +399,9 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     </div>
     <script src="/calendar.js"></script>
     <script src="/hero.js"></script>
+    ${recapHtml}
+    ${foundHtml}
+    ${deskHtml}
 
     ${insightsHtml}
 

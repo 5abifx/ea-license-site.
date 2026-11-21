@@ -251,4 +251,4 @@ function html(trades, accounts, opts) {
   <script src="/overview.js" defer></script>`;
 }
 
-module.exports = { html };
+module.exports = { html, smooth };

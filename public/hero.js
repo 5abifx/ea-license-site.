@@ -2,7 +2,7 @@
 // big number on the page counts up too. Tap to skip. Shown again after the browser tab is closed.
 (function () {
   const sc = document.currentScript, VER = sc && sc.src.includes('?') ? sc.src.slice(sc.src.indexOf('?')) : '';
-  const hero = document.querySelector('.pl-hero');
+  const hero = document.querySelector('.pl-hero, .jv-hero');
   if (!hero) return;
   const num = hero.querySelector('.pl-num');
   const target = Number(num && num.dataset.count) || 0;
