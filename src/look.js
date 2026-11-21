@@ -6,6 +6,7 @@ const express = require('express');
 
 const BG = new Set(['none', 'colour', 'grad', 'upload', 'ember', 'rivers', 'heat', 'grid', 'aurora', 'candles', 'gold', 'lagoon', 'porcelain',
   'ph-hyper', 'ph-gt', 'ph-chromecar', 'ph-coupe', 'ph-nightrun', 'ph-katana', 'ph-rivers', 'ph-ridge', 'ph-chrome', 'ph-still']);
+const CAR = new Set(['hyper', 'gwagon']);
 const PAINT = new Set(['original', 'obsidian', 'matte', 'ember', 'chrome', 'teal', 'royal', 'gold']);
 const PANEL = new Set(['auto', 'midnight', 'onyx', 'graphite']);
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -27,6 +28,7 @@ function clean(raw) {
     g1: HEX.test(o.g1) ? o.g1 : '#ff5a1f',
     g2: HEX.test(o.g2) ? o.g2 : '#1a1033',
     paint: PAINT.has(o.paint) ? o.paint : 'original',   // 3D garage car colour (wide PC side column)
+    car: CAR.has(o.car) ? o.car : 'hyper',               // which garage car
   };
 }
 
@@ -88,6 +90,10 @@ module.exports = function setup(app, { db, page, requireUser }) {
     </div>
     <div class="ap-sec">
       <div class="ap-sec-h"><b>Garage car</b><small>The 3D car on wide computer screens</small></div>
+      <div class="ap-well ap-seg" id="apCar">
+        <button type="button" data-v="hyper">Hyper</button>
+        <button type="button" data-v="gwagon">G-Wagon widebody</button>
+      </div>
       <div class="ap-well ap-seg" id="apPaint">
         <button type="button" data-v="original"><i style="background:conic-gradient(#333,#ff5a1f,#333)"></i>Original</button>
         <button type="button" data-v="obsidian"><i style="background:radial-gradient(circle at 35% 30%,#8a8a92,#111114 60%)"></i>Gloss black</button>
