@@ -34,6 +34,9 @@ export async function prepare(box, num) {
   const half = Math.tan(14 * Math.PI / 180), CAMD = Math.max(8.2, 2.7 / (2 * half * cam.aspect));
   cam.position.set(0, 1.0, CAMD); cam.lookAt(0, 0.9 * Math.min(1, 8.2 / CAMD) + (CAMD > 8.2 ? 0.25 : 0), 0);
   const HW = half * CAMD * cam.aspect, XS = -HW + 0.5, XE = HW + 2.2;
+  // phones cross a narrower road in the same time, so the car moves fewer units a second and the wheels looked parked
+  // (no speed blur). Spin and blur the wheels as fast as on a 16:9 PC screen.
+  const WK = Math.max(1, 8.97 / (XE - XS));
 
   // dim studio reflections, a bluish light that rides along beside the car, an orange rim
   const pm = new THREE.PMREMGenerator(r), sky = document.createElement('canvas'); sky.width = 512; sky.height = 256;
@@ -133,8 +136,8 @@ export async function prepare(box, num) {
       holder.position.set(x + (burning ? (Math.random() - 0.5) * 0.012 : 0), 0.004 * Math.sin(t * 60) * Math.min(1, v / 8), 0);
       ride.position.set(x + 0.2, 0.75, 1.35);
       // spokes turn at most 0.3 rad a frame (faster reads as frozen or backwards); the blur disc takes over above that
-      const om = Math.max(burning ? 45 : 0, v / 0.19);
-      wheels.forEach((w) => { const o = w.rear ? om : v / 0.19; w.spin.rotation.z += Math.min(o * dt, 0.3); w.disc.material.opacity = Math.min(0.94, Math.max(0, (o - 6) / 18)); });
+      const om = Math.max(burning ? 45 : 0, WK * v / 0.19);
+      wheels.forEach((w) => { const o = w.rear ? om : WK * v / 0.19; w.spin.rotation.z += Math.min(o * dt, 0.3); w.disc.material.opacity = Math.min(0.94, Math.max(0, (o - 6) / 18)); });
       car.updateMatrixWorld(true);
       headSpr.forEach((s, i) => s.position.copy(W(HEAD[i])));
       tailSpr.forEach((s, i) => { s.position.copy(W(TAIL[i])); s.material.opacity = 0.7 + 0.3 * Math.min(1, v / 6); });
