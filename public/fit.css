@@ -268,3 +268,13 @@ html.calm .app-body :not(.plx, .plx *) { transition-duration: .12s !important; }
 @keyframes pcSlN { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
 @keyframes pcSlP { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
 .pc-body { overflow: hidden; }
+/* side cards pinned: "+ Request a feature" and "Need help?" share one row under the right column, so the column
+   runs nearly to the bottom instead of stopping 132px short */
+@media (min-width: 1200px) and (pointer: fine) {
+  html.sc-wide .sc-r { bottom: 84px; }
+  html.sc-wide .fr { left: calc(100vw - 16px - var(--scw)); right: auto; bottom: 29px; width: auto; max-width: calc(var(--scw) - 84px); height: 38px; padding: 0 15px 0 12px;
+    border-radius: 999px; gap: 7px; display: flex; align-items: center; font-size: 18px; white-space: nowrap; overflow: hidden; }
+  html.sc-wide .fr::after { content: "Request a feature"; font: 700 12.5px/1 var(--body, Manrope, sans-serif); }
+  html.sc-wide .fr-pop { right: 16px; bottom: 80px; max-width: calc(100vw - 32px); }
+  html.sc-wide .sup .sup-btn em { display: none; }   /* the label would slide over the request pill */
+}
