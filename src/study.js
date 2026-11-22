@@ -59,10 +59,10 @@ module.exports = (app, { page, requireUser }) => {
 
           <section class="sr-view" id="v-book">
             <div class="sr-bk-top">
-              <div class="card sr-curve"><div class="sr-sh"><span class="sr-k">Each setup over time, in R</span><span class="sr-chips" id="sr-flt"><button class="on">All</button><button>Wins</button><button>Losses</button></span></div><canvas id="sr-curves"></canvas><div class="sr-leg" id="sr-leg"></div></div>
-              <div class="card sr-pairs"><span class="sr-k">Setup pairs</span><p class="muted small">Trades where two things lined up, best first.</p><div id="sr-pairs"></div></div>
+              <div class="sr-curve"><div class="sr-sh"><span class="sr-k">Each setup over time, in R</span><span class="sr-chips" id="sr-flt"><button class="on">All</button><button>Wins</button><button>Losses</button></span></div><canvas id="sr-curves"></canvas><div class="sr-leg" id="sr-leg"></div></div>
+              <div class="sr-pairs"><span class="sr-k">Setup pairs</span><p class="muted small">Trades where two things lined up, best first.</p><div id="sr-pairs"></div></div>
             </div>
-            <div class="sr-cards" id="sr-cards"></div>
+            <div class="sr-tbl"><div class="sr-tr sr-th"><span>Setup</span><span>Curve</span><span>Per trade</span><span>Profit factor</span><span>Won</span><span>Trades</span><span>Last traded</span></div><div id="sr-cards"></div></div>
           </section>
         </main>
 

@@ -253,3 +253,49 @@ html.sr-full body .app-main > .app-body { max-width: 1680px; padding-top: 14px; 
 .sr-drow.x span:not(:first-child) { color: #fff; }
 .sr-card::before { display: none; }
 .sr-leg span { color: #5a5a64; } .sr-leg span.on { color: #f2f2f4; }
+
+/* flat, no boxes: one surface, thin dividers, information only */
+.sr-app { gap: 0; border-radius: 20px; background: linear-gradient(180deg, rgba(16,16,19,.9), rgba(9,9,11,.92)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), 0 30px 80px rgba(0,0,0,.5);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); overflow: hidden; }
+.sr-top, .sr-lib, .sr-main, .sr-insp { background: none !important; box-shadow: none !important; border-radius: 0; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.sr-top { border-bottom: 1px solid rgba(255,255,255,.07); padding: 14px 20px; }
+.sr-nums { border-left-color: rgba(255,255,255,.07); }
+.sr-body { gap: 0; }
+.sr-lib { border-right: 1px solid rgba(255,255,255,.07); padding: 8px 16px 16px; }
+.sr-insp { border-left: 1px solid rgba(255,255,255,.07); padding: 14px 18px 0; }
+.sr-sec { border-top-color: rgba(255,255,255,.06); }
+.sr-it, .sr-set { border-radius: 8px; } .sr-it.on, .sr-set.on { background: rgba(255,255,255,.06); box-shadow: none; }
+/* picture tabs: text tabs with a small thumb, underline when on */
+.sr-tabs { gap: 2px; padding: 0 16px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.sr-tab, .sr-tab:hover { background: none; box-shadow: none; border-radius: 0; padding: 12px 12px 11px 4px; border-bottom: 2px solid transparent; }
+.sr-tab.on { background: none; box-shadow: none; border-bottom-color: #f2f2f4; }
+.sr-tab:not(.on) b { color: #a0a0aa; } .sr-tab canvas { width: 40px; height: 24px; border-radius: 4px; opacity: .85; }
+.sr-tab.add, .sr-tab.add:hover { box-shadow: none; } .sr-tab.add:hover b { color: #fff; }
+.sr-board { padding: 12px 16px; }
+.ci-rail { background: none; box-shadow: none; border-right: 1px solid rgba(255,255,255,.06); border-radius: 0; }
+.ci-stage { box-shadow: none; border-radius: 10px; }
+.ci-chip { background: none; color: #b8b8c0; } .ci-chip:hover { background: rgba(255,255,255,.06); color: #fff; }
+.ci-act { background: none; border-color: rgba(255,255,255,.1); }
+.sr-strip { padding: 10px 16px 12px; border-top: 1px solid rgba(255,255,255,.07); }
+.sr-pt, .sr-pt:hover { background: none; box-shadow: none; } .sr-pt:hover b { text-decoration: underline; }
+/* right panel without boxes */
+.sr-tcard { background: none; box-shadow: none; padding: 0 0 14px; border-radius: 0; }
+.sr-match, .sr-match.hit { background: none; box-shadow: none; padding: 4px 0; }
+.sr-paper { background: none; box-shadow: none; border-radius: 0; } .sr-paper label { padding-left: 0; padding-right: 0; }
+.sr-save { margin: auto -18px 0; padding: 14px 18px 16px; background: linear-gradient(180deg, rgba(10,10,12,0), rgba(10,10,12,.96) 35%); }
+/* compare without boxes */
+.sr-cmp { padding: 16px; } .sr-cside { background: none; box-shadow: none; } .sr-cside canvas { border-radius: 10px; } .sr-cside .b { padding: 12px 2px 0; }
+.sr-diff { background: none; box-shadow: none; border-top: 1px solid rgba(255,255,255,.07); border-radius: 0; padding: 14px 2px 0; }
+/* playbook: chart + pairs side by side, setups as a table */
+#v-book { padding: 16px 20px; gap: 18px; }
+.app-body .sr-main .card, .sr-curve, .sr-pairs { background: none; box-shadow: none; padding: 0; }
+.sr-bk-top { gap: 32px; padding-bottom: 18px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.sr-pairs { border-left: 1px solid rgba(255,255,255,.07); padding-left: 28px; }
+.sr-tbl { font-size: 13px; }
+.sr-tr { display: grid; grid-template-columns: minmax(220px, 2.4fr) 110px repeat(4, minmax(70px, .7fr)) 90px; gap: 16px; align-items: center; width: 100%; padding: 12px 8px; border: 0; border-bottom: 1px solid rgba(255,255,255,.06); background: none; color: var(--text); text-align: left; font-size: 13px; border-radius: 0; }
+.sr-th { padding-top: 0; color: #8a8a94; font-size: 11.5px; } .sr-th span:nth-child(n+3), .sr-card > span:nth-child(n+3) { text-align: right; }
+.sr-card { cursor: pointer; transition: background .15s; transform: none !important; overflow: visible; } .sr-card:hover { background: rgba(255,255,255,.03); box-shadow: none !important; }
+.sr-card b { font-weight: 600; display: block; } .sr-card small { display: block; color: #8a8a94; font-size: 12px; margin-top: 2px; }
+.sr-card canvas { width: 110px; height: 26px; margin: 0; } .sr-card .mu { color: #8a8a94; }
+.sr-tr.sr-card, .sr-tr.sr-card:hover { box-shadow: none !important; border-radius: 0; }
+.sr-rec .r span { min-width: 0; overflow-wrap: anywhere; }

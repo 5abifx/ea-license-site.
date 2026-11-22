@@ -261,7 +261,7 @@
   $('sr-inbox').innerHTML = INBOX.map((t, k) => `<div class="sr-it${k ? '' : ' on'}"><div><b><span class="sr-dot"></span>${t[0]} ${t[1]}</b></div><div class="v ${t[3] < 0 ? 'neg' : 'pos'}">${t[3] < 0 ? '−' : '+'}$${Math.abs(t[3])}<small>${R(t[4])}</small></div><small>${t[2].slice(4)} · <span class="hint">${t[5]}</span></small></div>`).join('');
   document.querySelectorAll('#sr-inbox .sr-it').forEach((r) => (r.onclick = () => document.querySelectorAll('#sr-inbox .sr-it').forEach((x) => x.classList.toggle('on', x === r))));
   let setI = 0;
-  $('sr-sets').innerHTML = SETS.map((s, i) => `<div class="sr-set${i ? '' : ' on'}" data-i="${i}"><i style="background:${s.c}"></i><b>${s.n}</b><canvas></canvas><small>${s.r.length} trades · <span class="${s.exp < 0 ? 'neg' : 'pos'}">${R(s.exp)}</span> each</small></div>`).join('');
+  $('sr-sets').innerHTML = SETS.map((s, i) => `<div class="sr-set${i ? '' : ' on'}" data-i="${i}"><i style="background:${s.c}"></i><b>${s.n}</b><canvas></canvas><small>${s.r.length} trades · <span class="${s.exp < -0.04 ? 'neg' : s.exp > 0.04 ? 'pos' : ''}">${R(s.exp)}</span> each</small></div>`).join('');
   const setsSpark = () => document.querySelectorAll('#sr-sets .sr-set').forEach((d) => { const s = SETS[d.dataset.i]; spark(d.querySelector('canvas'), s.r, +d.dataset.i === setI ? '#f2f2f4' : '#5a5a64'); });
   document.querySelectorAll('#sr-sets .sr-set').forEach((d) => (d.onclick = () => pickSet(+d.dataset.i)));
   function pickSet(i) { setI = i; document.querySelectorAll('#sr-sets .sr-set').forEach((d) => d.classList.toggle('on', +d.dataset.i === i)); head(); setsSpark(); }
@@ -351,11 +351,9 @@
   document.querySelectorAll('#sr-flt button').forEach((b) => (b.onclick = () => { flt = b.textContent; document.querySelectorAll('#sr-flt button').forEach((x) => x.classList.toggle('on', x === b)); curves(); }));
   const PAIRS = [['Absorption at value high', 'Heatmap wall held', 5, 7.4], ['Buy at value low', 'NY open', 6, 5.1], ['Exhaustion at poor high', 'Delta flip', 3, 4.8], ['Absorption at value high', 'Balance day', 4, 3.2], ['Stacked imbalance retest', 'Asia', 5, -3.4]];
   $('sr-pairs').innerHTML = PAIRS.map((p, i) => `<div class="sr-pair"><em>${i + 1}</em><span>${p[0]} <b>+</b> ${p[1]}</span><b class="v ${p[3] < 0 ? 'neg' : 'pos'}">${R(p[3])}</b><small>${p[2]} trades together</small></div>`).join('');
-  $('sr-cards').innerHTML = SETS.map((s, i) => `<div class="sr-card" data-i="${i}" style="--c:${s.c}"><h3>${s.n}</h3><p class="r">“${s.rule}”</p><canvas></canvas>
-    <div class="sr-cg"><div><span class="sr-k">Per trade</span><b class="${s.exp < 0 ? 'neg' : 'pos'}">${R(s.exp)}</b></div><div><span class="sr-k">Profit f.</span><b>${s.pf.toFixed(2)}</b></div><div><span class="sr-k">Won</span><b>${s.won}%</b></div></div>
-    <div class="ft"><span>${s.r.length} trades</span><span>Last traded ${s.last}</span></div></div>`).join('');
+  $('sr-cards').innerHTML = SETS.map((s, i) => `<button type="button" class="sr-tr sr-card" data-i="${i}"><span><b>${s.n}</b><small>${s.rule}</small></span><canvas></canvas><span class="${s.exp < -0.04 ? 'neg' : s.exp > 0.04 ? 'pos' : ''}">${R(s.exp)}</span><span>${s.pf.toFixed(2)}</span><span>${s.won}%</span><span>${s.r.length}</span><span class="mu">${s.last}</span></button>`).join('');
   document.querySelectorAll('.sr-card').forEach((c) => (c.onclick = () => { pickSet(+c.dataset.i); go('study'); }));
-  const book = () => { curves(); document.querySelectorAll('.sr-card').forEach((c) => { const s = SETS[c.dataset.i]; spark(c.querySelector('canvas'), s.r, s.c); }); };
+  const book = () => { curves(); document.querySelectorAll('.sr-card').forEach((c) => { const s = SETS[c.dataset.i]; spark(c.querySelector('canvas'), s.r, +c.dataset.i === setI ? '#f2f2f4' : '#6a6a74'); }); };
 
   /* ---------- modes ---------- */
   function go(m) { document.querySelectorAll('.sr-modes button').forEach((b) => b.classList.toggle('on', b.dataset.m === m)); document.querySelectorAll('.sr-view').forEach((v) => v.classList.toggle('on', v.id === 'v-' + m));
