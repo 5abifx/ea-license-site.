@@ -45,6 +45,7 @@ const ICONS = {
   cap: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5M22 9v6"/>',
   star: '<path d="M12 3l2.5 6 6.5.5-5 4 1.5 6.5L12 16l-5.5 4 1.5-6.5-5-4 6.5-.5z"/>',
   tour: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
+  study: '<path d="M4 19V6a2 2 0 012-2h5v15H6a2 2 0 00-2 2zM20 19V6a2 2 0 00-2-2h-5v15h5a2 2 0 012 2z"/>',
   a11y: '<circle cx="12" cy="4.5" r="1.8"/><path d="M5 8.5l7 1.5 7-1.5M12 10v4.5M12 14.5l-3.2 6M12 14.5l3.2 6"/>',
 };
 const icon = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
@@ -144,14 +145,15 @@ function appShell(req, u, flashHtml, body, title) {
   const adminPage = req.path.startsWith('/admin');
   const wnNew = require('./whatsnew').count(u);   // What's new lines this member has not seen (orange dot)
   const wnDot = wnNew ? '<em class="wn-dot" aria-label="new"></em>' : '';
-  const jOn = { desk: on('/journal/desk'), plan: on('/journal/plan'), ins: on('/journal/insights'), studio: on('/journal/studio'), mentor: on('/journal/mentor') };
-  const journalOn = on('/journal') && !jOn.desk && !jOn.plan && !jOn.ins && !jOn.studio && !jOn.mentor;
+  const jOn = { desk: on('/journal/desk'), plan: on('/journal/plan'), ins: on('/journal/insights'), studio: on('/journal/studio'), mentor: on('/journal/mentor'), study: on('/journal/study') };
+  const journalOn = on('/journal') && !jOn.desk && !jOn.plan && !jOn.ins && !jOn.studio && !jOn.mentor && !jOn.study;
   const mentor = req.mentorEligible && (req.hasJournal || u.mentor_share);
   const journalTiles = req.hasJournal ? `${tile('/journal/desk', 'desk', 'Desk', 'Today: plan, live trades, clock', jOn.desk)}
       ${tile('/journal', 'journal', 'Journal', 'Calendar and every trade', journalOn)}
       ${tile('/journal/plan', 'plan', 'Plan a trade', 'Entry, stop and size before you click', jOn.plan)}
       ${tile('/journal/insights', 'insights', 'Insights', 'Edge score, leaks, what works', jOn.ins)}
-      ${tile('/journal/studio', 'studio', 'Share Studio', 'Cards and clips for socials', jOn.studio)}` : '';
+      ${tile('/journal/studio', 'studio', 'Share Studio', 'Cards and clips for socials', jOn.studio)}
+      ${mentor ? tile('/journal/mentor', 'chat', 'Mentor review', 'Questions on your trades', jOn.mentor, req.mentorNew) : ''}` : '';
   const accountTiles = `${tile('/settings', 'user', 'Trading profile', 'Accounts and prop firm rules', on('/settings'))}
       ${tile('/appearance', 'paint', 'Appearance', 'Background, panels, accent', on('/appearance'))}
       ${tile('/mentorship', 'cap', 'Mentorship', 'The live programme', on('/mentorship'))}
@@ -173,7 +175,7 @@ function appShell(req, u, flashHtml, body, title) {
       ${tile('/admin/requests', 'chat', 'Requests', 'Features members asked for', on('/admin/requests'))}
       ${tile('/admin/affiliates', 'gift', 'Affiliates', 'Partners and payouts', on('/admin/affiliates'))}
       ${tile('/mentor', 'cap', 'Mentor', 'Student questions', on('/mentor'), req.mentorWaiting)}` : '';
-  const mentorTile = mentor ? tile('/journal/mentor', 'chat', 'Mentor review', 'Questions on your trades', jOn.mentor, req.mentorNew) : '';
+  const studyTile = req.hasJournal ? tile('/journal/study', 'study', 'Study room', 'Screenshots, setups, your playbook', jOn.study) : '';
   const acctOn = ['/settings', '/appearance', '/mentorship', '/pricing', '/profile', '/affiliate', '/password', '/faq', '/whats-new'].some(on);
   const ownOn = adminPage || on('/mentor');
   // phone dock tab (iPhone style): icon over a short label
@@ -186,8 +188,8 @@ function appShell(req, u, flashHtml, body, title) {
   <nav class="tb-bar tb-glass" aria-label="Members menu">
     <a class="tb-orb" href="/" aria-label="5ABI.FX home"><img src="/logo.png" alt="" width="30" height="18"></a>
     ${link('/dashboard', 'eas', 'My EAs', on('/dashboard'))}
-    ${req.hasJournal ? btn('j', 'journal', 'Journal', on('/journal') && !jOn.mentor) : ''}
-    ${mentor ? link('/journal/mentor', 'chat', 'Mentor review', jOn.mentor, req.mentorNew) : ''}
+    ${req.hasJournal ? btn('j', 'journal', 'Journal', on('/journal') && !jOn.study) : ''}
+    ${req.hasJournal ? link('/journal/study', 'study', 'Study room', jOn.study) : ''}
     ${btn('a', 'user', 'Account', acctOn)}
     ${u.is_admin ? btn('o', 'shield', 'Owner', ownOn) : ''}
   </nav>
@@ -207,7 +209,7 @@ function appShell(req, u, flashHtml, body, title) {
   ${u.is_admin ? `<div class="tb-panel tb-glass tb-p-o" id="tbp-o">${sect('Owner', ownerTiles)}</div>` : ''}
   <div class="tb-panel tb-glass tb-p-m" id="tbp-m">
     ${planPill(u)}
-    ${sect('Trading', `${tile('/dashboard', 'eas', 'My EAs', 'Downloads', on('/dashboard'))}${journalTiles}${mentorTile}`)}
+    ${sect('Trading', `${tile('/dashboard', 'eas', 'My EAs', 'Downloads', on('/dashboard'))}${studyTile}${journalTiles}`)}
     ${sect('Account', accountTiles)}${sect('Help', helpTiles)}${sect('Owner', ownerTiles)}
   </div>
   <nav class="tb-dock tb-glass" aria-label="Phone menu">
