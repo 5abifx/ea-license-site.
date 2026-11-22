@@ -114,6 +114,9 @@ export async function prepare(box, num) {
   await breathe();
   if (r.compileAsync) await r.compileAsync(sc, cam); else r.compile(sc, cam);
   await breathe();
+  // the run starts with the rear tyres already spinning: show their blur on this first still frame too
+  // (it used to show the bare wheels for a moment, then the blurred ones)
+  wheels.forEach((w) => { w.disc.material.opacity = w.rear ? 0.94 : 0; });
   r.render(sc, cam);
 
   // headlight wash: a soft light layer over the number whose opacity follows the car (filters on the text itself

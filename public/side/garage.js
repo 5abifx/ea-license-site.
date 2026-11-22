@@ -376,7 +376,7 @@ export default function garage(card) {
     // just turning slowly on its own: 30 frames a second is enough and halves the work; full rate while you drag,
     // zoom, rev or burn out
     const active = busyCtl || rev > 0 || burn > 0 || puffs.length;
-    if (!ready || (!active && (t - lastR < 40 || t - (window.__scBusy || 0) < 300))) return;   // idle spin pauses while the page scrolls
+    if (!ready || (!active && t - lastR < 40)) return;   // keeps turning while the page scrolls (owner, 2026-11-22)
     lastR = t;
     const dt = Math.min(0.05, (t - last) / 1000); last = t;
     // burnout: spin the rear tyres on the spot, then a full doughnut around the front axle with the tail sliding out,
@@ -394,8 +394,11 @@ export default function garage(card) {
       if (k < 0.9) { emit += dt * 26 * Math.min(1, ms / 300); while (emit >= 1) { emit--; wheels.forEach((w) => { if (w.rear) puff(w); }); } }
       if (k >= 1) { burn = 0; steerA = 0; rearW = 0; }
     }
-    wheels.forEach((w) => { const om = w.rear ? rearW : frontW;
+    wheels.forEach((w) => { const om = w.rear ? rearW : frontW, TAU = Math.PI * 2;
       w.spin.rotation.z += Math.min(om * dt, 0.3);                                      // spokes never strobe
+      // after a burnout or rev the wheel rolls on to a full turn, so the cut-out tyre lines up with the body again
+      if (om < 0.5) { const rest = w.spin.rotation.z % TAU; if (Math.abs(rest) > 1e-3) { const left = rest > 0 ? TAU - rest : -rest;
+        const stepZ = Math.min(left, Math.max(0.02, left * 4 * dt)); w.spin.rotation.z += stepZ; if (left - stepZ < 1e-3) w.spin.rotation.z = 0; } }
       w.disc.material.opacity = Math.min(0.94, Math.max(0, (om - 6) / 18));
       if (!w.rear) w.steer.rotation.y = steerA; });
     if (rev > 0) {

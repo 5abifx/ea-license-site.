@@ -193,7 +193,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       ${removedAccts.map((a) => chip(a, acctLabel(a), '<span class="tag">Removed</span>', `${base}${qs({ account: a.account_number })}`, sel === a)).join('')}
       ${openHidden ? hiddenAccts.map((a) => chip(a, acctLabel(a), '<span class="tag">Hidden</span>', `${base}${qs({ account: a.account_number })}`, sel === a)).join('')
         : hiddenAccts.length ? `<a class="acct acct-more" href="${base}${qs({ hidden: '1' })}"><small>Hidden accounts</small><b>${hiddenAccts.length}</b><small>Tap to see</small></a>` : ''}
-    </div>${bar}`;
+    </div><script src="/acct-dial.js"></script>${bar}`;
   };
 
   // columns the insights read

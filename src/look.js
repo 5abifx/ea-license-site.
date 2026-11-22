@@ -31,6 +31,7 @@ function clean(raw) {
     paint: PAINT.has(o.paint) ? o.paint : 'original',   // 3D garage car colour (wide PC side column)
     car: CAR.has(o.car) ? o.car : 'hyper',               // which garage car
     side: SIDE.has(o.side) ? o.side : 'pin',              // PC side cards: always on screen, or hidden at the edges (full-width middle)
+    calm: o.calm === true,                                // Reduce motion: no number sweeps or slide-ins (intro + garage stay)
   };
 }
 
@@ -38,7 +39,7 @@ function clean(raw) {
 function tags(u) {
   const look = clean(u && u.look);
   const json = JSON.stringify(look).replace(/</g, '\\u003c');
-  return `<script>window.__LOOK=${json}</script><script src="/look.js"></script>`;
+  return `<script>window.__LOOK=${json}${look.calm ? ";document.documentElement.classList.add('calm')" : ''}</script><script src="/look.js"></script>`;
 }
 
 module.exports = function setup(app, { db, page, requireUser }) {
@@ -95,6 +96,13 @@ module.exports = function setup(app, { db, page, requireUser }) {
       <div class="ap-well ap-seg" id="apSide">
         <button type="button" data-v="pin">Cards on sides</button>
         <button type="button" data-v="slide">Full width</button>
+      </div>
+    </div>
+    <div class="ap-sec">
+      <div class="ap-sec-h"><b>Motion</b><small>Reduce motion: numbers show at once and pages stop sliding in. The journal intro and the garage car stay.</small></div>
+      <div class="ap-well ap-seg" id="apCalm">
+        <button type="button" data-v="0">Full motion</button>
+        <button type="button" data-v="1">Reduce motion</button>
       </div>
     </div>
     <div class="ap-sec">

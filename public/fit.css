@@ -121,3 +121,33 @@ html.mid-s .tm > .tm-gh { grid-template-columns: 1fr; }
 /* garage card is second in the right column now: fixed height instead of filling the rest */
 .sc-r .sc-garage { flex: 0 0 280px; }
 @media (max-width: 1919px) { .sc-r .sc-garage { flex-basis: 250px; } }
+
+/* ---------- Appearance > Reduce motion (html.calm, set by src/look.js + public/look.js) ----------
+   page parts appear at once instead of rising/sliding in; numbers don't sweep (public/ignite.js skips);
+   the journal intro and the side globe/garage keep moving */
+html.calm .app-body :not(.plx, .plx *), html.calm .app-body :not(.plx, .plx *)::before, html.calm .app-body :not(.plx, .plx *)::after {
+  animation-duration: .001ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
+html.calm .app-main.swap-in, html.calm .app-main.swap-out { animation: none !important; transition: none !important; opacity: 1 !important; }
+html.calm .app-body :not(.plx, .plx *) { transition-duration: .12s !important; }
+
+/* ---------- account picker dial (public/acct-dial.js, PC only) ---------- */
+.app-body .accts.ad { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; width: 360px; max-width: 100%; padding: 4px 8px 4px 4px; overflow: visible;
+  border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.03); }
+.ad-drum { position: relative; flex: 1; min-width: 0; height: 104px; overflow: hidden; outline: none;
+  -webkit-mask-image: linear-gradient(transparent, #000 26%, #000 74%, transparent); mask-image: linear-gradient(transparent, #000 26%, #000 74%, transparent); }
+.ad-drum:focus-visible { box-shadow: inset 0 0 0 1px rgba(255,255,255,.3); border-radius: 10px; }
+.app-body .ad .acct { position: absolute; left: 0; right: 0; top: 50%; min-width: 0; margin: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 0;
+  padding: 5px 12px; border: 0; border-radius: 10px; box-shadow: none; background: transparent; transform-origin: left center;
+  transition: transform .45s cubic-bezier(.2,.7,.2,1), opacity .35s, background .2s; }
+.app-body .ad .acct > small:first-child { grid-column: 1; grid-row: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app-body .ad .acct > b { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 14px; }
+.app-body .ad .acct > small:last-child { grid-column: 1; grid-row: 2; font-size: 11px; }
+.app-body .ad .acct.cur { background: rgba(255,255,255,.07); }
+.app-body .ad .acct.cur > b { font-size: 17px; }
+.app-body .ad .acct.on::before { content: ''; position: absolute; left: 3px; top: 50%; width: 3px; height: 20px; margin-top: -10px; border-radius: 3px; background: var(--accent); }
+.app-body .ad.moved .acct.cur { box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); cursor: pointer; }
+.ad-side { display: flex; flex-direction: column; align-items: center; gap: 5px; flex: none; }
+.ad-side button { width: 26px; height: 26px; min-height: 0; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted);
+  font-size: 9px; line-height: 1; letter-spacing: 0; text-transform: none; box-shadow: none; display: grid; place-items: center; cursor: pointer; }
+.ad-side button:hover { color: #fff; border-color: rgba(255,255,255,.3); }
+.ad-n { font: 500 10px var(--mono, ui-monospace, monospace); color: var(--muted); white-space: nowrap; }

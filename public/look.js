@@ -231,6 +231,7 @@
   async function apply(next) {
     if (next) S = Object.assign({}, DEF, S, next);
     if (!VALID.has(S.bg)) S.bg = 'none';
+    root.classList.toggle('calm', !!S.calm);
     if (S.bg === 'none') {   // classic look: remove everything we added
       running = false; root.classList.remove('lk', 'lk-lightbg'); CLEAR.forEach((k) => root.style.removeProperty(k));
       const w = document.getElementById('lk-bg'); if (w) w.style.display = 'none';
