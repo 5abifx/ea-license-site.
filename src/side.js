@@ -144,7 +144,8 @@ module.exports = function setup(app, { db, page, requireUser, requireAdmin, esc 
     const should = daily * done, diff = got.month - should;   // where the month should be before today's trades
     const pace = got.month >= tgt.month ? `Month target hit. ${f(got.month - tgt.month)} over`
       : (diff >= 0 ? `Ahead by ${f(diff)}` : `Behind by ${f(-diff)}`) + ` · need ${f((tgt.month - got.month) / left)}/day for ${left} trading day${left > 1 ? 's' : ''}`;
-    return { pct: pc(got[k.per], tgt[k.per]), now: `${f(got[k.per])} of ${f(tgt[k.per])} ${k.per === 'day' ? 'today' : 'this ' + k.per}`, split, pace, ahead: diff >= 0 };
+    const mp = k.per === 'day' && wkend ? 'week' : k.per;   // weekend: a daily goal shows the week's progress
+    return { pct: pc(got[mp], tgt[mp]), now: `${f(got[k.per])} of ${f(tgt[k.per])} ${k.per === 'day' ? 'today' : 'this ' + k.per}`, split, pace, ahead: diff >= 0 };
   }
 
   // progress of each goal the journal can measure ({ pct, now } or null = manual)
