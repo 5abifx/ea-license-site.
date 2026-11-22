@@ -24,7 +24,7 @@
     var mx = 1; Object.keys(D).forEach(function (k) { mx = Math.max(mx, Math.abs(D[k][0])); });
     var tint = function (v) {   // stronger colour for bigger days, scaled to this member's own biggest day
       if (v == null) return '';
-      var a = (0.28 + Math.min(1, Math.abs(v) / (mx * 0.6)) * 0.67).toFixed(2);
+      var q = Math.abs(v) / mx, a = q >= 0.6 ? 1 : q >= 0.3 ? 0.75 : q >= 0.1 ? 0.5 : 0.3;   // 4 clear steps each side
       return v > 0 ? 'background:rgba(38,198,160,' + a + ')' : v < 0 ? 'background:rgba(240,70,75,' + a + ')' : 'background:rgba(255,255,255,.14)';
     };
     var sum = function (a, b) { var t = 0, n = 0, g = 0, d = 0; for (var x = a; x < b; x += DAY) { var r = D[iso(x)]; if (r) { t += r[0]; n += r[1]; d++; if (r[0] > 0) g++; } } return { t: t, n: n, g: g, d: d }; };
@@ -33,19 +33,20 @@
 
     function draw() {
       var d = new Date(at), y = d.getUTCFullYear(), mo = d.getUTCMonth(), a0, a1, label, body = '';
-      if (view === 0) {
+      if (view === 0) {   // 12 small month blocks (Mon-Fri rows, one column per week) so months and days read apart
         a0 = Date.UTC(y, 0, 1); a1 = Date.UTC(y + 1, 0, 1); label = String(y);
-        var cols = [], last = -1;
-        for (var w = monday(a0); w < a1; w += 7 * DAY) {
-          var cells = '', lab = '';
-          for (var i = 0; i < 5; i++) {
-            var t = w + i * DAY, inY = t >= a0 && t < a1, r = D[iso(t)];
-            cells += '<i' + (inY ? ' title="' + tip(t) + '" style="' + tint(r ? r[0] : null) + '"' : ' class="x"') + (iso(t) === today ? ' data-now' : '') + '></i>';
-            var m = new Date(t).getUTCMonth(); if (inY && m !== last && new Date(t).getUTCDate() <= 7) { last = m; lab = MON[m]; }
+        var ms12 = '';
+        for (var mm = 0; mm < 12; mm++) {
+          var m0s = Date.UTC(y, mm, 1), m0e = Date.UTC(y, mm + 1, 1), SM = sum(m0s, m0e), ld = (new Date(m0s).getUTCDay() + 6) % 7, cells = '';
+          if (ld < 5) for (var b = 0; b < ld; b++) cells += '<i class="x"></i>';
+          for (var t = m0s; t < m0e; t += DAY) {
+            if (!wd(t)) continue;
+            var r = D[iso(t)], fut = iso(t) > today;
+            cells += '<i title="' + tip(t) + '"' + (r ? ' style="' + tint(r[0]) + '"' : fut ? ' class="f"' : '') + (iso(t) === today ? ' data-now' : '') + '></i>';
           }
-          cols.push('<div class="pc-wk"><b>' + lab + '</b>' + cells + '</div>');
+          ms12 += '<button type="button" class="pc-ym" data-m="' + mm + '" aria-label="Open ' + MON[mm] + ' ' + y + '"><span class="pc-ymh"><b>' + MON[mm] + '</b><small class="' + cls(SM.t) + '">' + (SM.d ? money(SM.t).replace(/\.\d+/, '') : '') + '</small></span><span class="pc-ymg">' + cells + '</span></button>';
         }
-        body = '<div class="pc-yr">' + cols.join('') + '</div><div class="pc-key"><span>Loss</span><i style="background:rgba(240,70,75,.9)"></i><i style="background:rgba(240,70,75,.35)"></i><i></i><i style="background:rgba(38,198,160,.35)"></i><i style="background:rgba(38,198,160,.9)"></i><span>Profit</span></div>';
+        body = '<div class="pc-yr">' + ms12 + '</div><div class="pc-key"><span>Loss</span><i style="' + tint(-mx) + '"></i><i style="' + tint(-mx * 0.15) + '"></i><i></i><i style="' + tint(mx * 0.15) + '"></i><i style="' + tint(mx) + '"></i><span>Profit</span><span class="pc-kh">Tap a month to open it</span></div>';
       } else if (view === 1 || view === 2) {
         var n = view === 1 ? 3 : 1, m0 = view === 1 ? Math.floor(mo / 3) * 3 : mo;
         a0 = Date.UTC(y, m0, 1); a1 = Date.UTC(y, m0 + n, 1); label = view === 1 ? 'Q' + (m0 / 3 + 1) + ' ' + y : MON[mo] + ' ' + y;
@@ -99,6 +100,8 @@
       while (!wd(at)) at += DAY;
     }
     box.addEventListener('click', function (e) {
+      var ym = e.target.closest('[data-m]');
+      if (ym) { at = Date.UTC(new Date(at).getUTCFullYear(), +ym.dataset.m, 1); while (!wd(at)) at += DAY; view = 2; draw(); return; }
       var b = e.target.closest('[data-v],[data-s]'); if (!b) return;
       if (b.dataset.v) { view = Math.max(0, Math.min(4, view + Number(b.dataset.v))); try { localStorage.setItem('pcView', view); } catch (x) {} }
       else step(Number(b.dataset.s));

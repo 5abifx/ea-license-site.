@@ -30,9 +30,39 @@
       prev.disabled = L < 5 && cur === 0; next.disabled = L < 5 && cur === L - 1;
       bar.classList.toggle('moved', cur !== on);
     }
-    function go(i) { var L = items.length; cur = L >= 5 ? (i + L) % L : Math.max(0, Math.min(L - 1, i)); lay(); }
+    // Desk: turning the dial loads that account's numbers in place (P&L calendar, month card, hidden-account bar),
+    // everything from the dial down to the [data-live-end] marker, without leaving the page
+    var end = null, wait = 0, ctl = null;   // the marker is found on first use: this script runs before the rest of the page is parsed
+    function findEnd() { return (end = end || (bar.parentNode && bar.parentNode.querySelector('[data-live-end]'))); }
+    function load() {
+      var a = items[cur], href = a.getAttribute('href'); if (cur === on || !findEnd()) return;
+      if (ctl) ctl.abort(); ctl = window.AbortController ? new AbortController() : null;
+      var olds = []; for (var n = bar.nextElementSibling; n && n !== end; n = n.nextElementSibling) { olds.push(n); n.classList.add('ad-ld'); }
+      fetch(href, { credentials: 'same-origin', signal: ctl && ctl.signal }).then(function (r) { if (!r.ok) throw 0; return r.text(); }).then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html'), nb = doc.querySelector('.accts'), ne = doc.querySelector('[data-live-end]');
+        if (!nb || !ne) throw 0;
+        var frag = [], n2;
+        for (n2 = nb.nextElementSibling; n2 && n2 !== ne; n2 = n2.nextElementSibling) frag.push(n2);
+        olds.forEach(function (o) { if (o.parentNode) o.parentNode.removeChild(o); });
+        frag.forEach(function (f) {
+          var el = document.importNode(f, true);
+          end.parentNode.insertBefore(el, end);
+          [].slice.call(el.tagName === 'SCRIPT' ? [el] : el.querySelectorAll('script')).forEach(function (s0) {   // scripts added this way don't run by themselves
+            if (s0.type && s0.type !== 'text/javascript') return;
+            var s1 = document.createElement('script'); if (s0.src) s1.src = s0.src; else s1.textContent = s0.textContent;
+            s0.parentNode.replaceChild(s1, s0);
+          });
+        });
+        items.forEach(function (x) { x.classList.remove('on'); }); a.classList.add('on'); on = cur; lay();
+        try { history.replaceState(null, '', href); } catch (e) {}
+      }).catch(function (e) { if (e && e.name === 'AbortError') return; location.href = href; });
+    }
+    function go(i) {
+      var L = items.length; cur = L >= 5 ? (i + L) % L : Math.max(0, Math.min(L - 1, i)); lay();
+      if (findEnd()) { clearTimeout(wait); wait = setTimeout(load, 350); }
+    }
     items.forEach(function (a, i) {
-      a.addEventListener('click', function (e) { if (i !== cur) { e.preventDefault(); go(i); } });   // a side one turns the dial first
+      a.addEventListener('click', function (e) { if (i !== cur || (findEnd() && i === on)) { e.preventDefault(); go(i); } });   // a side one turns the dial first
     });
     prev.onclick = function () { go(cur - 1); }; next.onclick = function () { go(cur + 1); };
     var lock = 0;

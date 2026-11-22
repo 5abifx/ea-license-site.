@@ -744,7 +744,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     ${acctBar(req, '/journal/desk', qs, sc, cur)}
     ${pcHtml}
     ${ovHtml}
-    <h2 class="ov-sec">Today's desk</h2>
+    <h2 class="ov-sec" data-live-end>Today's desk</h2>
     ${terminalView.html(T, { news: N, money: m, cur, market: topSyms, acctNote: one ? (prop ? 'Prop firm rules included' : 'Add firm rules in Insights › Prop firm to include them') : 'All accounts' })}`);
   });
 
