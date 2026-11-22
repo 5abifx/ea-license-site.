@@ -265,7 +265,7 @@
   const setsSpark = () => document.querySelectorAll('#sr-sets .sr-set').forEach((d) => { const s = SETS[d.dataset.i]; spark(d.querySelector('canvas'), s.r, s.c); });
   document.querySelectorAll('#sr-sets .sr-set').forEach((d) => (d.onclick = () => pickSet(+d.dataset.i)));
   function pickSet(i) { setI = i; document.querySelectorAll('#sr-sets .sr-set').forEach((d) => d.classList.toggle('on', +d.dataset.i === i)); head(); }
-  function head() { const s = SETS[setI]; $('sr-setname').textContent = s.n; $('sr-done').textContent = 'Save to “' + s.n + '”';
+  function head() { const s = SETS[setI]; $('sr-setname').textContent = s.n; $('sr-done').firstChild.textContent = 'Save to “' + s.n + '”';
     $('sr-nums').innerHTML = `<div><span class="sr-k">Seen</span><b>${s.r.length}×</b></div><div><span class="sr-k">Won</span><b>${s.won}%</b></div><div><span class="sr-k">Per trade</span><b class="${s.exp < 0 ? 'neg' : 'pos'}">${R(s.exp)}</b></div><div><span class="sr-k">Profit factor</span><b>${s.pf.toFixed(2)}</b></div><div><span class="sr-k">Last</span><b>${s.last}</b></div><canvas id="sr-hs"></canvas>`;
     spark($('sr-hs'), s.r, s.c); }
 
@@ -273,15 +273,14 @@
   const ENV = [['Where', ['Value high', 'Value low', 'POC', 'Poor high', 'Poor low', 'Outside value'], 'Value high'], ['What happened', ['Absorption', 'Exhaustion', 'Big trades', 'Stacked imbalance', 'Delta flip', 'Heatmap wall held'], 'Absorption'],
     ['Day', ['Balance', 'Trend', 'Open drive', 'News'], 'Balance'], ['Session', ['Asia', 'London', 'NY open', 'NY PM'], 'NY open']];
   const env = ENV.map((g) => new Set([g[2]])); env[1].add('Heatmap wall held');
-  $('sr-env').innerHTML = ENV.map((g, i) => `<div class="sr-eg"><span>${g[0]}</span><div class="sr-ec">${g[1].map((c) => `<button type="button" data-g="${i}" class="${env[i].has(c) ? 'on' : ''}">${c}</button>`).join('')}<button type="button" title="Add your own word">+</button></div></div>`).join('');
+  $('sr-env').innerHTML = ENV.map((g, i) => `<div class="sr-eg"><span>${g[0]}</span><div class="sr-ec">${g[1].map((c) => `<button type="button" data-g="${i}" class="${env[i].has(c) ? 'on' : ''}">${c}</button>`).join('')}</div></div>`).join('') + '<button type="button" class="sr-link sr-own">+ Add your own tag</button>';
   $('sr-env').querySelectorAll('button[data-g]').forEach((b) => (b.onclick = () => { const s = env[b.dataset.g]; s.has(b.textContent) ? s.delete(b.textContent) : s.add(b.textContent); b.classList.toggle('on'); match(); }));
-  function match() { const w = env[1].has('Absorption'), a = env[0].has('Value high'), s = SETS[0];
-    $('sr-match').innerHTML = w && a ? `<span class="nm">Absorption at value high</span>You saved this before <b>${s.r.length} times</b>: <span class="pos">${s.r.filter((v) => v > 0).length} won</span>, <span class="neg">${s.r.filter((v) => v <= 0).length} lost</span>, <b>${R(s.exp)}</b> a trade.<div class="sr-mini">${s.r.map((v) => `<i class="${v > 0 ? 'w' : ''}"></i>`).join('')}</div>`
-      : `<span class="nm">${[...env[1]][0] || 'Something'} at ${([...env[0]][0] || 'somewhere').toLowerCase()}</span>New environment. Saving starts a new setup in your playbook.`; }
+  function match() { const w = env[1].has('Absorption'), a = env[0].has('Value high'), s = SETS[0], won = s.r.filter((v) => v > 0).length, el = $('sr-match');
+    if (w && a) { el.className = 'sr-match hit'; el.innerHTML = `<div class="sr-ring" style="--p:${s.won}"><b>${s.won}%</b><small>won</small></div><div><span class="nm">${s.n}</span><span class="ln">Seen <b>${s.r.length} times</b> before · <b class="${s.exp < 0 ? 'neg' : 'pos'}">${R(s.exp)}</b> a trade</span><div class="sr-mini">${s.r.map((v) => `<i class="${v > 0 ? 'w' : ''}"></i>`).join('')}</div></div>`; }
+    else { el.className = 'sr-match'; el.innerHTML = `<div class="sr-ring new"><b>New</b></div><div><span class="nm">${[...env[1]][0] || 'Something'} at ${([...env[0]][0] || 'somewhere').toLowerCase()}</span><span class="ln">First time. Saving starts a new setup.</span></div>`; } }
   match();
   document.querySelectorAll('#sr-grade button').forEach((b) => (b.onclick = () => document.querySelectorAll('#sr-grade button').forEach((x) => x.classList.toggle('on', x === b))));
-  $('sr-fix').onclick = (e) => { e.target.textContent = 'Added to your Focus panel ✓'; };
-  $('sr-done').onclick = (e) => { e.target.textContent = 'Saved to your playbook ✓'; const d = document.querySelector('#sr-inbox .sr-it.on .sr-dot'); if (d) d.classList.add('done'); };
+  $('sr-done').onclick = (e) => { $('sr-done').firstChild.textContent = 'Saved to your playbook ✓'; const d = document.querySelector('#sr-inbox .sr-it.on .sr-dot'); if (d) d.classList.add('done'); };
 
   /* ---------- bottom strip: same setup before ---------- */
   const pastPics = PAST.map((p, i) => shot(i % 2 ? 'heat' : 'fp', 40 + i * 7, 1600, 900));

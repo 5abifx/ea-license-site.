@@ -67,18 +67,25 @@ module.exports = (app, { page, requireUser }) => {
         </main>
 
         <aside class="sr-insp" id="sr-insp">
-          <div class="sr-sec sr-trade"><div class="sr-sh"><b id="sr-tname">XAUUSD sell</b><span class="sr-res neg" id="sr-tres">−1.0R</span></div>
-            <div class="sr-kv"><div><span>Entry</span><b>4012.4</b></div><div><span>Stop</span><b>4018.6</b></div><div><span>Target</span><b>4000.0</b></div><div><span>Result</span><b class="neg">−$184</b></div></div>
-            <p class="muted small" id="sr-twhen">Thu 20 Nov · 09:42 New York · held 42 min · from the Journal EA</p></div>
-          <div class="sr-sec"><span class="sr-k">The environment</span><div id="sr-env"></div><div class="sr-match" id="sr-match"></div></div>
-          <div class="sr-sec"><span class="sr-k">My notes</span>
-            <label>What I saw<textarea>Sellers sat on the value high. Three taps, no break.</textarea></label>
-            <label>What I did<textarea>Sold the 3rd tap. Took nothing at 1R. It turned and took my stop.</textarea></label>
-            <label>Next time<textarea id="sr-next">Take half at 1R when the next level is close.</textarea></label></div>
-          <div class="sr-sec"><span class="sr-k">How I traded it</span><div class="sr-grade" id="sr-grade"><button>A+</button><button>A</button><button class="on">B</button><button>C</button><button>F</button></div>
-            <button type="button" class="btn small secondary sr-fix" id="sr-fix">Make "Next time" a fix in my Focus panel</button>
-            ${req.mentorEligible ? '<button type="button" class="btn small secondary sr-fix">Ask my mentor about this trade</button>' : ''}</div>
-          <div class="sr-save"><button type="button" class="btn" id="sr-done">Save to “Absorption at value high”</button></div>
+          <div class="sr-tcard">
+            <div class="sr-trow"><b>XAUUSD</b><span class="sr-side">Sell</span><span class="sr-when">Thu 20 Nov · 09:42</span></div>
+            <div class="sr-big"><span class="neg">−1.0R</span><small>−$184</small></div>
+            <div class="sr-ladder" aria-label="Target 4000.0, entry 4012.4, stop 4018.6"><i class="tp"></i><i class="sl"></i><u></u></div>
+            <div class="sr-lv"><span>Target<b>4000.0</b></span><span>Entry<b>4012.4</b></span><span>Stop<b>4018.6</b></span></div>
+            <p class="sr-meta">Held 42 min · New York session · recorded by the Journal EA</p>
+          </div>
+          <section class="sr-blk"><h4>The environment<span>Same tags, same setup</span></h4><div id="sr-env"></div><div class="sr-match" id="sr-match"></div></section>
+          <section class="sr-blk"><h4>My notes</h4>
+            <div class="sr-paper">
+              <label>What I saw<textarea rows="2">Sellers sat on the value high. Three taps, no break.</textarea></label>
+              <label>What I did<textarea rows="2">Sold the 3rd tap. Took nothing at 1R. It turned and took my stop.</textarea></label>
+              <label>Next time<textarea rows="2" id="sr-next">Take half at 1R when the next level is close.</textarea></label>
+            </div></section>
+          <section class="sr-blk"><h4>How I traded it</h4>
+            <div class="sr-seg" id="sr-grade"><button type="button">A+</button><button type="button">A</button><button type="button" class="on">B</button><button type="button">C</button><button type="button">F</button></div>
+            <label class="sr-tog"><input type="checkbox" id="sr-fix" checked><i></i><span>Add “Next time” to my Focus panel</span></label>
+            ${req.mentorEligible ? '<button type="button" class="sr-link">Ask my mentor about this trade →</button>' : ''}</section>
+          <div class="sr-save"><button type="button" class="sr-pill" id="sr-done"><span>Save to “Absorption at value high”</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
         </aside>
       </div>
     </div>
