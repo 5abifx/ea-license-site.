@@ -161,7 +161,9 @@
     var main = D.querySelector('.app-main');
     if (!main) { location.assign(url.href); return; }
     var full = function () { location.assign(url.href); };
-    bar(true); main.classList.add('swap-out');
+    // a toggle or filter on the same page (New York / MT5 time, period, account...): swap in place, no fade, same scroll
+    var inPlace = push && url.pathname === location.pathname, keepY = W.scrollY;
+    bar(true); if (!inPlace) main.classList.add('swap-out');
     get(url).then(function (r) {
       var type = r.headers.get('content-type') || '';
       if (!/text\/html/.test(type) || (r.status >= 400 && r.status !== 404)) throw new Error('not a page');
@@ -206,10 +208,11 @@
         });
         // the middle
         var fresh = D.importNode(nMain, true);
-        fresh.classList.add('swap-in');
+        if (!inPlace) fresh.classList.add('swap-in');
         main.replaceWith(fresh);
         nST.call(W, function () { fresh.classList.remove('swap-in'); }, 400);
-        if (push) {
+        if (inPlace && !url.hash) W.scrollTo(0, keepY);
+        else if (push) {
           if (url.hash) { var t = D.getElementById(decodeURIComponent(url.hash.slice(1))); if (t) t.scrollIntoView(); else W.scrollTo(0, 0); }
           else W.scrollTo(0, 0);
         } else W.scrollTo(0, y || 0);
@@ -229,10 +232,23 @@
           try { W.dispatchEvent(new CustomEvent('swap:load', { detail: { url: finalUrl } })); } catch (e) { /* ignore */ }
           if (me === busy) { busy = null; bar(false); }
           // keyboard and screen reader users land on the new content
-          var h = fresh.querySelector('h1'); if (h && !h.hasAttribute('tabindex')) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
+          var h = !inPlace && fresh.querySelector('h1'); if (h && !h.hasAttribute('tabindex')) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
         });
       });
     }).catch(function () { if (!me.abort) full(); });
+  }
+
+  // a toggle looks switched the moment it is tapped, before the new page arrives
+  function mark(a) {
+    var p = a.parentNode, sib = p && p.children ? [].filter.call(p.children, function (x) { return x.tagName === a.tagName; }) : [];
+    var has = function (f) { return sib.some(f); };
+    var on = has(function (x) { return x.classList.contains('on'); }), cur = has(function (x) { return x.hasAttribute('aria-current'); });
+    var pr = has(function (x) { return x.hasAttribute('aria-pressed'); });
+    sib.forEach(function (x) {
+      if (on) x.classList.toggle('on', x === a);
+      if (cur) { if (x === a) x.setAttribute('aria-current', 'page'); else x.removeAttribute('aria-current'); }
+      if (pr) x.setAttribute('aria-pressed', String(x === a));
+    });
   }
 
   function start() {
@@ -248,6 +264,7 @@
       // after many switches, a normal load clears anything an old page left behind
       if (++count > 30) return;
       e.preventDefault();
+      if (u.pathname === location.pathname) mark(a);
       swapTo(u, true);
     });
     // start loading on press, before the click lands (saves ~100 ms on phones). Never on hover: some pages mark things read.

@@ -43,19 +43,41 @@
   // ---------- live market: TradingView's free chart widget for the trader's most traded instruments ----------
   const tv = $('tm-tv');
   if (tv) {
-    const load = (sym) => {
-      tv.innerHTML = '<div class="tradingview-widget-container" style="height:100%;width:100%"><div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
+    // Phones (owner, Nov 22): the full chart squeezed into the page was too small to use and caught every swipe.
+    // There the card shows a short bar instead, and "Open chart" fills the whole screen with a phone-sized chart.
+    const PHONE = matchMedia('(max-width: 760px)').matches;
+    const widget = (box, sym) => {
+      box.innerHTML = '<div class="tradingview-widget-container" style="height:100%;width:100%"><div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
       const sc = document.createElement('script');
       sc.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js'; sc.async = true;
       sc.textContent = JSON.stringify({ autosize: true, symbol: sym, interval: '5', timezone: 'America/New_York', theme: 'dark', style: '1', locale: 'en',
-        backgroundColor: 'rgba(14,14,16,1)', gridColor: 'rgba(255,255,255,0.04)', hide_side_toolbar: false, allow_symbol_change: true, save_image: false, calendar: false,
-        withdateranges: true, details: false, hide_volume: true, support_host: 'https://www.tradingview.com' });
-      tv.firstChild.appendChild(sc);
+        backgroundColor: 'rgba(14,14,16,1)', gridColor: 'rgba(255,255,255,0.04)', hide_side_toolbar: PHONE, allow_symbol_change: !PHONE, save_image: false, calendar: false,
+        withdateranges: !PHONE, details: false, hide_volume: true, support_host: 'https://www.tradingview.com' });
+      box.firstChild.appendChild(sc);
     };
-    load(tv.dataset.tv);
+    const tvApp = (sym) => 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
+    const name = (sym) => { const b = document.querySelector('#tm-mkts button[data-tv="' + sym + '"]'); return b ? b.firstChild.textContent : sym.split(':').pop(); };
+    let cur = tv.dataset.tv;
+    const poster = () => {
+      tv.innerHTML = `<div class="tm-tvph"><div><b>${name(cur)}</b><small>Live chart · 5 min · New York time</small></div>
+        <span class="tm-tvbtns"><button type="button" class="small" data-open>Open chart</button><a class="small" href="${tvApp(cur)}" target="_blank" rel="noopener">TradingView app ↗</a></span></div>`;
+    };
+    const full = () => {
+      const fs = document.createElement('div');
+      fs.className = 'tm-full'; fs.setAttribute('role', 'dialog'); fs.setAttribute('aria-label', name(cur) + ' live chart');
+      fs.innerHTML = `<div class="tm-full-h"><b>${name(cur)}</b><a class="small" href="${tvApp(cur)}" target="_blank" rel="noopener">TradingView app ↗</a><button type="button" class="tm-full-x" aria-label="Close chart"><i>×</i></button></div><div class="tm-full-c"></div>`;
+      document.body.appendChild(fs);
+      document.documentElement.classList.add('tm-full-on');
+      widget(fs.querySelector('.tm-full-c'), cur);
+      const close = () => { fs.remove(); document.documentElement.classList.remove('tm-full-on'); window.removeEventListener('swap:leave', close); };
+      fs.querySelector('.tm-full-x').addEventListener('click', close);
+      window.addEventListener('swap:leave', close);
+    };
+    if (PHONE) { tv.classList.add('ph'); poster(); tv.addEventListener('click', (ev) => { if (ev.target.closest('[data-open]')) full(); }); }
+    else widget(tv, cur);
     const chips = $('tm-mkts');
     if (chips) chips.addEventListener('click', (ev) => { const b = ev.target.closest('button'); if (!b || b.getAttribute('aria-pressed') === 'true') return;
-      chips.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); load(b.dataset.tv); });
+      chips.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); cur = b.dataset.tv; if (PHONE) poster(); else widget(tv, cur); });
   }
 
   // ---------- news catalysts ----------
