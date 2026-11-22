@@ -77,6 +77,10 @@
   $$('#apPaint button').forEach((b) => { b.onclick = () => set({ paint: b.dataset.v }); });
   $$('#apCar button').forEach((b) => { b.onclick = () => set({ car: b.dataset.v }); });
   $$('#apCalm button').forEach((b) => { b.onclick = () => set({ calm: b.dataset.v === '1' }); });
+  const supOn = () => { try { return localStorage.getItem('supHide') !== '1'; } catch (e) { return true; } };
+  const supMark = () => $$('#apSup button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === supOn())));
+  $$('#apSup button').forEach((b) => { b.onclick = () => { const on = b.dataset.v === '1'; try { localStorage.setItem('supHide', on ? '0' : '1'); } catch (e) {} window.dispatchEvent(new CustomEvent('sup:show', { detail: { show: on } })); supMark(); }; });
+  supMark();
   $$('#apSide button').forEach((b) => { b.onclick = () => { set({ side: b.dataset.v }); window.dispatchEvent(new CustomEvent('look:side', { detail: b.dataset.v })); }; });
   [['apDepth', 'depth'], ['apDim', 'dim'], ['apBlur', 'blur']].forEach(([id, k]) => { const el = $('#' + id); el.value = S[k]; el.oninput = () => set({ [k]: +el.value }); });
 

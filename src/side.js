@@ -56,14 +56,22 @@ const newId = () => (Date.now().toString(36) + (uid++).toString(36)).slice(-10);
 // Goals fill up by themselves when the text says what to count (owner, 2026-11-22: "I add a goal and it stays at 0%"):
 //   "$5k this month", "Make 2,000 this week", "20R this month", "60% win rate", "15 green days", "Pass phase 2" (prop firm target).
 // Anything else stays a manual goal: tap the bar to set it.
-function goalKind(text) {
-  const t = String(text || ''), per = /\bweek/i.test(t) ? 'week' : /\b(today|day)\b/i.test(t) && !/days/i.test(t) ? 'day' : 'month';
+// a goal can be set up by hand with ✎ (kind / target / period / trading days / account); otherwise it is read from its words
+const GKINDS = ['auto', 'money', 'r', 'wr', 'green', 'prop', 'manual'];
+function goalKind(g) {
+  if (g && typeof g === 'object') {
+    const x = { days: g.days === 7 ? 7 : 5, acct: g.acct || '' };
+    if (g.kind === 'manual') return null;
+    if (g.kind && g.kind !== 'auto') return g.kind === 'prop' || g.target > 0 ? { ...x, kind: g.kind, target: g.target, per: g.per || 'month' } : null;
+    const k = goalKind(g.text); return k ? { ...k, ...x, target: g.target > 0 ? g.target : k.target, per: g.per || k.per } : null;
+  }
+  const t = String(g || ''), per = /\bweek/i.test(t) ? 'week' : /\b(today|day)\b/i.test(t) && !/days/i.test(t) ? 'day' : 'month';
   let m;
   if (/phase|challenge|funded|\bprop\b|evaluation|\beval\b/i.test(t)) return { kind: 'prop', per };
   if ((m = /(\d{1,3}(?:\.\d+)?)\s*%/.exec(t)) && /win/i.test(t)) return { kind: 'wr', target: +m[1], per };
   if ((m = /(\d+(?:\.\d+)?)\s*R\b/.exec(t))) return { kind: 'r', target: +m[1], per };
   if ((m = /(\d+)\s*green/i.exec(t))) return { kind: 'green', target: +m[1], per };
-  if ((m = /(\$|usd|£|€)?\s*(\d[\d,]*(?:\.\d+)?)\s*(k\b)?/i.exec(t)) && (m[1] || m[3] || /make|profit|earn|\bpnl\b|p&l/i.test(t))) {
+  if ((m = /(\$|usd|£|€)?\s*(\d[\d,]*(?:\.\d+)?)\s*(k\b)?/i.exec(t)) && (m[1] || m[3] || /make|profit|earn|generate|target|\bpnl\b|p&l/i.test(t))) {
     const v = parseFloat(m[2].replace(/,/g, '')) * (m[3] ? 1000 : 1); if (v > 0) return { kind: 'money', target: v, per };
   }
   return null;
@@ -82,6 +90,11 @@ function clean(raw) {
   })).filter((f) => f.text);
   const goals = (Array.isArray(o.goals) ? o.goals : []).slice(0, 3).map((g) => ({
     id: /^[a-z0-9]{1,12}$/.test(g && g.id) ? g.id : newId(), text: str(g && g.text, 70), pct: Math.max(0, Math.min(100, Math.round(Number(g && g.pct) || 0))),
+    ...(g && GKINDS.includes(g.kind) && g.kind !== 'auto' ? { kind: g.kind } : {}),
+    ...(g && Number(g.target) > 0 ? { target: Math.min(1e9, Math.round(Number(g.target) * 100) / 100) } : {}),
+    ...(g && ['day', 'week', 'month'].includes(g.per) ? { per: g.per } : {}),
+    ...(g && Number(g.days) === 7 ? { days: 7 } : {}),
+    ...(g && /^[\w.-]{1,24}$/.test(g.acct || '') ? { acct: g.acct } : {}),
   })).filter((g) => g.text);
   return { fixes, goals, notes: str(o.notes, 600), saved: DAY.test(o.saved) ? o.saved : '' };
 }
@@ -122,20 +135,46 @@ module.exports = function setup(app, { db, page, requireUser, requireAdmin, esc 
       }
     }
     out.goalAuto = goalProgress(u, out.focus.goals, req.hasJournal);
+    try { out.goalAccts = db.prepare('SELECT account_number AS n, label FROM accounts WHERE user_id = ? ORDER BY id').all(u.id).slice(0, 30); } catch (e) { out.goalAccts = []; }
     res.json(out);
   });
 
+  // money / R goals (owner, 2026-11-22): one target split into today / this week / this month, so the member sees
+  // what they made against what they need. Trading days = Mon-Fri. "$10k this month" -> about $476 a day, $2,381 a week.
+  // Pace: where you should be by today; "need" = what each trading day left has to bring to still hit the month.
+  function paceGoal(u, k, live, A, from, now) {
+    const y = now.getUTCFullYear(), mo = now.getUTCMonth(), today = now.getUTCDate(), last = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+    const wd = (d) => { const g = new Date(Date.UTC(y, mo, d)).getUTCDay(); return k.days === 7 || (g > 0 && g < 6); };   // ✎ can set every day (crypto)
+    let mDays = 0, done = 0; for (let d = 1; d <= last; d++) if (wd(d)) { mDays++; if (d < today) done++; }
+    const left = Math.max(1, mDays - done);   // trading days left in the month, today included
+    const wk = k.days === 7 ? 7 : 5, daily = k.per === 'day' ? k.target : k.per === 'week' ? k.target / wk : k.target / Math.max(1, mDays);
+    const tgt = { day: daily, week: daily * wk, month: daily * mDays };
+    const sum = (rows) => rows.reduce((x, t) => x + (k.kind === 'r' ? (Number.isFinite(t.r) ? t.r : 0) : (t.net || 0)), 0);
+    const got = {}; ['day', 'week', 'month'].forEach((p) => { got[p] = sum(db.prepare(`SELECT net, r FROM journal_trades WHERE ${live} AND close_time >= ?`).all(...A, from[p])); });
+    const f = (v) => k.kind === 'r' ? (Math.round(v * 10) / 10) + 'R' : (v < 0 ? '−$' : '$') + Math.round(Math.abs(v)).toLocaleString('en-US');
+    const pc = (a, b) => Math.max(0, Math.min(100, Math.round(a / b * 100)));
+    const wkend = !wd(today);   // Saturday / Sunday: no daily target
+    const split = [['day', wkend ? 'Weekend' : 'Today'], ['week', 'This week'], ['month', 'This month']].map(([p, lab]) => ({ lab, got: f(got[p]), tgt: p === 'day' && wkend ? 'market shut' : f(tgt[p]), pct: p === 'day' && wkend ? 0 : pc(got[p], tgt[p]), neg: got[p] < 0, main: p === (k.per === 'day' && wkend ? 'week' : k.per) }));
+    const should = daily * done, diff = got.month - should;   // where the month should be before today's trades
+    const hit = got.month >= tgt.month, need = f((tgt.month - got.month) / left);
+    const pace = hit ? `Month hit, ${f(got.month - tgt.month)} over` : `${diff >= 0 ? 'Ahead' : 'Behind'} ${f(Math.abs(diff))} · ${need}/day`;
+    const paceLong = hit ? pace : `${diff >= 0 ? 'Ahead by' : 'Behind by'} ${f(Math.abs(diff))}. Need ${need} a day for the ${left} trading day${left > 1 ? 's' : ''} left this month.`;
+    const mp = k.per === 'day' && wkend ? 'week' : k.per;   // weekend: a daily goal shows the week's progress
+    return { pct: pc(got[mp], tgt[mp]), now: `${f(got[k.per])} of ${f(tgt[k.per])} ${k.per === 'day' ? 'today' : 'this ' + k.per}`, split, pace, paceLong, ahead: diff >= 0 };
+  }
+
   // progress of each goal the journal can measure ({ pct, now } or null = manual)
   function goalProgress(u, goals, has) {
-    const live = 'user_id = ? AND account_number IN (SELECT account_number FROM accounts WHERE user_id = ?)';
+    const live0 = 'user_id = ? AND account_number IN (SELECT account_number FROM accounts WHERE user_id = ?)';
     const now = new Date(), iso = (d) => d.toISOString().slice(0, 10);
     const from = { day: iso(now), week: iso(new Date(now - ((now.getUTCDay() + 6) % 7) * 864e5)), month: iso(now).slice(0, 8) + '01' };
     const fmt = (v) => '$' + Math.round(v).toLocaleString('en-US');
     return goals.map((g) => {
-      const k = goalKind(g.text); if (!k || !has) return null;
+      const k = goalKind(g); if (!k || !has) return null;
+      const live = k.acct ? live0 + ' AND account_number = ?' : live0, A = k.acct ? [u.id, u.id, k.acct] : [u.id, u.id];
       try {
         if (k.kind === 'prop') {
-          const a = db.prepare('SELECT account_number, prop_target, prop_start FROM accounts WHERE user_id = ? AND prop_target > 0 ORDER BY id').get(u.id);
+          const a = db.prepare(`SELECT account_number, prop_target, prop_start FROM accounts WHERE user_id = ? AND prop_target > 0${k.acct ? ' AND account_number = ?' : ''} ORDER BY id`).get(...(k.acct ? [u.id, k.acct] : [u.id]));
           if (!a) return { pct: 0, now: 'Add your firm target in Insights › Prop firm', need: 1 };
           const ts = db.prepare('SELECT net, balance_after FROM journal_trades WHERE user_id = ? AND account_number = ? ORDER BY close_time').all(u.id, a.account_number);
           if (!ts.length) return { pct: 0, now: 'No trades yet' };
@@ -145,11 +184,10 @@ module.exports = function setup(app, { db, page, requireUser, requireAdmin, esc 
           const goal = start * a.prop_target / 100; if (!(goal > 0)) return null;
           return { pct: Math.max(0, Math.min(100, Math.round(gain / goal * 100))), now: `${fmt(Math.max(0, gain))} of ${fmt(goal)} target` };
         }
-        const rows = db.prepare(`SELECT net, r, substr(close_time, 1, 10) AS d FROM journal_trades WHERE ${live} AND close_time >= ?`).all(u.id, u.id, from[k.per]);
+        const rows = db.prepare(`SELECT net, r, substr(close_time, 1, 10) AS d FROM journal_trades WHERE ${live} AND close_time >= ?`).all(...A, from[k.per]);
         const lab = k.per === 'day' ? 'today' : 'this ' + k.per;
         let v = 0, txt = '';
-        if (k.kind === 'money') { v = rows.reduce((x, t) => x + (t.net || 0), 0); txt = `${fmt(Math.max(0, v))} of ${fmt(k.target)} ${lab}`; }
-        if (k.kind === 'r') { v = rows.reduce((x, t) => x + (Number.isFinite(t.r) ? t.r : 0), 0); txt = `${Math.round(v * 10) / 10}R of ${k.target}R ${lab}`; }
+        if (k.kind === 'money' || k.kind === 'r') return paceGoal(u, k, live, A, from, now);
         if (k.kind === 'wr') { if (!rows.length) return { pct: 0, now: `No trades ${lab} yet` }; v = rows.filter((t) => t.net > 0).length / rows.length * 100; txt = `${Math.round(v)}% win ${lab} (${rows.length} trades)`; }
         if (k.kind === 'green') { const by = {}; rows.forEach((t) => { by[t.d] = (by[t.d] || 0) + (t.net || 0); }); v = Object.values(by).filter((x) => x > 0).length; txt = `${v} of ${k.target} green days ${lab}`; }
         return { pct: Math.max(0, Math.min(100, Math.round(v / k.target * 100))), now: txt };

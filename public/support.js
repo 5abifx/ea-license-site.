@@ -3,6 +3,10 @@
   var root = document.getElementById('sup'), btn = document.getElementById('sup-btn'), panel = document.getElementById('sup-panel');
   if (!root || !btn || !panel) return;
   var store = function (k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } };
+  if (store('supHide') === '1') root.hidden = true;   // hidden with the small ×; Appearance › Layout brings it back
+  var hide = document.getElementById('sup-hide');
+  if (hide) hide.addEventListener('click', function (e) { e.stopPropagation(); set(false); root.hidden = true; store('supHide', '1'); });
+  window.addEventListener('sup:show', function (e) { var on = !e.detail || e.detail.show; root.hidden = !on; store('supHide', on ? '0' : '1'); });
   if (store('supSeen')) root.classList.add('seen');
   var set = function (open) {
     panel.hidden = !open;

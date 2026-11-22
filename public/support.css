@@ -4,6 +4,23 @@
   position:fixed;right:max(18px,env(safe-area-inset-right,0px));bottom:max(18px,env(safe-area-inset-bottom,0px));z-index:45;
   font:500 14px/1.4 Manrope,Inter,system-ui,-apple-system,sans-serif;color:var(--s-fg);-webkit-font-smoothing:antialiased}
 .sup *{box-sizing:border-box}
+.sup[hidden]{display:none}
+.sup-hide{position:absolute;top:-6px;left:-6px;z-index:2;display:grid;place-items:center;width:20px;height:20px;min-height:0;padding:0;margin:0;border-radius:50%;
+  border:1px solid rgba(255,255,255,.22);background:rgba(12,12,16,.92);color:#d4d4d8;font:600 14px/1 Manrope,system-ui,sans-serif;letter-spacing:0;text-transform:none;
+  box-shadow:0 4px 12px rgba(0,0,0,.5);cursor:pointer;opacity:0;transition:opacity .2s}
+.sup:hover .sup-hide,.sup-hide:focus-visible{opacity:1}
+@media (hover:none){.sup-hide{opacity:1}}
+.sup.open .sup-hide{display:none}
+.sup-hide:hover{color:#fff;border-color:rgba(255,255,255,.45)}
+.sup-req{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border:1px solid var(--s-line);border-radius:10px;background:rgba(255,255,255,.03);
+  color:var(--s-fg);font:inherit;text-align:left;letter-spacing:0;text-transform:none;min-height:0;box-shadow:none;cursor:pointer;transition:border-color .2s,background .2s}
+.sup-req:hover{border-color:rgba(255,90,31,.55);background:rgba(255,90,31,.07)}
+.sup-req .sup-ic{background:rgba(255,90,31,.12);color:var(--s-or2);font:600 22px/1 Sora,system-ui,sans-serif}
+.sup-req>span:nth-child(2){flex:1;min-width:0}.sup-req b{display:block;font-weight:600;font-size:14.5px}.sup-req small{display:block;color:var(--s-dim);font-size:12.5px}
+.sup-form{display:grid;gap:8px}
+.sup-form textarea{width:100%;min-height:84px;resize:vertical;background:rgba(255,255,255,.05);border:1px solid var(--s-line);border-radius:10px;padding:9px;color:var(--s-fg);font:500 13px/1.4 Manrope,system-ui,sans-serif}
+.sup-form .sup-send{width:100%;padding:10px;border:0;border-radius:999px;background:#fff;color:#0a0a0b;font:800 13px Manrope,system-ui,sans-serif;letter-spacing:0;text-transform:none;min-height:0;cursor:pointer}
+.sup-form .sup-done{font-size:13.5px;color:var(--s-fg)}
 .sup-btn{position:relative;display:flex;align-items:center;gap:0;height:56px;min-width:56px;margin-left:auto;padding:0 16px;border:0;border-radius:999px;cursor:pointer;
   background:var(--s-or);color:#140600;box-shadow:0 14px 34px -10px rgba(255,90,31,.65),0 2px 8px rgba(0,0,0,.45);transition:transform .2s,background .2s,box-shadow .2s;
   font:600 14px Manrope,Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
