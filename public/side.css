@@ -62,7 +62,7 @@
 
   /* right column */
   .sc-quote { font: 600 19px/1.38 var(--display, Sora, sans-serif); letter-spacing: -.01em; margin: 8px 0 10px; }
-  .sc-quote em { font-style: normal; color: var(--accent, #ff5a1f); }
+  .sc-quote em { font-style: normal; color: var(--accent-2, var(--accent, #ff5a1f)); }
   .sc-pl { font: 700 32px var(--display, Sora, sans-serif); margin: 4px 0 2px; }
   .sc-pos { color: var(--ok, #26c6a0); } .sc-neg { color: var(--danger, #f0464b); }
   .sc-mini { display: flex; gap: 6px; margin-top: 10px; } .sc-mini span { flex: 1; height: 28px; border-radius: 7px; background: rgba(255,255,255,.07); display: grid; place-items: center; font: 600 11.5px var(--body, inherit); }

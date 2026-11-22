@@ -31,6 +31,7 @@ function clean(raw) {
     paint: PAINT.has(o.paint) ? o.paint : 'original',   // 3D garage car colour (wide PC side column)
     car: CAR.has(o.car) ? o.car : 'hyper',               // which garage car
     side: SIDE.has(o.side) ? o.side : 'pin',              // PC side cards: always on screen, or hidden at the edges (full-width middle)
+    calm: o.calm === true,                                // Reduce motion: no number sweeps or slide-ins (intro + garage stay)
   };
 }
 
@@ -38,7 +39,7 @@ function clean(raw) {
 function tags(u) {
   const look = clean(u && u.look);
   const json = JSON.stringify(look).replace(/</g, '\\u003c');
-  return `<script>window.__LOOK=${json}</script><script src="/look.js"></script>`;
+  return `<script>window.__LOOK=${json}${look.calm ? ";document.documentElement.classList.add('calm')" : ''}</script><script src="/look.js"></script>`;
 }
 
 module.exports = function setup(app, { db, page, requireUser }) {
@@ -68,8 +69,15 @@ module.exports = function setup(app, { db, page, requireUser }) {
   </div>
 
   <aside class="card ap-panel" aria-label="Appearance settings">
-    <div class="ap-sec">
-      <div class="ap-sec-h"><b>Background</b><span class="ap-tog">Motion <button type="button" class="ap-sw" id="apMotion" role="switch" aria-checked="true" aria-label="Motion"></button></span></div>
+    <div class="ap-tabs" role="tablist" aria-label="Settings">
+      <button type="button" role="tab" data-tab="bg" aria-selected="true">Background</button>
+      <button type="button" role="tab" data-tab="col" aria-selected="false">Colours</button>
+      <button type="button" role="tab" data-tab="car" aria-selected="false">Car</button>
+      <button type="button" role="tab" data-tab="lay" aria-selected="false">Layout</button>
+    </div>
+    <div class="ap-body">
+    <div class="ap-sec" data-pane="bg">
+      <div class="ap-sec-h"><b>Background</b><span class="ap-tog">Motion <button type="button" class="ap-sw" id="apMotion" role="switch" aria-checked="true" aria-label="Background motion"></button></span></div>
       <div class="ap-well ap-sl"><div class="row"><label for="apDepth">3D depth</label><output id="apDepthO">40</output></div><input type="range" id="apDepth" min="0" max="100" value="40"></div>
       <div class="ap-tiles"><button type="button" class="ap-tile" data-bg="none"><span class="th classic"><img src="/logo.png" alt=""></span><span class="nm">Classic 5ABI.FX</span></button></div>
       <div class="ap-grp">5ABI garage · move your mouse, the car floats</div>
@@ -90,20 +98,26 @@ module.exports = function setup(app, { db, page, requireUser }) {
         <div class="row"><label for="apBlur">Soften (blur)</label><output id="apBlurO">0</output></div><input type="range" id="apBlur" min="0" max="24" value="0">
       </div>
     </div>
-    <div class="ap-sec">
-      <div class="ap-sec-h"><b>Layout</b><small>Computer: keep the Focus, gallery, quote and garage cards on the sides, or go full width (they slide in when the mouse touches the edge)</small></div>
-      <div class="ap-well ap-seg" id="apSide">
-        <button type="button" data-v="pin">Cards on sides</button>
-        <button type="button" data-v="slide">Full width</button>
+    <div class="ap-sec" data-pane="col" hidden>
+      <div class="ap-sub">Panel tint <small>Auto picks for you</small></div>
+      <div class="ap-chips2" id="apPanel">
+        <button type="button" data-v="auto"><i style="background:conic-gradient(#0b0b0e 0 50%,#3a3a42 0)"></i>Auto</button>
+        <button type="button" data-v="midnight"><i style="background:#141a2e"></i>Midnight</button>
+        <button type="button" data-v="onyx"><i style="background:#050507"></i>Onyx</button>
+        <button type="button" data-v="graphite"><i style="background:#2a2b31"></i>Graphite</button>
       </div>
+      <div class="ap-sub">Accent <small>Buttons, highlights, the page you are on</small></div>
+      <div class="ap-grp">Metallic</div><div class="ap-dots" id="apMetal"></div>
+      <div class="ap-grp">Matte</div><div class="ap-dots" id="apMatte"></div>
     </div>
-    <div class="ap-sec">
-      <div class="ap-sec-h"><b>Garage car</b><small>The 3D car on wide computer screens</small></div>
-      <div class="ap-well ap-seg" id="apCar">
-        <button type="button" data-v="hyper">Hyper</button>
-        <button type="button" data-v="gwagon">G-Wagon widebody</button>
+    <div class="ap-sec" data-pane="car" hidden>
+      <div class="ap-sub">Model <small>The 3D car on wide computer screens</small></div>
+      <div class="ap-opts" id="apCar">
+        <button type="button" class="ap-opt" data-v="hyper"><b>Hyper</b><small>Low mid-engine supercar</small></button>
+        <button type="button" class="ap-opt" data-v="gwagon"><b>G-Wagon widebody</b><small>Boxy off-roader on wide arches</small></button>
       </div>
-      <div class="ap-well ap-seg" id="apPaint">
+      <div class="ap-sub">Paint</div>
+      <div class="ap-chips2" id="apPaint">
         <button type="button" data-v="original"><i style="background:conic-gradient(#333,#ff5a1f,#333)"></i>Original</button>
         <button type="button" data-v="obsidian"><i style="background:radial-gradient(circle at 35% 30%,#8a8a92,#111114 60%)"></i>Gloss black</button>
         <button type="button" data-v="matte"><i style="background:#2a2a2e"></i>Matte black</button>
@@ -114,26 +128,25 @@ module.exports = function setup(app, { db, page, requireUser }) {
         <button type="button" data-v="gold"><i style="background:#f2c14e"></i>Gold</button>
       </div>
     </div>
-    <div class="ap-sec">
-      <div class="ap-sec-h"><b>Panel tint</b><small>Auto picks for you</small></div>
-      <div class="ap-well ap-seg" id="apPanel">
-        <button type="button" data-v="auto"><i style="background:conic-gradient(#0b0b0e 0 50%,#3a3a42 0)"></i>Auto</button>
-        <button type="button" data-v="midnight"><i style="background:#141a2e"></i>Midnight</button>
-        <button type="button" data-v="onyx"><i style="background:#050507"></i>Onyx</button>
-        <button type="button" data-v="graphite"><i style="background:#2a2b31"></i>Graphite</button>
+    <div class="ap-sec" data-pane="lay" hidden>
+      <div class="ap-sub">Side cards <small>Computer only</small></div>
+      <div class="ap-opts" id="apSide">
+        <button type="button" class="ap-opt" data-v="pin"><b>Cards on sides</b><small>Focus, gallery, quote and garage stay beside the page</small></button>
+        <button type="button" class="ap-opt" data-v="slide"><b>Full width</b><small>Cards hide and slide in when the mouse touches the edge</small></button>
+      </div>
+      <div class="ap-sub">Motion</div>
+      <div class="ap-opts" id="apCalm">
+        <button type="button" class="ap-opt" data-v="0"><b>Full motion</b><small>Numbers count up and pages slide in</small></button>
+        <button type="button" class="ap-opt" data-v="1"><b>Reduce motion</b><small>Numbers show at once, pages switch calmly. Journal intro and garage car stay</small></button>
       </div>
     </div>
-    <div class="ap-sec">
-      <div class="ap-sec-h"><b>Accent</b><small>Buttons, highlights, the page you are on</small></div>
-      <div class="ap-grp">Metallic</div><div class="ap-dots" id="apMetal"></div>
-      <div class="ap-grp">Matte</div><div class="ap-dots" id="apMatte"></div>
     </div>
-    <div class="ap-sec">
+    <div class="ap-foot">
       <div class="ap-sec-h"><b>Readability check</b><span class="ap-ok" id="apOk">AAA</span></div>
       <div class="ap-well ap-read"><span class="sc" id="apScore">-</span><p id="apReadTxt">Choose a background to see the check.</p></div>
       <p class="ap-note" id="apAdj">The site measures your background and picks text colour, panel tint and accent shade so nothing gets lost.</p>
+      <div class="ap-save"><span id="apSaved" aria-live="polite">Changes save by themselves.</span></div>
     </div>
-    <div class="ap-save"><span id="apSaved" aria-live="polite">Changes save by themselves.</span></div>
   </aside>
 </div>
 <script src="/look-picker.js"></script>`);

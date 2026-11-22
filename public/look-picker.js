@@ -66,11 +66,17 @@
   pk.innerHTML = '<input type="color" id="apAccPick" value="#ff5a1f" aria-label="Pick any accent colour">'; $('#apMatte').appendChild(pk);
   $('#apAccPick').oninput = (e) => set({ accent: 'c-' + e.target.value });
 
+  /* tabs (same as Share Studio); last tab remembered on this device */
+  const showTab = (t) => { $$('.ap-tabs [data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === t))); $$('.ap-body [data-pane]').forEach((p) => { p.hidden = p.dataset.pane !== t; }); try { localStorage.setItem('apTab', t); } catch (e) {} };
+  $$('.ap-tabs [data-tab]').forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
+  try { const t = location.hash.slice(1) || localStorage.getItem('apTab'); if (t && document.querySelector('.ap-body [data-pane="' + t + '"]')) showTab(t); } catch (e) {}
+
   /* panel tint, motion, sliders */
   $$('#apPanel button').forEach((b) => { b.onclick = () => set({ panel: b.dataset.v }); });
   $('#apMotion').onclick = () => set({ motion: !S.motion });
   $$('#apPaint button').forEach((b) => { b.onclick = () => set({ paint: b.dataset.v }); });
   $$('#apCar button').forEach((b) => { b.onclick = () => set({ car: b.dataset.v }); });
+  $$('#apCalm button').forEach((b) => { b.onclick = () => set({ calm: b.dataset.v === '1' }); });
   $$('#apSide button').forEach((b) => { b.onclick = () => { set({ side: b.dataset.v }); window.dispatchEvent(new CustomEvent('look:side', { detail: b.dataset.v })); }; });
   [['apDepth', 'depth'], ['apDim', 'dim'], ['apBlur', 'blur']].forEach(([id, k]) => { const el = $('#' + id); el.value = S[k]; el.oninput = () => set({ [k]: +el.value }); });
 
@@ -82,6 +88,7 @@
     $$('#apPaint button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === (S.paint || 'original')));
     $$('#apCar button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === (S.car || 'hyper')));
     $$('#apSide button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === (S.side || 'pin')));
+    $$('#apCalm button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (S.calm ? '1' : '0'))));
     [['apDepth', 'depth'], ['apDim', 'dim'], ['apBlur', 'blur']].forEach(([id, k]) => { const el = $('#' + id); $('#' + id + 'O').textContent = S[k]; el.style.setProperty('--v', (S[k] - el.min) / (el.max - el.min) * 100 + '%'); });
     if (S.bg === 'colour') $('#apColourTh').style.background = S.colour;
     if (S.bg === 'none') { $('#apScore').textContent = '-'; $('#apOk').textContent = 'AAA'; $('#apReadTxt').textContent = 'Classic look: white text on near-black panels.'; }

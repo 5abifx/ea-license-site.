@@ -2,7 +2,7 @@
 // full, then settles on its real value. Runs once per page view, after the journal's loading screen closes.
 (function () {
   const main = document.querySelector('.app-body main') || document.querySelector('main');
-  if (!main) return;
+  if (!main || document.documentElement.classList.contains('calm')) return;   // Appearance > Reduce motion
   const RE = /^([+\-−]?)([$€£]?)(\d[\d,]*)(\.\d+)?(\s?(?:%|R|×|x))?$/;
   const easeIn = (t) => t * t * (3 - 2 * t);
   const easeOut = (t) => 1 - Math.pow(1 - t, 3);

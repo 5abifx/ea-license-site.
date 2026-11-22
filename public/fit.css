@@ -121,3 +121,38 @@ html.mid-s .tm > .tm-gh { grid-template-columns: 1fr; }
 /* garage card is second in the right column now: fixed height instead of filling the rest */
 .sc-r .sc-garage { flex: 0 0 280px; }
 @media (max-width: 1919px) { .sc-r .sc-garage { flex-basis: 250px; } }
+
+/* ---------- Appearance > Reduce motion (html.calm, set by src/look.js + public/look.js) ----------
+   page parts appear at once instead of rising/sliding in; numbers don't sweep (public/ignite.js skips);
+   the journal intro and the side globe/garage keep moving */
+html.calm .app-body :not(.plx, .plx *), html.calm .app-body :not(.plx, .plx *)::before, html.calm .app-body :not(.plx, .plx *)::after {
+  animation-duration: .001ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
+html.calm .app-main.swap-in, html.calm .app-main.swap-out { animation: none !important; transition: none !important; opacity: 1 !important; }
+html.calm .app-body :not(.plx, .plx *) { transition-duration: .12s !important; }
+
+/* ---------- account picker dial B1 (public/acct-dial.js, PC only): floating strip, no card behind ---------- */
+.app-body .accts.ad { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; width: 100%; height: 70px; padding: 0; margin-bottom: 14px;
+  overflow: visible; border: 0; background: none; box-shadow: none; }
+.ad-drum { position: relative; flex: 1; min-width: 0; height: 100%; overflow: hidden; outline: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+.ad-drum:focus-visible { box-shadow: inset 0 0 0 1px rgba(255,255,255,.3); border-radius: 10px; }
+.app-body .ad .acct { position: absolute; left: 50%; top: 50%; min-width: 0; max-width: 220px; margin: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 4px 10px 6px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; box-shadow: none; background: none; text-align: center; white-space: nowrap;
+  transition: transform .45s cubic-bezier(.2,.7,.2,1), opacity .35s, border-color .25s; }
+.app-body .ad .acct > small { max-width: 200px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.app-body .ad .acct > small:first-child { font-size: 11.5px; }
+.app-body .ad .acct > small:last-child { display: none; }
+.app-body .ad .acct > b { font-size: 15px; }
+.app-body .ad .acct.cur { border-bottom-color: var(--accent-2, var(--accent)); }
+.app-body .ad .acct.cur > small:first-child { color: var(--text); }
+.app-body .ad .acct.cur > b { font: 700 20px Sora, system-ui, sans-serif; letter-spacing: -.02em; }
+.app-body .ad.moved .acct.cur { cursor: pointer; border-bottom-style: dashed; }
+.ad-arr { flex: none; width: 30px; height: 30px; min-height: 0; padding: 0; border: 0; border-radius: 50%; background: transparent; box-shadow: none;
+  color: var(--muted); font-size: 20px; line-height: 1; letter-spacing: 0; text-transform: none; display: grid; place-items: center; cursor: pointer; }
+.ad-arr:hover:not(:disabled) { color: var(--text); background: rgba(255,255,255,.06); }
+.ad-arr:disabled { opacity: .25; cursor: default; }
+
+/* Focus goals: the line under each bar (what it counts, or "tap the bar") */
+.sc-gnow { margin-top: 5px; font-size: 11px; font-weight: 500; color: #8a8a93; }
+.sc-goal.auto .sc-bar { cursor: default; }
+.sc-goal.auto .sc-bar i { background: linear-gradient(90deg, var(--accent, #ff5a1f), #ffb07a); }
