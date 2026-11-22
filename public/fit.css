@@ -239,3 +239,12 @@ html.calm .app-body :not(.plx, .plx *) { transition-duration: .12s !important; }
   .pc-ses { grid-template-columns: 70px minmax(0, 1fr) 90px; }
   .pc-g.big > span { height: 48px; padding: 4px 5px; } .pc-g.big b { font-size: 10.5px; } .pc-g.big em { display: none; }
 }
+
+/* account dial on phones: same floating strip, a bit tighter */
+@media (max-width: 720px) {
+  .app-body .accts.ad { height: 60px; gap: 2px; margin-bottom: 10px; }
+  .app-body .ad .acct { max-width: 150px; padding: 3px 6px 5px; }
+  .app-body .ad .acct > small { max-width: 140px; font-size: 10.5px; }
+  .app-body .ad .acct.cur > b { font-size: 17px; }
+  .ad-arr { width: 26px; height: 26px; font-size: 18px; }
+}

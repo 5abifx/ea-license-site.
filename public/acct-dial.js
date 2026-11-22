@@ -1,12 +1,11 @@
 // Account picker dial (journal, Desk, Insights; owner picked style B1, 2026-11-22): on a computer the row of account
 // boxes becomes one floating strip with no card behind it. The chosen account sits in the middle with a thin orange
 // line under it; the others fade and shrink to the sides (with 5+ boxes it turns all the way round). Scroll over it, use ‹ › or the arrow keys to turn; click
-// the middle one (or press Enter) to open that account. Phones keep the swipe row. Styles: public/fit.css (.ad-*).
+// the middle one (or press Enter) to open that account. Phones get the same strip and swipe it. Styles: public/fit.css (.ad-*).
 (function () {
-  if (!matchMedia('(pointer: fine)').matches) return;
   document.querySelectorAll('.accts:not(.ad)').forEach(function (bar) {
     var items = [].slice.call(bar.querySelectorAll(':scope > a.acct'));
-    if (items.length < 3) return;
+    if (!items.length) return;
     bar.classList.add('ad');
     var drum = document.createElement('div'); drum.className = 'ad-drum'; drum.tabIndex = 0;
     drum.setAttribute('aria-label', 'Accounts: scroll or use the arrow keys to turn, Enter to open');
@@ -18,7 +17,7 @@
     bar.appendChild(prev); bar.appendChild(drum); bar.appendChild(next);
     var on = Math.max(0, items.findIndex(function (a) { return a.classList.contains('on'); })), cur = on;
     function lay() {
-      var w = Math.max(140, Math.min(190, drum.clientWidth * 0.19)), L = items.length;
+      var cw = drum.clientWidth, w = cw < 520 ? cw * 0.36 : Math.max(140, Math.min(190, cw * 0.19)), L = items.length;   // phones: neighbours peek at the edges
       items.forEach(function (a, i) {
         var d = i - cur;
         if (L >= 5) { if (d > L / 2) d -= L; else if (d < -L / 2) d += L; }   // turns round like a real dial
@@ -41,6 +40,9 @@
       var d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; if (!d) return;
       e.preventDefault(); var t = Date.now(); if (t - lock < 180) return; lock = t; go(cur + (d > 0 ? 1 : -1));
     }, { passive: false });
+    var sx = null;   // phones: swipe left / right to turn
+    drum.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; }, { passive: true });
+    drum.addEventListener('touchend', function (e) { if (sx == null) return; var dx = e.changedTouches[0].clientX - sx; sx = null; if (Math.abs(dx) > 30) go(cur + (dx < 0 ? 1 : -1)); }, { passive: true });
     drum.addEventListener('keydown', function (e) {
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); go(cur + 1); }
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); go(cur - 1); }
