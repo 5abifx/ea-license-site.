@@ -69,7 +69,10 @@ function recapHtml(R, { money, mask }) {
     const lo = Math.min(0, ...pts.map((p) => p[1])), hi = Math.max(0, ...pts.map((p) => p[1])), sp = hi - lo || mxs;
     const yy = (v) => +(H - 6 - ((v - lo) / sp) * (H - 12)).toFixed(1);
     return `<svg class="rc-seq" viewBox="0 0 ${Wd} ${H}" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="${Wd}" y1="${yy(0)}" y2="${yy(0)}" class="z"/>
-      <polyline points="0,${yy(0)} ${pts.map((p) => `${p[0]},${yy(p[1])}`).join(' ')}" class="ln"/>${pts.map((p, i) => `<circle cx="${p[0]}" cy="${yy(p[1])}" r="3.2" class="${seq[i] >= 0 ? 'up' : 'dn'}"/>`).join('')}</svg>`;
+      <polyline points="0,${yy(0)} ${pts.map((p) => `${p[0]},${yy(p[1])}`).join(' ')}" class="ln"/>${seq.length <= 30
+        ? pts.map((p, i) => `<circle cx="${p[0]}" cy="${yy(p[1])}" r="3.2" class="${seq[i] >= 0 ? 'up' : 'dn'}"/>`).join('')
+        // many trades: dots would pile up, so each trade is a thin win/loss tick along the bottom instead
+        : pts.map((p, i) => `<rect x="${(p[0] - step * 0.35).toFixed(2)}" width="${Math.max(0.3, step * 0.7).toFixed(2)}" y="${H - 4}" height="4" class="${seq[i] >= 0 ? 'up' : 'dn'}"/>`).join('')}</svg>`;
   };
   return `<div class="recap">
     <div class="rc-left">

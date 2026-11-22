@@ -1,0 +1,123 @@
+/* Members pages fit their middle column (owner's marked screenshots, 2026-11-21).
+   With the side cards pinned on a PC the middle is narrower than the screen, but most page CSS sizes itself by the
+   SCREEN width. public/side.js measures the middle and sets html.mid-m (middle < 1180px) and html.mid-s (< 900px);
+   the rules below re-flow the Desk, Journal, Insights and Appearance pages by those instead.
+   Also: side cards a bit smaller on 1280-1919px screens, scrollbars that blend in, "+" request button above "Need help?". */
+
+/* ---------- scrollbars: thin and dark everywhere in the members area ---------- */
+.app-body, .app-body *, .sc-col { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.14) transparent; }
+.app-body ::-webkit-scrollbar { width: 6px; height: 6px; }
+.app-body ::-webkit-scrollbar-track { background: transparent; }
+.app-body ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 6px; }
+.app-body ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.26); }
+.app-body ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+/* ---------- account tabs: wrap onto a second row on a PC instead of a scroll bar ---------- */
+@media (pointer: fine) {
+  .app-body .accts { flex-wrap: wrap; overflow: visible; }
+  .app-body .acct { min-width: 132px; padding: 7px 11px; }
+}
+
+/* ---------- side cards: a little smaller on 1280-1919px screens so the middle keeps room ---------- */
+@media (min-width: 1200px) and (pointer: fine) {
+  :root { --scw: clamp(236px, calc((100vw - 1680px) / 2 - 32px), 400px); }
+  /* "+" request button sits above the "Need help?" button, never under it when it opens out */
+  .fr { right: max(29px, calc(env(safe-area-inset-right, 0px) + 11px)); bottom: 84px; }
+  .fr-pop { right: 76px; bottom: 84px; }
+  .sc-r { bottom: 132px; }
+  .sc-globe { width: 100%; max-width: 250px; height: auto; aspect-ratio: 1; }
+  .sc-mini { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 5px; }
+  .sc-mini span { min-width: 0; overflow: hidden; white-space: nowrap; height: 24px; font-size: 10.5px; }
+}
+@media (min-width: 1200px) and (max-width: 1919px) and (pointer: fine) {
+  .sc-col { gap: 10px; font-size: 13px; }
+  .sc-card { padding: 14px 15px; border-radius: 18px; }
+  .sc-h { font-size: 15.5px; margin: 5px 0 10px; }
+  .sc-lbl { font-size: 9.5px; letter-spacing: .12em; }
+  .sc-rings { gap: 12px; } .sc-rings svg { width: 82px; height: 82px; }
+  .sc-leg div { font-size: 11.5px; gap: 6px; margin: 2px 0; } .sc-leg b { font-size: 14px; }
+  .sc-row .t { font-size: 12.5px; }
+  .sc-goal .top, .sc-ses div { font-size: 12px; }
+  .sc-ses { column-gap: 12px; } .sc-ses small { font-size: 10.5px; }
+  .sc-note { min-height: 52px; font-size: 12px; }
+  .sc-save { padding: 8px; font-size: 12.5px; margin-top: 10px; }
+  .sc-quote { font-size: 16px; }
+  .sc-pl { font-size: 26px; }
+  .sc-wt { padding: 11px; } .sc-wt .sc-wt-h { font-size: 14px; } .sc-wt p { font-size: 11.5px; }
+  .sc-mis { font-size: 12px; } .sc-mis small { font-size: 11px; } .sc-mis b { font-size: 11.5px; }
+  .sc-hint { font-size: 10.5px; }
+  /* gallery fan fits the card: smaller cards, closer together */
+  .sc-fan { height: 178px; margin: 10px 0 4px; }
+  .sc-fan img { width: 94px; height: 167px; margin-left: -47px; }
+  .sc-fan .f0 { transform: translateX(-50px) rotate(-8deg) scale(.86); } .sc-fan .f2 { transform: translateX(50px) rotate(8deg) scale(.86); }
+  .sc-fan:hover .f0 { transform: translateX(-56px) rotate(-10deg) scale(.86); } .sc-fan:hover .f2 { transform: translateX(56px) rotate(10deg) scale(.86); }
+  .sc-gb a { font-size: 12px; padding: 8px 0; }
+}
+
+/* ---------- Desk ---------- */
+html.mid-m .tm-day, html.mid-m .tm-mkt { grid-column: span 12; grid-row: auto; }
+html.mid-m .tm-tdy, html.mid-m .tm-rsk, html.mid-m .tm-upn, html.mid-m .tm-rl1,
+html.mid-m .tm.nomkt .tm-upn, html.mid-m .tm.nomkt .tm-rl1 { grid-column: span 6; }
+html.mid-m .tm-mkt .tm-tv { min-height: 440px; max-height: 560px; }
+html.mid-m .tm-ckp, html.mid-m .tm-gh { grid-column: span 12; }
+html.mid-s .tm-fc, html.mid-s .tm-rules { grid-column: span 12; }
+html.mid-m .tm-rskb .tm-rt { font-size: 15px; }
+/* news: the list scrolls inside a fixed height, the detail panel is only as tall as its content */
+.tm-nl { max-height: 480px; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+.tm-nwrap { align-items: start; }
+.tm-nd { position: sticky; top: 0; }
+@media (max-width: 1000px) { .tm-nl { max-height: 420px; } .tm-nd { position: static; } }
+
+/* ---------- Journal ---------- */
+/* calendar: day panel goes under the month when the middle is narrow, so the day squares get room */
+html.mid-m .app-body .cal-split { grid-template-columns: minmax(0, 1fr); }
+html.mid-m .app-body .cal-split > :last-child { max-height: 420px; overflow-y: auto; }
+/* trade-count dots: at most 3, smaller, never touching the day number */
+.app-body .cal-grid.cx .cn { gap: 2px; top: 9px; }
+.app-body .cal-grid.cx .cn i { width: 3px; height: 3px; }
+.app-body .cal-grid.cx .cn i:nth-child(n+4) { display: none; }
+/* What we found: 3 or 2 cards across by the middle's width, Fix line wraps under its text */
+html.mid-m .fq-grid { grid-auto-columns: calc((100% - 20px) / 3); }
+html.mid-s .fq-grid { grid-auto-columns: calc((100% - 10px) / 2); }
+.fq-fix { flex-wrap: wrap; row-gap: 4px; }
+.fq-fix > span { flex: 1 1 140px; min-width: 0; }
+.fq-fix .fq-go { white-space: nowrap; margin-left: auto; }
+/* last session / this week: chart takes the full card width when the card is narrow */
+html.mid-s .rc-split { grid-template-columns: 1fr; } html.mid-s .rc-curve, html.mid-s .rc-seq { min-height: 70px; }
+
+/* ---------- Insights > Time ---------- */
+html.mid-m .tm-top { grid-template-columns: 1fr; }
+.tm-clock, .tm-rank { overflow: hidden; }
+html.mid-m .ck-wrap { grid-template-columns: minmax(260px, 340px) minmax(200px, 1fr); }
+/* "New York | MT5 time | MT5 = NY + 7 h Save": one tidy control */
+.tz-pick { gap: 0; padding: 3px; border-radius: 999px; background: rgba(255,255,255,.04); border: 1px solid var(--line); flex-wrap: nowrap; }
+.tz-pick > a { border: 0; padding: 5px 12px; font-size: 12px; font-weight: 600; line-height: 1.2; }
+.tz-pick > a.on { background: rgba(255,255,255,.1); }
+.tz-pick .tz-off { margin-left: 4px; padding-left: 10px; border-left: 1px solid var(--line); gap: 6px; }
+.tz-pick .tz-off label { color: var(--muted); font-size: 11.5px; }
+.tz-pick .tz-off input { width: 40px !important; height: 24px; padding: 0 4px; border-radius: 7px; text-align: center; font-size: 12px; background: rgba(255,255,255,.06); border: 1px solid var(--line); }
+.tz-pick .tz-off button { min-height: 0; height: 26px; padding: 0 12px; border-radius: 999px; font-size: 11.5px; letter-spacing: 0; text-transform: none; }
+html.mid-s .tz-pick { flex-wrap: wrap; border-radius: 14px; }
+
+/* ---------- Appearance ---------- */
+/* the preview stays in view while the long settings list scrolls beside it */
+@media (min-width: 900px) {
+  .ap-prev { position: sticky; top: 84px; }
+  .ap-panel { position: static; }
+}
+.ap-stats .card { overflow: hidden; min-width: 0; }
+.ap-stats .v { white-space: nowrap; font-size: clamp(18px, 1.6vw, 24px); }
+html.mid-m .ap { grid-template-columns: minmax(0, 1fr) minmax(0, 380px); }
+html.mid-m .ap-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html.mid-m .ap-hero .big { font-size: 40px; }
+.rc-seq rect.up { fill: var(--ok); } .rc-seq rect.dn { fill: var(--danger); }
+/* You vs your rules at full width: chart left, facts right (instead of one huge chart) */
+html.mid-m .tm > .tm-gh { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 12px 20px; align-items: center; }
+html.mid-m .tm-gh > .tp-h { grid-column: 1 / -1; }
+html.mid-m .tm-gh .tm-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html.mid-s .tm > .tm-gh { grid-template-columns: 1fr; }
+/* garage label wraps before the sound button instead of running under it */
+.sc-garage .sc-lbl { right: 52px; line-height: 1.4; }
+/* garage card is second in the right column now: fixed height instead of filling the rest */
+.sc-r .sc-garage { flex: 0 0 280px; }
+@media (max-width: 1919px) { .sc-r .sc-garage { flex-basis: 250px; } }

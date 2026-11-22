@@ -16,9 +16,16 @@
   var wide = matchMedia('(min-width: 1280px)');   // owner: the side cards always stay on screen on a PC (was 2360px, then 1600px)
   // Appearance > Layout: 'pin' keeps the cards on screen, 'slide' gives the middle the full width and the cards slide in
   var sidePref = (window.__LOOK && window.__LOOK.side) || 'pin';
-  function mode() { root.classList.toggle('sc-wide', wide.matches && sidePref !== 'slide'); }
+  // the middle column's own width drives the page layout (public/fit.css): mid-m < 1180px, mid-s < 900px
+  function fit() {
+    var b = document.querySelector('.app-main > .app-body'), w = b ? b.getBoundingClientRect().width : innerWidth;
+    root.classList.toggle('mid-m', w > 0 && w < 1180); root.classList.toggle('mid-s', w > 0 && w < 900);
+  }
+  function mode() { root.classList.toggle('sc-wide', wide.matches && sidePref !== 'slide'); fit(); }
   mode(); wide.addEventListener && wide.addEventListener('change', mode);
   addEventListener('look:side', function (e) { sidePref = e.detail; mode(); });
+  var fitT = 0; addEventListener('resize', function () { clearTimeout(fitT); fitT = setTimeout(fit, 80); });
+  addEventListener('swap:load', fit);
 
   // ---------- request a feature (every members page) ----------
   var fr = el('button', 'fr', '+'); fr.type = 'button'; fr.title = 'Request a feature'; fr.setAttribute('aria-label', 'Request a feature');
@@ -214,6 +221,8 @@
   // ---------- right column ----------
   function right() {
     var h = '<div class="sc-card"><div class="sc-lbl">Today\'s thought</div><div class="sc-quote">“' + D.quote + '”</div></div>';
+    // the car sits right under the quote so it is on screen without scrolling the column (owner, 2026-11-22)
+    h += '<div class="sc-card sc-garage"><div class="sc-lbl">Garage · drag, scroll, tap to rev</div><canvas aria-label="3D car you can turn"></canvas><span class="sc-hint"></span></div>';
     if (D.last) {
       var dt = new Date(D.last.day + 'T12:00:00'), lab = dt.toLocaleString('en', { weekday: 'short' }) + ' ' + dt.getDate() + ' ' + dt.toLocaleString('en', { month: 'short' });
       var L0 = D.last, rr = L0.backR != null ? L0.backR : (L0.r != null && L0.r < 0 ? -L0.r : null);
@@ -234,7 +243,6 @@
       ? '<div class="sc-wt"><div class="sc-lbl" style="color:#ffb08a">Your #1 repeat mistake</div><div class="sc-wt-h">' + esc(w[0].title) + '</div><p>' + esc(w[0].text) + '</p>' + (w[0].fix ? '<p class="sc-wt-fix">Today: ' + esc(w[0].fix) + '</p>' : '') + '</div>'
         + w.slice(1).map(function (m) { return '<div class="sc-mis"><span>' + esc(m.title) + (m.tag ? '<small>' + esc(m.tag) + '</small>' : '') + '</span>' + (m.cost ? '<b>' + esc(m.cost) + '</b>' : '') + '</div>'; }).join('')
       : '<p class="sc-sub" style="margin:10px 0 0">' + (D.watchNeed ? 'Log ' + D.watchNeed + ' more trades and your repeat mistakes show here.' : D.last ? 'No repeat mistakes in your last 90 days. Keep it that way.' : 'Connect your MT5 account and your repeat mistakes show here.') + '</p>') + '</div>';
-    h += '<div class="sc-card sc-garage"><div class="sc-lbl">Garage · drag, scroll, tap to rev</div><canvas aria-label="3D car you can turn"></canvas><span class="sc-hint"></span></div>';
     R.innerHTML = h;
     var g = R.querySelector('.sc-garage canvas');
     // the 3D car is the heaviest thing on the page: start it only after the page has loaded and gone quiet,

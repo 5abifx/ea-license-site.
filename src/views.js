@@ -112,7 +112,7 @@ ${require('./seo').headTags(req, opts)}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@200;300;400;600&family=Manrope:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/style.css">
 ${u && !opts.wide ? swapHead() : ''}
-${u && !opts.wide ? '<link rel="stylesheet" href="/look.css"><link rel="stylesheet" href="/topbar.css"><link rel="stylesheet" href="/compact.css"><link rel="stylesheet" href="/dock.css"><link rel="stylesheet" href="/side.css"><script src="/side.js" defer></script><link rel="stylesheet" href="/select-ui.css"><script src="/select-ui.js" defer></script>' : ''}
+${u && !opts.wide ? '<link rel="stylesheet" href="/look.css"><link rel="stylesheet" href="/topbar.css"><link rel="stylesheet" href="/compact.css"><link rel="stylesheet" href="/dock.css"><link rel="stylesheet" href="/side.css"><link rel="stylesheet" href="/fit.css"><script src="/side.js" defer></script><link rel="stylesheet" href="/select-ui.css"><script src="/select-ui.js" defer></script>' : ''}
 <link rel="stylesheet" href="/guards.css">
 ${require('./look').a11yHead(u)}
 </head><body>
