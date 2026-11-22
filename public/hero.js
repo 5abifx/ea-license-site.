@@ -3,6 +3,7 @@
 (function () {
   const sc = document.currentScript, VER = sc && sc.src.includes('?') ? sc.src.slice(sc.src.indexOf('?')) : '';
   const hero = document.querySelector('.pl-hero, .jv-hero');
+  const PHONE = matchMedia('(max-width: 760px), (pointer: coarse) and (max-width: 1024px)').matches;
   if (!hero) return;
   const num = hero.querySelector('.pl-num');
   const target = Number(num && num.dataset.count) || 0;
@@ -47,7 +48,9 @@
   // Night run: the car crosses the screen as the number counts (3D, loaded only for this intro). If it is not ready
   // within 3.5s (very slow connection, no WebGL) the plain count runs instead and the car is dropped.
   let started = false;
-  const plain = () => { if (started) return; started = true; count(nEl, 1500, landed); };
+  const plain = () => { if (started) return; started = true; count(nEl, PHONE ? 1100 : 1500, landed); };
+  // Phones (owner, Nov 22): just the P&L counting up. No car: the 3D model is heavy to load and lagged on iPhone.
+  if (PHONE) { ov.classList.add('lite'); plain(); return; }
   const wait = setTimeout(plain, 3500);
   import('/nightrun.js' + VER).then((m) => m.prepare(ov, nEl)).then((play) => {
     if (started || closed) { const c = ov.querySelector('.plx-cv'); if (c) c.remove(); return; }

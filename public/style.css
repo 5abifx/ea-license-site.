@@ -1109,6 +1109,7 @@ select option:disabled { color: #6b6b73; }
 .plx.run::after { opacity: .5; }
 .plx.run .plx-in { top: -14vh; }
 .plx.run.go .plx-bar i { transition: none; }
+.plx.lite.go .plx-bar i { transition-duration: 1.1s; }   /* phones: P&L only, no car (hero.js) */
 
 /* recap row */
 .recap { display: grid; grid-template-columns: 1fr 1fr 1.35fr; gap: 12px; margin-bottom: 4px; align-items: start; }
@@ -1824,6 +1825,20 @@ a.tp-st.done { color: var(--text); display: inline-flex; align-items: center; ga
 .tm-mkts button[aria-pressed="true"] { background: var(--card); color: var(--text); }
 .tm-tv { height: clamp(360px, 52vh, 600px); border-radius: 12px; overflow: hidden; background: #0e0e10; }
 .tm-tvnote { margin: 0; }
+.tm-tv.ph { height: auto !important; min-height: 0 !important; max-height: none !important; flex: none !important; background: transparent; border-radius: 12px; }
+.tm-tvph { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.03); }
+.tm-tvph b { display: block; font-size: 16px; }
+.tm-tvph small { color: var(--muted); font-size: 11.5px; }
+.tm-tvbtns { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tm-tvbtns a { color: var(--muted); }
+.tm-full { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 10050; display: flex; flex-direction: column; background: #0e0e10; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+.tm-full-h { display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--line); }
+.tm-full-h b { flex: 1; font-size: 16px; }
+.tm-full-h a { color: var(--muted); }
+.tm-full-x { width: 40px; height: 40px; min-height: 0; padding: 0; border-radius: 50%; display: grid; place-items: center; text-transform: none; letter-spacing: 0; background: rgba(255,255,255,.08); border: 1px solid var(--line); box-shadow: none; color: #fff; }
+.tm-full-x i { font-style: normal; font-size: 22px; line-height: 1; }
+.tm-full-c { flex: 1; min-height: 0; }
+html.tm-full-on, html.tm-full-on body { overflow: hidden; }
 /* ---------- My EAs ---------- */
 .page-head .kicker, .ea-setup .kicker { display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
 .ea-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 14px; margin: 14px 0 16px; }
