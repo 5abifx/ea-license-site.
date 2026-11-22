@@ -53,6 +53,22 @@ const str = (v, n) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().sl
 let uid = 0;
 const newId = () => (Date.now().toString(36) + (uid++).toString(36)).slice(-10);
 
+// Goals fill up by themselves when the text says what to count (owner, 2026-11-22: "I add a goal and it stays at 0%"):
+//   "$5k this month", "Make 2,000 this week", "20R this month", "60% win rate", "15 green days", "Pass phase 2" (prop firm target).
+// Anything else stays a manual goal: tap the bar to set it.
+function goalKind(text) {
+  const t = String(text || ''), per = /\bweek/i.test(t) ? 'week' : /\b(today|day)\b/i.test(t) && !/days/i.test(t) ? 'day' : 'month';
+  let m;
+  if (/phase|challenge|funded|\bprop\b|evaluation|\beval\b/i.test(t)) return { kind: 'prop', per };
+  if ((m = /(\d{1,3}(?:\.\d+)?)\s*%/.exec(t)) && /win/i.test(t)) return { kind: 'wr', target: +m[1], per };
+  if ((m = /(\d+(?:\.\d+)?)\s*R\b/.exec(t))) return { kind: 'r', target: +m[1], per };
+  if ((m = /(\d+)\s*green/i.exec(t))) return { kind: 'green', target: +m[1], per };
+  if ((m = /(\$|usd|£|€)?\s*(\d[\d,]*(?:\.\d+)?)\s*(k\b)?/i.exec(t)) && (m[1] || m[3] || /make|profit|earn|\bpnl\b|p&l/i.test(t))) {
+    const v = parseFloat(m[2].replace(/,/g, '')) * (m[3] ? 1000 : 1); if (v > 0) return { kind: 'money', target: v, per };
+  }
+  return null;
+}
+
 // keep only what the panel needs: up to 6 fixes (each with the days it was kept), 3 goals, one note
 function clean(raw) {
   let o = {};
@@ -105,14 +121,47 @@ module.exports = function setup(app, { db, page, requireUser, requireAdmin, esc 
         } catch (e) { /* insights are optional here */ }
       }
     }
+    out.goalAuto = goalProgress(u, out.focus.goals, req.hasJournal);
     res.json(out);
   });
+
+  // progress of each goal the journal can measure ({ pct, now } or null = manual)
+  function goalProgress(u, goals, has) {
+    const live = 'user_id = ? AND account_number IN (SELECT account_number FROM accounts WHERE user_id = ?)';
+    const now = new Date(), iso = (d) => d.toISOString().slice(0, 10);
+    const from = { day: iso(now), week: iso(new Date(now - ((now.getUTCDay() + 6) % 7) * 864e5)), month: iso(now).slice(0, 8) + '01' };
+    const fmt = (v) => '$' + Math.round(v).toLocaleString('en-US');
+    return goals.map((g) => {
+      const k = goalKind(g.text); if (!k || !has) return null;
+      try {
+        if (k.kind === 'prop') {
+          const a = db.prepare('SELECT account_number, prop_target, prop_start FROM accounts WHERE user_id = ? AND prop_target > 0 ORDER BY id').get(u.id);
+          if (!a) return { pct: 0, now: 'Add your firm target in Insights › Prop firm', need: 1 };
+          const ts = db.prepare('SELECT net, balance_after FROM journal_trades WHERE user_id = ? AND account_number = ? ORDER BY close_time').all(u.id, a.account_number);
+          if (!ts.length) return { pct: 0, now: 'No trades yet' };
+          const first = ts.find((t) => t.balance_after > 0), last = [...ts].reverse().find((t) => t.balance_after > 0);
+          const start = a.prop_start > 0 ? a.prop_start : first ? first.balance_after - (first.net || 0) : 0;
+          const gain = last && start ? last.balance_after - start : ts.reduce((x, t) => x + (t.net || 0), 0);
+          const goal = start * a.prop_target / 100; if (!(goal > 0)) return null;
+          return { pct: Math.max(0, Math.min(100, Math.round(gain / goal * 100))), now: `${fmt(Math.max(0, gain))} of ${fmt(goal)} target` };
+        }
+        const rows = db.prepare(`SELECT net, r, substr(close_time, 1, 10) AS d FROM journal_trades WHERE ${live} AND close_time >= ?`).all(u.id, u.id, from[k.per]);
+        const lab = k.per === 'day' ? 'today' : 'this ' + k.per;
+        let v = 0, txt = '';
+        if (k.kind === 'money') { v = rows.reduce((x, t) => x + (t.net || 0), 0); txt = `${fmt(Math.max(0, v))} of ${fmt(k.target)} ${lab}`; }
+        if (k.kind === 'r') { v = rows.reduce((x, t) => x + (Number.isFinite(t.r) ? t.r : 0), 0); txt = `${Math.round(v * 10) / 10}R of ${k.target}R ${lab}`; }
+        if (k.kind === 'wr') { if (!rows.length) return { pct: 0, now: `No trades ${lab} yet` }; v = rows.filter((t) => t.net > 0).length / rows.length * 100; txt = `${Math.round(v)}% win ${lab} (${rows.length} trades)`; }
+        if (k.kind === 'green') { const by = {}; rows.forEach((t) => { by[t.d] = (by[t.d] || 0) + (t.net || 0); }); v = Object.values(by).filter((x) => x > 0).length; txt = `${v} of ${k.target} green days ${lab}`; }
+        return { pct: Math.max(0, Math.min(100, Math.round(v / k.target * 100))), now: txt };
+      } catch (e) { return null; }
+    });
+  }
 
   // save the Focus panel
   app.post('/api/focus', requireUser, json, (req, res) => {
     const f = clean(req.body);
     db.prepare('UPDATE users SET focus = ? WHERE id = ?').run(JSON.stringify(f), req.user.id);
-    res.json(f);
+    res.json({ ...f, goalAuto: goalProgress(req.user, f.goals, req.hasJournal) });
   });
 
   // "Request a feature"

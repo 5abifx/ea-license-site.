@@ -71,6 +71,8 @@
 
   // ---------- focus ----------
   var saveT = null;
+  var goalDirty = false;
+  function refreshGoals() { goalDirty = true; save(); }
   function save(now) {
     clearTimeout(saveT);
     saveT = setTimeout(function () {
@@ -78,6 +80,7 @@
       fetch('/api/focus', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(F) })
         .then(function (r) { return r.json(); }).then(function (j) {
           j.fixes.forEach(function (f, i) { if (F.fixes[i]) F.fixes[i].id = f.id; });
+          if (goalDirty && j.goalAuto) { goalDirty = false; D.goalAuto = j.goalAuto; drawFocus(); }
           var b = L.querySelector('.sc-save'); if (b && now) { b.classList.add('ok'); b.textContent = 'Saved'; setTimeout(function () { b.classList.remove('ok'); b.textContent = 'Save today'; }, 1600); }
         }).catch(function () {});
     }, now ? 0 : 900);
@@ -126,10 +129,13 @@
       + (F.fixes.length < 6 ? '<form class="sc-add" data-add="fix"><input maxlength="80" placeholder="' + (D.watch[0] && !F.fixes.length ? esc(D.watch[0].fix || '+ Add a fix').slice(0, 70) : '+ Add a fix') + '"></form>' : '')
       + '<div class="sc-sec"><div class="sc-lbl">Goals</div>'
       + F.goals.map(function (g, i) {
-        return '<div class="sc-goal"><div class="top"><span>' + esc(g.text) + '</span><span>' + g.pct + '% <button type="button" class="sc-x" data-rmg="' + i + '" aria-label="Remove">×</button></span></div>'
-          + '<div class="sc-bar" data-g="' + i + '" title="Click to set progress"><i style="width:' + g.pct + '%"></i></div></div>';
+        // goals the journal can measure fill up by themselves (src/side.js goalKind); the rest: tap the bar
+        var a = (D.goalAuto || [])[i], pct = a ? a.pct : g.pct;
+        return '<div class="sc-goal' + (a ? ' auto' : '') + '"><div class="top"><span>' + esc(g.text) + '</span><span>' + pct + '% <button type="button" class="sc-x" data-rmg="' + i + '" aria-label="Remove">×</button></span></div>'
+          + '<div class="sc-bar"' + (a ? ' title="Fills from your journal"' : ' data-g="' + i + '" title="Tap the bar to set your progress"') + '><i style="width:' + pct + '%"></i></div>'
+          + '<div class="sc-gnow">' + (a ? esc(a.now) : 'Tap the bar to set progress') + '</div></div>';
       }).join('')
-      + (F.goals.length < 3 ? '<form class="sc-add" data-add="goal"><input maxlength="70" placeholder="+ Add a goal (e.g. Pass phase 1)"></form>' : '') + '</div>'
+      + (F.goals.length < 3 ? '<form class="sc-add" data-add="goal"><input maxlength="70" placeholder="+ Add a goal (e.g. $5k this month, 20R, 60% win rate)"></form>' : '') + '</div>'
       + '<div class="sc-sec"><div class="sc-lbl" style="margin-bottom:8px">Notes</div><textarea class="sc-note" maxlength="600" placeholder="What did today teach you?">' + esc(F.notes) + '</textarea></div>'
       + '<button type="button" class="sc-save">Save today</button>';
   }
@@ -139,7 +145,7 @@
       var t = e.target.closest('[data-ck],[data-rm],[data-rmg],[data-g],.sc-save'); if (!t) return;
       if (t.dataset.ck != null) { var f = F.fixes[+t.dataset.ck]; if (f.days[today]) delete f.days[today]; else f.days[today] = 1; drawFocus(); save(); return; }
       if (t.dataset.rm != null) { F.fixes.splice(+t.dataset.rm, 1); drawFocus(); save(); return; }
-      if (t.dataset.rmg != null) { F.goals.splice(+t.dataset.rmg, 1); drawFocus(); save(); return; }
+      if (t.dataset.rmg != null) { F.goals.splice(+t.dataset.rmg, 1); if (D.goalAuto) D.goalAuto.splice(+t.dataset.rmg, 1); drawFocus(); save(); return; }
       if (t.dataset.g != null) { var bb = t.getBoundingClientRect(); F.goals[+t.dataset.g].pct = Math.max(0, Math.min(100, Math.round((e.clientX - bb.left) / bb.width * 20) * 5)); drawFocus(); save(); return; }
       if (t.classList.contains('sc-save')) save(true);
     });
@@ -148,6 +154,7 @@
       var i = e.target.querySelector('input'), v = i.value.trim(); if (!v) return;
       if (e.target.dataset.add === 'fix') F.fixes.push({ id: '', text: v, days: {} }); else F.goals.push({ id: '', text: v, pct: 0 });
       drawFocus(); save(); var n = c.querySelector('[data-add="' + e.target.dataset.add + '"] input'); if (n) n.focus();
+      if (e.target.dataset.add === 'goal') refreshGoals();
     });
     c.addEventListener('input', function (e) { if (e.target.classList.contains('sc-note')) { F.notes = e.target.value; save(); } });
   }
