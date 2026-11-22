@@ -1,9 +1,8 @@
-// Study room (/journal/study): a full-screen PC workbench where closed trades are studied and turned into setups.
-//   Left   - "To study" (trades the Journal EA recorded that have not been studied yet) and the member's setups
-//   Middle - the board: the trade's MT5 chart (its saved candles) plus screenshots from other platforms, each one
-//            marked up with Chart Ink (hand-drawn arrows, boxes, lines, handwriting; public/study.js)
-//   Right  - the trade, its environment (asked one question at a time; same answers = same setup), notes, grade
-//   Compare - this trade next to past trades of the same setup;  Playbook - every setup's curve, numbers and pairs
+// Study room (/journal/study): an open canvas, like a whiteboard, where closed trades are studied and turned into setups.
+//   Boards   - every setup gets its own endless board; members can add free boards too (study_boards.data = items + marks)
+//   Canvas   - trade frames (the trade's MT5 candles), screenshots, sticky notes, handwriting, hand-drawn boxes/arrows/lines
+//   Trades   - right panel: account buttons, search, To study / Studied, wins / losses; drag a trade onto the board
+//   Question - click a trade: the same one-question-at-a-time panel as sign-up (environment), notes, grade, save to setup
 // Rooms: students get the order flow room; others the room for the edge picked at sign-up (price action, ICT, own).
 // Screenshots are stored as JPEG BLOBs (max 1600 px wide) with a per-member cap. PC only (phones get a short note).
 const express = require('express');
@@ -25,6 +24,10 @@ module.exports = (app, { db, page, requireUser }) => {
       id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, trade_id INTEGER NOT NULL, name TEXT NOT NULL DEFAULT '',
       marks TEXT NOT NULL DEFAULT '[]', bytes INTEGER NOT NULL DEFAULT 0, jpg BLOB NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')));
     CREATE INDEX IF NOT EXISTS study_shots_trade ON study_shots(user_id, trade_id);
+    CREATE TABLE IF NOT EXISTS study_boards (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, room TEXT NOT NULL, name TEXT NOT NULL, setup_id INTEGER,
+      data TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL DEFAULT (datetime('now')));
+    CREATE INDEX IF NOT EXISTS study_boards_user ON study_boards(user_id, room);
     CREATE TABLE IF NOT EXISTS study_words (user_id INTEGER NOT NULL, room TEXT NOT NULL, qk TEXT NOT NULL, word TEXT NOT NULL, UNIQUE (user_id, room, qk, word));`);
   if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'study_room')) db.exec("ALTER TABLE users ADD COLUMN study_room TEXT NOT NULL DEFAULT ''");
 
@@ -40,141 +43,133 @@ module.exports = (app, { db, page, requireUser }) => {
     const shots = db.prepare('SELECT id, name, marks FROM study_shots WHERE user_id = ? AND trade_id = ? ORDER BY id').all(uid, t.id)
       .map((x) => ({ id: x.id, name: x.name, marks: parse(x.marks, []) }));
     let candles = parse(t.candles, []); if (!Array.isArray(candles)) candles = [];
-    return { id: t.id, symbol: t.symbol, side: t.side, lots: t.lots, entry: t.entry, exit: t.exit, sl: t.sl, tp: t.tp, digits: t.digits,
+    return { id: t.id, acct: t.account_number, symbol: t.symbol, side: t.side, lots: t.lots, entry: t.entry, exit: t.exit, sl: t.sl, tp: t.tp, digits: t.digits,
       open: t.open_time, close: t.close_time, net: t.net, r: t.r, cur: t.currency || '', tf: t.tf || '', candles: candles.slice(-400),
       setup: st.setup_id || null, env: parse(st.env, []), notes: parse(st.notes, []), grade: st.grade || '', marks: parse(st.marks, []), studied: Boolean(st.studied_at), shots };
   }
 
+  const json = express.json({ limit: '200kb' });
+  const RN = { flow: 'Order flow', pa: 'Price action', ict: 'ICT / SMC', own: 'My own' };
+  function roomOf(req) {
+    let prof = {}; try { prof = JSON.parse(req.user.profile || '{}') || {}; } catch (e) { /* ignore */ }
+    const rooms = roomsFor(req), student = Boolean(req.mentorEligible || req.user.is_admin);
+    if (rooms.includes(String(req.query.room)) && req.query.room !== req.user.study_room) db.prepare('UPDATE users SET study_room = ? WHERE id = ?').run(String(req.query.room), req.user.id);
+    const auto = student ? 'flow' : ({ pa: 'pa', ict: 'ict', breakout: 'pa' }[prof.edge] || 'own');
+    return { rooms, room: [req.query.room, req.user.study_room].map(String).find((r) => rooms.includes(r)) || auto };
+  }
+  // one board per setup (made when first needed) + the member's own free boards
+  function ensureSetupBoard(uid, room, setupId, name) {
+    const b = db.prepare('SELECT id FROM study_boards WHERE user_id = ? AND setup_id = ?').get(uid, setupId);
+    if (b) return b.id;
+    return Number(db.prepare('INSERT INTO study_boards (user_id, room, name, setup_id) VALUES (?, ?, ?, ?)').run(uid, room, name, setupId).lastInsertRowid);
+  }
+  // setups of a room with every studied trade's R (oldest first)
+  function setupStats(uid, room) {
+    const sets = db.prepare('SELECT id, name, rule FROM study_setups WHERE user_id = ? AND room = ? ORDER BY id').all(uid, room);
+    const studied = db.prepare(`SELECT st.setup_id, t.id, t.r, t.close_time FROM study_trades st JOIN journal_trades t ON t.id = st.trade_id AND t.user_id = st.user_id
+      WHERE st.user_id = ? AND st.studied_at IS NOT NULL AND st.setup_id IS NOT NULL ORDER BY t.close_time`).all(uid);
+    return sets.map((s) => { const ts = studied.filter((x) => x.setup_id === s.id);
+      return { id: s.id, n: s.name, rule: s.rule, r: ts.map((x) => Math.round((x.r || 0) * 100) / 100), last: ts.length ? ts[ts.length - 1].close_time : '' }; });
+  }
+  // accounts with trades (hidden ones left out), newest first
+  function accounts(uid) {
+    const hidden = new Set(db.prepare('SELECT account_number FROM journal_hidden WHERE user_id = ?').all(uid).map((a) => a.account_number));
+    return db.prepare(`SELECT t.account_number AS num, COUNT(*) AS n, MAX(t.broker) AS broker,
+        SUM(CASE WHEN st.studied_at IS NULL THEN 1 ELSE 0 END) AS todo
+      FROM journal_trades t LEFT JOIN study_trades st ON st.user_id = t.user_id AND st.trade_id = t.id
+      WHERE t.user_id = ? GROUP BY t.account_number ORDER BY MAX(t.close_time) DESC`).all(uid)
+      .filter((a) => !hidden.has(a.num)).map((a) => ({ num: a.num, n: a.n, todo: a.todo, name: `${clean(a.broker, 18) || 'Account'} ••${String(a.num).slice(-3)}` }));
+  }
+
   app.get('/journal/study', requireUser, (req, res) => {
     if (!req.hasJournal) return res.redirect('/journal');
-    const uid = req.user.id;
-    // which room: students get the order flow room; others the room for the edge they picked at sign-up (users.profile.edge)
-    let prof = {}; try { prof = JSON.parse(req.user.profile || '{}') || {}; } catch (e) { /* ignore */ }
-    const student = Boolean(req.mentorEligible || req.user.is_admin);
-    const rooms = roomsFor(req);
-    if (rooms.includes(String(req.query.room)) && req.query.room !== req.user.study_room) db.prepare('UPDATE users SET study_room = ? WHERE id = ?').run(String(req.query.room), uid);
-    const auto = student ? 'flow' : ({ pa: 'pa', ict: 'ict', breakout: 'pa' }[prof.edge] || 'own');
-    const room = [req.query.room, req.user.study_room].map(String).find((r) => rooms.includes(r)) || auto;
-    const RN = { flow: 'Order flow', pa: 'Price action', ict: 'ICT / SMC', own: 'My own' };
-
-    // trades still to study (newest first), and the one on the board
-    const inbox = db.prepare(`SELECT t.id, t.symbol, t.side, t.close_time, t.net, t.r, (SELECT COUNT(*) FROM study_shots s WHERE s.user_id = t.user_id AND s.trade_id = t.id) AS shots
-      FROM journal_trades t LEFT JOIN study_trades st ON st.user_id = t.user_id AND st.trade_id = t.id
-      WHERE t.user_id = ? AND st.studied_at IS NULL ORDER BY t.close_time DESC LIMIT 40`).all(uid);
-    const left = db.prepare(`SELECT COUNT(*) AS n FROM journal_trades t LEFT JOIN study_trades st ON st.user_id = t.user_id AND st.trade_id = t.id WHERE t.user_id = ? AND st.studied_at IS NULL`).get(uid).n;
-    let cur = req.query.t ? ownTrade(uid, req.query.t) : null;
-    if (!cur && inbox.length) cur = ownTrade(uid, inbox[0].id);
-    if (!cur) cur = db.prepare('SELECT * FROM journal_trades WHERE user_id = ? ORDER BY close_time DESC LIMIT 1').get(uid);
-
-    // setups of this room with every studied trade's R (oldest first) -> curves, cards, pairs
-    const sets = db.prepare('SELECT id, name, rule FROM study_setups WHERE user_id = ? AND room = ? ORDER BY id').all(uid, room);
-    const studied = db.prepare(`SELECT st.setup_id, st.env, t.id, t.r, t.net, t.close_time FROM study_trades st JOIN journal_trades t ON t.id = st.trade_id AND t.user_id = st.user_id
-      WHERE st.user_id = ? AND st.studied_at IS NOT NULL AND st.setup_id IS NOT NULL ORDER BY t.close_time`).all(uid);
-    const setups = sets.map((s) => { const ts = studied.filter((x) => x.setup_id === s.id);
-      return { id: s.id, n: s.name, rule: s.rule, r: ts.map((x) => Math.round((x.r || 0) * 100) / 100), last: ts.length ? ts[ts.length - 1].close_time : '', trades: ts.map((x) => ({ id: x.id, r: x.r, close: x.close_time })) }; });
-    const pairs = {};
-    studied.forEach((x) => { const s = sets.find((q) => q.id === x.setup_id); if (!s) return;
-      parse(x.env, []).slice(1).flat().filter((w) => !s.name.toLowerCase().includes(String(w).toLowerCase())).forEach((w) => { const k = s.name + '\u0001' + w; (pairs[k] = pairs[k] || [s.name, w, 0, 0]); pairs[k][2]++; pairs[k][3] += x.r || 0; }); });
+    const uid = req.user.id, { rooms, room } = roomOf(req);
+    const setups = setupStats(uid, room);
+    setups.forEach((s) => ensureSetupBoard(uid, room, s.id, s.n));
+    if (!db.prepare('SELECT 1 FROM study_boards WHERE user_id = ? AND room = ? AND setup_id IS NULL').get(uid, room)) db.prepare("INSERT INTO study_boards (user_id, room, name) VALUES (?, ?, 'My board')").run(uid, room);
+    const boards = db.prepare('SELECT id, name, setup_id AS setup, updated_at FROM study_boards WHERE user_id = ? AND room = ? ORDER BY setup_id IS NULL, name').all(uid, room);
+    const want = Number(req.query.b) || 0;
+    const cur = boards.find((b) => b.id === want) || boards.slice().sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))[0];
+    const board = db.prepare('SELECT data FROM study_boards WHERE id = ?').get(cur.id);
+    const accts = accounts(uid), used = db.prepare('SELECT COUNT(*) AS n FROM study_shots WHERE user_id = ?').get(uid).n;
     const words = db.prepare('SELECT qk, word FROM study_words WHERE user_id = ? AND room = ?').all(uid, room);
-    const used = db.prepare('SELECT COUNT(*) AS n FROM study_shots WHERE user_id = ?').get(uid).n;
-    const data = { room, trade: cur ? tradeData(uid, cur) : null, inbox, left, setups, words,
-      pairs: Object.values(pairs).filter((p) => p[2] >= 2).sort((a, b) => b[3] - a[3]).slice(0, 6).map((p) => [p[0], p[1], p[2], Math.round(p[3] * 10) / 10]),
-      shots: { used, cap: CAP, perTrade: PER_TRADE } };
+    const data = { room, rooms: rooms.map((r) => [r, RN[r]]), board: { id: cur.id, name: cur.name, setup: cur.setup, data: parse(board.data, {}) },
+      boards: boards.map((b) => ({ id: b.id, name: b.name, setup: b.setup })), setups, accts, words, mentor: Boolean(req.mentorEligible), shots: { used, cap: CAP } };
     const json = JSON.stringify(data).replace(/</g, '\\u003c');
-    const tool = (t, k, title, path) => `<button type="button" class="ci-tool" data-tool="${t}" title="${title} (${k})" aria-label="${title}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg><kbd>${k}</kbd></button>`;
     page(req, res, 'Study room', `
     <link rel="stylesheet" href="/study.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Instrument+Serif:ital@0;1&family=Architects+Daughter&family=Caveat:wght@500;700&family=Kalam:wght@400;700&family=Permanent+Marker&family=Patrick+Hand&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Architects+Daughter&family=Caveat:wght@500;700&display=swap">
     <script>document.documentElement.classList.add('sr-full')</script>
-
-    <div class="sr-phone card"><h2>Study room works on a PC</h2><p class="muted">It is a big workbench: your chart, your screenshots and your setups side by side. Open 5abifx.com on your computer to use it.</p></div>
-
+    <div class="sr-phone card"><h2>Study room works on a PC</h2><p class="muted">It is a big open board: your trades, screenshots and notes side by side. Open 5abifx.com on your computer to use it.</p></div>
     <script type="application/json" id="sr-data">${json}</script>
-    <div class="sr-app" id="sr-app" data-room="${room}">
-      <header class="sr-top">
-        <div class="sr-title"><span class="sr-k">Study room</span><h1 id="sr-setname">Absorption at value high</h1></div>
-        <div class="sr-nums" id="sr-nums"></div>
-        <nav class="sr-modes" aria-label="Study room views"><button class="on" data-m="study">Study</button><button data-m="compare">Compare</button><button data-m="book">Playbook</button></nav>
-        <label class="sr-room" title="Your room follows the edge you picked at sign-up. Change it in Profile."><span>Room</span><select id="sr-room" onchange="location.search='?room='+this.value">${rooms.map((r) => `<option value="${r}"${r === room ? ' selected' : ''}>${RN[r]}</option>`).join('')}</select></label>
-        ${data.trade ? '' : '<span class="sr-prev" title="Your trades show up here once the Journal EA records them.">Sample trade</span>'}
-      </header>
-
-      <div class="sr-body">
-        <aside class="sr-lib">
-          <div class="sr-sec"><div class="sr-sh"><span class="sr-k">To study</span><em class="count" id="sr-left">${left}</em></div><div id="sr-inbox"></div></div>
-          <div class="sr-sec"><div class="sr-sh"><span class="sr-k">My setups</span><button type="button" class="sr-add" title="New setup">+</button></div><div id="sr-sets"></div></div>
-          <p class="sr-quote" id="sr-q"></p>
-        </aside>
-
-        <main class="sr-main">
-          <section class="sr-view on" id="v-study">
-            <div class="sr-tabs" id="sr-tabs"></div>
-            <div class="sr-board">
-              <nav class="ci-rail" aria-label="Pen tools">
-                ${tool('select', 'V', 'Select and move', 'M5 3l14 8-6 2-3 6z')}
-                ${tool('text', 'T', 'Handwriting', 'M5 6c3-1.5 9-1.5 14 0M12 5.5c-.3 5 0 9 .3 13.5M9 19h6')}
-                ${tool('arrow', 'A', 'Arrow', 'M4 19C8 13 12 9 19 5M13 5.5l6-.5-1 6')}
-                ${tool('ellipse', 'O', 'Circle', 'M15 5.5C10 3.5 3.5 6 4 12s8 8 13 5.5 3-10-4-11.5')}
-                ${tool('rect', 'R', 'Box', 'M3 6.5l18-.8M20 5l.6 13.5M21.5 18 3.5 18.6M4 19.5 3.6 5')}
-                ${tool('line', 'L', 'Level line', 'M3 13c6-.6 12-.4 18 .3')}
-                ${tool('pen', 'P', 'Pen', 'M3 17c3-6 5 2 8-3s4-7 6-4 2 6 4 4')}
-                <i class="ci-sep"></i>
-                <div class="ci-sws" id="ci-sws"></div>
-                <button type="button" class="ci-tool" id="ci-undo" title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3"/></svg></button>
-              </nav>
-              <div class="ci-wrap">
-                <div class="ci-bar" id="ci-bar"></div>
-                <div class="ci-stage" id="ci-stage"><canvas id="ci-cv" width="1600" height="900"></canvas><textarea class="ci-type" id="ci-type" hidden spellcheck="false"></textarea><div class="ci-hint" id="ci-hint" hidden>Paste (Ctrl+V) or drop a screenshot here</div></div>
-              </div>
-            </div>
-            <div class="sr-strip"><span class="sr-k">Same setup before</span><div id="sr-past"></div><button type="button" class="ci-act" data-go="compare">Compare side by side</button></div>
-          </section>
-
-          <section class="sr-view" id="v-compare"><div class="sr-cmp" id="sr-cmp"></div></section>
-
-          <section class="sr-view" id="v-book">
-            <div class="sr-bk-top">
-              <div class="sr-curve"><div class="sr-sh"><span class="sr-k">Each setup over time, in R</span><span class="sr-chips" id="sr-flt"><button class="on">All</button><button>Wins</button><button>Losses</button></span></div><canvas id="sr-curves"></canvas><div class="sr-leg" id="sr-leg"></div></div>
-              <div class="sr-pairs"><span class="sr-k">Setup pairs</span><p class="muted small">Trades where two things lined up, best first.</p><div id="sr-pairs"></div></div>
-            </div>
-            <div class="sr-tbl"><div class="sr-tr sr-th"><span>Setup</span><span>Curve</span><span>Per trade</span><span>Profit factor</span><span>Won</span><span>Trades</span><span>Last traded</span></div><div id="sr-cards"></div></div>
-          </section>
-        </main>
-
-        <aside class="sr-insp" id="sr-insp">
-          <div class="sr-tcard">
-            <div class="sr-trow"><b>XAUUSD</b><span class="sr-side">Sell</span><span class="sr-when">Thu 20 Nov · 09:42</span></div>
-            <div class="sr-big"><span class="neg">−1.0R</span><small>−$184</small></div>
-            <div class="sr-ladder" aria-label="Target 4000.0, entry 4012.4, stop 4018.6"><i class="tp"></i><i class="sl"></i><u></u></div>
-            <div class="sr-lv"><span>Target<b>4000.0</b></span><span>Entry<b>4012.4</b></span><span>Stop<b>4018.6</b></span></div>
-            <p class="sr-meta">Held 42 min · New York session · recorded by the Journal EA</p>
-          </div>
-          <div class="sr-itabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-p="env">Environment</button><button type="button" role="tab" data-p="notes">Notes</button><button type="button" role="tab" data-p="review">Review</button></div>
-          <section class="sr-pane on" id="p-env">
-            <div class="sr-step" id="sr-step"></div>
-            <div class="sr-rec" id="sr-rec"></div>
-          </section>
-          <section class="sr-pane" id="p-notes">
-            <div class="sr-k sr-pk">Write it like you'd tell a friend. Short is fine.</div>
-            <div class="sr-paper">
-              <label>What I saw<textarea rows="3">Sellers sat on the value high. Three taps, no break.</textarea></label>
-              <label>What I did<textarea rows="3">Sold the 3rd tap. Took nothing at 1R. It turned and took my stop.</textarea></label>
-              <label>Next time<textarea rows="3" id="sr-next">Take half at 1R when the next level is close.</textarea></label>
-            </div></section>
-          <section class="sr-pane" id="p-review">
-            <h3 class="sr-qh">How did you <em>trade</em> it?</h3>
-            <div class="sr-chips2" id="sr-grade">${[['A+', 'Perfect, by the plan'], ['A', 'Good, small slip'], ['B', 'Right idea, poor exit'], ['C', 'Forced it'], ['F', 'Broke my rules']].map(([g, h], i) => `<button type="button" class="sr-chip${i === 2 ? ' on' : ''}" data-h="${h}"><b>${g}</b></button>`).join('')}</div>
-            <p class="sr-hint" id="sr-gh">Right idea, poor exit</p>
-            <label class="sr-tog"><input type="checkbox" id="sr-fix" checked><i></i><span>Add “Next time” to my Focus panel</span></label>
-            ${req.mentorEligible ? '<button type="button" class="sr-link">Ask my mentor about this trade →</button>' : ''}</section>
-          <div class="sr-save"><button type="button" class="sr-share" id="sr-done"><span>Save to “Absorption at value high”</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
-        </aside>
-      </div>
+    <div class="sr-app" id="sr-app" data-room="${room}"><h1 class="sr-vh">Study room</h1>
+      <div class="sr-vp" id="sr-vp"><div class="sr-world" id="sr-world"><svg class="sr-ink" id="sr-ink"></svg></div></div>
+      <div class="sr-isl" id="sr-tl"></div>
+      <div class="sr-isl" id="sr-boards" hidden></div>
+      <nav class="sr-isl" id="sr-tools" aria-label="Tools"></nav>
+      <div class="sr-isl" id="sr-props" hidden></div>
+      <aside class="sr-isl sr-side" id="sr-drawer" aria-label="Trades"></aside>
+      <aside class="sr-isl sr-side" id="sr-insp" hidden aria-label="This trade"></aside>
+      <button type="button" class="sr-isl sr-tab" id="sr-tab" hidden></button>
+      <div class="sr-isl" id="sr-zoom"></div>
+      <div class="sr-hint" id="sr-hint"></div>
+      <div class="sr-toast" id="sr-toast" hidden role="status"></div>
+      <input type="file" id="sr-file" accept="image/*" hidden>
     </div>
     <script src="/study.js" defer></script>`);
   });
 
-  const json = express.json({ limit: '200kb' });
+  // the trade list on the right: one account (or all), To study / Studied, wins / losses, search; 60 at a time
+  app.get('/journal/study/trades.json', requireUser, journalOnly, (req, res) => {
+    const uid = req.user.id, q = req.query, w = ['t.user_id = ?'], a = [uid];
+    const accts = accounts(uid);
+    if (q.acct && accts.some((x) => x.num === q.acct)) { w.push('t.account_number = ?'); a.push(q.acct); } else { w.push(`t.account_number IN (${accts.map(() => '?').join(',') || "''"})`); a.push(...accts.map((x) => x.num)); }
+    if (q.st === 'todo') w.push('st.studied_at IS NULL'); else if (q.st === 'done') w.push('st.studied_at IS NOT NULL');
+    if (q.res === 'win') w.push('t.net > 0'); else if (q.res === 'loss') w.push('t.net <= 0');
+    const s = clean(q.q, 30).toLowerCase(); if (s) { w.push('(LOWER(t.symbol) LIKE ? OR LOWER(COALESCE(ss.name, \'\')) LIKE ? OR LOWER(t.setup) LIKE ?)'); a.push(`%${s}%`, `%${s}%`, `%${s}%`); }
+    const from = `FROM journal_trades t LEFT JOIN study_trades st ON st.user_id = t.user_id AND st.trade_id = t.id LEFT JOIN study_setups ss ON ss.id = st.setup_id WHERE ${w.join(' AND ')}`;
+    const off = Math.max(0, Number(q.off) || 0), total = db.prepare(`SELECT COUNT(*) AS n ${from}`).get(...a).n;
+    const rows = db.prepare(`SELECT t.id, t.symbol, t.side, t.net, t.r, t.close_time AS close, t.account_number AS acct, ss.name AS setup, st.studied_at IS NOT NULL AS done ${from}
+      ORDER BY t.close_time DESC LIMIT 60 OFFSET ?`).all(...a, off);
+    res.set('Cache-Control', 'no-store').json({ rows, total, more: off + rows.length < total });
+  });
+  // a board: save its items and marks (auto-saved), rename, new, delete
+  const big = express.json({ limit: '1500kb' });
+  const ownBoard = (uid, id) => db.prepare('SELECT * FROM study_boards WHERE id = ? AND user_id = ?').get(Number(id) || 0, uid);
+  app.post('/journal/study/board/:id', requireUser, journalOnly, big, (req, res) => {
+    const b = ownBoard(req.user.id, req.params.id); if (!b) return res.status(404).json({ error: 'Board not found.' });
+    const d = req.body && req.body.data; if (!d || typeof d !== 'object') return res.status(400).json({ error: 'Nothing to save.' });
+    const out = { items: (Array.isArray(d.items) ? d.items : []).slice(0, 400), shapes: (Array.isArray(d.shapes) ? d.shapes : []).slice(0, 800), view: d.view && typeof d.view === 'object' ? d.view : null };
+    db.prepare("UPDATE study_boards SET data = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(out), b.id);
+    res.json({ ok: true });
+  });
+  app.post('/journal/study/boards/new', requireUser, journalOnly, json, (req, res) => {
+    const { room } = roomOf(req), name = clean(req.body && req.body.name, 50) || 'New board';
+    if (db.prepare('SELECT COUNT(*) AS n FROM study_boards WHERE user_id = ?').get(req.user.id).n >= 60) return res.status(400).json({ error: 'You have 60 boards already. Delete one first.' });
+    res.json({ ok: true, id: Number(db.prepare('INSERT INTO study_boards (user_id, room, name) VALUES (?, ?, ?)').run(req.user.id, room, name).lastInsertRowid) });
+  });
+  app.post('/journal/study/board/:id/rename', requireUser, journalOnly, json, (req, res) => {
+    const b = ownBoard(req.user.id, req.params.id); if (!b) return res.status(404).json({ error: 'Board not found.' });
+    const name = clean(req.body && req.body.name, 50); if (!name) return res.status(400).json({ error: 'Type a name first.' });
+    if (b.setup_id) return res.status(400).json({ error: 'Setup boards keep the setup name.' });
+    db.prepare('UPDATE study_boards SET name = ? WHERE id = ?').run(name, b.id); res.json({ ok: true });
+  });
+  app.post('/journal/study/board/:id/delete', requireUser, journalOnly, (req, res) => {
+    const b = ownBoard(req.user.id, req.params.id); if (!b) return res.status(404).json({ error: 'Board not found.' });
+    if (b.setup_id) return res.status(400).json({ error: 'A setup board stays while the setup has trades.' });
+    db.prepare('DELETE FROM study_boards WHERE id = ?').run(b.id); res.json({ ok: true });
+  });
+  // screenshot dropped on a board (not tied to one trade)
+  app.post('/journal/study/board/:id/shot', requireUser, journalOnly, express.raw({ type: 'image/jpeg', limit: '700kb' }), (req, res) => {
+    const uid = req.user.id; if (!ownBoard(uid, req.params.id)) return res.status(404).json({ error: 'Board not found.' });
+    const b = req.body;
+    if (!Buffer.isBuffer(b) || b.length < 100 || b[0] !== 0xff || b[1] !== 0xd8) return res.status(400).json({ error: 'That is not a picture.' });
+    const used = db.prepare('SELECT COUNT(*) AS n FROM study_shots WHERE user_id = ?').get(uid).n;
+    if (used >= CAP) return res.status(400).json({ error: `You have used all ${CAP} screenshots. Delete old ones to add more.` });
+    const id = db.prepare('INSERT INTO study_shots (user_id, trade_id, name, bytes, jpg) VALUES (?, 0, ?, ?, ?)').run(uid, clean(req.query.name, 30) || 'Screenshot', b.length, b).lastInsertRowid;
+    res.json({ ok: true, id: Number(id), used: used + 1, cap: CAP });
+  });
+
   // a past trade for Compare
   app.get('/journal/study/trade/:id.json', requireUser, journalOnly, (req, res) => {
     const t = ownTrade(req.user.id, req.params.id); if (!t) return res.status(404).json({ error: 'Trade not found.' });
@@ -190,6 +185,14 @@ module.exports = (app, { db, page, requireUser }) => {
     if (b.done && name) {
       db.prepare('INSERT OR IGNORE INTO study_setups (user_id, room, name) VALUES (?, ?, ?)').run(uid, room, name);
       setupId = db.prepare('SELECT id FROM study_setups WHERE user_id = ? AND room = ? AND name = ?').get(uid, room, name).id;
+      // the trade also lands on its setup's board (to the right of what is there)
+      const bid = ensureSetupBoard(uid, room, setupId, name), bd = parse(db.prepare('SELECT data FROM study_boards WHERE id = ?').get(bid).data, {}) || {};
+      bd.items = Array.isArray(bd.items) ? bd.items : [];
+      if (!bd.items.some((o) => o && o.type === 'trade' && o.tid === t.id)) {
+        const n = bd.items.filter((o) => o && o.type === 'trade').length;
+        bd.items.push({ id: 'b' + Date.now().toString(36), type: 'trade', tid: t.id, x: (n % 3) * 660, y: Math.floor(n / 3) * 420, w: 600 });
+        db.prepare("UPDATE study_boards SET data = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(bd), bid);
+      }
     }
     db.prepare(`INSERT INTO study_trades (user_id, trade_id, setup_id, env, notes, grade, marks, studied_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (user_id, trade_id) DO UPDATE SET setup_id = COALESCE(excluded.setup_id, setup_id), env = excluded.env, notes = excluded.notes,
@@ -202,7 +205,7 @@ module.exports = (app, { db, page, requireUser }) => {
       f.fixes = Array.isArray(f.fixes) ? f.fixes : []; const text = notes[2].slice(0, 80);
       if (f.fixes.length < 6 && !f.fixes.some((x) => x.text === text)) { f.fixes.push({ id: Math.random().toString(36).slice(2, 10), text, days: {} }); db.prepare('UPDATE users SET focus = ? WHERE id = ?').run(JSON.stringify(f), uid); fixed = true; }
     }
-    res.json({ ok: true, setup: setupId, fixed });
+    res.json({ ok: true, setup: setupId, fixed, board: setupId ? db.prepare('SELECT id FROM study_boards WHERE user_id = ? AND setup_id = ?').get(uid, setupId).id : null });
   });
   // set a setup's one-line rule
   app.post('/journal/study/setup/:id/rule', requireUser, journalOnly, json, (req, res) => {
