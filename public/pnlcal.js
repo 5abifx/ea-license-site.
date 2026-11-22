@@ -10,6 +10,7 @@
     var VIEWS = ['Year', 'Quarter', 'Month', 'Week', 'Day'], DAY = 864e5;
     var view = 0, at = Date.parse(today + 'T00:00:00Z');
     try { var sv = +localStorage.getItem('pcView'); if (sv >= 0 && sv < 5) view = sv; } catch (e) {}
+    var rows = 0; try { var sr = +localStorage.getItem('pcRows'); if ([12, 6, 2].indexOf(sr) >= 0) rows = sr; } catch (e) {}
     if (!localStorageHas() && box.clientWidth < 560) view = 2;   // phones open on the month
     function localStorageHas() { try { return localStorage.getItem('pcView') != null; } catch (e) { return false; } }
     // the last trading day with data is a better "today" on weekends
@@ -35,7 +36,8 @@
       var d = new Date(at), y = d.getUTCFullYear(), mo = d.getUTCMonth(), a0, a1, label, body = '';
       if (view === 0) {   // one continuous strip of weeks (Mon-Fri rows); phones split it into two halves so squares stay big
         a0 = Date.UTC(y, 0, 1); a1 = Date.UTC(y + 1, 0, 1); label = String(y);
-        var halves = box.clientWidth < 700 ? [[0, 6], [6, 12]] : [[0, 12]], strips = '';
+        var per = rows || (box.clientWidth < 700 ? 6 : 12), halves = [], strips = '', maxWk = 0;   // months per row: 12 = one straight strip
+        for (var hs = 0; hs < 12; hs += per) halves.push([hs, hs + per]);
         halves.forEach(function (hv) {
           var h0 = Date.UTC(y, hv[0], 1), h1 = Date.UTC(y, hv[1], 1), cols = '', last = -1, nc = 0;
           for (var w = monday(h0); w < h1; w += 7 * DAY) {
@@ -48,9 +50,9 @@
             }
             cols += '<div class="pc-wk' + (lab ? ' ms' : '') + '"><b>' + lab + '</b>' + cells + '</div>'; nc++;
           }
-          strips += '<div class="pc-yr" style="--wk:' + nc + '">' + cols + '</div>';
+          strips += '<div class="pc-yr" style="--wk:@WK@">' + cols + '</div>'; maxWk = Math.max(maxWk, nc);
         });
-        body = strips + '<div class="pc-key"><span>Loss</span><i style="' + tint(-mx) + '"></i><i style="' + tint(-mx * 0.15) + '"></i><i></i><i style="' + tint(mx * 0.15) + '"></i><i style="' + tint(mx) + '"></i><span>Profit</span><span class="pc-kh">Tap a month to open it</span></div>';
+        body = '<div class="pc-yrs n' + per + '">' + strips.replace(/@WK@/g, maxWk) + '</div><div class="pc-key"><span>Loss</span><i style="' + tint(-mx) + '"></i><i style="' + tint(-mx * 0.15) + '"></i><i></i><i style="' + tint(mx * 0.15) + '"></i><i style="' + tint(mx) + '"></i><span>Profit</span><span class="pc-kh">Tap a month to open it</span><span class="pc-rows" role="group" aria-label="Months per row">' + [12, 6, 2].map(function (n) { return '<button type="button" data-rows="' + n + '"' + (n === per ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') + '>' + n + ' mo</button>'; }).join('') + '</span></div>';
       } else if (view === 1 || view === 2) {
         var n = view === 1 ? 3 : 1, m0 = view === 1 ? Math.floor(mo / 3) * 3 : mo;
         a0 = Date.UTC(y, m0, 1); a1 = Date.UTC(y, m0 + n, 1); label = view === 1 ? 'Q' + (m0 / 3 + 1) + ' ' + y : MON[mo] + ' ' + y;
@@ -104,6 +106,8 @@
       while (!wd(at)) at += DAY;
     }
     box.addEventListener('click', function (e) {
+      var rb = e.target.closest('[data-rows]');
+      if (rb) { rows = +rb.dataset.rows; try { localStorage.setItem('pcRows', rows); } catch (x) {} draw(); return; }
       var ym = e.target.closest('[data-m]');
       if (ym) { at = Date.UTC(new Date(at).getUTCFullYear(), +ym.dataset.m, 1); while (!wd(at)) at += DAY; view = 2; draw(); return; }
       var b = e.target.closest('[data-v],[data-s]'); if (!b) return;

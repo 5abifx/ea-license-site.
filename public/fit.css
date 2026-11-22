@@ -199,7 +199,8 @@ html.calm .app-body :not(.plx, .plx *) { transition-duration: .12s !important; }
 .pc-sw button:disabled { opacity: .25; cursor: default; }
 .pc-body i, .pc-body span { font-style: normal; }
 .pc-yr { display: grid; grid-template-columns: repeat(var(--wk, 53), minmax(0, 1fr)); gap: 5px; }
-.pc-yr + .pc-yr { margin-top: 18px; }
+.pc-yrs { display: grid; gap: 22px 40px; } .pc-yrs .pc-yr { max-width: calc(var(--wk, 53) * 30px); }
+.pc-yrs.n6 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pc-yrs.n2 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .pc-wk { display: grid; grid-template-rows: 30px repeat(5, auto); gap: 5px; min-width: 0; }
 .pc-wk > b { position: relative; min-width: 0; }
 .pc-wk > b button { all: unset; position: absolute; left: 0; bottom: 4px; display: flex; flex-direction: column; gap: 1px; white-space: nowrap; cursor: pointer;
@@ -256,4 +257,9 @@ html.calm .app-body :not(.plx, .plx *) { transition-duration: .12s !important; }
   .ad-arr { width: 26px; height: 26px; font-size: 18px; }
 }
 .accts.ad ~ .ad-ld { opacity: .45; transition: opacity .15s; pointer-events: none; }
-.pc-yr + .pc-key { margin-top: 14px; }
+.pc-yrs + .pc-key { margin-top: 14px; }
+.pc-rows { display: inline-flex; gap: 2px; padding: 2px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); }
+.pc-kh + .pc-rows { margin-left: 12px; }
+.pc-rows button { all: unset; cursor: pointer; padding: 3px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 700; color: #a1a1aa; }
+.pc-rows button:hover { color: #fff; } .pc-rows button.on { background: rgba(255,255,255,.12); color: #fff; }
+@media (max-width: 720px) { .pc-rows { margin-left: auto; } .pc-yrs.n6 { grid-template-columns: minmax(0, 1fr); } .pc-yrs.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 16px; } }
