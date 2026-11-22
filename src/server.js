@@ -275,7 +275,7 @@ const { studentBox: mentorBox } = require('./mentor')(app, { db, page, flash, re
 // guided first run after sign-up + Profile settings (src/onboard.js); stripe is set up further down, so it is looked up at request time
 const onboard = require('./onboard')(app, { db, page, flash, requireUser, trialDays,
   stripe: { on: () => stripe.on(), needsCardTrial: (u) => stripe.needsCardTrial(u) } });
-require('./study')(app, { page, requireUser });   // Study room: screenshots, environments, playbook (preview)
+require('./study')(app, { db, page, requireUser });   // Study room: screenshots with hand-drawn marks, environments, setups playbook
 require('./journal')(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, onboard, setJournalAccess: (f) => { journalAccess = f; } });
 require('./welcome')(app, { db, requireUser });   // student welcome + journal result reveal
 require('./tour')(app, { db, requireUser });

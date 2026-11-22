@@ -1,5 +1,6 @@
 // Study room (src/study.js): full-screen PC workbench. Chart Ink (hand-drawn marks on screenshots) sits in the middle.
-// PREVIEW: sample trades, pictures and setups so the owner can try how it works. Nothing is saved yet.
+// LIVE when the page carries a trade (#sr-data from src/study.js): real candles, saved marks, screenshots, setups.
+// With no trades yet it shows a sample trade so the member can see how it works (nothing is saved then).
 (function () {
   const $ = (id) => document.getElementById(id);
   if (!$('sr-app')) return;
@@ -44,6 +45,17 @@
         { k: 'What happened', q: 'What did you <em>see</em>?', multi: 1, own: 1, o: [] }],
       pick: ['Resistance'] } };
   const RC = RM[ROOM] || RM.flow;
+  let D = {}; try { D = JSON.parse($('sr-data').textContent) || {}; } catch (e) { D = {}; }
+  const LIVE = Boolean(D.trade), TR = D.trade || {};
+  const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const tDate = (v) => { const d = new Date(String(v || '').replace(' ', 'T') + 'Z'); return isNaN(d) ? null : d; };
+  const DN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const p2 = (n) => String(n).padStart(2, '0');
+  const fDay = (v) => { const d = tDate(v); return d ? d.getUTCDate() + ' ' + MN[d.getUTCMonth()] : ''; };
+  const fWhen = (v) => { const d = tDate(v); return d ? `${DN[d.getUTCDay()]} ${fDay(v)} · ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}` : ''; };
+  const money = (v) => (v < 0 ? '−' : '+') + '$' + Math.abs(Math.round(v || 0)).toLocaleString('en-US');
+  const api = (url, body, raw) => fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': raw ? 'image/jpeg' : 'application/json' }, body: raw ? body : JSON.stringify(body || {}) })
+    .then((r) => r.json().catch(() => ({})).then((j) => (r.ok ? j : Promise.reject(new Error(j.error || 'Could not save. Check your connection.')))));
   const DPR = () => Math.min(devicePixelRatio || 1, 2);
   function fitCv(cv) { const d = DPR(), w = cv.clientWidth, h = cv.clientHeight; cv.width = w * d; cv.height = h * d; const x = cv.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); return [x, w, h]; }
   function spark(cv, pts, col) {
@@ -54,9 +66,10 @@
 
   /* ---------- sample data ---------- */
   const RS = [[1.6, -1, 2.1, 1.4, -1, 1.8, -1, '20 Nov'], [0.8, -1, 1.2, -1, 2, 0.9, -1, 1.1, 0.6, '19 Nov'], [2.2, 1.9, -1, 2.6, '14 Nov'], [1.5, -1, -1, 0.9, -1, 1.2, -0.6, '12 Nov'], [-1, 1.4, -1, -1, 0.8, -1, -1, 1.2, '6 Nov']];
-  const SETS = RC.sets.map(([n, rule], i) => ({ n, rule, c: '#f2f2f4', r: RS[i].slice(0, -1), last: RS[i][RS[i].length - 1] }));
-  SETS.forEach((s) => { const w = s.r.filter((v) => v > 0), l = s.r.filter((v) => v <= 0), gw = w.reduce((a, b) => a + b, 0), gl = -l.reduce((a, b) => a + b, 0);
-    s.won = Math.round(w.length / s.r.length * 100); s.exp = (gw - gl) / s.r.length; s.pf = gl ? gw / gl : gw; s.tot = gw - gl; });
+  const SETS = LIVE ? (D.setups || []).map((s) => ({ id: s.id, n: s.n, rule: s.rule || '', c: '#f2f2f4', r: s.r || [], last: fDay(s.last) || '–', trades: s.trades || [] }))
+    : RC.sets.map(([n, rule], i) => ({ n, rule, c: '#f2f2f4', r: RS[i].slice(0, -1), last: RS[i][RS[i].length - 1], trades: [] }));
+  SETS.forEach((s) => { const w = s.r.filter((v) => v > 0), l = s.r.filter((v) => v <= 0), gw = w.reduce((a, b) => a + b, 0), gl = -l.reduce((a, b) => a + b, 0), n = s.r.length || 1;
+    s.won = Math.round(w.length / n * 100); s.exp = (gw - gl) / n; s.pf = gl ? gw / gl : gw; s.tot = gw - gl; });
   const INBOX = [['XAUUSD', 'sell', 'Thu 20 Nov · 09:42', -184, -1, 'No screenshot yet'], ['NAS100', 'buy', 'Wed 19 Nov · 10:05', 612, 2.4, '2 pictures, no setup'],
     ['XAUUSD', 'buy', 'Wed 19 Nov · 15:22', 203, 1.1, 'No notes yet'], ['EURUSD', 'sell', 'Tue 18 Nov · 08:31', -96, -0.6, 'No screenshot yet']];
   const PAST = [['14 Nov', 2.1, 'Sold the 3rd tap, half off at 1R, rest ran to the POC.'], ['12 Nov', 1.4, 'Two taps only, but big sellers on the footprint.'], ['6 Nov', -1, '1st tap. Too early, no absorption yet.'], ['3 Nov', 1.8, 'Heatmap wall above held all morning.'], ['29 Oct', 1.6, 'Clean 3 taps in the New York open.'], ['27 Oct', -1, 'Against my bias on a trend day.']];
@@ -91,6 +104,31 @@
     [[4000, 'TP 4000.0', '#26c6a0', '#03130e'], [4018.6, 'SL 4018.6', '#f0464b', '#fff'], [4012.4, 'Sell 4012.4', '#fff', '#000']].forEach(([v, t, bg, fg]) => { g.fillStyle = bg; g.fillRect(ax + 2, Y(v) - 13, 106, 26); g.fillStyle = fg; g.font = '600 14px Manrope, sans-serif'; g.fillText(t, ax + 8, Y(v) + 5); });
     g.fillStyle = '#6b6b75'; g.font = '15px Manrope, sans-serif'; ['09:00', '09:15', '09:30', '09:45', '10:00', '10:15'].forEach((t, i) => g.fillText(t, 20 + i * (ax - 60) / 5, H - 22));
     return { c, tap: [[X(28), Y(4013.6)], [X(37), Y(4013.4)], [X(44), Y(4013.9)]], entry: [X(46), Y(4012.4)], stop: [X(64), Y(4004)], Y, ax };
+  }
+  function realChart(t, W, H) {
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'), dg = Number.isFinite(t.digits) ? Math.min(t.digits, 5) : 2;
+    g.fillStyle = '#0a0a0d'; g.fillRect(0, 0, W, H);
+    const all = (t.candles || []).filter((k) => Array.isArray(k) && k.length >= 5), o = tDate(t.open), cl = tDate(t.close);
+    const at = (d) => { if (!d) return -1; const ts = d / 1000; let b = 0; all.forEach((k, i) => { if (k[0] <= ts) b = i; }); return b; };
+    let iE = at(o), iX = Math.max(at(cl), iE); const a0 = Math.max(0, iE - 40), a1 = Math.min(all.length, Math.max(iX + 20, a0 + 60)), K = all.slice(a0, Math.min(a1, a0 + 140)); iE -= a0; iX -= a0;
+    const lv = [t.entry, t.exit, t.sl, t.tp].filter((v) => Number.isFinite(v) && v > 0), ps = [...lv, ...K.flatMap((k) => [k[2], k[3]])];
+    let lo = Math.min(...ps), hi = Math.max(...ps); if (!Number.isFinite(lo)) { lo = 0; hi = 1; } const pad = (hi - lo) * 0.08 || 1; lo -= pad; hi += pad;
+    const ax = W - 130, Y = (v) => 60 + (hi - v) / (hi - lo) * (H - 120);
+    g.strokeStyle = '#15151b'; g.lineWidth = 1; g.font = '17px Manrope, sans-serif'; g.fillStyle = '#6b6b75';
+    for (let i = 0; i <= 6; i++) { const v = lo + (hi - lo) * i / 6; g.beginPath(); g.moveTo(0, Y(v)); g.lineTo(ax, Y(v)); g.stroke(); g.fillText(v.toFixed(dg), ax + 12, Y(v) + 6); }
+    g.fillStyle = '#c9c9d0'; g.font = '600 20px Manrope, sans-serif'; g.fillText(`${t.symbol} · ${t.tf || 'M1'} · MT5`, 24, 36);
+    const N = Math.max(K.length, 1), cw = (ax - 30) / N, X = (i) => 15 + i * cw + cw / 2;
+    if (!K.length) { g.fillStyle = '#6b6b75'; g.font = '18px Manrope, sans-serif'; g.fillText('No candles were saved with this trade. Add a screenshot instead.', 24, 70); }
+    if (K.length && iE >= 0) { const x1 = X(Math.max(0, iE)), x2 = X(Math.min(K.length - 1, Math.max(iX, iE + 1)));
+      if (Number.isFinite(t.tp) && t.tp > 0) { g.fillStyle = 'rgba(38,198,160,.12)'; g.fillRect(x1, Math.min(Y(t.entry), Y(t.tp)), x2 - x1, Math.abs(Y(t.entry) - Y(t.tp))); }
+      if (Number.isFinite(t.sl) && t.sl > 0) { g.fillStyle = 'rgba(240,70,75,.14)'; g.fillRect(x1, Math.min(Y(t.entry), Y(t.sl)), x2 - x1, Math.abs(Y(t.entry) - Y(t.sl))); } }
+    K.forEach((k, i) => { const up = k[4] >= k[1], y1 = Y(Math.max(k[1], k[4])), bh = Math.max(2, Y(Math.min(k[1], k[4])) - y1); g.strokeStyle = up ? '#e8e8ec' : '#7a7a84'; g.fillStyle = up ? '#e8e8ec' : '#25252b'; g.lineWidth = 1.4;
+      g.beginPath(); g.moveTo(X(i), Y(k[2])); g.lineTo(X(i), Y(k[3])); g.stroke(); g.fillRect(X(i) - cw * 0.32, y1, cw * 0.64, bh); if (!up) g.strokeRect(X(i) - cw * 0.32, y1, cw * 0.64, bh); });
+    const tag = (v, txt, bg, fg) => { if (!Number.isFinite(v) || v <= 0) return; g.strokeStyle = bg; g.globalAlpha = 0.5; g.setLineDash([6, 6]); g.beginPath(); g.moveTo(0, Y(v)); g.lineTo(ax, Y(v)); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+      g.fillStyle = bg; g.fillRect(ax + 2, Y(v) - 13, 126, 26); g.fillStyle = fg; g.font = '600 14px Manrope, sans-serif'; g.fillText(txt + ' ' + v.toFixed(dg), ax + 8, Y(v) + 5); };
+    tag(t.tp, 'TP', '#26c6a0', '#03130e'); tag(t.sl, 'SL', '#f0464b', '#fff'); tag(t.exit, 'Exit', '#8a8a94', '#000'); tag(t.entry, String(t.side).toLowerCase() === 'sell' ? 'Sell' : 'Buy', '#fff', '#000');
+    if (K.length) { g.fillStyle = '#6b6b75'; g.font = '15px Manrope, sans-serif'; for (let i = 0; i < 6; i++) { const k = K[Math.round(i / 5 * (K.length - 1))], d = new Date(k[0] * 1000); g.fillText(p2(d.getUTCHours()) + ':' + p2(d.getUTCMinutes()), 20 + i * (ax - 60) / 5, H - 22); } }
+    return c;
   }
   function shot(kind, seed, W, H) {
     const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'), r = rng(seed); x.fillStyle = '#09090c'; x.fillRect(0, 0, W, H);
@@ -250,8 +288,9 @@
 
   /* ---------- picture tabs (one board per picture) ---------- */
   const T = (x, y, text, fs, extra) => ({ id: uid(), type: 'text', x, y, text, fs, font: 'Architects Daughter', color: '#ffffff', box: 0, ul: false, seed: seedNew(), rot: 0, ...extra });
-  const m5 = mt5(1600, 900);
-  const tabs = [
+  const m5 = LIVE ? null : mt5(1600, 900);
+  const tabs = LIVE ? [{ name: 'MT5 chart', sub: 'from the Journal EA', bg: realChart(TR, 1600, 900), objs: Array.isArray(TR.marks) ? TR.marks : [], mt5: 1 },
+    ...(TR.shots || []).map((x) => shotTab(x))] : [
     { name: 'MT5 chart', sub: 'from the Journal EA', bg: m5.c, objs: [
       ...m5.tap.map(([x, y], i) => ({ id: uid(), type: 'ellipse', x: x - 26, y: y - 26, w: 52, h: 46, color: i === 2 ? '#ff5a1f' : '#ffffff', size: 4, seed: seedNew() })),
       T(m5.tap[0][0] - 70, m5.tap[0][1] - 110, '3 taps,\nno break', 40),
@@ -268,36 +307,70 @@
         : ROOM === 'pa' ? [{ id: uid(), type: 'line', x1: 120, y1: 760, x2: 1300, y2: 330, color: '#ffffff', size: 4, seed: seedNew() }, T(980, 300, 'Trend line,\n3rd touch', 44), { id: uid(), type: 'ellipse', x: 1140, y: 330, w: 90, h: 90, color: '#ff5a1f', size: 4, seed: seedNew() }, T(100, 70, 'RESISTANCE', 70, { ul: true })]
         : [T(100, 70, 'Mark it your way', 64, { ul: true })] }[kind] || []) }))];
   tabs.forEach((t) => (t.hist = []));
-  let cur = 0;
+  let cur = 0, used = (D.shots || {}).used || 0;
+  const CAP = (D.shots || {}).cap || 150, PER = (D.shots || {}).perTrade || 6;
+  function shotTab(x) { const t = { name: x.name || 'Screenshot', sub: 'screenshot', bg: null, objs: Array.isArray(x.marks) ? x.marks : [], hist: [], shot: x.id };
+    const im = new Image(); im.onload = () => { const c = document.createElement('canvas'); c.width = 1600; c.height = 900; const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 1600, 900);
+      const s = Math.min(1600 / im.width, 900 / im.height), w = im.width * s, h = im.height * s; g.drawImage(im, (1600 - w) / 2, (900 - h) / 2, w, h); t.bg = c; if (B === t) { $('ci-hint').hidden = true; redraw(); } thumbs(); };
+    im.src = '/journal/study/shot/' + x.id + '.jpg'; return t; }
+  // saving: marks on a screenshot save to that screenshot; marks on the MT5 chart save with the trade's study
+  const dirtyB = new Set(); let saveT = 0, booted = false;
+  function dirty() { if (!LIVE || !booted || !B) return; dirtyB.add(B); clearTimeout(saveT); saveT = setTimeout(flush, 1200); }
+  function flush() { const list = [...dirtyB]; dirtyB.clear();
+    list.forEach((b) => { if (b.shot) api('/journal/study/shot/' + b.shot + '/marks', { marks: b.objs }).catch((e) => toast(e.message)); else saveStudy(false).catch((e) => toast(e.message)); }); }
+  addEventListener('beforeunload', () => { if (dirtyB.size) flush(); });
   function renderTabs() {
-    $('sr-tabs').innerHTML = tabs.map((t, i) => `<button type="button" class="sr-tab${i === cur ? ' on' : ''}" data-i="${i}"><canvas width="108" height="64"></canvas><span><b>${t.name}</b><small>${t.sub}</small></span>${t.objs.length ? `<em>${t.objs.length}</em>` : ''}</button>`).join('')
-      + '<button type="button" class="sr-tab add" id="sr-addpic" title="Paste (Ctrl+V), drop or choose a screenshot"><span>+</span><span><b>Add a screenshot</b><small>paste, drop or choose</small></span></button><input type="file" id="sr-file" accept="image/*" hidden>';
-    $('sr-tabs').querySelectorAll('.sr-tab[data-i]').forEach((b) => (b.onclick = () => openTab(+b.dataset.i)));
+    const capTxt = LIVE ? `${used} of ${CAP} used` : 'paste, drop or choose';
+    $('sr-tabs').innerHTML = tabs.map((t, i) => `<button type="button" class="sr-tab${i === cur ? ' on' : ''}" data-i="${i}"><canvas width="108" height="64"></canvas><span><b>${esc(t.name)}</b><small>${esc(t.sub)}</small></span>${t.objs.length ? `<em>${t.objs.length}</em>` : ''}${t.shot ? '<s class="sr-del" title="Delete this screenshot" aria-label="Delete this screenshot">×</s>' : ''}</button>`).join('')
+      + `<button type="button" class="sr-tab add" id="sr-addpic" title="Paste (Ctrl+V), drop or choose a screenshot"><span>+</span><span><b>Add a screenshot</b><small>${capTxt}</small></span></button><input type="file" id="sr-file" accept="image/*" hidden>`;
+    $('sr-tabs').querySelectorAll('.sr-tab[data-i]').forEach((b) => (b.onclick = (e) => { const d = e.target.closest('.sr-del'); if (d) return delShot(+b.dataset.i, d); openTab(+b.dataset.i); }));
     $('sr-addpic').onclick = () => $('sr-file').click(); $('sr-file').onchange = (e) => { addPic(e.target.files[0]); e.target.value = ''; };
     thumbs(); }
-  function thumbs() { document.querySelectorAll('#sr-tabs .sr-tab[data-i]').forEach((b) => { const t = tabs[b.dataset.i], c = b.querySelector('canvas'); paint(c.getContext('2d'), t, 108, 64, null);
+  function thumbs() { dirty(); document.querySelectorAll('#sr-tabs .sr-tab[data-i]').forEach((b) => { const t = tabs[b.dataset.i], c = b.querySelector('canvas'); paint(c.getContext('2d'), t, 108, 64, null);
     let em = b.querySelector('em'); if (t.objs.length) { if (!em) { em = document.createElement('em'); b.appendChild(em); } em.textContent = t.objs.length; } else if (em) em.remove(); }); }
   function openTab(i) { endType(); cur = i; B = tabs[i]; S.sel = null; document.querySelectorAll('#sr-tabs .sr-tab[data-i]').forEach((b) => b.classList.toggle('on', +b.dataset.i === i)); $('ci-hint').hidden = !!B.bg; redraw(); }
   function addPic(f) { if (!f || !/^image\//.test(f.type)) return toast('That is not a picture. Use a PNG or JPG screenshot.');
+    if (LIVE && used >= CAP) return toast(`You have used all ${CAP} screenshots. Delete old ones to add more.`);
+    if (LIVE && tabs.filter((t) => t.shot).length >= PER) return toast(`Up to ${PER} screenshots per trade.`);
     const im = new Image(); im.onload = () => { const c = document.createElement('canvas'); c.width = 1600; c.height = 900; const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 1600, 900);
       const s = Math.min(1600 / im.width, 900 / im.height), w = im.width * s, h = im.height * s; g.drawImage(im, (1600 - w) / 2, (900 - h) / 2, w, h);
-      tabs.push({ name: 'Screenshot ' + (tabs.length - 3), sub: 'added just now', bg: c, objs: [], hist: [] }); renderTabs(); openTab(tabs.length - 1); toast('Added. Mark it up, it saves with this trade.'); };
+      const name = 'Screenshot ' + (tabs.filter((t) => t.shot || t.local).length + 1), t = { name, sub: 'added just now', bg: c, objs: [], hist: [], local: !LIVE };
+      const show = () => { tabs.push(t); renderTabs(); openTab(tabs.length - 1); };
+      if (!LIVE) { show(); return toast('Added. In your own trades it saves with the trade.'); }
+      // shrink to a JPEG (picture only, max 1600 x 900) and store it with this trade
+      const q = (k) => new Promise((ok) => c.toBlob(ok, 'image/jpeg', k));
+      toast('Saving the screenshot…');
+      q(0.82).then((b) => (b && b.size > 650000 ? q(0.6) : b)).then((b) => api('/journal/study/' + TR.id + '/shot?name=' + encodeURIComponent(name), b, true))
+        .then((j) => { t.shot = j.id; t.sub = 'screenshot'; used = j.used; show(); toast(`Saved with this trade. ${used} of ${CAP} screenshots used.`); })
+        .catch((e) => toast(e.message)); };
     im.onerror = () => toast('Could not read that picture.'); im.src = URL.createObjectURL(f); }
+  function delShot(i, d) { const t = tabs[i]; if (!t || !t.shot) return;
+    if (!d.classList.contains('arm')) { d.classList.add('arm'); d.textContent = 'Delete?'; setTimeout(() => { d.classList.remove('arm'); d.textContent = '×'; }, 3000); return; }
+    api('/journal/study/shot/' + t.shot + '/delete').then((j) => { used = j.used; dirtyB.delete(t); tabs.splice(i, 1); if (cur >= tabs.length || cur === i) cur = 0; renderTabs(); openTab(cur); toast('Screenshot deleted.'); }).catch((e) => toast(e.message)); }
   ['dragenter', 'dragover'].forEach((t) => stage.addEventListener(t, (e) => { e.preventDefault(); stage.classList.add('drop'); }));
   ['dragleave', 'drop'].forEach((t) => stage.addEventListener(t, (e) => { e.preventDefault(); stage.classList.remove('drop'); }));
   stage.addEventListener('drop', (e) => addPic(e.dataTransfer.files[0]));
   document.addEventListener('paste', (e) => { if (/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return; const it = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith('image/')); if (it) { e.preventDefault(); go('study'); addPic(it.getAsFile()); } });
 
-  document.querySelectorAll('.sr-paper textarea').forEach((t, i) => (t.value = RC.notes[i] || ''));
+  document.querySelectorAll('.sr-paper textarea').forEach((t, i) => { t.value = LIVE ? (TR.notes || [])[i] || '' : RC.notes[i] || '';
+    t.addEventListener('input', () => { if (LIVE) { dirtyB.add(tabs[0]); clearTimeout(saveT); saveT = setTimeout(flush, 1500); } }); });
   /* ---------- left: inbox and setups ---------- */
-  $('sr-inbox').innerHTML = INBOX.map((t, k) => `<div class="sr-it${k ? '' : ' on'}"><div><b><span class="sr-dot"></span>${t[0]} ${t[1]}</b></div><div class="v ${t[3] < 0 ? 'neg' : 'pos'}">${t[3] < 0 ? '−' : '+'}$${Math.abs(t[3])}<small>${R(t[4])}</small></div><small>${t[2].slice(4)} · <span class="hint">${t[5]}</span></small></div>`).join('');
-  document.querySelectorAll('#sr-inbox .sr-it').forEach((r) => (r.onclick = () => document.querySelectorAll('#sr-inbox .sr-it').forEach((x) => x.classList.toggle('on', x === r))));
-  let setI = 0;
-  $('sr-sets').innerHTML = SETS.map((s, i) => `<div class="sr-set${i ? '' : ' on'}" data-i="${i}"><i style="background:${s.c}"></i><b>${s.n}</b><canvas></canvas><small>${s.r.length} trades · <span class="${s.exp < -0.04 ? 'neg' : s.exp > 0.04 ? 'pos' : ''}">${R(s.exp)}</span> each</small></div>`).join('');
+  if (LIVE) {
+    const ib = D.inbox || [];
+    $('sr-inbox').innerHTML = ib.length ? ib.map((t) => `<a class="sr-it${t.id === TR.id ? ' on' : ''}" href="?t=${t.id}"><div><b><span class="sr-dot"></span>${esc(t.symbol)} ${esc(String(t.side).toLowerCase())}</b></div><div class="v ${t.net < 0 ? 'neg' : 'pos'}">${money(t.net)}<small>${R(t.r || 0)}</small></div><small>${fWhen(t.close_time).slice(4)} · <span class="hint">${t.shots ? t.shots + ' screenshot' + (t.shots > 1 ? 's' : '') : 'No screenshot yet'}</span></small></a>`).join('')
+      : '<p class="sr-empty">All caught up. New trades from the Journal EA land here.</p>';
+  } else $('sr-inbox').innerHTML = INBOX.map((t, k) => `<div class="sr-it${k ? '' : ' on'}"><div><b><span class="sr-dot"></span>${t[0]} ${t[1]}</b></div><div class="v ${t[3] < 0 ? 'neg' : 'pos'}">${t[3] < 0 ? '−' : '+'}$${Math.abs(t[3])}<small>${R(t[4])}</small></div><small>${t[2].slice(4)} · <span class="hint">${t[5]}</span></small></div>`).join('');
+  if (!LIVE) document.querySelectorAll('#sr-inbox .sr-it').forEach((r) => (r.onclick = () => document.querySelectorAll('#sr-inbox .sr-it').forEach((x) => x.classList.toggle('on', x === r))));
+  let setI = Math.max(0, SETS.findIndex((s) => s.id && s.id === TR.setup));
+  $('sr-sets').innerHTML = !SETS.length ? '<p class="sr-empty">Your setups show up here. Answer the questions on the right and save your first trade.</p>' : SETS.map((s, i) => `<div class="sr-set${i ? '' : ' on'}" data-i="${i}"><i style="background:${s.c}"></i><b>${esc(s.n)}</b><canvas></canvas><small>${s.r.length} trade${s.r.length === 1 ? '' : 's'} · <span class="${s.exp < -0.04 ? 'neg' : s.exp > 0.04 ? 'pos' : ''}">${R(s.exp)}</span> each</small></div>`).join('');
   const setsSpark = () => document.querySelectorAll('#sr-sets .sr-set').forEach((d) => { const s = SETS[d.dataset.i]; spark(d.querySelector('canvas'), s.r, +d.dataset.i === setI ? '#f2f2f4' : '#5a5a64'); });
   document.querySelectorAll('#sr-sets .sr-set').forEach((d) => (d.onclick = () => pickSet(+d.dataset.i)));
-  function pickSet(i) { setI = i; document.querySelectorAll('#sr-sets .sr-set').forEach((d) => d.classList.toggle('on', +d.dataset.i === i)); head(); setsSpark(); }
-  function head() { const s = SETS[setI]; $('sr-setname').textContent = s.n; $('sr-done').firstChild.textContent = 'Save to “' + s.n + '”';
+  let picked = false;
+  function pickSet(i) { setI = i; picked = true; document.querySelectorAll('#sr-sets .sr-set').forEach((d) => d.classList.toggle('on', +d.dataset.i === i)); if (LIVE) { cmpI = 0; liveStrip(); } head(); setsSpark(); }
+  function head() { const s = SETS[setI];
+    if (LIVE && (!s || (!TR.setup && !picked))) { $('sr-setname').textContent = TR.setup && s ? s.n : `${TR.symbol} ${String(TR.side).toLowerCase()}`; $('sr-done').firstChild.textContent = setName() ? 'Save to “' + setName() + '”' : 'Save to my playbook';
+      $('sr-nums').innerHTML = `<div><span class="sr-k">Closed</span><b>${fWhen(TR.close)}</b></div><div><span class="sr-k">Result</span><b class="${(TR.r || TR.net) < 0 ? 'neg' : 'pos'}">${TR.r ? R(TR.r) : money(TR.net)}</b></div><div><span class="sr-k">Setup</span><b>${s && TR.setup ? esc(s.n) : 'Not saved yet'}</b></div>`; return; }
+    $('sr-setname').textContent = s.n; $('sr-done').firstChild.textContent = 'Save to “' + (LIVE ? setName() || s.n : s.n) + '”';
     $('sr-nums').innerHTML = `<div><span class="sr-k">Seen</span><b>${s.r.length}×</b></div><div><span class="sr-k">Won</span><b>${s.won}%</b></div><div><span class="sr-k">Per trade</span><b class="${s.exp < 0 ? 'neg' : 'pos'}">${R(s.exp)}</b></div><div><span class="sr-k">Profit factor</span><b>${s.pf.toFixed(2)}</b></div><div><span class="sr-k">Last</span><b>${s.last}</b></div><canvas id="sr-hs"></canvas>`;
     spark($('sr-hs'), s.r, s.c); }
 
@@ -313,12 +386,28 @@
     { k: 'Day', q: 'What kind of <em>day</em>?', o: [['Balance', 'flat', 'Price rotated inside a range'], ['Trend', 'trend', 'One direction most of the day'], ['Open drive', 'bolt', 'Strong move straight from the open'], ['News', 'news', 'A big report moved it']] },
     { k: 'Session', q: 'Which <em>session</em>?', o: [['Asia', 'moon', 'Quiet hours'], ['London', 'sun', 'Europe opens'], ['NY open', 'clock', 'First hours of New York'], ['NY PM', 'clock', 'New York afternoon']] }];
   ENV.forEach((g) => (g.multi = g.multi || 0));
-  const env = [new Set([RC.pick[0]]), new Set(), new Set(), new Set()];
-  let qn = 1, hintT = '';
+  (D.words || []).forEach((w) => { const g = ENV.find((q) => q.k === w.qk); if (g && !g.o.some((o) => o[0].toLowerCase() === String(w.word).toLowerCase())) g.o.push([w.word, 'dot', 'Your own word.']); });
+  const tEnv = Array.isArray(TR.env) ? TR.env : [];
+  // answers saved earlier that are not in the list any more still show (as own words)
+  if (LIVE) ENV.forEach((g, i) => (tEnv[i] || []).forEach((w) => { if (!g.o.some((o) => o[0] === w)) g.o.push([w, 'dot', 'Your own word.']); }));
+  const env = LIVE ? ENV.map((g, i) => new Set(tEnv[i] || [])) : [new Set([RC.pick[0]]), new Set(), new Set(), new Set()];
+  let qn = LIVE ? (TR.studied ? ENV.length : Math.max(0, env.findIndex((s) => !s.size))) : 1, hintT = '';
+  if (qn < 0) qn = ENV.length;
+  let nameTyped = TR.setup && SETS[setI] ? SETS[setI].n : '';
+  const autoName = () => { const w = [...env[1]][0], a = [...env[0]][0]; return w && a ? `${w} at ${a.toLowerCase()}` : w || a || ''; };
+  function setName() { return (nameTyped || autoName()).trim().slice(0, 70); }
   const svg = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${IC[k]}"/></svg>`;
   function step() {
     const el = $('sr-step'); el.classList.remove('fade'); void el.offsetWidth; el.classList.add('fade');
-    if (qn >= ENV.length) {
+    if (qn >= ENV.length && LIVE) {
+      const nm = setName(), m = SETS.find((s) => s.n.toLowerCase() === nm.toLowerCase());
+      el.innerHTML = `<div class="sr-sbar"><i style="width:100%"></i></div><div class="sr-sk">${m && m.r.length ? 'You have seen this before' : 'Name this setup'}</div>
+        <input class="sr-own-in sr-name" id="sr-name" list="sr-names" maxlength="70" value="${esc(nm)}" placeholder="e.g. ${esc(RC.sets[0][0])}" aria-label="Setup name"><datalist id="sr-names">${SETS.map((s) => `<option value="${esc(s.n)}">`).join('')}</datalist>
+        ${m && m.r.length ? `<div class="sr-match hit"><div class="sr-ring" style="--p:${m.won}"><b>${m.won}%</b><small>won</small></div><div><span class="ln"><b>${m.r.length} time${m.r.length > 1 ? 's' : ''}</b> before · <b class="${m.exp < 0 ? 'neg' : 'pos'}">${R(m.exp)}</b> a trade · last ${m.last}</span><div class="sr-mini">${m.r.map((v) => `<i class="${v > 0 ? 'w' : ''}"></i>`).join('')}</div>${m.rule ? `<span class="ln">${esc(m.rule)}</span>` : ''}</div></div>`
+          : '<p class="sr-hint">Same name = same setup. Saving adds this trade to it in your playbook.</p>'}
+        <div class="sr-act"><button type="button" class="sr-ghost" data-back>Change answers</button>${m && m.r.length ? '<button type="button" class="sr-ghost" data-go="compare">Compare with past trades →</button>' : ''}</div>`;
+      const ni = $('sr-name'); ni.oninput = () => { nameTyped = ni.value; head(); }; ni.onchange = () => step();
+    } else if (qn >= ENV.length) {
       const a = env[0].has(RC.pick[0]), w = RC.pick[1] ? env[1].has(RC.pick[1]) : false, s = SETS[0], name = `${[...env[1]][0] || 'Something'} at ${([...env[0]][0] || 'somewhere').toLowerCase()}`;
       el.innerHTML = `<div class="sr-sbar"><i style="width:100%"></i></div><div class="sr-sk">${w && a ? 'You have seen this before' : 'A new environment'}</div><h3 class="sr-qh">${w && a ? s.n.replace(/(\S+ \S+)$/, '<em>$1</em>') : name}</h3>
         ${w && a ? `<div class="sr-match hit"><div class="sr-ring" style="--p:${s.won}"><b>${s.won}%</b><small>won</small></div><div><span class="ln"><b>${s.r.length} times</b> before · <b class="${s.exp < 0 ? 'neg' : 'pos'}">${R(s.exp)}</b> a trade · last ${s.last}</span><div class="sr-mini">${s.r.map((v) => `<i class="${v > 0 ? 'w' : ''}"></i>`).join('')}</div><span class="ln">Best when: half off at 1R, NY open.</span></div></div>`
@@ -327,35 +416,70 @@
     } else {
       const g = ENV[qn], sel = env[qn];
       el.innerHTML = `<div class="sr-sbar"><i style="width:${qn / ENV.length * 100}%"></i></div><div class="sr-sk">Question ${qn + 1} of ${ENV.length}${g.multi ? ' · pick all that fit' : ''}</div><h3 class="sr-qh">${g.q}</h3>
-        <div class="sr-chips2">${g.o.map(([t, i, h]) => `<button type="button" class="sr-chip${sel.has(t) ? ' on' : ''}" data-t="${t}" data-h="${h}">${svg(i)}${t}</button>`).join('')}<button type="button" class="sr-chip add" data-own>+ Own word</button></div>
+        <div class="sr-chips2">${g.o.map(([t, i, h]) => `<button type="button" class="sr-chip${sel.has(t) ? ' on' : ''}" data-t="${esc(t)}" data-h="${esc(h)}">${svg(i)}${esc(t)}</button>`).join('')}<button type="button" class="sr-chip add" data-own>+ Own word</button></div>
         <p class="sr-hint" id="sr-hn">${hintT || (g.own && !g.o.length ? 'Add the words you use, like FVG or order block. They stay in your list.' : g.multi ? 'Tap all that fit, then Continue.' : 'Tap one. It moves on by itself.')}</p>
         <div class="sr-act">${qn ? '<button type="button" class="sr-ghost" data-back>← Back</button>' : '<span></span>'}<button type="button" class="sr-cta" data-next ${sel.size ? '' : 'disabled'}>Continue<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>`;
       el.querySelectorAll('.sr-chip[data-t]').forEach((b) => { b.onmouseenter = () => ($('sr-hn').textContent = b.dataset.h);
         b.onclick = () => { const t = b.dataset.t; if (g.multi) sel.has(t) ? sel.delete(t) : sel.add(t); else { sel.clear(); sel.add(t); } hintT = b.dataset.h; rec();
           if (!g.multi) { setTimeout(() => { qn++; hintT = ''; step(); rec(); }, 260); el.querySelectorAll('.sr-chip').forEach((x) => x.classList.toggle('on', x === b)); } else { b.classList.toggle('on'); el.querySelector('[data-next]').disabled = !sel.size; } }; });
       el.querySelector('[data-own]').onclick = (e) => { const b = e.currentTarget, inp = document.createElement('input'); inp.className = 'sr-own-in'; inp.placeholder = ROOM === 'flow' ? 'Your word' : 'e.g. FVG, order block'; inp.maxLength = 28; b.replaceWith(inp); inp.focus();
-        const add = () => { const v = inp.value.trim(); if (v && !g.o.some((o) => o[0].toLowerCase() === v.toLowerCase())) { g.o.push([v, 'dot', 'Your own word. It stays in your list.']); if (!g.multi) sel.clear(); sel.add(v); rec(); } step(); };
+        const add = () => { const v = inp.value.trim().replace(/[<>]/g, '').slice(0, 28); if (v && !g.o.some((o) => o[0].toLowerCase() === v.toLowerCase())) { g.o.push([v, 'dot', 'Your own word. It stays in your list.']); if (!g.multi) sel.clear(); sel.add(v); rec();
+          if (LIVE) api('/journal/study/word', { room: ROOM, qk: g.k, word: v }).catch((e) => toast(e.message)); } step(); };
         inp.onkeydown = (k) => { if (k.key === 'Enter') add(); if (k.key === 'Escape') step(); }; inp.onblur = add; };
       const nx = el.querySelector('[data-next]'); if (nx) nx.onclick = () => { qn++; hintT = ''; step(); rec(); };
     }
     const bk = el.querySelector('[data-back]'); if (bk) bk.onclick = () => { qn = qn >= ENV.length ? 0 : Math.max(0, qn - 1); hintT = ''; step(); rec(); };
     const gc = el.querySelector('[data-go]'); if (gc) gc.onclick = () => go('compare');
   }
-  function rec() { $('sr-rec').innerHTML = '<h6>The record</h6>' + ENV.map((g, i) => `<button type="button" class="r${i === qn ? ' on' : ''}" data-i="${i}"><small>${g.k}</small><span>${[...env[i]].join(', ')}</span></button>`).join('');
+  function rec() { if (LIVE) head(); $('sr-rec').innerHTML = '<h6>The record</h6>' + ENV.map((g, i) => `<button type="button" class="r${i === qn ? ' on' : ''}" data-i="${i}"><small>${g.k}</small><span>${esc([...env[i]].join(', '))}</span></button>`).join('');
     $('sr-rec').querySelectorAll('.r').forEach((r) => (r.onclick = () => { qn = +r.dataset.i; hintT = ''; step(); rec(); })); }
   step(); rec();
-  document.querySelectorAll('#sr-grade .sr-chip').forEach((b) => (b.onclick = () => { document.querySelectorAll('#sr-grade .sr-chip').forEach((x) => x.classList.toggle('on', x === b)); $('sr-gh').textContent = b.dataset.h; }));
-  $('sr-done').onclick = (e) => { $('sr-done').firstChild.textContent = 'Saved to your playbook ✓'; const d = document.querySelector('#sr-inbox .sr-it.on .sr-dot'); if (d) d.classList.add('done'); };
+  const gradeEls = [...document.querySelectorAll('#sr-grade .sr-chip')];
+  if (LIVE) { gradeEls.forEach((x) => x.classList.toggle('on', x.textContent.trim() === TR.grade)); const g = gradeEls.find((x) => x.classList.contains('on')); $('sr-gh').textContent = g ? g.dataset.h : 'Pick one. Be honest, only you see it.'; }
+  gradeEls.forEach((b) => (b.onclick = () => { gradeEls.forEach((x) => x.classList.toggle('on', x === b)); $('sr-gh').textContent = b.dataset.h; if (LIVE) { dirtyB.add(tabs[0]); clearTimeout(saveT); saveT = setTimeout(flush, 800); } }));
+  function saveStudy(done) { const g = gradeEls.find((x) => x.classList.contains('on'));
+    return api('/journal/study/' + TR.id + '/save', { room: ROOM, env: env.map((s) => [...s]), notes: [...document.querySelectorAll('.sr-paper textarea')].map((t) => t.value), grade: g ? g.textContent.trim() : '',
+      marks: tabs[0].objs, setup: done ? setName() : '', done: done ? 1 : 0, fix: $('sr-fix').checked ? 1 : 0 }); }
+  $('sr-done').onclick = () => {
+    if (!LIVE) { $('sr-done').firstChild.textContent = 'Saved to your playbook ✓'; const d = document.querySelector('#sr-inbox .sr-it.on .sr-dot'); if (d) d.classList.add('done'); return; }
+    if (!setName()) { document.querySelector('.sr-itabs [data-p="env"]').click(); qn = env.findIndex((s) => !s.size); if (qn < 0) qn = ENV.length; step(); rec(); return toast('Answer the questions first, or give the setup a name.'); }
+    clearTimeout(saveT); dirtyB.forEach((b) => b.shot && api('/journal/study/shot/' + b.shot + '/marks', { marks: b.objs }).catch(() => {})); dirtyB.clear();
+    const btn = $('sr-done'); btn.disabled = true; btn.firstChild.textContent = 'Saving…';
+    saveStudy(true).then((j) => { btn.firstChild.textContent = 'Saved to “' + setName() + '” ✓'; toast(j.fixed ? 'Saved. “Next time” is now a fix in your Focus panel.' : 'Saved to your playbook.');
+      const d = document.querySelector('#sr-inbox .sr-it.on .sr-dot'); if (d) d.classList.add('done');
+      const nx = (D.inbox || []).find((t) => t.id !== TR.id); setTimeout(() => { location.href = nx ? '?t=' + nx.id : location.pathname; }, 1100); })
+      .catch((e) => { btn.disabled = false; head(); toast(e.message); }); };
 
   /* ---------- bottom strip: same setup before ---------- */
-  const pastPics = PAST.map((p, i) => shot(ROOM !== 'flow' ? 'tv' : i % 2 ? 'heat' : 'fp', 40 + i * 7, 1600, 900));
-  $('sr-past').innerHTML = PAST.map((p, i) => `<button type="button" class="sr-pt" data-i="${i}"><canvas width="92" height="56"></canvas><span>${p[0]}<b class="${p[1] < 0 ? 'neg' : 'pos'}">${R(p[1])}</b></span></button>`).join('');
-  document.querySelectorAll('#sr-past .sr-pt').forEach((b) => { b.querySelector('canvas').getContext('2d').drawImage(pastPics[b.dataset.i], 0, 0, 92, 56); b.onclick = () => { cmpI = +b.dataset.i; go('compare'); }; });
+  const pastCache = {};
+  const getPast = (id) => pastCache[id] || (pastCache[id] = fetch('/journal/study/trade/' + id + '.json', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.reject(new Error('Could not load that trade.')))));
+  const pastList = () => { const s = SETS[setI]; return s && LIVE ? s.trades.filter((t) => t.id !== TR.id).slice(-8).reverse() : []; };
+  function liveStrip() { const L = pastList();
+    $('sr-past').innerHTML = L.length ? L.map((p, i) => `<button type="button" class="sr-pt" data-i="${i}"><canvas width="92" height="56"></canvas><span>${fDay(p.close)}<b class="${p.r < 0 ? 'neg' : 'pos'}">${R(p.r || 0)}</b></span></button>`).join('') : '<p class="sr-empty">No other trades of this setup yet.</p>';
+    $('sr-past').querySelectorAll('.sr-pt').forEach((b) => { const p = L[b.dataset.i]; b.onclick = () => { cmpI = +b.dataset.i; go('compare'); };
+      getPast(p.id).then((t) => { const c = b.querySelector('canvas'); paint(c.getContext('2d'), { bg: realChart(t, 1600, 900), objs: t.marks || [] }, 92, 56, null); }).catch(() => {}); }); }
+  const pastPics = LIVE ? [] : PAST.map((p, i) => shot(ROOM !== 'flow' ? 'tv' : i % 2 ? 'heat' : 'fp', 40 + i * 7, 1600, 900));
+  if (!LIVE) $('sr-past').innerHTML = PAST.map((p, i) => `<button type="button" class="sr-pt" data-i="${i}"><canvas width="92" height="56"></canvas><span>${p[0]}<b class="${p[1] < 0 ? 'neg' : 'pos'}">${R(p[1])}</b></span></button>`).join('');
+  if (!LIVE) document.querySelectorAll('#sr-past .sr-pt').forEach((b) => { b.querySelector('canvas').getContext('2d').drawImage(pastPics[b.dataset.i], 0, 0, 92, 56); b.onclick = () => { cmpI = +b.dataset.i; go('compare'); }; });
 
   /* ---------- compare ---------- */
   let cmpI = 0;
   const pastMarks = (i) => [{ id: uid(), type: 'rect', x: 600 + i * 20, y: 160, w: 320, h: 340, color: '#ffffff', size: 9, seed: 900 + i }, T(960, 560, PAST[i][1] > 0 ? 'Sellers held,\n3rd tap' : 'Too early', 84, { seed: 950 + i })];
-  function compare() {
+  function liveCompare() { const L = pastList(), el = $('sr-cmp');
+    if (!L.length) { el.innerHTML = '<p class="sr-empty big">Compare shows this trade next to past trades of the same setup. Save a few trades to a setup first.</p>'; return; }
+    if (cmpI >= L.length) cmpI = 0; const p = L[cmpI];
+    el.innerHTML = `<div class="sr-cpick"><span class="sr-k" style="margin-right:6px">Compare with</span>${L.map((q, i) => `<button type="button" data-i="${i}" class="${i === cmpI ? 'on' : ''}">${fDay(q.close)} · ${R(q.r || 0)}</button>`).join('')}</div>
+      <div class="sr-cside"><canvas width="1600" height="900"></canvas><div class="b"><h3>This trade · ${fDay(TR.close)} <span class="${(TR.r || 0) < 0 ? 'neg' : 'pos'}">${R(TR.r || 0)}</span></h3><p>${esc([...document.querySelectorAll('.sr-paper textarea')][1].value || 'No notes yet.')}</p></div></div>
+      <div class="sr-cside" id="sr-cpast"><canvas width="1600" height="900"></canvas><div class="b"><h3>${fDay(p.close)} <span class="${p.r < 0 ? 'neg' : 'pos'}">${R(p.r || 0)}</span></h3><p class="muted">Loading…</p></div></div>
+      <div class="sr-diff" id="sr-cdiff"><span class="sr-k">What was different</span></div>`;
+    const cs = el.querySelectorAll('.sr-cside canvas'); paint(cs[0].getContext('2d'), tabs[0], 1600, 900, null);
+    el.querySelectorAll('.sr-cpick button').forEach((b) => (b.onclick = () => { cmpI = +b.dataset.i; compare(); }));
+    getPast(p.id).then((t) => { if (L[cmpI] !== p) return; paint(cs[1].getContext('2d'), { bg: realChart(t, 1600, 900), objs: t.marks || [] }, 1600, 900, null);
+      $('sr-cpast').querySelector('p').textContent = (t.notes || [])[1] || (t.notes || [])[0] || 'No notes on this one.'; $('sr-cpast').querySelector('p').className = '';
+      let diff = 0; const rows = ENV.map((g, i) => { const a = [...env[i]].join(', ') || '–', b = (t.env[i] || []).join(', ') || '–', x = a !== b; diff += x; return `<div class="sr-drow${x ? ' x' : ''}"><span>${esc(g.k)}</span><span>${esc(a)}</span><span>${esc(b)}</span></div>`; }).join('');
+      $('sr-cdiff').innerHTML = `<span class="sr-k">What was different</span>${rows}<p class="sr-lesson">${diff ? `${diff} thing${diff > 1 ? 's were' : ' was'} different. Look there first.` : 'Same picture both times. The difference is in how you traded it: check the notes.'}</p>`; })
+      .catch((e) => toast(e.message)); }
+  function compare() { if (LIVE) return liveCompare();
     const p = PAST[cmpI], took = p[2].includes('half');
     $('sr-cmp').innerHTML = `<div class="sr-cpick"><span class="sr-k" style="margin-right:6px">Compare with</span>${PAST.map((q, i) => `<button type="button" data-i="${i}" class="${i === cmpI ? 'on' : ''}">${q[0]} · ${R(q[1])}</button>`).join('')}</div>
       <div class="sr-cside"><canvas width="1600" height="900"></canvas><div class="b"><h3>This trade · 20 Nov <span class="neg">−1.0R</span></h3><p>Sold the 3rd tap. Took nothing at 1R. It turned and took my stop.</p></div></div>
@@ -374,20 +498,21 @@
   /* ---------- playbook ---------- */
   let flt = 'All';
   function curves() { const cvs = $('sr-curves'), [x, w, h] = fitCv(cvs); if (!w) return;
+    if (!SETS.some((s) => s.r.length)) { x.fillStyle = '#6b6b75'; x.font = '13px Manrope, sans-serif'; x.fillText('Each setup gets a curve here once you save trades to it.', 0, h / 2); $('sr-leg').innerHTML = ''; return; }
     const series = SETS.map((s) => { let c = 0; return [0, ...s.r.filter((v) => (flt === 'Wins' ? v > 0 : flt === 'Losses' ? v <= 0 : true)).map((v) => (c += v))]; });
-    const all = series.flat(), lo = Math.min(0, ...all), hi = Math.max(1, ...all), n = Math.max(...series.map((s) => s.length)) - 1, P = 34, Y = (v) => 10 + (hi - v) / (hi - lo) * (h - 30), X = (i) => P + i / n * (w - P - 8);
+    const all = series.flat(), lo = Math.min(0, ...all), hi = Math.max(1, ...all), n = Math.max(1, ...series.map((s) => s.length)) - 1 || 1, P = 34, Y = (v) => 10 + (hi - v) / (hi - lo) * (h - 30), X = (i) => P + i / n * (w - P - 8);
     x.font = '10px Manrope, sans-serif'; x.fillStyle = '#6b6b75'; x.strokeStyle = 'rgba(255,255,255,.05)';
     for (let v = Math.ceil(lo / 2) * 2; v <= hi; v += 2) { x.beginPath(); x.moveTo(P, Y(v)); x.lineTo(w, Y(v)); x.stroke(); x.fillText((v > 0 ? '+' : '') + v + 'R', 0, Y(v) + 3); }
     x.strokeStyle = 'rgba(255,255,255,.2)'; x.beginPath(); x.moveTo(P, Y(0)); x.lineTo(w, Y(0)); x.stroke();
     series.map((s, k) => [s, k]).sort((a, b) => (a[1] === setI) - (b[1] === setI)).forEach(([s, k]) => { x.strokeStyle = k === setI ? '#f2f2f4' : '#4a4a54'; x.lineWidth = k === setI ? 2.4 : 1.4; x.globalAlpha = 1; x.beginPath(); s.forEach((v, i) => (i ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)))); x.stroke();
       x.fillStyle = k === setI ? '#f2f2f4' : '#4a4a54'; x.beginPath(); x.arc(X(s.length - 1), Y(s[s.length - 1]), 3, 0, 7); x.fill(); }); x.globalAlpha = 1;
     x.fillStyle = '#6b6b75'; x.fillText('trade 1', P, h - 4); x.fillText('trade ' + n, w - 44, h - 4);
-    $('sr-leg').innerHTML = SETS.map((s, k) => `<span class="${k === setI ? 'on' : ''}"><i style="background:${k === setI ? '#f2f2f4' : '#4a4a54'}"></i>${s.n} <b class="${series[k][series[k].length - 1] < 0 ? 'neg' : 'pos'}">${R(series[k][series[k].length - 1])}</b></span>`).join(''); }
+    $('sr-leg').innerHTML = SETS.map((s, k) => `<span class="${k === setI ? 'on' : ''}"><i style="background:${k === setI ? '#f2f2f4' : '#4a4a54'}"></i>${esc(s.n)} <b class="${series[k][series[k].length - 1] < 0 ? 'neg' : 'pos'}">${R(series[k][series[k].length - 1])}</b></span>`).join(''); }
   document.querySelectorAll('#sr-flt button').forEach((b) => (b.onclick = () => { flt = b.textContent; document.querySelectorAll('#sr-flt button').forEach((x) => x.classList.toggle('on', x === b)); curves(); }));
-  const PAIRS = RC.pairs;
-  $('sr-pairs').innerHTML = PAIRS.map((p, i) => `<div class="sr-pair"><em>${i + 1}</em><span>${p[0]} <b>+</b> ${p[1]}</span><b class="v ${p[3] < 0 ? 'neg' : 'pos'}">${R(p[3])}</b><small>${p[2]} trades together</small></div>`).join('');
-  $('sr-cards').innerHTML = SETS.map((s, i) => `<button type="button" class="sr-tr sr-card" data-i="${i}"><span><b>${s.n}</b><small>${s.rule}</small></span><canvas></canvas><span class="${s.exp < -0.04 ? 'neg' : s.exp > 0.04 ? 'pos' : ''}">${R(s.exp)}</span><span>${s.pf.toFixed(2)}</span><span>${s.won}%</span><span>${s.r.length}</span><span class="mu">${s.last}</span></button>`).join('');
-  document.querySelectorAll('.sr-card').forEach((c) => (c.onclick = () => { pickSet(+c.dataset.i); go('study'); }));
+  const PAIRS = LIVE ? D.pairs || [] : RC.pairs;
+  $('sr-pairs').innerHTML = !PAIRS.length ? '<p class="sr-empty">Shows up once two things line up on 2 or more trades.</p>' : PAIRS.map((p, i) => `<div class="sr-pair"><em>${i + 1}</em><span>${esc(p[0])} <b>+</b> ${esc(p[1])}</span><b class="v ${p[3] < 0 ? 'neg' : 'pos'}">${R(p[3])}</b><small>${p[2]} trades together</small></div>`).join('');
+  $('sr-cards').innerHTML = !SETS.length ? '<p class="sr-empty">No setups yet.</p>' : SETS.map((s, i) => `<button type="button" class="sr-tr sr-card" data-i="${i}"><span><b>${esc(s.n)}</b><small>${esc(s.rule) || (LIVE ? 'No rule yet' : '')}</small></span><canvas></canvas><span class="${s.exp < -0.04 ? 'neg' : s.exp > 0.04 ? 'pos' : ''}">${R(s.exp)}</span><span>${s.pf.toFixed(2)}</span><span>${s.won}%</span><span>${s.r.length}</span><span class="mu">${s.last}</span></button>`).join('');
+  document.querySelectorAll('.sr-card').forEach((c) => (c.onclick = () => { const s = SETS[+c.dataset.i]; if (LIVE && s.trades.length) { location.href = '?t=' + s.trades[s.trades.length - 1].id; return; } pickSet(+c.dataset.i); go('study'); }));
   const book = () => { curves(); document.querySelectorAll('.sr-card').forEach((c) => { const s = SETS[c.dataset.i]; spark(c.querySelector('canvas'), s.r, +c.dataset.i === setI ? '#f2f2f4' : '#6a6a74'); }); };
 
   /* ---------- modes ---------- */
@@ -397,8 +522,16 @@
   document.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => go(b.dataset.go)));
 
   /* ---------- boot ---------- */
-  renderTabs(); openTab(0); setTool('select'); syncBar(); head(); setsSpark();
+  if (LIVE) { const dg = Number.isFinite(TR.digits) ? Math.min(TR.digits, 5) : 2, f = (v) => (Number.isFinite(v) && v > 0 ? v.toFixed(dg) : '–'), tc = document.querySelector('.sr-tcard');
+    const o = tDate(TR.open), c = tDate(TR.close), mins = o && c ? Math.round((c - o) / 60000) : null, hold = mins == null ? '' : mins < 60 ? mins + ' min' : mins < 1440 ? Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min' : Math.round(mins / 1440) + ' days';
+    tc.querySelector('.sr-trow').innerHTML = `<b>${esc(TR.symbol)}</b><span class="sr-side">${String(TR.side).toLowerCase() === 'sell' ? 'Sell' : 'Buy'}</span><span class="sr-when">${fWhen(TR.open)}</span>`;
+    tc.querySelector('.sr-big').innerHTML = TR.r ? `<span class="${TR.r < 0 ? 'neg' : 'pos'}">${R(TR.r)}</span><small>${money(TR.net)}</small>` : `<span class="${TR.net < 0 ? 'neg' : 'pos'}">${money(TR.net)}</span><small>no stop, so no R</small>`;
+    const lad = tc.querySelector('.sr-ladder'); lad.setAttribute('aria-label', `Target ${f(TR.tp)}, entry ${f(TR.entry)}, stop ${f(TR.sl)}`); if (!(TR.tp > 0)) lad.querySelector('.tp').style.opacity = 0.2; if (!(TR.sl > 0)) lad.querySelector('.sl').style.opacity = 0.2;
+    tc.querySelector('.sr-lv').innerHTML = `<span>Target<b>${f(TR.tp)}</b></span><span>Entry<b>${f(TR.entry)}</b></span><span>Stop<b>${f(TR.sl)}</b></span>`;
+    tc.querySelector('.sr-meta').textContent = (hold ? 'Held ' + hold + ' · ' : '') + (TR.lots ? TR.lots + ' lots · ' : '') + 'recorded by the Journal EA'; }
+  renderTabs(); openTab(0); setTool('select'); syncBar(); head(); setsSpark(); if (LIVE) liveStrip();
   const start = { '#compare': 'compare', '#playbook': 'book' }[location.hash]; go(start || 'study');
   addEventListener('resize', () => { sizeCanvas(); setsSpark(); head(); if ($('v-book').classList.contains('on')) book(); });
-  Promise.all(FONTS.map((f) => document.fonts.load(`40px "${f[0]}"`).catch(() => {}))).then(() => { redraw(); thumbs(); });
+  booted = true;
+  Promise.all(FONTS.map((f) => document.fonts.load(`40px "${f[0]}"`).catch(() => {}))).then(() => { booted = false; redraw(); thumbs(); booted = true; });
 })();
