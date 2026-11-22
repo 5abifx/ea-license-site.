@@ -127,11 +127,11 @@ module.exports = function setup(app, { db, page, requireUser, requireAdmin, esc 
 
   app.get('/admin/requests', requireAdmin, (req, res) => {
     const rows = db.prepare(`SELECT f.*, u.email, u.name FROM feature_requests f LEFT JOIN users u ON u.id = f.user_id ORDER BY f.id DESC LIMIT 500`).all();
-    res.send(page(req, 'Feature requests', `<h1>Feature requests</h1>
+    page(req, res, 'Feature requests', `<h1>Feature requests</h1>
       <p class="muted">What members asked for from the small + button on wide screens. Newest first.</p>
       ${rows.length ? `<div class="card"><table><thead><tr><th>When</th><th>Member</th><th>Request</th><th>Page</th></tr></thead><tbody>${rows.map((r) => `<tr>
         <td class="muted small">${esc(r.created_at.slice(0, 16))}</td><td><a href="/admin/user/${r.user_id}">${esc(r.name || r.email || '#' + r.user_id)}</a></td>
-        <td>${esc(r.text)}</td><td class="muted small">${esc(r.page)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="card"><p class="muted">No requests yet.</p></div>'}`));
+        <td>${esc(r.text)}</td><td class="muted small">${esc(r.page)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="card"><p class="muted">No requests yet.</p></div>'}`);
   });
 };
 module.exports.clean = clean;
