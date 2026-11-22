@@ -134,6 +134,11 @@ module.exports = function setup(app, { db, page, requireUser }) {
         <button type="button" class="ap-opt" data-v="pin"><b>Cards on sides</b><small>Focus, gallery, quote and garage stay beside the page</small></button>
         <button type="button" class="ap-opt" data-v="slide"><b>Full width</b><small>Cards hide and slide in when the mouse touches the edge</small></button>
       </div>
+      <div class="ap-sub">Help button <small>The orange chat button in the corner, on this device</small></div>
+      <div class="ap-opts" id="apSup">
+        <button type="button" class="ap-opt" data-v="1"><b>Show</b><small>Help, contact and Request a feature</small></button>
+        <button type="button" class="ap-opt" data-v="0"><b>Hidden</b><small>Same as the small × on the button</small></button>
+      </div>
       <div class="ap-sub">Motion</div>
       <div class="ap-opts" id="apCalm">
         <button type="button" class="ap-opt" data-v="0"><b>Full motion</b><small>Numbers count up and pages slide in</small></button>

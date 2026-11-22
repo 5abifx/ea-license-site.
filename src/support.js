@@ -34,6 +34,7 @@ function supportWidget(req) {
     <div class="sup-list">${links}</div>
     <div class="sup-foot">${svg('help', 15)}<span>Quick answers: <a href="/faq">FAQ</a> · <a href="/help/ea-blocked">EA blocked by broker?</a></span></div>
   </div>
+  <button type="button" class="sup-hide" id="sup-hide" aria-label="Hide the help button" title="Hide (bring it back in Appearance › Layout)">×</button>
   <button type="button" class="sup-btn" id="sup-btn" aria-controls="sup-panel" aria-expanded="false" aria-label="Help and contact"><span class="sup-o">${svg('chat', 24)}</span><span class="sup-x">${svg('close', 22)}</span><em>Need help?</em></button>
 </div>
 <script src="/support.js?v=1" defer></script>`;

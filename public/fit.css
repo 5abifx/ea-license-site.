@@ -268,3 +268,5 @@ html.calm .app-body :not(.plx, .plx *) { transition-duration: .12s !important; }
 @keyframes pcSlN { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
 @keyframes pcSlP { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
 .pc-body { overflow: hidden; }
+/* the request form lives in the help panel now: the right column only keeps clear of the help button */
+@media (min-width: 1200px) and (pointer: fine) { html.sc-wide .sc-r { bottom: 86px; } }
