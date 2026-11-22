@@ -133,9 +133,12 @@
         var a = (D.goalAuto || [])[i], pct = a ? a.pct : g.pct;
         return '<div class="sc-goal' + (a ? ' auto' : '') + '"><div class="top"><span>' + esc(g.text) + '</span><span>' + pct + '% <button type="button" class="sc-x" data-rmg="' + i + '" aria-label="Remove">×</button></span></div>'
           + '<div class="sc-bar"' + (a ? ' title="Fills from your journal"' : ' data-g="' + i + '" title="Tap the bar to set your progress"') + '><i style="width:' + pct + '%"></i></div>'
-          + '<div class="sc-gnow">' + (a ? esc(a.now) : 'Tap the bar to set progress') + '</div></div>';
+          + (a && a.split ? '<div class="sc-split">' + a.split.map(function (r) {   // today / week / month against the target
+              return '<div class="sc-sp' + (r.main ? ' on' : '') + '"><span>' + esc(r.lab) + '</span><b class="' + (r.neg ? 'neg' : '') + '">' + esc(r.got) + '</b><em>/ ' + esc(r.tgt) + '</em><i><u style="width:' + r.pct + '%"></u></i></div>';
+            }).join('') + '<div class="sc-pace ' + (a.ahead ? 'up' : 'dn') + '">' + esc(a.pace) + '</div></div>'
+            : '<div class="sc-gnow">' + (a ? esc(a.now) : 'Tap the bar to set progress') + '</div>') + '</div>';
       }).join('')
-      + (F.goals.length < 3 ? '<form class="sc-add" data-add="goal"><input maxlength="70" placeholder="+ Add a goal (e.g. $5k this month, 20R, 60% win rate)"></form>' : '') + '</div>'
+      + (F.goals.length < 3 ? '<form class="sc-add" data-add="goal"><input maxlength="70" placeholder="+ Add a goal (e.g. $10k this month, 2R a day, 60% win rate)"></form>' : '') + '</div>'
       + '<div class="sc-sec"><div class="sc-lbl" style="margin-bottom:8px">Notes</div><textarea class="sc-note" maxlength="600" placeholder="What did today teach you?">' + esc(F.notes) + '</textarea></div>'
       + '<button type="button" class="sc-save">Save today</button>';
   }

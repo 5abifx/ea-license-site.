@@ -63,7 +63,7 @@ function goalKind(text) {
   if ((m = /(\d{1,3}(?:\.\d+)?)\s*%/.exec(t)) && /win/i.test(t)) return { kind: 'wr', target: +m[1], per };
   if ((m = /(\d+(?:\.\d+)?)\s*R\b/.exec(t))) return { kind: 'r', target: +m[1], per };
   if ((m = /(\d+)\s*green/i.exec(t))) return { kind: 'green', target: +m[1], per };
-  if ((m = /(\$|usd|£|€)?\s*(\d[\d,]*(?:\.\d+)?)\s*(k\b)?/i.exec(t)) && (m[1] || m[3] || /make|profit|earn|\bpnl\b|p&l/i.test(t))) {
+  if ((m = /(\$|usd|£|€)?\s*(\d[\d,]*(?:\.\d+)?)\s*(k\b)?/i.exec(t)) && (m[1] || m[3] || /make|profit|earn|generate|target|\bpnl\b|p&l/i.test(t))) {
     const v = parseFloat(m[2].replace(/,/g, '')) * (m[3] ? 1000 : 1); if (v > 0) return { kind: 'money', target: v, per };
   }
   return null;
@@ -125,6 +125,28 @@ module.exports = function setup(app, { db, page, requireUser, requireAdmin, esc 
     res.json(out);
   });
 
+  // money / R goals (owner, 2026-11-22): one target split into today / this week / this month, so the member sees
+  // what they made against what they need. Trading days = Mon-Fri. "$10k this month" -> about $476 a day, $2,381 a week.
+  // Pace: where you should be by today; "need" = what each trading day left has to bring to still hit the month.
+  function paceGoal(u, k, live, from, now) {
+    const y = now.getUTCFullYear(), mo = now.getUTCMonth(), today = now.getUTCDate(), last = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+    const wd = (d) => { const g = new Date(Date.UTC(y, mo, d)).getUTCDay(); return g > 0 && g < 6; };
+    let mDays = 0, done = 0; for (let d = 1; d <= last; d++) if (wd(d)) { mDays++; if (d < today) done++; }
+    const left = Math.max(1, mDays - done);   // trading days left in the month, today included
+    const daily = k.per === 'day' ? k.target : k.per === 'week' ? k.target / 5 : k.target / Math.max(1, mDays);
+    const tgt = { day: daily, week: daily * 5, month: daily * mDays };
+    const sum = (rows) => rows.reduce((x, t) => x + (k.kind === 'r' ? (Number.isFinite(t.r) ? t.r : 0) : (t.net || 0)), 0);
+    const got = {}; ['day', 'week', 'month'].forEach((p) => { got[p] = sum(db.prepare(`SELECT net, r FROM journal_trades WHERE ${live} AND close_time >= ?`).all(u.id, u.id, from[p])); });
+    const f = (v) => k.kind === 'r' ? (Math.round(v * 10) / 10) + 'R' : (v < 0 ? '−$' : '$') + Math.round(Math.abs(v)).toLocaleString('en-US');
+    const pc = (a, b) => Math.max(0, Math.min(100, Math.round(a / b * 100)));
+    const wkend = !wd(today);   // Saturday / Sunday: no daily target
+    const split = [['day', wkend ? 'Weekend' : 'Today'], ['week', 'This week'], ['month', 'This month']].map(([p, lab]) => ({ lab, got: f(got[p]), tgt: p === 'day' && wkend ? 'market shut' : f(tgt[p]), pct: p === 'day' && wkend ? 0 : pc(got[p], tgt[p]), neg: got[p] < 0, main: p === k.per }));
+    const should = daily * done, diff = got.month - should;   // where the month should be before today's trades
+    const pace = got.month >= tgt.month ? `Month target hit. ${f(got.month - tgt.month)} over`
+      : (diff >= 0 ? `Ahead by ${f(diff)}` : `Behind by ${f(-diff)}`) + ` · need ${f((tgt.month - got.month) / left)}/day for ${left} trading day${left > 1 ? 's' : ''}`;
+    return { pct: pc(got[k.per], tgt[k.per]), now: `${f(got[k.per])} of ${f(tgt[k.per])} ${k.per === 'day' ? 'today' : 'this ' + k.per}`, split, pace, ahead: diff >= 0 };
+  }
+
   // progress of each goal the journal can measure ({ pct, now } or null = manual)
   function goalProgress(u, goals, has) {
     const live = 'user_id = ? AND account_number IN (SELECT account_number FROM accounts WHERE user_id = ?)';
@@ -148,8 +170,7 @@ module.exports = function setup(app, { db, page, requireUser, requireAdmin, esc 
         const rows = db.prepare(`SELECT net, r, substr(close_time, 1, 10) AS d FROM journal_trades WHERE ${live} AND close_time >= ?`).all(u.id, u.id, from[k.per]);
         const lab = k.per === 'day' ? 'today' : 'this ' + k.per;
         let v = 0, txt = '';
-        if (k.kind === 'money') { v = rows.reduce((x, t) => x + (t.net || 0), 0); txt = `${fmt(Math.max(0, v))} of ${fmt(k.target)} ${lab}`; }
-        if (k.kind === 'r') { v = rows.reduce((x, t) => x + (Number.isFinite(t.r) ? t.r : 0), 0); txt = `${Math.round(v * 10) / 10}R of ${k.target}R ${lab}`; }
+        if (k.kind === 'money' || k.kind === 'r') return paceGoal(u, k, live, from, now);
         if (k.kind === 'wr') { if (!rows.length) return { pct: 0, now: `No trades ${lab} yet` }; v = rows.filter((t) => t.net > 0).length / rows.length * 100; txt = `${Math.round(v)}% win ${lab} (${rows.length} trades)`; }
         if (k.kind === 'green') { const by = {}; rows.forEach((t) => { by[t.d] = (by[t.d] || 0) + (t.net || 0); }); v = Object.values(by).filter((x) => x > 0).length; txt = `${v} of ${k.target} green days ${lab}`; }
         return { pct: Math.max(0, Math.min(100, Math.round(v / k.target * 100))), now: txt };
