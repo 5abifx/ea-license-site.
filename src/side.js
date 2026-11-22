@@ -140,12 +140,13 @@ module.exports = function setup(app, { db, page, requireUser, requireAdmin, esc 
     const f = (v) => k.kind === 'r' ? (Math.round(v * 10) / 10) + 'R' : (v < 0 ? '−$' : '$') + Math.round(Math.abs(v)).toLocaleString('en-US');
     const pc = (a, b) => Math.max(0, Math.min(100, Math.round(a / b * 100)));
     const wkend = !wd(today);   // Saturday / Sunday: no daily target
-    const split = [['day', wkend ? 'Weekend' : 'Today'], ['week', 'This week'], ['month', 'This month']].map(([p, lab]) => ({ lab, got: f(got[p]), tgt: p === 'day' && wkend ? 'market shut' : f(tgt[p]), pct: p === 'day' && wkend ? 0 : pc(got[p], tgt[p]), neg: got[p] < 0, main: p === k.per }));
+    const split = [['day', wkend ? 'Weekend' : 'Today'], ['week', 'This week'], ['month', 'This month']].map(([p, lab]) => ({ lab, got: f(got[p]), tgt: p === 'day' && wkend ? 'market shut' : f(tgt[p]), pct: p === 'day' && wkend ? 0 : pc(got[p], tgt[p]), neg: got[p] < 0, main: p === (k.per === 'day' && wkend ? 'week' : k.per) }));
     const should = daily * done, diff = got.month - should;   // where the month should be before today's trades
-    const pace = got.month >= tgt.month ? `Month target hit. ${f(got.month - tgt.month)} over`
-      : (diff >= 0 ? `Ahead by ${f(diff)}` : `Behind by ${f(-diff)}`) + ` · need ${f((tgt.month - got.month) / left)}/day for ${left} trading day${left > 1 ? 's' : ''}`;
+    const hit = got.month >= tgt.month, need = f((tgt.month - got.month) / left);
+    const pace = hit ? `Month hit, ${f(got.month - tgt.month)} over` : `${diff >= 0 ? 'Ahead' : 'Behind'} ${f(Math.abs(diff))} · ${need}/day`;
+    const paceLong = hit ? pace : `${diff >= 0 ? 'Ahead by' : 'Behind by'} ${f(Math.abs(diff))}. Need ${need} a day for the ${left} trading day${left > 1 ? 's' : ''} left this month.`;
     const mp = k.per === 'day' && wkend ? 'week' : k.per;   // weekend: a daily goal shows the week's progress
-    return { pct: pc(got[mp], tgt[mp]), now: `${f(got[k.per])} of ${f(tgt[k.per])} ${k.per === 'day' ? 'today' : 'this ' + k.per}`, split, pace, ahead: diff >= 0 };
+    return { pct: pc(got[mp], tgt[mp]), now: `${f(got[k.per])} of ${f(tgt[k.per])} ${k.per === 'day' ? 'today' : 'this ' + k.per}`, split, pace, paceLong, ahead: diff >= 0 };
   }
 
   // progress of each goal the journal can measure ({ pct, now } or null = manual)

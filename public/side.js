@@ -130,25 +130,34 @@
       + '<div class="sc-sec"><div class="sc-lbl">Goals</div>'
       + F.goals.map(function (g, i) {
         // goals the journal can measure fill up by themselves (src/side.js goalKind); the rest: tap the bar
-        var a = (D.goalAuto || [])[i], pct = a ? a.pct : g.pct;
+        var a = (D.goalAuto || [])[i], pct = a ? a.pct : g.pct, line;
+        if (a && a.split) {
+          // money / R target: one line you flip with ‹ › between Today, This week, This month and Pace (owner: keep the card small)
+          var vs = a.split.concat([{ lab: 'Pace', pace: 1, pct: a.split[2].pct }]);
+          var v = GV[i] != null ? GV[i] : Math.max(0, vs.findIndex(function (r) { return r.main; })); GV[i] = v = (v + vs.length) % vs.length;
+          var r = vs[v]; pct = r.pct;
+          line = '<div class="sc-gv"><button type="button" data-gv="' + i + '" data-d="-1" aria-label="Previous view">‹</button>'
+            + (r.pace ? '<span class="sc-pace ' + (a.ahead ? 'up' : 'dn') + '" title="' + esc(a.paceLong || a.pace) + '">' + esc(a.pace) + '</span>'
+              : '<span><em>' + esc(r.lab) + '</em> <b class="' + (r.neg ? 'neg' : '') + '">' + esc(r.got) + '</b> / ' + esc(r.tgt) + '</span>')
+            + '<button type="button" data-gv="' + i + '" data-d="1" aria-label="Next view">›</button></div>';
+        } else line = '<div class="sc-gnow">' + (a ? esc(a.now) : 'Tap the bar to set progress') + '</div>';
         return '<div class="sc-goal' + (a ? ' auto' : '') + '"><div class="top"><span>' + esc(g.text) + '</span><span>' + pct + '% <button type="button" class="sc-x" data-rmg="' + i + '" aria-label="Remove">×</button></span></div>'
           + '<div class="sc-bar"' + (a ? ' title="Fills from your journal"' : ' data-g="' + i + '" title="Tap the bar to set your progress"') + '><i style="width:' + pct + '%"></i></div>'
-          + (a && a.split ? '<div class="sc-split">' + a.split.map(function (r) {   // today / week / month against the target
-              return '<div class="sc-sp' + (r.main ? ' on' : '') + '"><span>' + esc(r.lab) + '</span><b class="' + (r.neg ? 'neg' : '') + '">' + esc(r.got) + '</b><em>/ ' + esc(r.tgt) + '</em><i><u style="width:' + r.pct + '%"></u></i></div>';
-            }).join('') + '<div class="sc-pace ' + (a.ahead ? 'up' : 'dn') + '">' + esc(a.pace) + '</div></div>'
-            : '<div class="sc-gnow">' + (a ? esc(a.now) : 'Tap the bar to set progress') + '</div>') + '</div>';
+          + line + '</div>';
       }).join('')
       + (F.goals.length < 3 ? '<form class="sc-add" data-add="goal"><input maxlength="70" placeholder="+ Add a goal (e.g. $10k this month, 2R a day, 60% win rate)"></form>' : '') + '</div>'
       + '<div class="sc-sec"><div class="sc-lbl" style="margin-bottom:8px">Notes</div><textarea class="sc-note" maxlength="600" placeholder="What did today teach you?">' + esc(F.notes) + '</textarea></div>'
       + '<button type="button" class="sc-save">Save today</button>';
   }
+  var GV = {};   // which view (Today / week / month / pace) each target goal shows
   function focusEvents() {
     var c = L.querySelector('.sc-focus');
     c.addEventListener('click', function (e) {
-      var t = e.target.closest('[data-ck],[data-rm],[data-rmg],[data-g],.sc-save'); if (!t) return;
+      var t = e.target.closest('[data-ck],[data-rm],[data-rmg],[data-g],[data-gv],.sc-save'); if (!t) return;
+      if (t.dataset.gv != null) { GV[+t.dataset.gv] = (GV[+t.dataset.gv] || 0) + Number(t.dataset.d); drawFocus(); return; }
       if (t.dataset.ck != null) { var f = F.fixes[+t.dataset.ck]; if (f.days[today]) delete f.days[today]; else f.days[today] = 1; drawFocus(); save(); return; }
       if (t.dataset.rm != null) { F.fixes.splice(+t.dataset.rm, 1); drawFocus(); save(); return; }
-      if (t.dataset.rmg != null) { F.goals.splice(+t.dataset.rmg, 1); if (D.goalAuto) D.goalAuto.splice(+t.dataset.rmg, 1); drawFocus(); save(); return; }
+      if (t.dataset.rmg != null) { GV = {}; F.goals.splice(+t.dataset.rmg, 1); if (D.goalAuto) D.goalAuto.splice(+t.dataset.rmg, 1); drawFocus(); save(); return; }
       if (t.dataset.g != null) { var bb = t.getBoundingClientRect(); F.goals[+t.dataset.g].pct = Math.max(0, Math.min(100, Math.round((e.clientX - bb.left) / bb.width * 20) * 5)); drawFocus(); save(); return; }
       if (t.classList.contains('sc-save')) save(true);
     });
