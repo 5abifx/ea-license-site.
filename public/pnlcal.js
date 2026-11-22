@@ -10,6 +10,7 @@
     var VIEWS = ['Year', 'Quarter', 'Month', 'Week', 'Day'], DAY = 864e5;
     var view = 0, at = Date.parse(today + 'T00:00:00Z');
     try { var sv = +localStorage.getItem('pcView'); if (sv >= 0 && sv < 5) view = sv; } catch (e) {}
+    function perNow() { return rows || (box.clientWidth < 700 ? 6 : 12); }
     var rows = 0; try { var sr = +localStorage.getItem('pcRows'); if ([12, 6, 2].indexOf(sr) >= 0) rows = sr; } catch (e) {}
     if (!localStorageHas() && box.clientWidth < 560) view = 2;   // phones open on the month
     function localStorageHas() { try { return localStorage.getItem('pcView') != null; } catch (e) { return false; } }
@@ -35,9 +36,11 @@
     function draw() {
       var d = new Date(at), y = d.getUTCFullYear(), mo = d.getUTCMonth(), a0, a1, label, body = '';
       if (view === 0) {   // one continuous strip of weeks (Mon-Fri rows); phones split it into two halves so squares stay big
+        var per = perNow(), halves = [], strips = '', maxWk = 0;   // months per row: 12 = one straight strip
         a0 = Date.UTC(y, 0, 1); a1 = Date.UTC(y + 1, 0, 1); label = String(y);
-        var per = rows || (box.clientWidth < 700 ? 6 : 12), halves = [], strips = '', maxWk = 0;   // months per row: 12 = one straight strip
-        for (var hs = 0; hs < 12; hs += per) halves.push([hs, hs + per]);
+        if (per === 6) {   // 6 mo: one half on screen, the date arrows slide to the other half
+          var h6 = mo < 6 ? 0 : 6; halves = [[h6, h6 + 6]]; a0 = Date.UTC(y, h6, 1); a1 = Date.UTC(y, h6 + 6, 1); label = MON[h6] + '–' + MON[h6 + 5] + ' ' + y;
+        } else for (var hs = 0; hs < 12; hs += per) halves.push([hs, hs + per]);
         halves.forEach(function (hv) {
           var h0 = Date.UTC(y, hv[0], 1), h1 = Date.UTC(y, hv[1], 1), cols = '', last = -1, nc = 0;
           for (var w = monday(h0); w < h1; w += 7 * DAY) {
@@ -98,7 +101,7 @@
     }
     function step(dir) {
       var d = new Date(at), y = d.getUTCFullYear(), m = d.getUTCMonth(), dd = Math.min(28, d.getUTCDate());
-      if (view === 0) at = Date.UTC(y + dir, m, dd);
+      if (view === 0) at = perNow() === 6 ? Date.UTC(y, (m < 6 ? 0 : 6) + 6 * dir, 1) : Date.UTC(y + dir, m, dd);
       else if (view === 1) at = Date.UTC(y, m + 3 * dir, dd);
       else if (view === 2) at = Date.UTC(y, m + dir, dd);
       else if (view === 3) at += 7 * dir * DAY;
@@ -114,6 +117,7 @@
       if (b.dataset.v) { view = Math.max(0, Math.min(4, view + Number(b.dataset.v))); try { localStorage.setItem('pcView', view); } catch (x) {} }
       else step(Number(b.dataset.s));
       draw();
+      if (b.dataset.s) { var fc = box.querySelector('.pc-body').firstElementChild; if (fc) fc.classList.add(+b.dataset.s > 0 ? 'sl-n' : 'sl-p'); }   // slide in from the side it came from
     });
     draw();
   });
