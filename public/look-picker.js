@@ -66,6 +66,11 @@
   pk.innerHTML = '<input type="color" id="apAccPick" value="#ff5a1f" aria-label="Pick any accent colour">'; $('#apMatte').appendChild(pk);
   $('#apAccPick').oninput = (e) => set({ accent: 'c-' + e.target.value });
 
+  /* tabs (same as Share Studio); last tab remembered on this device */
+  const showTab = (t) => { $$('.ap-tabs [data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === t))); $$('.ap-body [data-pane]').forEach((p) => { p.hidden = p.dataset.pane !== t; }); try { localStorage.setItem('apTab', t); } catch (e) {} };
+  $$('.ap-tabs [data-tab]').forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
+  try { const t = location.hash.slice(1) || localStorage.getItem('apTab'); if (t && document.querySelector('.ap-body [data-pane="' + t + '"]')) showTab(t); } catch (e) {}
+
   /* panel tint, motion, sliders */
   $$('#apPanel button').forEach((b) => { b.onclick = () => set({ panel: b.dataset.v }); });
   $('#apMotion').onclick = () => set({ motion: !S.motion });

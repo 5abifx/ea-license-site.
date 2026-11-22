@@ -130,27 +130,27 @@ html.calm .app-body :not(.plx, .plx *), html.calm .app-body :not(.plx, .plx *)::
 html.calm .app-main.swap-in, html.calm .app-main.swap-out { animation: none !important; transition: none !important; opacity: 1 !important; }
 html.calm .app-body :not(.plx, .plx *) { transition-duration: .12s !important; }
 
-/* ---------- account picker dial (public/acct-dial.js, PC only) ---------- */
-.app-body .accts.ad { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; width: 360px; max-width: 100%; padding: 4px 8px 4px 4px; overflow: visible;
-  border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.03); }
-.ad-drum { position: relative; flex: 1; min-width: 0; height: 104px; overflow: hidden; outline: none;
-  -webkit-mask-image: linear-gradient(transparent, #000 26%, #000 74%, transparent); mask-image: linear-gradient(transparent, #000 26%, #000 74%, transparent); }
+/* ---------- account picker dial B1 (public/acct-dial.js, PC only): floating strip, no card behind ---------- */
+.app-body .accts.ad { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; width: 100%; height: 70px; padding: 0; margin-bottom: 14px;
+  overflow: visible; border: 0; background: none; box-shadow: none; }
+.ad-drum { position: relative; flex: 1; min-width: 0; height: 100%; overflow: hidden; outline: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
 .ad-drum:focus-visible { box-shadow: inset 0 0 0 1px rgba(255,255,255,.3); border-radius: 10px; }
-.app-body .ad .acct { position: absolute; left: 0; right: 0; top: 50%; min-width: 0; margin: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 0;
-  padding: 5px 12px; border: 0; border-radius: 10px; box-shadow: none; background: transparent; transform-origin: left center;
-  transition: transform .45s cubic-bezier(.2,.7,.2,1), opacity .35s, background .2s; }
-.app-body .ad .acct > small:first-child { grid-column: 1; grid-row: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.app-body .ad .acct > b { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 14px; }
-.app-body .ad .acct > small:last-child { grid-column: 1; grid-row: 2; font-size: 11px; }
-.app-body .ad .acct.cur { background: rgba(255,255,255,.07); }
-.app-body .ad .acct.cur > b { font-size: 17px; }
-.app-body .ad .acct.on::before { content: ''; position: absolute; left: 3px; top: 50%; width: 3px; height: 20px; margin-top: -10px; border-radius: 3px; background: var(--accent); }
-.app-body .ad.moved .acct.cur { box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); cursor: pointer; }
-.ad-side { display: flex; flex-direction: column; align-items: center; gap: 5px; flex: none; }
-.ad-side button { width: 26px; height: 26px; min-height: 0; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted);
-  font-size: 9px; line-height: 1; letter-spacing: 0; text-transform: none; box-shadow: none; display: grid; place-items: center; cursor: pointer; }
-.ad-side button:hover { color: #fff; border-color: rgba(255,255,255,.3); }
-.ad-n { font: 500 10px var(--mono, ui-monospace, monospace); color: var(--muted); white-space: nowrap; }
+.app-body .ad .acct { position: absolute; left: 50%; top: 50%; min-width: 0; max-width: 220px; margin: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 4px 10px 6px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; box-shadow: none; background: none; text-align: center; white-space: nowrap;
+  transition: transform .45s cubic-bezier(.2,.7,.2,1), opacity .35s, border-color .25s; }
+.app-body .ad .acct > small { max-width: 200px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.app-body .ad .acct > small:first-child { font-size: 11.5px; }
+.app-body .ad .acct > small:last-child { display: none; }
+.app-body .ad .acct > b { font-size: 15px; }
+.app-body .ad .acct.cur { border-bottom-color: var(--accent-2, var(--accent)); }
+.app-body .ad .acct.cur > small:first-child { color: var(--text); }
+.app-body .ad .acct.cur > b { font: 700 20px Sora, system-ui, sans-serif; letter-spacing: -.02em; }
+.app-body .ad.moved .acct.cur { cursor: pointer; border-bottom-style: dashed; }
+.ad-arr { flex: none; width: 30px; height: 30px; min-height: 0; padding: 0; border: 0; border-radius: 50%; background: transparent; box-shadow: none;
+  color: var(--muted); font-size: 20px; line-height: 1; letter-spacing: 0; text-transform: none; display: grid; place-items: center; cursor: pointer; }
+.ad-arr:hover:not(:disabled) { color: var(--text); background: rgba(255,255,255,.06); }
+.ad-arr:disabled { opacity: .25; cursor: default; }
 
 /* Focus goals: the line under each bar (what it counts, or "tap the bar") */
 .sc-gnow { margin-top: 5px; font-size: 11px; font-weight: 500; color: #8a8a93; }

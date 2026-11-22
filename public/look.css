@@ -131,3 +131,36 @@ html.lk .app-body .btn:not(.secondary):not(.link), html.lk .app-body button[type
 .app-body .ov-sec, .app-body .ov-cmp, .app-body .ov-note, .app-body .ov-card small { color: #c2c2ca; }
 .app-body .pos, .app-body .acct b.pos { color: #3fdcb5; }
 .app-body .neg { color: #ff6f74; }
+
+/* Appearance settings in Share Studio style: tabs, wrapping chips, option cards (2026-11-22) */
+.ap-panel { gap: 12px; max-height: calc(100vh - 110px); padding: 6px 18px 16px !important; }
+.ap-tabs { display: flex; gap: 2px; border-bottom: 1px solid rgba(255,255,255,.08); flex: none; }
+.ap-tabs button { flex: 1; padding: 12px 4px; min-height: 0; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 0; background: none; box-shadow: none;
+  color: var(--muted); font: 600 13.5px Manrope, system-ui, sans-serif; letter-spacing: 0; text-transform: none; cursor: pointer; white-space: nowrap; }
+.ap-tabs button:hover { color: var(--text); }
+.ap-tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--text); }
+.ap-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0 -6px; padding: 2px 6px; scrollbar-width: thin; }
+.ap-body .ap-sec { gap: 10px; }
+.ap-sec[hidden] { display: none; }
+.ap-sub { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 700; margin-top: 6px; }
+.ap-sub:first-child { margin-top: 0; }
+.ap-sub small { font-size: 11.5px; font-weight: 500; color: var(--muted); }
+.ap-chips2 { display: flex; flex-wrap: wrap; gap: 8px; }
+.ap-chips2 button { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; min-height: 0; border-radius: 12px; cursor: pointer;
+  font: 600 12.5px Manrope, system-ui, sans-serif; letter-spacing: 0; text-transform: none; color: var(--muted); white-space: nowrap;
+  background: linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.025)); border: 1px solid rgba(255,255,255,.08); box-shadow: none; transition: .15s; }
+.ap-chips2 button:hover { color: var(--text); transform: translateY(-1px); }
+.ap-chips2 button i { width: 16px; height: 16px; flex: none; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+.ap-chips2 button[aria-pressed="true"] { color: var(--text); border-color: var(--accent-2); background: rgba(255,255,255,.1); }
+.ap-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ap-opt { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 14px; min-height: 0; min-width: 0; white-space: normal; border-radius: 14px; cursor: pointer; text-align: left;
+  letter-spacing: 0; text-transform: none; color: var(--text); background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02)); border: 1px solid rgba(255,255,255,.08); box-shadow: none; transition: .15s; }
+.ap-opt b { font: 700 13px Manrope, system-ui, sans-serif; }
+.ap-opt small { font-size: 11.5px; font-weight: 500; line-height: 1.35; color: var(--muted); }
+.ap-opt:hover { background: rgba(255,255,255,.09); }
+.ap-opt[aria-pressed="true"] { border-color: var(--accent-2); background: rgba(255,255,255,.1); box-shadow: inset 0 0 0 1px var(--accent-2); }
+.ap-foot { flex: none; display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
+.ap-foot .ap-read { padding: 10px 12px; }
+.ap-foot .ap-note { font-size: 11.5px; }
+@media (max-width: 1100px) { .ap-panel { max-height: none; } .ap-body { overflow: visible; } }
+@media (max-width: 420px) { .ap-opts { grid-template-columns: 1fr; } .ap-tabs button { font-size: 12.5px; } }
