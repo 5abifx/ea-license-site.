@@ -7,7 +7,7 @@
   addEventListener('swap:leave', () => H.classList.remove('sr-full'), { once: true });
   const rng = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   const uid = () => Math.random().toString(36).slice(2, 9), seedNew = () => (Math.random() * 1e9) | 0;
-  const R = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + 'R';
+  const R = (v) => (Math.abs(v) < 0.05 ? '' : v > 0 ? '+' : '−') + Math.abs(v).toFixed(1) + 'R';
   const DPR = () => Math.min(devicePixelRatio || 1, 2);
   function fitCv(cv) { const d = DPR(), w = cv.clientWidth, h = cv.clientHeight; cv.width = w * d; cv.height = h * d; const x = cv.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); return [x, w, h]; }
   function spark(cv, pts, col) {
@@ -18,11 +18,11 @@
 
   /* ---------- sample data ---------- */
   const SETS = [
-    { n: 'Absorption at value high', c: '#ff5a1f', rule: 'Sell the 3rd tap. Half off at 1R.', r: [1.6, -1, 2.1, 1.4, -1, 1.8, -1], last: '20 Nov' },
-    { n: 'Buy at value low', c: '#26c6a0', rule: 'Only while the heatmap wall below holds.', r: [0.8, -1, 1.2, -1, 2, 0.9, -1, 1.1, 0.6], last: '19 Nov' },
-    { n: 'Exhaustion at poor high', c: '#5cc8ff', rule: 'Wait for delta to flip first.', r: [2.2, 1.9, -1, 2.6], last: '14 Nov' },
-    { n: 'Open drive with trend', c: '#f6d743', rule: 'First pullback only. No chasing.', r: [1.5, -1, -1, 0.9, -1, 1.2, -0.6], last: '12 Nov' },
-    { n: 'Stacked imbalance retest', c: '#b18cff', rule: 'Needs work: 5 of 8 lost in Asia.', r: [-1, 1.4, -1, -1, 0.8, -1, -1, 1.2], last: '6 Nov' }];
+    { n: 'Absorption at value high', c: '#f2f2f4', rule: 'Sell the 3rd tap. Half off at 1R.', r: [1.6, -1, 2.1, 1.4, -1, 1.8, -1], last: '20 Nov' },
+    { n: 'Buy at value low', c: '#f2f2f4', rule: 'Only while the heatmap wall below holds.', r: [0.8, -1, 1.2, -1, 2, 0.9, -1, 1.1, 0.6], last: '19 Nov' },
+    { n: 'Exhaustion at poor high', c: '#f2f2f4', rule: 'Wait for delta to flip first.', r: [2.2, 1.9, -1, 2.6], last: '14 Nov' },
+    { n: 'Open drive with trend', c: '#f2f2f4', rule: 'First pullback only. No chasing.', r: [1.5, -1, -1, 0.9, -1, 1.2, -0.6], last: '12 Nov' },
+    { n: 'Stacked imbalance retest', c: '#f2f2f4', rule: 'Needs work: 5 of 8 lost in Asia.', r: [-1, 1.4, -1, -1, 0.8, -1, -1, 1.2], last: '6 Nov' }];
   SETS.forEach((s) => { const w = s.r.filter((v) => v > 0), l = s.r.filter((v) => v <= 0), gw = w.reduce((a, b) => a + b, 0), gl = -l.reduce((a, b) => a + b, 0);
     s.won = Math.round(w.length / s.r.length * 100); s.exp = (gw - gl) / s.r.length; s.pf = gl ? gw / gl : gw; s.tot = gw - gl; });
   const INBOX = [['XAUUSD', 'sell', 'Thu 20 Nov · 09:42', -184, -1, 'No screenshot yet'], ['NAS100', 'buy', 'Wed 19 Nov · 10:05', 612, 2.4, '2 pictures, no setup'],
@@ -85,7 +85,7 @@
 
   /* ---------- Chart Ink engine (hand-drawn marks) ---------- */
   const cv = $('ci-cv'), ctx = cv.getContext('2d'), stage = $('ci-stage'), typer = $('ci-type');
-  const COLORS = [['#ffffff', 'White'], ['#ff5a1f', 'Orange'], ['#26c6a0', 'Teal'], ['#f0464b', 'Red'], ['#f6d743', 'Yellow'], ['#5cc8ff', 'Blue']];
+  const COLORS = [['#ffffff', 'White'], ['#ff5a1f', 'Orange'], ['#26c6a0', 'Teal'], ['#f0464b', 'Red']];
   const FONTS = [['Architects Daughter', 'Print caps'], ['Caveat', 'Marker'], ['Kalam', 'Felt tip'], ['Patrick Hand', 'Neat'], ['Permanent Marker', 'Bold']];
   const LABELS = ['Absorption', 'Value high', 'Entry', 'Stop', 'Target', '1R', 'Big sellers', 'Heatmap wall', '3rd tap', 'Half off here'];
   const S = { tool: 'select', color: '#ffffff', size: 4, font: 'Architects Daughter', fs: 40, sel: null, drag: null };
@@ -134,8 +134,8 @@
   function paint(c, b, W, Hh, sel) { c.fillStyle = '#000'; c.fillRect(0, 0, W, Hh); if (!b) return; if (b.bg) c.drawImage(b.bg, 0, 0, W, Hh);
     const k = W / 1600; c.save(); c.scale(k, k); for (const o of b.objs) drawObj(c, o);
     const o = sel && b.objs.find((q) => q.id === sel);
-    if (o) { const u = uiScale(), bb = bbox(o), p = 6 * u; c.strokeStyle = 'rgba(255,90,31,.95)'; c.lineWidth = 1.5 * u; c.setLineDash([6 * u, 5 * u]); c.strokeRect(bb.x - p, bb.y - p, bb.w + p * 2, bb.h + p * 2); c.setLineDash([]);
-      for (const [, hx, hy] of handles(o)) { c.fillStyle = '#ff5a1f'; c.strokeStyle = '#000'; c.beginPath(); c.arc(hx, hy, 7 * u, 0, 7); c.fill(); c.stroke(); } }
+    if (o) { const u = uiScale(), bb = bbox(o), p = 6 * u; c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 1.5 * u; c.setLineDash([6 * u, 5 * u]); c.strokeRect(bb.x - p, bb.y - p, bb.w + p * 2, bb.h + p * 2); c.setLineDash([]);
+      for (const [, hx, hy] of handles(o)) { c.fillStyle = '#fff'; c.strokeStyle = '#000'; c.beginPath(); c.arc(hx, hy, 7 * u, 0, 7); c.fill(); c.stroke(); } }
     c.restore(); }
   let raf = 0; const redraw = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; paint(ctx, B, cv.width, cv.height, S.sel); if (typer.hidden === false) placeTyper(); }); };
   function sizeCanvas() { const r = stage.getBoundingClientRect(), mw = r.width - 24, mh = r.height - 24; if (mw <= 0) return; const w = Math.min(mw, mh * 16 / 9); cv.style.width = w + 'px'; cv.style.height = w * 9 / 16 + 'px'; redraw(); }
@@ -223,15 +223,15 @@
     { name: 'MT5 chart', sub: 'from the Journal EA', bg: m5.c, objs: [
       ...m5.tap.map(([x, y], i) => ({ id: uid(), type: 'ellipse', x: x - 26, y: y - 26, w: 52, h: 46, color: i === 2 ? '#ff5a1f' : '#ffffff', size: 4, seed: seedNew() })),
       T(m5.tap[0][0] - 70, m5.tap[0][1] - 110, '3 taps,\nno break', 40),
-      { id: uid(), type: 'arrow', x1: m5.entry[0] + 150, y1: m5.entry[1] - 150, x2: m5.entry[0] + 22, y2: m5.entry[1] - 14, color: '#ff5a1f', size: 4, seed: seedNew() },
-      T(m5.entry[0] + 160, m5.entry[1] - 200, 'Sold the 3rd tap', 40, { color: '#ff5a1f' }),
-      { id: uid(), type: 'line', x1: m5.entry[0], y1: m5.Y(4006.2), x2: m5.ax - 20, y2: m5.Y(4006.2), color: '#26c6a0', size: 3, seed: seedNew(), dashed: true },
-      T(m5.ax - 330, m5.Y(4006.2) + 14, '1R: take half here', 36, { color: '#26c6a0' }),
+      { id: uid(), type: 'arrow', x1: m5.entry[0] + 150, y1: m5.entry[1] - 150, x2: m5.entry[0] + 22, y2: m5.entry[1] - 14, color: '#ffffff', size: 4, seed: seedNew() },
+      T(m5.entry[0] + 160, m5.entry[1] - 200, 'Sold the 3rd tap', 40),
+      { id: uid(), type: 'line', x1: m5.entry[0], y1: m5.Y(4006.2), x2: m5.ax - 20, y2: m5.Y(4006.2), color: '#ffffff', size: 3, seed: seedNew(), dashed: true },
+      T(m5.ax - 330, m5.Y(4006.2) + 14, '1R: take half here', 36),
       T(70, 640, 'LESSON', 84, { rot: -0.02 }), T(74, 740, 'Took nothing at 1R.\nIt came back for my stop.', 36),
-      T(1120, 760, '−1.0R', 64, { box: 2, color: '#f0464b', rot: 0.015 })] },
+      T(1120, 760, '−1.0R', 64, { box: 2, rot: 0.015 })] },
     { name: 'DeepCharts', sub: 'footprint', bg: shot('fp', 11, 1600, 900), objs: [
       { id: uid(), type: 'rect', x: 680, y: 190, w: 250, h: 300, color: '#ff5a1f', size: 4, seed: seedNew() },
-      T(960, 200, 'Big sellers\nsat here', 44, { color: '#ff5a1f' }), { id: uid(), type: 'arrow', x1: 950, y1: 330, x2: 940, y2: 330, color: '#ff5a1f', size: 4, seed: seedNew() },
+      T(960, 200, 'Big sellers\nsat here', 44), { id: uid(), type: 'arrow', x1: 950, y1: 330, x2: 940, y2: 330, color: '#ffffff', size: 4, seed: seedNew() },
       T(120, 70, 'ABSORPTION', 70, { ul: true })] },
     { name: 'Heatmap', sub: 'liquidity', bg: shot('heat', 5, 1600, 900), objs: [
       { id: uid(), type: 'ellipse', x: 520, y: 210, w: 900, h: 100, color: '#ffffff', size: 4, seed: seedNew() }, T(560, 120, 'Wall above held all morning', 42)] },
@@ -262,9 +262,9 @@
   document.querySelectorAll('#sr-inbox .sr-it').forEach((r) => (r.onclick = () => document.querySelectorAll('#sr-inbox .sr-it').forEach((x) => x.classList.toggle('on', x === r))));
   let setI = 0;
   $('sr-sets').innerHTML = SETS.map((s, i) => `<div class="sr-set${i ? '' : ' on'}" data-i="${i}"><i style="background:${s.c}"></i><b>${s.n}</b><canvas></canvas><small>${s.r.length} trades · <span class="${s.exp < 0 ? 'neg' : 'pos'}">${R(s.exp)}</span> each</small></div>`).join('');
-  const setsSpark = () => document.querySelectorAll('#sr-sets .sr-set').forEach((d) => { const s = SETS[d.dataset.i]; spark(d.querySelector('canvas'), s.r, s.c); });
+  const setsSpark = () => document.querySelectorAll('#sr-sets .sr-set').forEach((d) => { const s = SETS[d.dataset.i]; spark(d.querySelector('canvas'), s.r, +d.dataset.i === setI ? '#f2f2f4' : '#5a5a64'); });
   document.querySelectorAll('#sr-sets .sr-set').forEach((d) => (d.onclick = () => pickSet(+d.dataset.i)));
-  function pickSet(i) { setI = i; document.querySelectorAll('#sr-sets .sr-set').forEach((d) => d.classList.toggle('on', +d.dataset.i === i)); head(); }
+  function pickSet(i) { setI = i; document.querySelectorAll('#sr-sets .sr-set').forEach((d) => d.classList.toggle('on', +d.dataset.i === i)); head(); setsSpark(); }
   function head() { const s = SETS[setI]; $('sr-setname').textContent = s.n; $('sr-done').firstChild.textContent = 'Save to “' + s.n + '”';
     $('sr-nums').innerHTML = `<div><span class="sr-k">Seen</span><b>${s.r.length}×</b></div><div><span class="sr-k">Won</span><b>${s.won}%</b></div><div><span class="sr-k">Per trade</span><b class="${s.exp < 0 ? 'neg' : 'pos'}">${R(s.exp)}</b></div><div><span class="sr-k">Profit factor</span><b>${s.pf.toFixed(2)}</b></div><div><span class="sr-k">Last</span><b>${s.last}</b></div><canvas id="sr-hs"></canvas>`;
     spark($('sr-hs'), s.r, s.c); }
@@ -320,7 +320,7 @@
 
   /* ---------- compare ---------- */
   let cmpI = 0;
-  const pastMarks = (i) => [{ id: uid(), type: 'rect', x: 600 + i * 20, y: 160, w: 320, h: 340, color: PAST[i][1] > 0 ? '#26c6a0' : '#f0464b', size: 9, seed: 900 + i }, T(960, 560, PAST[i][1] > 0 ? 'Sellers held,\n3rd tap' : 'Too early', 84, { color: PAST[i][1] > 0 ? '#26c6a0' : '#f0464b', seed: 950 + i })];
+  const pastMarks = (i) => [{ id: uid(), type: 'rect', x: 600 + i * 20, y: 160, w: 320, h: 340, color: '#ffffff', size: 9, seed: 900 + i }, T(960, 560, PAST[i][1] > 0 ? 'Sellers held,\n3rd tap' : 'Too early', 84, { seed: 950 + i })];
   function compare() {
     const p = PAST[cmpI], took = p[2].includes('half');
     $('sr-cmp').innerHTML = `<div class="sr-cpick"><span class="sr-k" style="margin-right:6px">Compare with</span>${PAST.map((q, i) => `<button type="button" data-i="${i}" class="${i === cmpI ? 'on' : ''}">${q[0]} · ${R(q[1])}</button>`).join('')}</div>
@@ -344,10 +344,10 @@
     x.font = '10px Manrope, sans-serif'; x.fillStyle = '#6b6b75'; x.strokeStyle = 'rgba(255,255,255,.05)';
     for (let v = Math.ceil(lo / 2) * 2; v <= hi; v += 2) { x.beginPath(); x.moveTo(P, Y(v)); x.lineTo(w, Y(v)); x.stroke(); x.fillText((v > 0 ? '+' : '') + v + 'R', 0, Y(v) + 3); }
     x.strokeStyle = 'rgba(255,255,255,.2)'; x.beginPath(); x.moveTo(P, Y(0)); x.lineTo(w, Y(0)); x.stroke();
-    series.forEach((s, k) => { x.strokeStyle = SETS[k].c; x.lineWidth = k === setI ? 2.6 : 1.6; x.globalAlpha = k === setI ? 1 : 0.75; x.beginPath(); s.forEach((v, i) => (i ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)))); x.stroke();
-      x.fillStyle = SETS[k].c; x.beginPath(); x.arc(X(s.length - 1), Y(s[s.length - 1]), 3, 0, 7); x.fill(); }); x.globalAlpha = 1;
+    series.map((s, k) => [s, k]).sort((a, b) => (a[1] === setI) - (b[1] === setI)).forEach(([s, k]) => { x.strokeStyle = k === setI ? '#f2f2f4' : '#4a4a54'; x.lineWidth = k === setI ? 2.4 : 1.4; x.globalAlpha = 1; x.beginPath(); s.forEach((v, i) => (i ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)))); x.stroke();
+      x.fillStyle = k === setI ? '#f2f2f4' : '#4a4a54'; x.beginPath(); x.arc(X(s.length - 1), Y(s[s.length - 1]), 3, 0, 7); x.fill(); }); x.globalAlpha = 1;
     x.fillStyle = '#6b6b75'; x.fillText('trade 1', P, h - 4); x.fillText('trade ' + n, w - 44, h - 4);
-    $('sr-leg').innerHTML = SETS.map((s, k) => `<span><i style="background:${s.c}"></i>${s.n} <b class="${series[k][series[k].length - 1] < 0 ? 'neg' : 'pos'}">${R(series[k][series[k].length - 1])}</b></span>`).join(''); }
+    $('sr-leg').innerHTML = SETS.map((s, k) => `<span class="${k === setI ? 'on' : ''}"><i style="background:${k === setI ? '#f2f2f4' : '#4a4a54'}"></i>${s.n} <b class="${series[k][series[k].length - 1] < 0 ? 'neg' : 'pos'}">${R(series[k][series[k].length - 1])}</b></span>`).join(''); }
   document.querySelectorAll('#sr-flt button').forEach((b) => (b.onclick = () => { flt = b.textContent; document.querySelectorAll('#sr-flt button').forEach((x) => x.classList.toggle('on', x === b)); curves(); }));
   const PAIRS = [['Absorption at value high', 'Heatmap wall held', 5, 7.4], ['Buy at value low', 'NY open', 6, 5.1], ['Exhaustion at poor high', 'Delta flip', 3, 4.8], ['Absorption at value high', 'Balance day', 4, 3.2], ['Stacked imbalance retest', 'Asia', 5, -3.4]];
   $('sr-pairs').innerHTML = PAIRS.map((p, i) => `<div class="sr-pair"><em>${i + 1}</em><span>${p[0]} <b>+</b> ${p[1]}</span><b class="v ${p[3] < 0 ? 'neg' : 'pos'}">${R(p[3])}</b><small>${p[2]} trades together</small></div>`).join('');
