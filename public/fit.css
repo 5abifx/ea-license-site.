@@ -181,15 +181,15 @@ html.calm .app-body :not(.plx, .plx *) { transition-duration: .12s !important; }
 .sc-goal .top .sc-x[data-edg] { font-size: 12px; }
 
 /* Desk P&L calendar: year squares -> quarter -> month -> week -> sessions (public/pnlcal.js) */
-.pc { margin-top: 14px; display: flex; flex-direction: column; gap: 14px; }
+.pc { margin: 4px 0 26px; display: flex; flex-direction: column; gap: 16px; background: none; border: 0; box-shadow: none; padding: 0; }   /* no card: sits on the page like the hero */
 .pc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .pc-lbl { font-size: 12px; color: #a1a1aa; }
 .pc-l2 { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
-.pc-tot { font: 700 24px Sora, system-ui, sans-serif; letter-spacing: -.03em; color: #e4e4e7; font-variant-numeric: tabular-nums; }
+.pc-tot { font: 700 34px Sora, system-ui, sans-serif; letter-spacing: -.03em; color: #e4e4e7; font-variant-numeric: tabular-nums; }
 .pc-tot.pos { color: #3fdcb5; } .pc-tot.neg { color: #f0464b; }
 .pc-sub { font-size: 12px; color: #8a8a93; }
 .pc-ctl { display: flex; gap: 8px; flex-wrap: wrap; }
-.pc-sw { display: inline-flex; align-items: center; gap: 2px; height: 32px; padding: 0 4px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); }
+.pc-sw { display: inline-flex; align-items: center; gap: 2px; height: 32px; padding: 0 4px; border-radius: 999px; background: rgba(23,23,28,.7); border: 1px solid rgba(255,255,255,.09); }
 .pc-sw.o { background: transparent; }
 .pc-sw > span { min-width: 64px; text-align: center; font-size: 12px; font-weight: 700; color: #e4e4e7; white-space: nowrap; }
 .pc-sw.o > span { min-width: 92px; font-weight: 600; color: #d4d4d8; }
@@ -198,10 +198,10 @@ html.calm .app-body :not(.plx, .plx *) { transition-duration: .12s !important; }
 .pc-sw button:hover:not(:disabled) { color: #fff; background: rgba(255,255,255,.08); }
 .pc-sw button:disabled { opacity: .25; cursor: default; }
 .pc-body i, .pc-body span { font-style: normal; }
-.pc-yr { display: grid; grid-template-columns: repeat(53, minmax(0, 1fr)); gap: 3px; }
+.pc-yr { display: grid; grid-template-columns: repeat(53, minmax(0, 16px)); justify-content: space-between; gap: 3px; }
 .pc-wk { display: grid; grid-template-rows: 14px repeat(5, auto); gap: 3px; min-width: 0; }
 .pc-wk b { font-size: 9.5px; font-weight: 600; color: #71717a; white-space: nowrap; overflow: visible; }
-.pc-wk i { display: block; aspect-ratio: 1; max-height: 16px; border-radius: 3px; background: rgba(255,255,255,.055); }
+.pc-wk i { display: block; aspect-ratio: 1; max-height: 16px; border-radius: 3px; background: rgba(255,255,255,.045); }
 .pc-wk i.x { background: none; }
 .pc-body [data-now] { box-shadow: 0 0 0 1.5px var(--accent-2, #ff5a1f); }
 .pc-key { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: #71717a; }

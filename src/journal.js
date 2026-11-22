@@ -733,7 +733,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       r[0] += v; r[1] += 1; r[ses === 'Asia' ? 2 : ses === 'London' ? 3 : 4] += v;
     });
     Object.values(pcDays).forEach((r) => { for (let i = 0; i < 5; i++) if (i !== 1) r[i] = Math.round(r[i] * 100) / 100; });
-    const pcHtml = rows.length ? `<section class="ov-pn pc" data-days="${esc(JSON.stringify(pcDays))}" data-cur="${esc(cur || 'USD')}" data-today="${esc(desk.serverToday(off))}">
+    const pcHtml = rows.length ? `<section class="pc" data-days="${esc(JSON.stringify(pcDays))}" data-cur="${esc(cur || 'USD')}" data-today="${esc(desk.serverToday(off))}">
       <div class="pc-head"><div><div class="pc-lbl">P&amp;L</div><div class="pc-l2"><b class="pc-tot"></b><span class="pc-sub"></span></div></div>
         <div class="pc-ctl"><span class="pc-sw"><button type="button" data-v="-1" aria-label="Bigger view">‹</button><span class="pc-vn">Year</span><button type="button" data-v="1" aria-label="Closer view">›</button></span>
         <span class="pc-sw o"><button type="button" data-s="-1" aria-label="Earlier">‹</button><span class="pc-dn"></span><button type="button" data-s="1" aria-label="Later">›</button></span></div></div>
@@ -742,8 +742,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <div class="row between page-head"><h1>Desk</h1>
       <span class="head-btns"><button type="button" class="small secondary replay-btn" data-replay title="Play the opening animation again">↻ Replay</button><button type="button" class="small secondary priv-toggle" aria-pressed="false" title="Hides account numbers, broker servers and your name, so you can screenshot this page">Hide private info</button></span></div>
     ${acctBar(req, '/journal/desk', qs, sc, cur)}
-    ${ovHtml}
     ${pcHtml}
+    ${ovHtml}
     <h2 class="ov-sec">Today's desk</h2>
     ${terminalView.html(T, { news: N, money: m, cur, market: topSyms, acctNote: one ? (prop ? 'Prop firm rules included' : 'Add firm rules in Insights › Prop firm to include them') : 'All accounts' })}`);
   });
