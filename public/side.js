@@ -16,9 +16,16 @@
   var wide = matchMedia('(min-width: 1280px)');   // owner: the side cards always stay on screen on a PC (was 2360px, then 1600px)
   // Appearance > Layout: 'pin' keeps the cards on screen, 'slide' gives the middle the full width and the cards slide in
   var sidePref = (window.__LOOK && window.__LOOK.side) || 'pin';
-  function mode() { root.classList.toggle('sc-wide', wide.matches && sidePref !== 'slide'); }
+  // the middle column's own width drives the page layout (public/fit.css): mid-m < 1180px, mid-s < 900px
+  function fit() {
+    var b = document.querySelector('.app-main > .app-body'), w = b ? b.getBoundingClientRect().width : innerWidth;
+    root.classList.toggle('mid-m', w > 0 && w < 1180); root.classList.toggle('mid-s', w > 0 && w < 900);
+  }
+  function mode() { root.classList.toggle('sc-wide', wide.matches && sidePref !== 'slide'); fit(); }
   mode(); wide.addEventListener && wide.addEventListener('change', mode);
   addEventListener('look:side', function (e) { sidePref = e.detail; mode(); });
+  var fitT = 0; addEventListener('resize', function () { clearTimeout(fitT); fitT = setTimeout(fit, 80); });
+  addEventListener('swap:load', fit);
 
   // ---------- request a feature (every members page) ----------
   var fr = el('button', 'fr', '+'); fr.type = 'button'; fr.title = 'Request a feature'; fr.setAttribute('aria-label', 'Request a feature');
