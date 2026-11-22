@@ -33,20 +33,24 @@
 
     function draw() {
       var d = new Date(at), y = d.getUTCFullYear(), mo = d.getUTCMonth(), a0, a1, label, body = '';
-      if (view === 0) {   // 12 small month blocks (Mon-Fri rows, one column per week) so months and days read apart
+      if (view === 0) {   // one continuous strip of weeks (Mon-Fri rows); phones split it into two halves so squares stay big
         a0 = Date.UTC(y, 0, 1); a1 = Date.UTC(y + 1, 0, 1); label = String(y);
-        var ms12 = '';
-        for (var mm = 0; mm < 12; mm++) {
-          var m0s = Date.UTC(y, mm, 1), m0e = Date.UTC(y, mm + 1, 1), SM = sum(m0s, m0e), ld = (new Date(m0s).getUTCDay() + 6) % 7, cells = '';
-          if (ld < 5) for (var b = 0; b < ld; b++) cells += '<i class="x"></i>';
-          for (var t = m0s; t < m0e; t += DAY) {
-            if (!wd(t)) continue;
-            var r = D[iso(t)], fut = iso(t) > today;
-            cells += '<i title="' + tip(t) + '"' + (r ? ' style="' + tint(r[0]) + '"' : fut ? ' class="f"' : '') + (iso(t) === today ? ' data-now' : '') + '></i>';
+        var halves = box.clientWidth < 700 ? [[0, 6], [6, 12]] : [[0, 12]], strips = '';
+        halves.forEach(function (hv) {
+          var h0 = Date.UTC(y, hv[0], 1), h1 = Date.UTC(y, hv[1], 1), cols = '', last = -1, nc = 0;
+          for (var w = monday(h0); w < h1; w += 7 * DAY) {
+            var cells = '', lab = '';
+            for (var i = 0; i < 5; i++) {
+              var t = w + i * DAY, inY = t >= h0 && t < h1, r = D[iso(t)];
+              cells += inY ? '<i title="' + tip(t) + '"' + (r ? ' style="' + tint(r[0]) + '"' : iso(t) > today ? ' class="f"' : '') + (iso(t) === today ? ' data-now' : '') + '></i>' : '<i class="x"></i>';
+              var m = new Date(t).getUTCMonth();
+              if (inY && m !== last) { last = m; var SM = sum(Date.UTC(y, m, 1), Date.UTC(y, m + 1, 1)); lab = '<button type="button" data-m="' + m + '" title="Open ' + MON[m] + '">' + MON[m] + (SM.d ? ' <small class="' + cls(SM.t) + '">' + money(SM.t).replace(/\.\d+/, '') + '</small>' : '') + '</button>'; }
+            }
+            cols += '<div class="pc-wk' + (lab ? ' ms' : '') + '"><b>' + lab + '</b>' + cells + '</div>'; nc++;
           }
-          ms12 += '<button type="button" class="pc-ym" data-m="' + mm + '" aria-label="Open ' + MON[mm] + ' ' + y + '"><span class="pc-ymh"><b>' + MON[mm] + '</b><small class="' + cls(SM.t) + '">' + (SM.d ? money(SM.t).replace(/\.\d+/, '') : '') + '</small></span><span class="pc-ymg">' + cells + '</span></button>';
-        }
-        body = '<div class="pc-yr">' + ms12 + '</div><div class="pc-key"><span>Loss</span><i style="' + tint(-mx) + '"></i><i style="' + tint(-mx * 0.15) + '"></i><i></i><i style="' + tint(mx * 0.15) + '"></i><i style="' + tint(mx) + '"></i><span>Profit</span><span class="pc-kh">Tap a month to open it</span></div>';
+          strips += '<div class="pc-yr" style="--wk:' + nc + '">' + cols + '</div>';
+        });
+        body = strips + '<div class="pc-key"><span>Loss</span><i style="' + tint(-mx) + '"></i><i style="' + tint(-mx * 0.15) + '"></i><i></i><i style="' + tint(mx * 0.15) + '"></i><i style="' + tint(mx) + '"></i><span>Profit</span><span class="pc-kh">Tap a month to open it</span></div>';
       } else if (view === 1 || view === 2) {
         var n = view === 1 ? 3 : 1, m0 = view === 1 ? Math.floor(mo / 3) * 3 : mo;
         a0 = Date.UTC(y, m0, 1); a1 = Date.UTC(y, m0 + n, 1); label = view === 1 ? 'Q' + (m0 / 3 + 1) + ' ' + y : MON[mo] + ' ' + y;
