@@ -8,6 +8,13 @@
 module.exports = (app, { page, requireUser }) => {
   app.get('/journal/study', requireUser, (req, res) => {
     if (!req.hasJournal) return res.redirect('/journal');
+    // which room: students get the order flow room; others get the room for the edge they picked at sign-up (users.profile.edge)
+    let prof = {}; try { prof = JSON.parse(req.user.profile || '{}') || {}; } catch (e) { /* ignore */ }
+    const student = Boolean(req.mentorEligible || req.user.is_admin);
+    const rooms = student ? ['flow', 'pa', 'ict', 'own'] : ['pa', 'ict', 'own'];
+    const auto = student ? 'flow' : ({ pa: 'pa', ict: 'ict', breakout: 'pa' }[prof.edge] || 'own');
+    const room = rooms.includes(String(req.query.room)) ? String(req.query.room) : auto;
+    const RN = { flow: 'Order flow', pa: 'Price action', ict: 'ICT / SMC', own: 'My own' };
     const tool = (t, k, title, path) => `<button type="button" class="ci-tool" data-tool="${t}" title="${title} (${k})" aria-label="${title}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg><kbd>${k}</kbd></button>`;
     page(req, res, 'Study room', `
     <link rel="stylesheet" href="/study.css">
@@ -16,11 +23,12 @@ module.exports = (app, { page, requireUser }) => {
 
     <div class="sr-phone card"><h2>Study room works on a PC</h2><p class="muted">It is a big workbench: your chart, your screenshots and your setups side by side. Open 5abifx.com on your computer to use it.</p></div>
 
-    <div class="sr-app" id="sr-app">
+    <div class="sr-app" id="sr-app" data-room="${room}">
       <header class="sr-top">
         <div class="sr-title"><span class="sr-k">Study room</span><h1 id="sr-setname">Absorption at value high</h1></div>
         <div class="sr-nums" id="sr-nums"></div>
         <nav class="sr-modes" aria-label="Study room views"><button class="on" data-m="study">Study</button><button data-m="compare">Compare</button><button data-m="book">Playbook</button></nav>
+        <label class="sr-room" title="Your room follows the edge you picked at sign-up. Change it in Profile."><span>Room</span><select id="sr-room" onchange="location.search='?room='+this.value">${rooms.map((r) => `<option value="${r}"${r === room ? ' selected' : ''}>${RN[r]}</option>`).join('')}</select></label>
         <span class="sr-prev" title="Sample trades and pictures. Nothing is saved yet.">Preview</span>
       </header>
 

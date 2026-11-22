@@ -8,6 +8,42 @@
   const rng = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   const uid = () => Math.random().toString(36).slice(2, 9), seedNew = () => (Math.random() * 1e9) | 0;
   const R = (v) => (Math.abs(v) < 0.05 ? '' : v > 0 ? '+' : '−') + Math.abs(v).toFixed(1) + 'R';
+  const ROOM = $('sr-app').dataset.room || 'flow';
+  // each room: its setup names, pen labels, sample notes and the four questions (only words change; the flow is the same)
+  const RM = {
+    flow: { sets: [['Absorption at value high', 'Sell the 3rd tap. Half off at 1R.'], ['Buy at value low', 'Only while the heatmap wall below holds.'], ['Exhaustion at poor high', 'Wait for delta to flip first.'], ['Open drive with trend', 'First pullback only. No chasing.'], ['Stacked imbalance retest', 'Needs work: 5 of 8 lost in Asia.']],
+      labels: ['Absorption', 'Value high', 'Entry', 'Stop', 'Target', '1R', 'Big sellers', 'Heatmap wall', '3rd tap', 'Half off here'],
+      notes: ['Sellers sat on the value high. Three taps, no break.', 'Sold the 3rd tap. Took nothing at 1R. It turned and took my stop.', 'Take half at 1R when the next level is close.'],
+      pairs: [['Absorption at value high', 'Heatmap wall held', 5, 7.4], ['Buy at value low', 'NY open', 6, 5.1], ['Exhaustion at poor high', 'Delta flip', 3, 4.8], ['Absorption at value high', 'Balance day', 4, 3.2], ['Stacked imbalance retest', 'Asia', 5, -3.4]],
+      tabs: [['DeepCharts', 'footprint', 'fp'], ['Heatmap', 'liquidity', 'heat'], ['NinjaTrader', 'volume profile', 'mp']],
+      q: [{ k: 'Where', q: 'Where was <em>price</em>?', o: [['Value high', 'up', 'Top of the value area'], ['Value low', 'down', 'Bottom of the value area'], ['POC', 'dot', 'Where most volume traded'], ['Poor high', 'up', 'A flat, unfinished top'], ['Poor low', 'down', 'A flat, unfinished bottom'], ['Outside value', 'out', 'Away from the value area']] },
+        { k: 'What happened', q: 'What did you <em>see</em>?', multi: 1, o: [['Absorption', 'wall', 'Big orders soaked up the push'], ['Exhaustion', 'wave', 'The push ran out of fuel'], ['Big trades', 'bars', 'Large prints at the level'], ['Stacked imbalance', 'bars', 'One side kept winning, level after level'], ['Delta flip', 'wave', 'Buyers and sellers swapped control'], ['Heatmap wall held', 'wall', 'Resting orders stayed put'], ['Heatmap wall pulled', 'wall', 'Resting orders vanished']] }],
+      pick: ['Value high', 'Absorption'] },
+    pa: { sets: [['Rejection at resistance', 'Wait for the close, not the wick.'], ['Break and retest', 'Enter on the retest, never the break.'], ['Trend line bounce', 'Third touch only.'], ['Double top', 'Neckline must break first.'], ['Range breakout', 'Needs work: fakeouts in Asia.']],
+      labels: ['Support', 'Resistance', 'Trend line', 'Rejection', 'Breakout', 'Retest', 'Entry', 'Stop', 'Target', '1R'],
+      notes: ['Price tapped resistance three times with long wicks.', 'Sold the 3rd rejection. Took nothing at 1R. It turned and took my stop.', 'Take half at 1R when support is close.'],
+      pairs: [['Rejection at resistance', 'Pin bar', 5, 6.8], ['Break and retest', 'London', 6, 5.0], ['Trend line bounce', 'Trend day', 3, 4.1], ['Rejection at resistance', 'Range day', 4, 2.9], ['Range breakout', 'Asia', 5, -3.1]],
+      tabs: [['TradingView', 'higher time frame', 'tv']],
+      q: [{ k: 'Where', q: 'Where was <em>price</em>?', o: [['Resistance', 'up', 'A level price failed at before'], ['Support', 'down', 'A level price held before'], ['Trend line', 'trend', 'A line of higher lows or lower highs'], ['Range high', 'up', 'Top of a sideways box'], ['Range low', 'down', 'Bottom of a sideways box'], ['Round number', 'dot', 'Like 4000.0 or 1.1000']] },
+        { k: 'What happened', q: 'What did the <em>candles</em> do?', multi: 1, o: [['Rejection wick', 'wave', 'Long wick, close back inside'], ['Pin bar', 'wave', 'Small body, one long tail'], ['Engulfing', 'bars', 'One candle swallowed the last'], ['Breakout', 'bolt', 'Closed through the level'], ['Retest', 'out', 'Came back to the broken level'], ['Double top / bottom', 'wall', 'Same level failed twice']] }],
+      pick: ['Resistance', 'Rejection wick'] },
+    ict: { sets: [['Sweep and FVG', 'Wait for displacement after the sweep.'], ['Order block in discount', 'Only with a BOS on the 5 min.'], ['Silver bullet FVG', 'NY 10 to 11 only.'], ['Breaker block', 'Needs a clean CHoCH.'], ['Asia range sweep', 'Needs work: chop days.']],
+      labels: ['FVG', 'BOS', 'CHoCH', 'Sweep', 'Order block', 'Liquidity', 'Entry', 'Stop', 'Target', '1R'],
+      notes: ['Price swept the equal highs and left a FVG.', 'Sold into the FVG. Took nothing at 1R. It ran back for my stop.', 'Take half at the first draw on liquidity.'],
+      pairs: [['Sweep and FVG', 'NY kill zone', 5, 7.1], ['Order block in discount', 'BOS', 6, 4.9], ['Silver bullet FVG', 'Trend day', 3, 4.4], ['Sweep and FVG', 'London', 4, 2.6], ['Asia range sweep', 'Asia', 5, -2.8]],
+      tabs: [['TradingView', '15 min structure', 'tv']],
+      q: [{ k: 'Where', q: 'Where was <em>price</em>?', o: [['Premium', 'up', 'Above the middle of the range'], ['Discount', 'down', 'Below the middle of the range'], ['Order block', 'wall', 'Last candle before the move'], ['FVG', 'flat', 'A gap three candles left behind'], ['Equal highs / lows', 'flat', 'Resting liquidity'], ['Previous day high / low', 'out', 'Yesterday\'s extremes']] },
+        { k: 'What happened', q: 'What did you <em>see</em>?', multi: 1, o: [['Liquidity sweep', 'wave', 'Took the stops, then turned'], ['BOS', 'bolt', 'Broke the last swing'], ['CHoCH', 'wave', 'First break the other way'], ['Displacement', 'bolt', 'Big, fast candles'], ['FVG filled', 'flat', 'Came back into the gap'], ['Order block tap', 'wall', 'Touched it and reacted']] }],
+      pick: ['Premium', 'Liquidity sweep'] },
+    own: { sets: [['My first setup', 'Write your rule here.'], ['Level rejection', 'Add your own words below.'], ['Breakout', ''], ['Pullback', ''], ['Reversal', '']],
+      labels: ['Entry', 'Stop', 'Target', '1R', 'Level', 'Note'],
+      notes: ['Price stalled at the level.', 'Sold. Took nothing at 1R. It turned and took my stop.', 'Take half at 1R.'],
+      pairs: [['Level rejection', 'London', 3, 3.2], ['Breakout', 'NY open', 4, 2.1], ['Pullback', 'Trend day', 2, 1.4], ['Reversal', 'Asia', 3, -1.8]],
+      tabs: [['Screenshot', 'any platform', 'tv']],
+      q: [{ k: 'Where', q: 'Where was <em>price</em>?', own: 1, o: [['Support', 'down', 'Your words. Add more with + Own word'], ['Resistance', 'up', 'Your words. Add more with + Own word']] },
+        { k: 'What happened', q: 'What did you <em>see</em>?', multi: 1, own: 1, o: [] }],
+      pick: ['Resistance'] } };
+  const RC = RM[ROOM] || RM.flow;
   const DPR = () => Math.min(devicePixelRatio || 1, 2);
   function fitCv(cv) { const d = DPR(), w = cv.clientWidth, h = cv.clientHeight; cv.width = w * d; cv.height = h * d; const x = cv.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); return [x, w, h]; }
   function spark(cv, pts, col) {
@@ -17,12 +53,8 @@
   }
 
   /* ---------- sample data ---------- */
-  const SETS = [
-    { n: 'Absorption at value high', c: '#f2f2f4', rule: 'Sell the 3rd tap. Half off at 1R.', r: [1.6, -1, 2.1, 1.4, -1, 1.8, -1], last: '20 Nov' },
-    { n: 'Buy at value low', c: '#f2f2f4', rule: 'Only while the heatmap wall below holds.', r: [0.8, -1, 1.2, -1, 2, 0.9, -1, 1.1, 0.6], last: '19 Nov' },
-    { n: 'Exhaustion at poor high', c: '#f2f2f4', rule: 'Wait for delta to flip first.', r: [2.2, 1.9, -1, 2.6], last: '14 Nov' },
-    { n: 'Open drive with trend', c: '#f2f2f4', rule: 'First pullback only. No chasing.', r: [1.5, -1, -1, 0.9, -1, 1.2, -0.6], last: '12 Nov' },
-    { n: 'Stacked imbalance retest', c: '#f2f2f4', rule: 'Needs work: 5 of 8 lost in Asia.', r: [-1, 1.4, -1, -1, 0.8, -1, -1, 1.2], last: '6 Nov' }];
+  const RS = [[1.6, -1, 2.1, 1.4, -1, 1.8, -1, '20 Nov'], [0.8, -1, 1.2, -1, 2, 0.9, -1, 1.1, 0.6, '19 Nov'], [2.2, 1.9, -1, 2.6, '14 Nov'], [1.5, -1, -1, 0.9, -1, 1.2, -0.6, '12 Nov'], [-1, 1.4, -1, -1, 0.8, -1, -1, 1.2, '6 Nov']];
+  const SETS = RC.sets.map(([n, rule], i) => ({ n, rule, c: '#f2f2f4', r: RS[i].slice(0, -1), last: RS[i][RS[i].length - 1] }));
   SETS.forEach((s) => { const w = s.r.filter((v) => v > 0), l = s.r.filter((v) => v <= 0), gw = w.reduce((a, b) => a + b, 0), gl = -l.reduce((a, b) => a + b, 0);
     s.won = Math.round(w.length / s.r.length * 100); s.exp = (gw - gl) / s.r.length; s.pf = gl ? gw / gl : gw; s.tot = gw - gl; });
   const INBOX = [['XAUUSD', 'sell', 'Thu 20 Nov · 09:42', -184, -1, 'No screenshot yet'], ['NAS100', 'buy', 'Wed 19 Nov · 10:05', 612, 2.4, '2 pictures, no setup'],
@@ -52,7 +84,7 @@
     const zone = (a, b, col) => { g.fillStyle = col; g.fillRect(X(44), Math.min(Y(a), Y(b)), X(80) - X(44), Math.abs(Y(a) - Y(b))); };
     zone(4012.4, 4000, 'rgba(38,198,160,.12)'); zone(4012.4, 4018.6, 'rgba(240,70,75,.14)');
     g.strokeStyle = 'rgba(255,255,255,.16)'; g.setLineDash([8, 6]); g.beginPath(); g.moveTo(0, Y(4013.2)); g.lineTo(ax, Y(4013.2)); g.stroke(); g.setLineDash([]);
-    g.fillStyle = '#8a8a94'; g.font = '15px Manrope, sans-serif'; g.fillText('VAH 4013.2', 24, Y(4013.2) - 8);
+    g.fillStyle = '#8a8a94'; g.font = '15px Manrope, sans-serif'; g.fillText(ROOM === 'flow' ? 'VAH 4013.2' : ROOM === 'ict' ? 'Equal highs 4013.2' : 'Resistance 4013.2', 24, Y(4013.2) - 8);
     C.forEach((k, i) => { const up = k[3] >= k[0]; g.strokeStyle = up ? '#e8e8ec' : '#7a7a84'; g.fillStyle = up ? '#e8e8ec' : '#25252b'; g.lineWidth = 1.4;
       g.beginPath(); g.moveTo(X(i), Y(k[1])); g.lineTo(X(i), Y(k[2])); g.stroke(); const y1 = Y(Math.max(k[0], k[3])); g.fillRect(X(i) - cw * 0.32, y1, cw * 0.64, Math.max(2, Y(Math.min(k[0], k[3])) - y1));
       if (!up) { g.strokeStyle = '#7a7a84'; g.strokeRect(X(i) - cw * 0.32, y1, cw * 0.64, Math.max(2, Y(Math.min(k[0], k[3])) - y1)); } });
@@ -77,8 +109,8 @@
     } else {
       let p = H * 0.55; const n = 40; for (let i = 0; i < n; i++) { const o = p, cl = o + (r() - 0.5) * H * 0.07, xx = 8 + i * (W - 16) / n, bw = (W - 16) / n * 0.55;
         x.strokeStyle = cl < o ? '#ddd' : '#777'; x.fillStyle = cl < o ? '#ddd' : '#2a2a30'; x.lineWidth = Math.max(1, W / 900); x.beginPath(); x.moveTo(xx + bw / 2, Math.min(o, cl) - r() * H * 0.02); x.lineTo(xx + bw / 2, Math.max(o, cl) + r() * H * 0.02); x.stroke(); x.fillRect(xx, Math.min(o, cl), bw, Math.max(1, Math.abs(cl - o))); p = cl; }
-      for (let k = 0; k < 24; k++) { x.fillStyle = k === 9 ? 'rgba(255,90,31,.45)' : 'rgba(255,255,255,.14)'; x.fillRect(W - 4 - r() * W * 0.24, k * H / 24 + 1, W, H / 24 - 2); }
-      if (W > 300) { x.fillStyle = '#c9c9d0'; x.font = `600 ${H * 0.028}px Manrope, sans-serif`; x.fillText('Volume profile · GC · 5 min · sample', 14, H - 14); }
+      if (kind !== 'tv') for (let k = 0; k < 24; k++) { x.fillStyle = k === 9 ? 'rgba(255,90,31,.45)' : 'rgba(255,255,255,.14)'; x.fillRect(W - 4 - r() * W * 0.24, k * H / 24 + 1, W, H / 24 - 2); }
+      if (W > 300) { x.fillStyle = '#c9c9d0'; x.font = `600 ${H * 0.028}px Manrope, sans-serif`; x.fillText(kind === 'tv' ? 'XAUUSD · 15 min · sample' : 'Volume profile · GC · 5 min · sample', 14, H - 14); }
     }
     return c;
   }
@@ -87,7 +119,7 @@
   const cv = $('ci-cv'), ctx = cv.getContext('2d'), stage = $('ci-stage'), typer = $('ci-type');
   const COLORS = [['#ffffff', 'White'], ['#ff5a1f', 'Orange'], ['#26c6a0', 'Teal'], ['#f0464b', 'Red']];
   const FONTS = [['Architects Daughter', 'Print caps'], ['Caveat', 'Marker'], ['Kalam', 'Felt tip'], ['Patrick Hand', 'Neat'], ['Permanent Marker', 'Bold']];
-  const LABELS = ['Absorption', 'Value high', 'Entry', 'Stop', 'Target', '1R', 'Big sellers', 'Heatmap wall', '3rd tap', 'Half off here'];
+  const LABELS = RC.labels;
   const S = { tool: 'select', color: '#ffffff', size: 4, font: 'Architects Daughter', fs: 40, sel: null, drag: null };
   let B = null; // current board {bg, objs, hist}
 
@@ -229,13 +261,12 @@
       T(m5.ax - 330, m5.Y(4006.2) + 14, '1R: take half here', 36),
       T(70, 640, 'LESSON', 84, { rot: -0.02 }), T(74, 740, 'Took nothing at 1R.\nIt came back for my stop.', 36),
       T(1120, 760, '−1.0R', 64, { box: 2, rot: 0.015 })] },
-    { name: 'DeepCharts', sub: 'footprint', bg: shot('fp', 11, 1600, 900), objs: [
-      { id: uid(), type: 'rect', x: 680, y: 190, w: 250, h: 300, color: '#ff5a1f', size: 4, seed: seedNew() },
-      T(960, 200, 'Big sellers\nsat here', 44), { id: uid(), type: 'arrow', x1: 950, y1: 330, x2: 940, y2: 330, color: '#ffffff', size: 4, seed: seedNew() },
-      T(120, 70, 'ABSORPTION', 70, { ul: true })] },
-    { name: 'Heatmap', sub: 'liquidity', bg: shot('heat', 5, 1600, 900), objs: [
-      { id: uid(), type: 'ellipse', x: 520, y: 210, w: 900, h: 100, color: '#ffffff', size: 4, seed: seedNew() }, T(560, 120, 'Wall above held all morning', 42)] },
-    { name: 'NinjaTrader', sub: 'volume profile', bg: shot('mp', 21, 1600, 900), objs: [] }];
+    ...RC.tabs.map(([name, sub, kind], i) => ({ name, sub, bg: shot(kind, [11, 5, 21][i], 1600, 900), objs: ({
+      fp: [{ id: uid(), type: 'rect', x: 680, y: 190, w: 250, h: 300, color: '#ff5a1f', size: 4, seed: seedNew() }, T(960, 200, 'Big sellers\nsat here', 44), T(120, 70, 'ABSORPTION', 70, { ul: true })],
+      heat: [{ id: uid(), type: 'ellipse', x: 520, y: 210, w: 900, h: 100, color: '#ffffff', size: 4, seed: seedNew() }, T(560, 120, 'Wall above held all morning', 42)],
+      tv: ROOM === 'ict' ? [{ id: uid(), type: 'rect', x: 820, y: 300, w: 300, h: 90, color: '#ff5a1f', size: 4, seed: seedNew() }, T(1140, 300, 'FVG', 56), { id: uid(), type: 'line', x1: 300, y1: 560, x2: 1300, y2: 560, color: '#ffffff', size: 3, seed: seedNew(), dashed: true }, T(320, 580, 'BOS', 48), T(100, 70, 'SWEEP THEN FVG', 64, { ul: true })]
+        : ROOM === 'pa' ? [{ id: uid(), type: 'line', x1: 120, y1: 760, x2: 1300, y2: 330, color: '#ffffff', size: 4, seed: seedNew() }, T(980, 300, 'Trend line,\n3rd touch', 44), { id: uid(), type: 'ellipse', x: 1140, y: 330, w: 90, h: 90, color: '#ff5a1f', size: 4, seed: seedNew() }, T(100, 70, 'RESISTANCE', 70, { ul: true })]
+        : [T(100, 70, 'Mark it your way', 64, { ul: true })] }[kind] || []) }))];
   tabs.forEach((t) => (t.hist = []));
   let cur = 0;
   function renderTabs() {
@@ -257,6 +288,7 @@
   stage.addEventListener('drop', (e) => addPic(e.dataTransfer.files[0]));
   document.addEventListener('paste', (e) => { if (/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return; const it = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith('image/')); if (it) { e.preventDefault(); go('study'); addPic(it.getAsFile()); } });
 
+  document.querySelectorAll('.sr-paper textarea').forEach((t, i) => (t.value = RC.notes[i] || ''));
   /* ---------- left: inbox and setups ---------- */
   $('sr-inbox').innerHTML = INBOX.map((t, k) => `<div class="sr-it${k ? '' : ' on'}"><div><b><span class="sr-dot"></span>${t[0]} ${t[1]}</b></div><div class="v ${t[3] < 0 ? 'neg' : 'pos'}">${t[3] < 0 ? '−' : '+'}$${Math.abs(t[3])}<small>${R(t[4])}</small></div><small>${t[2].slice(4)} · <span class="hint">${t[5]}</span></small></div>`).join('');
   document.querySelectorAll('#sr-inbox .sr-it').forEach((r) => (r.onclick = () => document.querySelectorAll('#sr-inbox .sr-it').forEach((x) => x.classList.toggle('on', x === r))));
@@ -277,31 +309,33 @@
     eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z', bars: 'M5 20V10M12 20V4M19 20v-7', wall: 'M3 7h18M3 12h18M3 17h18', wave: 'M3 12c3-6 6 6 9 0s6 6 9 0',
     flat: 'M3 9h18M3 15h18', trend: 'M3 17l6-6 4 4 8-8', bolt: 'M13 2L4 14h7l-1 8 9-12h-7z', news: 'M5 4h14v16H5zM8 8h8M8 12h8M8 16h5', moon: 'M20 14A8 8 0 019 3a8 8 0 1011 11z',
     sun: 'M12 4V2M12 22v-2M4 12H2M22 12h-2M12 8a4 4 0 100 8 4 4 0 000-8z', clock: 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 7v5l3 2' };
-  const ENV = [
-    { k: 'Where', q: 'Where was <em>price</em>?', multi: 0, o: [['Value high', 'up', 'Top of the value area'], ['Value low', 'down', 'Bottom of the value area'], ['POC', 'dot', 'Where most volume traded'], ['Poor high', 'up', 'A flat, unfinished top'], ['Poor low', 'down', 'A flat, unfinished bottom'], ['Outside value', 'out', 'Away from the value area']] },
-    { k: 'What happened', q: 'What did you <em>see</em>?', multi: 1, o: [['Absorption', 'wall', 'Big orders soaked up the push'], ['Exhaustion', 'wave', 'The push ran out of fuel'], ['Big trades', 'bars', 'Large prints at the level'], ['Stacked imbalance', 'bars', 'One side kept winning, level after level'], ['Delta flip', 'wave', 'Buyers and sellers swapped control'], ['Heatmap wall held', 'wall', 'Resting orders stayed put'], ['Heatmap wall pulled', 'wall', 'Resting orders vanished']] },
-    { k: 'Day', q: 'What kind of <em>day</em>?', multi: 0, o: [['Balance', 'flat', 'Price rotated inside a range'], ['Trend', 'trend', 'One direction most of the day'], ['Open drive', 'bolt', 'Strong move straight from the open'], ['News', 'news', 'A big report moved it']] },
-    { k: 'Session', q: 'Which <em>session</em>?', multi: 0, o: [['Asia', 'moon', 'Quiet hours'], ['London', 'sun', 'Europe opens'], ['NY open', 'clock', 'First hours of New York'], ['NY PM', 'clock', 'New York afternoon']] }];
-  const env = [new Set(['Value high']), new Set(), new Set(), new Set()];
+  const ENV = [...RC.q.map((g) => ({ ...g, o: g.o.slice() })),
+    { k: 'Day', q: 'What kind of <em>day</em>?', o: [['Balance', 'flat', 'Price rotated inside a range'], ['Trend', 'trend', 'One direction most of the day'], ['Open drive', 'bolt', 'Strong move straight from the open'], ['News', 'news', 'A big report moved it']] },
+    { k: 'Session', q: 'Which <em>session</em>?', o: [['Asia', 'moon', 'Quiet hours'], ['London', 'sun', 'Europe opens'], ['NY open', 'clock', 'First hours of New York'], ['NY PM', 'clock', 'New York afternoon']] }];
+  ENV.forEach((g) => (g.multi = g.multi || 0));
+  const env = [new Set([RC.pick[0]]), new Set(), new Set(), new Set()];
   let qn = 1, hintT = '';
   const svg = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${IC[k]}"/></svg>`;
   function step() {
     const el = $('sr-step'); el.classList.remove('fade'); void el.offsetWidth; el.classList.add('fade');
     if (qn >= ENV.length) {
-      const w = env[1].has('Absorption'), a = env[0].has('Value high'), s = SETS[0], name = `${[...env[1]][0] || 'Something'} at ${([...env[0]][0] || 'somewhere').toLowerCase()}`;
-      el.innerHTML = `<div class="sr-sbar"><i style="width:100%"></i></div><div class="sr-sk">${w && a ? 'You have seen this before' : 'A new environment'}</div><h3 class="sr-qh">${w && a ? s.n.replace('value high', '<em>value high</em>') : name}</h3>
+      const a = env[0].has(RC.pick[0]), w = RC.pick[1] ? env[1].has(RC.pick[1]) : false, s = SETS[0], name = `${[...env[1]][0] || 'Something'} at ${([...env[0]][0] || 'somewhere').toLowerCase()}`;
+      el.innerHTML = `<div class="sr-sbar"><i style="width:100%"></i></div><div class="sr-sk">${w && a ? 'You have seen this before' : 'A new environment'}</div><h3 class="sr-qh">${w && a ? s.n.replace(/(\S+ \S+)$/, '<em>$1</em>') : name}</h3>
         ${w && a ? `<div class="sr-match hit"><div class="sr-ring" style="--p:${s.won}"><b>${s.won}%</b><small>won</small></div><div><span class="ln"><b>${s.r.length} times</b> before · <b class="${s.exp < 0 ? 'neg' : 'pos'}">${R(s.exp)}</b> a trade · last ${s.last}</span><div class="sr-mini">${s.r.map((v) => `<i class="${v > 0 ? 'w' : ''}"></i>`).join('')}</div><span class="ln">Best when: half off at 1R, NY open.</span></div></div>`
           : '<p class="sr-hint">Saving starts a new setup page in your playbook.</p>'}
         <div class="sr-act"><button type="button" class="sr-ghost" data-back>Change answers</button><button type="button" class="sr-ghost" data-go="compare">Compare with past trades →</button></div>`;
     } else {
       const g = ENV[qn], sel = env[qn];
       el.innerHTML = `<div class="sr-sbar"><i style="width:${qn / ENV.length * 100}%"></i></div><div class="sr-sk">Question ${qn + 1} of ${ENV.length}${g.multi ? ' · pick all that fit' : ''}</div><h3 class="sr-qh">${g.q}</h3>
-        <div class="sr-chips2">${g.o.map(([t, i, h]) => `<button type="button" class="sr-chip${sel.has(t) ? ' on' : ''}" data-t="${t}" data-h="${h}">${svg(i)}${t}</button>`).join('')}<button type="button" class="sr-chip add">+ Own word</button></div>
-        <p class="sr-hint" id="sr-hn">${hintT || (g.multi ? 'Tap all that fit, then Continue.' : 'Tap one. It moves on by itself.')}</p>
+        <div class="sr-chips2">${g.o.map(([t, i, h]) => `<button type="button" class="sr-chip${sel.has(t) ? ' on' : ''}" data-t="${t}" data-h="${h}">${svg(i)}${t}</button>`).join('')}<button type="button" class="sr-chip add" data-own>+ Own word</button></div>
+        <p class="sr-hint" id="sr-hn">${hintT || (g.own && !g.o.length ? 'Add the words you use, like FVG or order block. They stay in your list.' : g.multi ? 'Tap all that fit, then Continue.' : 'Tap one. It moves on by itself.')}</p>
         <div class="sr-act">${qn ? '<button type="button" class="sr-ghost" data-back>← Back</button>' : '<span></span>'}<button type="button" class="sr-cta" data-next ${sel.size ? '' : 'disabled'}>Continue<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>`;
       el.querySelectorAll('.sr-chip[data-t]').forEach((b) => { b.onmouseenter = () => ($('sr-hn').textContent = b.dataset.h);
         b.onclick = () => { const t = b.dataset.t; if (g.multi) sel.has(t) ? sel.delete(t) : sel.add(t); else { sel.clear(); sel.add(t); } hintT = b.dataset.h; rec();
           if (!g.multi) { setTimeout(() => { qn++; hintT = ''; step(); rec(); }, 260); el.querySelectorAll('.sr-chip').forEach((x) => x.classList.toggle('on', x === b)); } else { b.classList.toggle('on'); el.querySelector('[data-next]').disabled = !sel.size; } }; });
+      el.querySelector('[data-own]').onclick = (e) => { const b = e.currentTarget, inp = document.createElement('input'); inp.className = 'sr-own-in'; inp.placeholder = ROOM === 'flow' ? 'Your word' : 'e.g. FVG, order block'; inp.maxLength = 28; b.replaceWith(inp); inp.focus();
+        const add = () => { const v = inp.value.trim(); if (v && !g.o.some((o) => o[0].toLowerCase() === v.toLowerCase())) { g.o.push([v, 'dot', 'Your own word. It stays in your list.']); if (!g.multi) sel.clear(); sel.add(v); rec(); } step(); };
+        inp.onkeydown = (k) => { if (k.key === 'Enter') add(); if (k.key === 'Escape') step(); }; inp.onblur = add; };
       const nx = el.querySelector('[data-next]'); if (nx) nx.onclick = () => { qn++; hintT = ''; step(); rec(); };
     }
     const bk = el.querySelector('[data-back]'); if (bk) bk.onclick = () => { qn = qn >= ENV.length ? 0 : Math.max(0, qn - 1); hintT = ''; step(); rec(); };
@@ -314,7 +348,7 @@
   $('sr-done').onclick = (e) => { $('sr-done').firstChild.textContent = 'Saved to your playbook ✓'; const d = document.querySelector('#sr-inbox .sr-it.on .sr-dot'); if (d) d.classList.add('done'); };
 
   /* ---------- bottom strip: same setup before ---------- */
-  const pastPics = PAST.map((p, i) => shot(i % 2 ? 'heat' : 'fp', 40 + i * 7, 1600, 900));
+  const pastPics = PAST.map((p, i) => shot(ROOM !== 'flow' ? 'tv' : i % 2 ? 'heat' : 'fp', 40 + i * 7, 1600, 900));
   $('sr-past').innerHTML = PAST.map((p, i) => `<button type="button" class="sr-pt" data-i="${i}"><canvas width="92" height="56"></canvas><span>${p[0]}<b class="${p[1] < 0 ? 'neg' : 'pos'}">${R(p[1])}</b></span></button>`).join('');
   document.querySelectorAll('#sr-past .sr-pt').forEach((b) => { b.querySelector('canvas').getContext('2d').drawImage(pastPics[b.dataset.i], 0, 0, 92, 56); b.onclick = () => { cmpI = +b.dataset.i; go('compare'); }; });
 
@@ -330,7 +364,8 @@
         <div class="sr-drow"><span>Tap</span><span>3rd</span><span>${p[2].includes('1st') ? '1st' : p[2].includes('Two') ? '2nd' : '3rd'}</span></div>
         <div class="sr-drow x"><span>Half off at 1R</span><span>No</span><span>${took ? 'Yes' : 'No'}</span></div>
         <div class="sr-drow"><span>Session</span><span>NY open</span><span>NY open</span></div>
-        <div class="sr-drow"><span>Heatmap wall</span><span>Held</span><span>${p[2].includes('wall') ? 'Held' : 'None'}</span></div>
+        ${ROOM === 'flow' ? `<div class="sr-drow"><span>Heatmap wall</span><span>Held</span><span>${p[2].includes('wall') ? 'Held' : 'None'}</span></div>` : ''}
+
         <p class="sr-lesson">${took ? 'Same picture. The only change was taking half at 1R.' : 'Look at the tap and the footprint before the entry.'}</p></div>`;
     const cs = $('sr-cmp').querySelectorAll('.sr-cside canvas');
     paint(cs[0].getContext('2d'), tabs[0], 1600, 900, null); paint(cs[1].getContext('2d'), { bg: pastPics[cmpI], objs: pastMarks(cmpI) }, 1600, 900, null);
@@ -349,7 +384,7 @@
     x.fillStyle = '#6b6b75'; x.fillText('trade 1', P, h - 4); x.fillText('trade ' + n, w - 44, h - 4);
     $('sr-leg').innerHTML = SETS.map((s, k) => `<span class="${k === setI ? 'on' : ''}"><i style="background:${k === setI ? '#f2f2f4' : '#4a4a54'}"></i>${s.n} <b class="${series[k][series[k].length - 1] < 0 ? 'neg' : 'pos'}">${R(series[k][series[k].length - 1])}</b></span>`).join(''); }
   document.querySelectorAll('#sr-flt button').forEach((b) => (b.onclick = () => { flt = b.textContent; document.querySelectorAll('#sr-flt button').forEach((x) => x.classList.toggle('on', x === b)); curves(); }));
-  const PAIRS = [['Absorption at value high', 'Heatmap wall held', 5, 7.4], ['Buy at value low', 'NY open', 6, 5.1], ['Exhaustion at poor high', 'Delta flip', 3, 4.8], ['Absorption at value high', 'Balance day', 4, 3.2], ['Stacked imbalance retest', 'Asia', 5, -3.4]];
+  const PAIRS = RC.pairs;
   $('sr-pairs').innerHTML = PAIRS.map((p, i) => `<div class="sr-pair"><em>${i + 1}</em><span>${p[0]} <b>+</b> ${p[1]}</span><b class="v ${p[3] < 0 ? 'neg' : 'pos'}">${R(p[3])}</b><small>${p[2]} trades together</small></div>`).join('');
   $('sr-cards').innerHTML = SETS.map((s, i) => `<button type="button" class="sr-tr sr-card" data-i="${i}"><span><b>${s.n}</b><small>${s.rule}</small></span><canvas></canvas><span class="${s.exp < -0.04 ? 'neg' : s.exp > 0.04 ? 'pos' : ''}">${R(s.exp)}</span><span>${s.pf.toFixed(2)}</span><span>${s.won}%</span><span>${s.r.length}</span><span class="mu">${s.last}</span></button>`).join('');
   document.querySelectorAll('.sr-card').forEach((c) => (c.onclick = () => { pickSet(+c.dataset.i); go('study'); }));
