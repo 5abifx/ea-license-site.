@@ -175,7 +175,7 @@ function appShell(req, u, flashHtml, body, title) {
       ${tile('/admin/requests', 'chat', 'Requests', 'Features members asked for', on('/admin/requests'))}
       ${tile('/admin/affiliates', 'gift', 'Affiliates', 'Partners and payouts', on('/admin/affiliates'))}
       ${tile('/mentor', 'cap', 'Mentor', 'Student questions', on('/mentor'), req.mentorWaiting)}` : '';
-  const studyTile = req.hasJournal ? tile('/journal/study', 'study', 'Study room', 'Screenshots, setups, your playbook', jOn.study) : '';
+
   const acctOn = ['/settings', '/appearance', '/mentorship', '/pricing', '/profile', '/affiliate', '/password', '/faq', '/whats-new'].some(on);
   const ownOn = adminPage || on('/mentor');
   // phone dock tab (iPhone style): icon over a short label
@@ -209,7 +209,7 @@ function appShell(req, u, flashHtml, body, title) {
   ${u.is_admin ? `<div class="tb-panel tb-glass tb-p-o" id="tbp-o">${sect('Owner', ownerTiles)}</div>` : ''}
   <div class="tb-panel tb-glass tb-p-m" id="tbp-m">
     ${planPill(u)}
-    ${sect('Trading', `${tile('/dashboard', 'eas', 'My EAs', 'Downloads', on('/dashboard'))}${studyTile}${journalTiles}`)}
+    ${sect('Trading', `${tile('/dashboard', 'eas', 'My EAs', 'Downloads', on('/dashboard'))}${journalTiles}`)}
     ${sect('Account', accountTiles)}${sect('Help', helpTiles)}${sect('Owner', ownerTiles)}
   </div>
   <nav class="tb-dock tb-glass" aria-label="Phone menu">
