@@ -11,7 +11,7 @@ module.exports = (app, { page, requireUser }) => {
     const tool = (t, k, title, path) => `<button type="button" class="ci-tool" data-tool="${t}" title="${title} (${k})" aria-label="${title}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg><kbd>${k}</kbd></button>`;
     page(req, res, 'Study room', `
     <link rel="stylesheet" href="/study.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Architects+Daughter&family=Caveat:wght@500;700&family=Kalam:wght@400;700&family=Permanent+Marker&family=Patrick+Hand&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Instrument+Serif:ital@0;1&family=Architects+Daughter&family=Caveat:wght@500;700&family=Kalam:wght@400;700&family=Permanent+Marker&family=Patrick+Hand&display=swap">
     <script>document.documentElement.classList.add('sr-full')</script>
 
     <div class="sr-phone card"><h2>Study room works on a PC</h2><p class="muted">It is a big workbench: your chart, your screenshots and your setups side by side. Open 5abifx.com on your computer to use it.</p></div>
@@ -52,7 +52,7 @@ module.exports = (app, { page, requireUser }) => {
                 <div class="ci-stage" id="ci-stage"><canvas id="ci-cv" width="1600" height="900"></canvas><textarea class="ci-type" id="ci-type" hidden spellcheck="false"></textarea><div class="ci-hint" id="ci-hint" hidden>Paste (Ctrl+V) or drop a screenshot here</div></div>
               </div>
             </div>
-            <div class="sr-strip"><span class="sr-k">Same setup before</span><div id="sr-past"></div><button type="button" class="btn small secondary" data-go="compare">Compare side by side</button></div>
+            <div class="sr-strip"><span class="sr-k">Same setup before</span><div id="sr-past"></div><button type="button" class="ci-act" data-go="compare">Compare side by side</button></div>
           </section>
 
           <section class="sr-view" id="v-compare"><div class="sr-cmp" id="sr-cmp"></div></section>
@@ -74,18 +74,25 @@ module.exports = (app, { page, requireUser }) => {
             <div class="sr-lv"><span>Target<b>4000.0</b></span><span>Entry<b>4012.4</b></span><span>Stop<b>4018.6</b></span></div>
             <p class="sr-meta">Held 42 min · New York session · recorded by the Journal EA</p>
           </div>
-          <section class="sr-blk"><h4>The environment<span>Same tags, same setup</span></h4><div id="sr-env"></div><div class="sr-match" id="sr-match"></div></section>
-          <section class="sr-blk"><h4>My notes</h4>
+          <div class="sr-itabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-p="env">Environment</button><button type="button" role="tab" data-p="notes">Notes</button><button type="button" role="tab" data-p="review">Review</button></div>
+          <section class="sr-pane on" id="p-env">
+            <div class="sr-step" id="sr-step"></div>
+            <div class="sr-rec" id="sr-rec"></div>
+          </section>
+          <section class="sr-pane" id="p-notes">
+            <div class="sr-k sr-pk">Write it like you'd tell a friend. Short is fine.</div>
             <div class="sr-paper">
-              <label>What I saw<textarea rows="2">Sellers sat on the value high. Three taps, no break.</textarea></label>
-              <label>What I did<textarea rows="2">Sold the 3rd tap. Took nothing at 1R. It turned and took my stop.</textarea></label>
-              <label>Next time<textarea rows="2" id="sr-next">Take half at 1R when the next level is close.</textarea></label>
+              <label>What I saw<textarea rows="3">Sellers sat on the value high. Three taps, no break.</textarea></label>
+              <label>What I did<textarea rows="3">Sold the 3rd tap. Took nothing at 1R. It turned and took my stop.</textarea></label>
+              <label>Next time<textarea rows="3" id="sr-next">Take half at 1R when the next level is close.</textarea></label>
             </div></section>
-          <section class="sr-blk"><h4>How I traded it</h4>
-            <div class="sr-seg" id="sr-grade"><button type="button">A+</button><button type="button">A</button><button type="button" class="on">B</button><button type="button">C</button><button type="button">F</button></div>
+          <section class="sr-pane" id="p-review">
+            <h3 class="sr-qh">How did you <em>trade</em> it?</h3>
+            <div class="sr-chips2" id="sr-grade">${[['A+', 'Perfect, by the plan'], ['A', 'Good, small slip'], ['B', 'Right idea, poor exit'], ['C', 'Forced it'], ['F', 'Broke my rules']].map(([g, h], i) => `<button type="button" class="sr-chip${i === 2 ? ' on' : ''}" data-h="${h}"><b>${g}</b></button>`).join('')}</div>
+            <p class="sr-hint" id="sr-gh">Right idea, poor exit</p>
             <label class="sr-tog"><input type="checkbox" id="sr-fix" checked><i></i><span>Add “Next time” to my Focus panel</span></label>
             ${req.mentorEligible ? '<button type="button" class="sr-link">Ask my mentor about this trade →</button>' : ''}</section>
-          <div class="sr-save"><button type="button" class="sr-pill" id="sr-done"><span>Save to “Absorption at value high”</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
+          <div class="sr-save"><button type="button" class="sr-share" id="sr-done"><span>Save to “Absorption at value high”</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
         </aside>
       </div>
     </div>

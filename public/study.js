@@ -269,17 +269,48 @@
     $('sr-nums').innerHTML = `<div><span class="sr-k">Seen</span><b>${s.r.length}×</b></div><div><span class="sr-k">Won</span><b>${s.won}%</b></div><div><span class="sr-k">Per trade</span><b class="${s.exp < 0 ? 'neg' : 'pos'}">${R(s.exp)}</b></div><div><span class="sr-k">Profit factor</span><b>${s.pf.toFixed(2)}</b></div><div><span class="sr-k">Last</span><b>${s.last}</b></div><canvas id="sr-hs"></canvas>`;
     spark($('sr-hs'), s.r, s.c); }
 
-  /* ---------- right: environment ---------- */
-  const ENV = [['Where', ['Value high', 'Value low', 'POC', 'Poor high', 'Poor low', 'Outside value'], 'Value high'], ['What happened', ['Absorption', 'Exhaustion', 'Big trades', 'Stacked imbalance', 'Delta flip', 'Heatmap wall held'], 'Absorption'],
-    ['Day', ['Balance', 'Trend', 'Open drive', 'News'], 'Balance'], ['Session', ['Asia', 'London', 'NY open', 'NY PM'], 'NY open']];
-  const env = ENV.map((g) => new Set([g[2]])); env[1].add('Heatmap wall held');
-  $('sr-env').innerHTML = ENV.map((g, i) => `<div class="sr-eg"><span>${g[0]}</span><div class="sr-ec">${g[1].map((c) => `<button type="button" data-g="${i}" class="${env[i].has(c) ? 'on' : ''}">${c}</button>`).join('')}</div></div>`).join('') + '<button type="button" class="sr-link sr-own">+ Add your own tag</button>';
-  $('sr-env').querySelectorAll('button[data-g]').forEach((b) => (b.onclick = () => { const s = env[b.dataset.g]; s.has(b.textContent) ? s.delete(b.textContent) : s.add(b.textContent); b.classList.toggle('on'); match(); }));
-  function match() { const w = env[1].has('Absorption'), a = env[0].has('Value high'), s = SETS[0], won = s.r.filter((v) => v > 0).length, el = $('sr-match');
-    if (w && a) { el.className = 'sr-match hit'; el.innerHTML = `<div class="sr-ring" style="--p:${s.won}"><b>${s.won}%</b><small>won</small></div><div><span class="nm">${s.n}</span><span class="ln">Seen <b>${s.r.length} times</b> before · <b class="${s.exp < 0 ? 'neg' : 'pos'}">${R(s.exp)}</b> a trade</span><div class="sr-mini">${s.r.map((v) => `<i class="${v > 0 ? 'w' : ''}"></i>`).join('')}</div></div>`; }
-    else { el.className = 'sr-match'; el.innerHTML = `<div class="sr-ring new"><b>New</b></div><div><span class="nm">${[...env[1]][0] || 'Something'} at ${([...env[0]][0] || 'somewhere').toLowerCase()}</span><span class="ln">First time. Saving starts a new setup.</span></div>`; } }
-  match();
-  document.querySelectorAll('#sr-grade button').forEach((b) => (b.onclick = () => document.querySelectorAll('#sr-grade button').forEach((x) => x.classList.toggle('on', x === b))));
+  /* ---------- right: inspector tabs (Share Studio style) ---------- */
+  document.querySelectorAll('.sr-itabs button').forEach((b) => (b.onclick = () => { document.querySelectorAll('.sr-itabs button').forEach((x) => x.setAttribute('aria-selected', x === b)); document.querySelectorAll('.sr-pane').forEach((p) => p.classList.toggle('on', p.id === 'p-' + b.dataset.p)); }));
+
+  /* ---------- environment: one question at a time (same feel as sign-up) ---------- */
+  const IC = { up: 'M12 19V5M6 11l6-6 6 6', down: 'M12 5v14M6 13l6 6 6-6', dot: 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 9a3 3 0 100 6 3 3 0 000-6z', out: 'M4 12h16M14 6l6 6-6 6',
+    eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z', bars: 'M5 20V10M12 20V4M19 20v-7', wall: 'M3 7h18M3 12h18M3 17h18', wave: 'M3 12c3-6 6 6 9 0s6 6 9 0',
+    flat: 'M3 9h18M3 15h18', trend: 'M3 17l6-6 4 4 8-8', bolt: 'M13 2L4 14h7l-1 8 9-12h-7z', news: 'M5 4h14v16H5zM8 8h8M8 12h8M8 16h5', moon: 'M20 14A8 8 0 019 3a8 8 0 1011 11z',
+    sun: 'M12 4V2M12 22v-2M4 12H2M22 12h-2M12 8a4 4 0 100 8 4 4 0 000-8z', clock: 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 7v5l3 2' };
+  const ENV = [
+    { k: 'Where', q: 'Where was <em>price</em>?', multi: 0, o: [['Value high', 'up', 'Top of the value area'], ['Value low', 'down', 'Bottom of the value area'], ['POC', 'dot', 'Where most volume traded'], ['Poor high', 'up', 'A flat, unfinished top'], ['Poor low', 'down', 'A flat, unfinished bottom'], ['Outside value', 'out', 'Away from the value area']] },
+    { k: 'What happened', q: 'What did you <em>see</em>?', multi: 1, o: [['Absorption', 'wall', 'Big orders soaked up the push'], ['Exhaustion', 'wave', 'The push ran out of fuel'], ['Big trades', 'bars', 'Large prints at the level'], ['Stacked imbalance', 'bars', 'One side kept winning, level after level'], ['Delta flip', 'wave', 'Buyers and sellers swapped control'], ['Heatmap wall held', 'wall', 'Resting orders stayed put'], ['Heatmap wall pulled', 'wall', 'Resting orders vanished']] },
+    { k: 'Day', q: 'What kind of <em>day</em>?', multi: 0, o: [['Balance', 'flat', 'Price rotated inside a range'], ['Trend', 'trend', 'One direction most of the day'], ['Open drive', 'bolt', 'Strong move straight from the open'], ['News', 'news', 'A big report moved it']] },
+    { k: 'Session', q: 'Which <em>session</em>?', multi: 0, o: [['Asia', 'moon', 'Quiet hours'], ['London', 'sun', 'Europe opens'], ['NY open', 'clock', 'First hours of New York'], ['NY PM', 'clock', 'New York afternoon']] }];
+  const env = [new Set(['Value high']), new Set(), new Set(), new Set()];
+  let qn = 1, hintT = '';
+  const svg = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${IC[k]}"/></svg>`;
+  function step() {
+    const el = $('sr-step'); el.classList.remove('fade'); void el.offsetWidth; el.classList.add('fade');
+    if (qn >= ENV.length) {
+      const w = env[1].has('Absorption'), a = env[0].has('Value high'), s = SETS[0], name = `${[...env[1]][0] || 'Something'} at ${([...env[0]][0] || 'somewhere').toLowerCase()}`;
+      el.innerHTML = `<div class="sr-sbar"><i style="width:100%"></i></div><div class="sr-sk">${w && a ? 'You have seen this before' : 'A new environment'}</div><h3 class="sr-qh">${w && a ? s.n.replace('value high', '<em>value high</em>') : name}</h3>
+        ${w && a ? `<div class="sr-match hit"><div class="sr-ring" style="--p:${s.won}"><b>${s.won}%</b><small>won</small></div><div><span class="ln"><b>${s.r.length} times</b> before · <b class="${s.exp < 0 ? 'neg' : 'pos'}">${R(s.exp)}</b> a trade · last ${s.last}</span><div class="sr-mini">${s.r.map((v) => `<i class="${v > 0 ? 'w' : ''}"></i>`).join('')}</div><span class="ln">Best when: half off at 1R, NY open.</span></div></div>`
+          : '<p class="sr-hint">Saving starts a new setup page in your playbook.</p>'}
+        <div class="sr-act"><button type="button" class="sr-ghost" data-back>Change answers</button><button type="button" class="sr-ghost" data-go="compare">Compare with past trades →</button></div>`;
+    } else {
+      const g = ENV[qn], sel = env[qn];
+      el.innerHTML = `<div class="sr-sbar"><i style="width:${qn / ENV.length * 100}%"></i></div><div class="sr-sk">Question ${qn + 1} of ${ENV.length}${g.multi ? ' · pick all that fit' : ''}</div><h3 class="sr-qh">${g.q}</h3>
+        <div class="sr-chips2">${g.o.map(([t, i, h]) => `<button type="button" class="sr-chip${sel.has(t) ? ' on' : ''}" data-t="${t}" data-h="${h}">${svg(i)}${t}</button>`).join('')}<button type="button" class="sr-chip add">+ Own word</button></div>
+        <p class="sr-hint" id="sr-hn">${hintT || (g.multi ? 'Tap all that fit, then Continue.' : 'Tap one. It moves on by itself.')}</p>
+        <div class="sr-act">${qn ? '<button type="button" class="sr-ghost" data-back>← Back</button>' : '<span></span>'}<button type="button" class="sr-cta" data-next ${sel.size ? '' : 'disabled'}>Continue<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>`;
+      el.querySelectorAll('.sr-chip[data-t]').forEach((b) => { b.onmouseenter = () => ($('sr-hn').textContent = b.dataset.h);
+        b.onclick = () => { const t = b.dataset.t; if (g.multi) sel.has(t) ? sel.delete(t) : sel.add(t); else { sel.clear(); sel.add(t); } hintT = b.dataset.h; rec();
+          if (!g.multi) { setTimeout(() => { qn++; hintT = ''; step(); rec(); }, 260); el.querySelectorAll('.sr-chip').forEach((x) => x.classList.toggle('on', x === b)); } else { b.classList.toggle('on'); el.querySelector('[data-next]').disabled = !sel.size; } }; });
+      const nx = el.querySelector('[data-next]'); if (nx) nx.onclick = () => { qn++; hintT = ''; step(); rec(); };
+    }
+    const bk = el.querySelector('[data-back]'); if (bk) bk.onclick = () => { qn = qn >= ENV.length ? 0 : Math.max(0, qn - 1); hintT = ''; step(); rec(); };
+    const gc = el.querySelector('[data-go]'); if (gc) gc.onclick = () => go('compare');
+  }
+  function rec() { $('sr-rec').innerHTML = '<h6>The record</h6>' + ENV.map((g, i) => `<button type="button" class="r${i === qn ? ' on' : ''}" data-i="${i}"><small>${g.k}</small><span>${[...env[i]].join(', ')}</span></button>`).join('');
+    $('sr-rec').querySelectorAll('.r').forEach((r) => (r.onclick = () => { qn = +r.dataset.i; hintT = ''; step(); rec(); })); }
+  step(); rec();
+  document.querySelectorAll('#sr-grade .sr-chip').forEach((b) => (b.onclick = () => { document.querySelectorAll('#sr-grade .sr-chip').forEach((x) => x.classList.toggle('on', x === b)); $('sr-gh').textContent = b.dataset.h; }));
   $('sr-done').onclick = (e) => { $('sr-done').firstChild.textContent = 'Saved to your playbook ✓'; const d = document.querySelector('#sr-inbox .sr-it.on .sr-dot'); if (d) d.classList.add('done'); };
 
   /* ---------- bottom strip: same setup before ---------- */
