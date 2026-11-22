@@ -130,6 +130,7 @@
       + '<div class="sc-sec"><div class="sc-lbl">Goals</div>'
       + F.goals.map(function (g, i) {
         // goals the journal can measure fill up by themselves (src/side.js goalKind); the rest: tap the bar
+        if (EG === i) return goalEditor(g, i);
         var a = (D.goalAuto || [])[i], pct = a ? a.pct : g.pct, line;
         if (a && a.split) {
           // money / R target: one line you flip with ‹ › between Today, This week, This month and Pace (owner: keep the card small)
@@ -141,7 +142,7 @@
               : '<span><em>' + esc(r.lab) + '</em> <b class="' + (r.neg ? 'neg' : '') + '">' + esc(r.got) + '</b> / ' + esc(r.tgt) + '</span>')
             + '<button type="button" data-gv="' + i + '" data-d="1" aria-label="Next view">›</button></div>';
         } else line = '<div class="sc-gnow">' + (a ? esc(a.now) : 'Tap the bar to set progress') + '</div>';
-        return '<div class="sc-goal' + (a ? ' auto' : '') + '"><div class="top"><span>' + esc(g.text) + '</span><span>' + pct + '% <button type="button" class="sc-x" data-rmg="' + i + '" aria-label="Remove">×</button></span></div>'
+        return '<div class="sc-goal' + (a ? ' auto' : '') + '"><div class="top"><span>' + esc(g.text) + '</span><span>' + pct + '% <button type="button" class="sc-x" data-edg="' + i + '" aria-label="Edit goal" title="Edit">✎</button><button type="button" class="sc-x" data-rmg="' + i + '" aria-label="Remove">×</button></span></div>'
           + '<div class="sc-bar"' + (a ? ' title="Fills from your journal"' : ' data-g="' + i + '" title="Tap the bar to set your progress"') + '><i style="width:' + pct + '%"></i></div>'
           + line + '</div>';
       }).join('')
@@ -150,19 +151,42 @@
       + '<button type="button" class="sc-save">Save today</button>';
   }
   var GV = {};   // which view (Today / week / month / pace) each target goal shows
+  var EG = null;   // goal open in the ✎ editor
+  function goalEditor(g, i) {
+    var opt = function (list, cur) { return list.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(o[0]) === String(cur) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join(''); };
+    var accts = [['', 'All accounts']].concat((D.goalAccts || []).map(function (x) { return [x.n, (x.label ? x.label + ' ' : '') + '••' + String(x.n).slice(-2)]; }));
+    return '<form class="sc-ged" data-ged="' + i + '">'
+      + '<label>Name<input title="Auto reads the amount and period from the name" name="text" maxlength="70" value="' + esc(g.text) + '"></label>'
+      + '<div class="r"><label>Counts<select name="kind">' + opt([['auto', 'Auto'], ['money', 'Money ($)'], ['r', 'R'], ['wr', 'Win rate %'], ['green', 'Green days'], ['prop', 'Prop target'], ['manual', 'By hand (tap bar)']], g.kind || 'auto') + '</select></label>'
+      + '<label>Target<input name="target" type="number" min="0" step="any" inputmode="decimal" value="' + (g.target || '') + '" placeholder="10000"></label></div>'
+      + '<div class="r"><label>Per<select name="per">' + opt([['', 'Auto'], ['day', 'Day'], ['week', 'Week'], ['month', 'Month']], g.per || '') + '</select></label>'
+      + '<label>Trading days<select name="days">' + opt([[5, 'Mon–Fri'], [7, 'Every day']], g.days || 5) + '</select></label></div>'
+      + '<label>Account<select name="acct">' + opt(accts, g.acct || '') + '</select></label>'
+      + '<div class="b"><button type="button" data-egx="1">Cancel</button><button type="submit">Save goal</button></div></form>';
+  }
   function focusEvents() {
     var c = L.querySelector('.sc-focus');
     c.addEventListener('click', function (e) {
-      var t = e.target.closest('[data-ck],[data-rm],[data-rmg],[data-g],[data-gv],.sc-save'); if (!t) return;
+      var t = e.target.closest('[data-ck],[data-rm],[data-rmg],[data-g],[data-gv],[data-edg],[data-egx],.sc-save'); if (!t) return;
+      if (t.dataset.edg != null) { EG = +t.dataset.edg; drawFocus(); var nm = c.querySelector('.sc-ged input'); if (nm) nm.focus(); return; }
+      if (t.dataset.egx != null) { EG = null; drawFocus(); return; }
       if (t.dataset.gv != null) { GV[+t.dataset.gv] = (GV[+t.dataset.gv] || 0) + Number(t.dataset.d); drawFocus(); return; }
       if (t.dataset.ck != null) { var f = F.fixes[+t.dataset.ck]; if (f.days[today]) delete f.days[today]; else f.days[today] = 1; drawFocus(); save(); return; }
       if (t.dataset.rm != null) { F.fixes.splice(+t.dataset.rm, 1); drawFocus(); save(); return; }
-      if (t.dataset.rmg != null) { GV = {}; F.goals.splice(+t.dataset.rmg, 1); if (D.goalAuto) D.goalAuto.splice(+t.dataset.rmg, 1); drawFocus(); save(); return; }
+      if (t.dataset.rmg != null) { GV = {}; EG = null; F.goals.splice(+t.dataset.rmg, 1); if (D.goalAuto) D.goalAuto.splice(+t.dataset.rmg, 1); drawFocus(); save(); return; }
       if (t.dataset.g != null) { var bb = t.getBoundingClientRect(); F.goals[+t.dataset.g].pct = Math.max(0, Math.min(100, Math.round((e.clientX - bb.left) / bb.width * 20) * 5)); drawFocus(); save(); return; }
       if (t.classList.contains('sc-save')) save(true);
     });
     c.addEventListener('submit', function (e) {
       e.preventDefault();
+      if (e.target.dataset.ged != null) {   // ✎ editor: keep the name, store how it is counted
+        var gi = +e.target.dataset.ged, fd = new FormData(e.target), g = F.goals[gi], nm = String(fd.get('text') || '').trim();
+        if (!g || !nm) return;
+        g.text = nm; g.kind = fd.get('kind') === 'auto' ? undefined : fd.get('kind');
+        g.target = Number(fd.get('target')) > 0 ? Number(fd.get('target')) : undefined; g.per = fd.get('per') || undefined;
+        g.days = fd.get('days') === '7' ? 7 : undefined; g.acct = fd.get('acct') || undefined;
+        EG = null; delete GV[gi]; drawFocus(); refreshGoals(); return;
+      }
       var i = e.target.querySelector('input'), v = i.value.trim(); if (!v) return;
       if (e.target.dataset.add === 'fix') F.fixes.push({ id: '', text: v, days: {} }); else F.goals.push({ id: '', text: v, pct: 0 });
       drawFocus(); save(); var n = c.querySelector('[data-add="' + e.target.dataset.add + '"] input'); if (n) n.focus();

@@ -166,3 +166,16 @@ html.calm .app-body :not(.plx, .plx *) { transition-duration: .12s !important; }
   font-size: 14px; line-height: 1; letter-spacing: 0; text-transform: none; display: grid; place-items: center; cursor: pointer; }
 .sc-gv button:hover { color: #fff; background: rgba(255,255,255,.08); }
 .sc-pace { font-weight: 600; } .sc-pace.up { color: #3fdcb5; } .sc-pace.dn { color: #ffb07a; }
+
+/* Focus goal ✎ editor */
+.sc-ged { display: grid; gap: 7px; margin: 8px 0 10px; padding: 10px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09); }
+.sc-ged label { display: grid; gap: 3px; min-width: 0; font-size: 10.5px; font-weight: 600; color: #8a8a93; }
+.sc-ged .r { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.sc-ged input, .sc-ged select { width: 100%; min-width: 0; min-height: 0; margin: 0; padding: 6px 8px; border-radius: 8px; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.1);
+  color: #f4f4f5; font: 500 12px var(--body, inherit); box-shadow: none; }
+.sc-ged select option { background: #141418; color: #f4f4f5; }
+.sc-ged .b { display: flex; gap: 6px; justify-content: flex-end; margin-top: 2px; }
+.sc-ged .b button { min-height: 0; padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12); background: transparent; color: #d4d4d8;
+  font: 700 11.5px var(--body, inherit); letter-spacing: 0; text-transform: none; box-shadow: none; cursor: pointer; }
+.sc-ged .b button[type=submit] { background: #fff; border-color: #fff; color: #0a0a0b; }
+.sc-goal .top .sc-x[data-edg] { font-size: 12px; }
