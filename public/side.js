@@ -28,8 +28,29 @@
   addEventListener('swap:load', fit);
 
   // ---------- request a feature (every members page) ----------
+  var supList = document.querySelector('#sup-panel .sup-list');
+  if (supList) {   // the help panel is on: "Request a feature" is one of its rows, no separate + button
+    var rq = el('button', 'sup-req', '<span class="sup-ic">+</span><span><b>Request a feature</b><small>What would make your journal better?</small></span>'); rq.type = 'button';
+    supList.appendChild(rq);
+    rq.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var f = el('div', 'sup-form', '<textarea maxlength="1000" placeholder="I wish I could…"></textarea><button type="button" class="sup-send">Send</button>');
+      supList.replaceChild(f, rq);
+      var ta = f.querySelector('textarea'), b = f.querySelector('button'); ta.focus();
+      b.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        if (ta.value.trim().length < 3) { ta.focus(); return; }
+        b.disabled = true; b.textContent = 'Sending…';
+        fetch('/api/feature', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: ta.value, page: location.pathname }) })
+          .then(function (r) { return r.json(); }).then(function (j) {
+            f.innerHTML = '<div class="sup-done"><b>' + (j.ok ? 'Thank you!' : esc(j.error || 'Could not send')) + '</b> ' + (j.ok ? 'We read every request.' : 'Try again later.') + '</div>';
+            setTimeout(function () { if (f.parentNode) f.parentNode.replaceChild(rq, f); }, 2600);
+          }).catch(function () { b.disabled = false; b.textContent = 'Send'; });
+      });
+    });
+  }
   var fr = el('button', 'fr', '+'); fr.type = 'button'; fr.title = 'Request a feature'; fr.setAttribute('aria-label', 'Request a feature');
-  document.body.appendChild(fr);
+  if (!supList) document.body.appendChild(fr);
   var pop = null;
   fr.addEventListener('click', function () {
     if (pop) { pop.remove(); pop = null; return; }
@@ -265,7 +286,7 @@
   function right() {
     var h = '<div class="sc-card"><div class="sc-lbl">Today\'s thought</div><div class="sc-quote">“' + D.quote + '”</div></div>';
     // the car sits right under the quote so it is on screen without scrolling the column (owner, 2026-11-22)
-    h += '<div class="sc-card sc-garage"><div class="sc-lbl">Garage · drag, scroll, tap to rev</div><canvas aria-label="3D car you can turn"></canvas><span class="sc-hint"></span></div>';
+    h += '<div class="sc-card sc-garage"><canvas aria-label="3D car you can turn"></canvas><span class="sc-hint"></span></div>';
     if (D.last) {
       var dt = new Date(D.last.day + 'T12:00:00'), lab = dt.toLocaleString('en', { weekday: 'short' }) + ' ' + dt.getDate() + ' ' + dt.toLocaleString('en', { month: 'short' });
       var L0 = D.last, rr = L0.backR != null ? L0.backR : (L0.r != null && L0.r < 0 ? -L0.r : null);

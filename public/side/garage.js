@@ -185,7 +185,7 @@ export default function garage(card) {
     });
   }
   const paint = () => (window.__LOOK && window.__LOOK.paint) || 'original';
-  const idleHint = () => { hint.textContent = 'Tap to rev · double-tap for a burnout'; };
+  const idleHint = () => { hint.textContent = 'Tap to rev'; };
 
   // ---------- sound (made in the browser, no files) ----------
   let ac = null, muted = false;
@@ -330,8 +330,8 @@ export default function garage(card) {
     // the car's box is enough for a tap (the compressed model's own triangles don't ray-test reliably)
     return !!car && ray.ray.intersectsBox(new THREE.Box3().setFromObject(car));
   };
-  const doRev = () => { rev = 1; revT = performance.now(); revSound('blip'); hint.textContent = 'Vroom'; setTimeout(idleHint, 1600); };
-  const doBurn = () => { if (burn) return; burn = 1; burnT = performance.now(); rev = 1; revT = burnT; revSound('burn'); setTimeout(() => screech(2.9), 380); hint.textContent = 'Burnout'; setTimeout(idleHint, 2800); };
+  const doRev = () => { rev = 1; revT = performance.now(); revSound('blip'); };
+  const doBurn = () => { if (burn) return; burn = 1; burnT = performance.now(); rev = 1; revT = burnT; revSound('burn'); setTimeout(() => screech(2.9), 380); };
   card.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY]; card.style.cursor = 'grabbing'; });
   card.addEventListener('pointerup', (e) => {
     card.style.cursor = 'grab';
