@@ -59,6 +59,16 @@ function planPill(u) {
   return `<a class="tb-plan" href="/pricing" title="Your plan">${esc(name)} <i class="${state[0]}">${state[1]}</i></a>`;
 }
 
+// Members pages switch without a full reload (public/swap.js). Scripts that declare top-level const/let/class can't
+// run twice on one page, so swap.js loads those only once; the list is read from public/ at start-up.
+const SWAP_ONCE = (() => {
+  const fs = require('fs'), dir = require('path').join(__dirname, '..', 'public');
+  try {
+    return fs.readdirSync(dir).filter((f) => f.endsWith('.js') && /^(const|let|class) /m.test(fs.readFileSync(require('path').join(dir, f), 'utf8'))).map((f) => '/' + f);
+  } catch (e) { return []; }
+})();
+const swapHead = () => `<script>window.__SWAP_ONCE=${JSON.stringify(SWAP_ONCE)}</script><script src="/swap.js"></script>`;
+
 // opts.wide: full-width main for the landing page (sections bring their own .wrap)
 function layout(req, title, body, opts = {}) {
   const u = req.user;
@@ -101,6 +111,7 @@ ${require('./seo').headTags(req, opts)}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@200;300;400;600&family=Manrope:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/style.css">
+${u && !opts.wide ? swapHead() : ''}
 ${u && !opts.wide ? '<link rel="stylesheet" href="/look.css"><link rel="stylesheet" href="/topbar.css"><link rel="stylesheet" href="/compact.css"><link rel="stylesheet" href="/dock.css"><link rel="stylesheet" href="/side.css"><link rel="stylesheet" href="/fit.css"><script src="/side.js" defer></script><link rel="stylesheet" href="/select-ui.css"><script src="/select-ui.js" defer></script>' : ''}
 <link rel="stylesheet" href="/guards.css">
 ${require('./look').a11yHead(u)}
