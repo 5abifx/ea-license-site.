@@ -118,3 +118,6 @@ html.mid-m .tm-gh .tm-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); 
 html.mid-s .tm > .tm-gh { grid-template-columns: 1fr; }
 /* garage label wraps before the sound button instead of running under it */
 .sc-garage .sc-lbl { right: 52px; line-height: 1.4; }
+/* garage card is second in the right column now: fixed height instead of filling the rest */
+.sc-r .sc-garage { flex: 0 0 280px; }
+@media (max-width: 1919px) { .sc-r .sc-garage { flex-basis: 250px; } }
