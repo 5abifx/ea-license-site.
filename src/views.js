@@ -83,7 +83,7 @@ function layout(req, title, body, opts = {}) {
        ${u.is_admin ? link('/admin', 'Admin') : ''}
        ${u.google_sub ? '' : link('/password', 'Password')}
        <form method="post" action="/logout" class="inline"><button class="link">Sign out</button></form>`
-    : `<a href="/#katana">KATANA</a><a href="/#journal">Journal</a>${link('/mentorship', 'Mentorship')}${link('/pricing', 'Pricing')}${link('/faq', 'FAQ')}${link('/login', 'Sign in')}${signup ? `<a class="btn small" href="/signup">${trialDays() ? 'Start free trial' : 'Create account'}</a>` : ''}`;
+    : `<a href="/#katana">KATANA</a><a href="/#journal">Journal</a>${link('/pricing', 'Pricing')}${link('/faq', 'FAQ')}${link('/login', 'Sign in')}${signup ? `<a class="btn small" href="/signup">${trialDays() ? 'Start free trial' : 'Create account'}</a>` : ''}`;
   const origin = `${req.protocol}://${req.get('host')}`;
   const og = opts.og || {}; // link preview (Discord, iMessage, WhatsApp): { title, desc, image }
   const trial = trialDays();
@@ -156,7 +156,7 @@ function appShell(req, u, flashHtml, body, title) {
       ${mentor ? tile('/journal/mentor', 'chat', 'Mentor review', 'Questions on your trades', jOn.mentor, req.mentorNew) : ''}` : '';
   const accountTiles = `${tile('/settings', 'user', 'Trading profile', 'Accounts and prop firm rules', on('/settings'))}
       ${tile('/appearance', 'paint', 'Appearance', 'Background, panels, accent', on('/appearance'))}
-      ${tile('/mentorship', 'cap', 'Mentorship', 'The live programme', on('/mentorship'))}
+      ${u.is_admin ? tile('/mentorship', 'cap', 'Mentorship', 'The live programme (hidden from members)', on('/mentorship')) : ''}
       ${tile('/pricing', 'plans', 'Plans', 'Your plan and billing', on('/pricing'))}
       ${tile('/profile', 'user', 'My page', 'Your public trader page', on('/profile'))}
       ${tile('/affiliate', 'gift', 'Affiliate', 'Share and earn', on('/affiliate'))}

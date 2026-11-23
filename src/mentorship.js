@@ -146,6 +146,15 @@ module.exports = function mentorship(app, { db, page, flash, requireUser, requir
 </section>`;
   }
 
+  // HIDDEN (owner, 2026-11-23): the mentorship page is taken down for now. Only admins can open /mentorship
+  // and its sub-pages; everyone else is sent home. The legal agreement stays readable (linked from /terms).
+  // Set MENTORSHIP_PUBLIC=1 on Render to show it again, and put the links back (git log for this commit).
+  app.use('/mentorship', (req, res, next) => {
+    if (process.env.MENTORSHIP_PUBLIC === '1' || (req.user && req.user.is_admin) || req.path === '/agreement') return next();
+    if (req.method === 'GET' || req.method === 'HEAD') return res.redirect(302, '/');
+    return res.status(404).send('Not found');
+  });
+
   // Claim the mystery discount. Signed out: make a free account first, then it is claimed on the way back.
   app.get('/mentorship/claim', (req, res) => {
     if (!promo()) return res.redirect('/mentorship#price');

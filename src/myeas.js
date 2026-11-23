@@ -28,7 +28,7 @@ const TOOLS = {
     feats: ['Daily and weekly levels drawn for you', 'The session bias in one glance', 'Marks untouched levels until price reaches them', 'Matches the 5ABI.FX chart themes'],
     steps: ['Put the file in MQL5 → Indicators and refresh the Navigator.', 'Keep the Trade Journal EA running on any chart in the same MT5: it unlocks the indicator.',
       'Drag Auction Compass onto your chart, or load a chart theme "with Auction Compass" below.'],
-    unlock: { href: '/mentorship', label: 'Unlock with mentorship', note: 'Students only' },
+    unlock: { href: '/faq', label: 'How to get access', note: 'Students only' },
   },
 };
 
