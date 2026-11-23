@@ -107,7 +107,7 @@ module.exports = function registerMentor(app, { db, page, flash, requireUser, re
 
   app.get('/journal/mentor', requireUser, (req, res) => {
     const u = req.user;
-    if (!eligible(u)) return res.redirect('/mentorship');
+    if (!eligible(u)) return res.redirect('/dashboard');
     const rows = db.prepare(`SELECT t.id, t.symbol, t.side, t.net, t.r, t.close_time, t.currency, t.review_req,
         COUNT(n.id) AS notes, SUM(n.by_mentor = 1 AND n.seen = 0) AS fresh, MAX(n.created_at) AS last
       FROM journal_trades t JOIN trade_notes n ON n.trade_id = t.id

@@ -39,7 +39,7 @@ const META = {
   }),
 };
 // pages listed in /sitemap.xml and opened to crawlers in robots.txt (/why ships with its own page)
-const PUBLIC = ['/', '/katana', '/trade-journal', '/mentorship', '/pricing', '/why', '/faq', '/help/ea-blocked', '/terms', '/privacy'];
+const PUBLIC = ['/', '/katana', '/trade-journal', '/pricing', '/why', '/faq', '/help/ea-blocked', '/terms', '/privacy'];
 
 const metaFor = (path) => (META[path] ? META[path]() : null);
 const canonical = (path) => `${SITE_URL}${path === '/' ? '/' : path}`;
@@ -75,7 +75,7 @@ function homeData() {
       appData('/katana'),
       appData('/trade-journal'),
       { '@type': 'ItemList', name: 'Main pages', itemListElement: [
-        ['KATANA', '/katana'], ['Trade Journal', '/trade-journal'], ['Mentorship', '/mentorship'], ['Pricing', '/pricing'], ['Why KATANA', '/why'], ['FAQ', '/faq'],
+        ['KATANA', '/katana'], ['Trade Journal', '/trade-journal'], ['Pricing', '/pricing'], ['Why KATANA', '/why'], ['FAQ', '/faq'],
       ].map(([name, p], i) => ({ '@type': 'SiteNavigationElement', position: i + 1, name, url: `${SITE_URL}${p}` })) },
     ],
   });

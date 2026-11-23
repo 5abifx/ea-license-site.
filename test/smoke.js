@@ -247,6 +247,16 @@ function client(base, ip) {
     assert.strictEqual(r.status, 404);
     assert.match(r.text, /doesn&#39;t exist|doesn't exist/);
     assert.match((await anon.get('/')).text, /property="og:image" content="http:\/\/127\.0\.0\.1:\d+\/og\.png\?v=3"/);
+    // mentorship page is hidden from the public (owner, 2026-11-23): visitors go home, no links anywhere
+    assert.strictEqual((await anonGet(base, '/mentorship')).status, 302);
+    assert.doesNotMatch((await anon.get('/mentorship')).text, /og-mentorship/);           // lands on home
+    assert.strictEqual((await anonGet(base, '/mentorship/claim')).status, 302);
+    assert.strictEqual((await anon.post('/mentorship/checkout', { plan: 'full' })).status, 404);
+    assert.strictEqual((await anon.get('/mentorship/agreement')).status, 200);
+    assert.doesNotMatch((await anon.get('/')).text, /href="\/mentorship/);
+    assert.doesNotMatch((await anon.get('/sitemap.xml')).text, /mentorship/);
+    assert.doesNotMatch((await anon.get('/robots.txt')).text, /mentorship/);
+    process.env.MENTORSHIP_PUBLIC = '1';
     assert.match((await anon.get('/mentorship')).text, /property="og:image" content="[^"]+\/og-mentorship\.png\?v=3"/);
     r = await anon.get('/why');                                                   // with vs without showcase
     assert.strictEqual(r.status, 200);
@@ -525,7 +535,8 @@ function client(base, ip) {
     r = await tia.get('/dashboard');
     const compassId = db.prepare("SELECT id FROM eas WHERE code = 'COMPASS'").get().id;
     // members who are not students see it locked, with where to unlock it, and no download
-    assert.match(r.text, /Unlock with mentorship/);
+    assert.match(r.text, /How to get access/);
+    assert.doesNotMatch(r.text, /href="\/mentorship/);
     assert.doesNotMatch(r.text, new RegExp(`/download/${compassId}"`));
     assert.doesNotMatch(r.text, /Compass\.tpl/);
     assert.strictEqual((await tia.get(`/download/${compassId}`)).status, 404);
