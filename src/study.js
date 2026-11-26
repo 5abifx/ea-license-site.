@@ -1,12 +1,13 @@
 // Study room (/journal/study): an open canvas, like a whiteboard, where closed trades are studied and turned into setups.
 //   Boards   - every setup gets its own endless board; members can add free boards too (study_boards.data = items + marks)
+//   Tabs     - clicking a trade opens it on its own board (study_boards.trade_id), shown as a tab like a browser tab
 //   Canvas   - trade frames (the trade's MT5 candles), screenshots, sticky notes, handwriting, hand-drawn boxes/arrows/lines
 //   Trades   - right panel: account buttons, search, To study / Studied, wins / losses; drag a trade onto the board
 //   Question - click a trade: the same one-question-at-a-time panel as sign-up (environment), notes, grade, save to setup
 // Rooms: students get the order flow room; others the room for the edge picked at sign-up (price action, ICT, own).
-// Screenshots are stored as JPEG BLOBs (max 1600 px wide) with a per-member cap. PC only (phones get a short note).
+// Screenshots are stored as JPEG BLOBs (good quality, up to 2560 px wide) with a per-member cap. PC only (phones get a short note).
 const express = require('express');
-const CAP = Number(process.env.STUDY_SHOT_CAP) || 150;     // screenshots per member (5 GB disk; ~150 KB each)
+const CAP = Number(process.env.STUDY_SHOT_CAP) || 150;     // screenshots per member (5 GB disk; ~0.3-0.8 MB each)
 const PER_TRADE = 6;                                         // screenshots per trade
 const ROOMS = ['flow', 'pa', 'ict', 'own'];
 const clean = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u0008\u000b-\u001f<>]/g, '').trim().slice(0, n);
@@ -29,6 +30,10 @@ module.exports = (app, { db, page, requireUser }) => {
       data TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL DEFAULT (datetime('now')));
     CREATE INDEX IF NOT EXISTS study_boards_user ON study_boards(user_id, room);
     CREATE TABLE IF NOT EXISTS study_words (user_id INTEGER NOT NULL, room TEXT NOT NULL, qk TEXT NOT NULL, word TEXT NOT NULL, UNIQUE (user_id, room, qk, word));`);
+  // a trade opened from the Trades list gets its own board, shown as a tab (open = tab still open)
+  const bcols = db.prepare('PRAGMA table_info(study_boards)').all().map((c) => c.name);
+  if (!bcols.includes('trade_id')) db.exec('ALTER TABLE study_boards ADD COLUMN trade_id INTEGER');
+  if (!bcols.includes('open')) db.exec('ALTER TABLE study_boards ADD COLUMN open INTEGER NOT NULL DEFAULT 0');
   if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'study_room')) db.exec("ALTER TABLE users ADD COLUMN study_room TEXT NOT NULL DEFAULT ''");
 
   const roomsFor = (req) => (req.mentorEligible || req.user.is_admin ? ROOMS : ROOMS.slice(1));
@@ -86,15 +91,28 @@ module.exports = (app, { db, page, requireUser }) => {
     const uid = req.user.id, { rooms, room } = roomOf(req);
     const setups = setupStats(uid, room);
     setups.forEach((s) => ensureSetupBoard(uid, room, s.id, s.n));
-    if (!db.prepare('SELECT 1 FROM study_boards WHERE user_id = ? AND room = ? AND setup_id IS NULL').get(uid, room)) db.prepare("INSERT INTO study_boards (user_id, room, name) VALUES (?, ?, 'My board')").run(uid, room);
-    const boards = db.prepare('SELECT id, name, setup_id AS setup, updated_at FROM study_boards WHERE user_id = ? AND room = ? ORDER BY setup_id IS NULL, name').all(uid, room);
-    const want = Number(req.query.b) || 0;
+    if (!db.prepare('SELECT 1 FROM study_boards WHERE user_id = ? AND room = ? AND setup_id IS NULL AND trade_id IS NULL').get(uid, room)) db.prepare("INSERT INTO study_boards (user_id, room, name) VALUES (?, ?, 'My board')").run(uid, room);
+    let want = Number(req.query.b) || 0;
+    // ?t=<trade>: open that trade on its own board (its own tab), made the first time
+    const tr = req.query.t ? ownTrade(uid, req.query.t) : null;
+    if (tr) {
+      const tb = db.prepare('SELECT id FROM study_boards WHERE user_id = ? AND trade_id = ?').get(uid, tr.id);
+      if (tb) { want = tb.id; db.prepare('UPDATE study_boards SET open = 1 WHERE id = ?').run(tb.id); }
+      else {
+        const side = String(tr.side).toLowerCase() === 'sell' ? 'sell' : 'buy', data = { items: [{ id: 't' + tr.id, type: 'trade', tid: tr.id, x: 0, y: 0, w: 900 }] };
+        want = Number(db.prepare('INSERT INTO study_boards (user_id, room, name, trade_id, open, data) VALUES (?, ?, ?, ?, 1, ?)').run(uid, room, clean(`${tr.symbol} ${side}`, 50), tr.id, JSON.stringify(data)).lastInsertRowid);
+      }
+    }
+    const boards = db.prepare('SELECT id, name, setup_id AS setup, trade_id AS trade, open, updated_at FROM study_boards WHERE user_id = ? AND room = ? AND (trade_id IS NULL OR open = 1 OR id = ?) ORDER BY setup_id IS NULL, name').all(uid, room, want);
     const cur = boards.find((b) => b.id === want) || boards.slice().sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))[0];
     const board = db.prepare('SELECT data FROM study_boards WHERE id = ?').get(cur.id);
+    // the open trade tabs, oldest first, with the trade's day and result for the tab label
+    const tabs = boards.filter((b) => b.trade).sort((a, b) => a.id - b.id).slice(-12).map((b) => { const t = db.prepare('SELECT close_time, net, r FROM journal_trades WHERE id = ? AND user_id = ?').get(b.trade, uid) || {};
+      return { id: b.id, trade: b.trade, name: b.name, close: t.close_time || '', net: t.net || 0, r: t.r || 0 }; });
     const accts = accounts(uid), used = db.prepare('SELECT COUNT(*) AS n FROM study_shots WHERE user_id = ?').get(uid).n;
     const words = db.prepare('SELECT qk, word FROM study_words WHERE user_id = ? AND room = ?').all(uid, room);
-    const data = { room, rooms: rooms.map((r) => [r, RN[r]]), board: { id: cur.id, name: cur.name, setup: cur.setup, data: parse(board.data, {}) },
-      boards: boards.map((b) => ({ id: b.id, name: b.name, setup: b.setup })), setups, accts, words, mentor: Boolean(req.mentorEligible), shots: { used, cap: CAP } };
+    const data = { room, rooms: rooms.map((r) => [r, RN[r]]), board: { id: cur.id, name: cur.name, setup: cur.setup, trade: cur.trade || null, data: parse(board.data, {}) },
+      boards: boards.filter((b) => !b.trade).map((b) => ({ id: b.id, name: b.name, setup: b.setup })), tabs, setups, accts, words, mentor: Boolean(req.mentorEligible), shots: { used, cap: CAP } };
     const json = JSON.stringify(data).replace(/</g, '\\u003c');
     page(req, res, 'Study room', `
     <link rel="stylesheet" href="/study.css">
@@ -105,6 +123,7 @@ module.exports = (app, { db, page, requireUser }) => {
     <div class="sr-app" id="sr-app" data-room="${room}"><h1 class="sr-vh">Study room</h1>
       <div class="sr-vp" id="sr-vp"><div class="sr-world" id="sr-world"><svg class="sr-ink" id="sr-ink"></svg></div></div>
       <div class="sr-isl" id="sr-tl"></div>
+      <nav class="sr-isl" id="sr-tabs" hidden aria-label="Open trades"></nav>
       <div class="sr-isl" id="sr-boards" hidden></div>
       <nav class="sr-isl" id="sr-tools" aria-label="Tools"></nav>
       <div class="sr-isl" id="sr-props" hidden></div>
@@ -145,7 +164,7 @@ module.exports = (app, { db, page, requireUser }) => {
   });
   app.post('/journal/study/boards/new', requireUser, journalOnly, json, (req, res) => {
     const { room } = roomOf(req), name = clean(req.body && req.body.name, 50) || 'New board';
-    if (db.prepare('SELECT COUNT(*) AS n FROM study_boards WHERE user_id = ?').get(req.user.id).n >= 60) return res.status(400).json({ error: 'You have 60 boards already. Delete one first.' });
+    if (db.prepare('SELECT COUNT(*) AS n FROM study_boards WHERE user_id = ? AND trade_id IS NULL').get(req.user.id).n >= 60) return res.status(400).json({ error: 'You have 60 boards already. Delete one first.' });
     res.json({ ok: true, id: Number(db.prepare('INSERT INTO study_boards (user_id, room, name) VALUES (?, ?, ?)').run(req.user.id, room, name).lastInsertRowid) });
   });
   app.post('/journal/study/board/:id/rename', requireUser, journalOnly, json, (req, res) => {
@@ -154,19 +173,23 @@ module.exports = (app, { db, page, requireUser }) => {
     if (b.setup_id) return res.status(400).json({ error: 'Setup boards keep the setup name.' });
     db.prepare('UPDATE study_boards SET name = ? WHERE id = ?').run(name, b.id); res.json({ ok: true });
   });
+  app.post('/journal/study/board/:id/close', requireUser, journalOnly, (req, res) => {
+    const b = ownBoard(req.user.id, req.params.id); if (!b || !b.trade_id) return res.status(404).json({ error: 'Tab not found.' });
+    db.prepare('UPDATE study_boards SET open = 0 WHERE id = ?').run(b.id); res.json({ ok: true });
+  });
   app.post('/journal/study/board/:id/delete', requireUser, journalOnly, (req, res) => {
     const b = ownBoard(req.user.id, req.params.id); if (!b) return res.status(404).json({ error: 'Board not found.' });
     if (b.setup_id) return res.status(400).json({ error: 'A setup board stays while the setup has trades.' });
     db.prepare('DELETE FROM study_boards WHERE id = ?').run(b.id); res.json({ ok: true });
   });
   // screenshot dropped on a board (not tied to one trade)
-  app.post('/journal/study/board/:id/shot', requireUser, journalOnly, express.raw({ type: 'image/jpeg', limit: '700kb' }), (req, res) => {
-    const uid = req.user.id; if (!ownBoard(uid, req.params.id)) return res.status(404).json({ error: 'Board not found.' });
+  app.post('/journal/study/board/:id/shot', requireUser, journalOnly, express.raw({ type: 'image/jpeg', limit: '2mb' }), (req, res) => {
+    const uid = req.user.id, bd = ownBoard(uid, req.params.id); if (!bd) return res.status(404).json({ error: 'Board not found.' });
     const b = req.body;
     if (!Buffer.isBuffer(b) || b.length < 100 || b[0] !== 0xff || b[1] !== 0xd8) return res.status(400).json({ error: 'That is not a picture.' });
     const used = db.prepare('SELECT COUNT(*) AS n FROM study_shots WHERE user_id = ?').get(uid).n;
     if (used >= CAP) return res.status(400).json({ error: `You have used all ${CAP} screenshots. Delete old ones to add more.` });
-    const id = db.prepare('INSERT INTO study_shots (user_id, trade_id, name, bytes, jpg) VALUES (?, 0, ?, ?, ?)').run(uid, clean(req.query.name, 30) || 'Screenshot', b.length, b).lastInsertRowid;
+    const id = db.prepare('INSERT INTO study_shots (user_id, trade_id, name, bytes, jpg) VALUES (?, ?, ?, ?, ?)').run(uid, bd.trade_id || 0, clean(req.query.name, 30) || 'Screenshot', b.length, b).lastInsertRowid;
     res.json({ ok: true, id: Number(id), used: used + 1, cap: CAP });
   });
 
@@ -221,7 +244,7 @@ module.exports = (app, { db, page, requireUser }) => {
     res.json({ ok: true });
   });
   // screenshots: upload (JPEG, already shrunk in the browser), marks, picture, delete
-  app.post('/journal/study/:id/shot', requireUser, journalOnly, express.raw({ type: 'image/jpeg', limit: '700kb' }), (req, res) => {
+  app.post('/journal/study/:id/shot', requireUser, journalOnly, express.raw({ type: 'image/jpeg', limit: '2mb' }), (req, res) => {
     const uid = req.user.id, t = ownTrade(uid, req.params.id); if (!t) return res.status(404).json({ error: 'Trade not found.' });
     const b = req.body;
     if (!Buffer.isBuffer(b) || b.length < 100 || b[0] !== 0xff || b[1] !== 0xd8) return res.status(400).json({ error: 'That is not a picture.' });

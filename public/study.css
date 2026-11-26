@@ -35,7 +35,22 @@
 .sr-board:hover { background: var(--gl2) !important; }
 .sr-saved { color: var(--mu); font-size: 12px; display: flex; align-items: center; gap: 6px; white-space: nowrap; margin-left: 4px; }
 .sr-saved i { width: 6px; height: 6px; border-radius: 50%; background: var(--te); } .sr-saved.bad i { background: var(--re); }
-#sr-boards { top: 62px; left: 12px; width: 290px; padding: 6px; max-height: calc(100% - 140px); overflow-y: auto; }
+/* open trades as tabs (each trade on its own board), under the board name */
+#sr-tabs { top: 62px; left: 12px; max-width: calc(100% - 390px); display: flex; align-items: stretch; gap: 2px; padding: 4px; overflow-x: auto; scrollbar-width: none; }
+#sr-tabs::-webkit-scrollbar { display: none; }
+.sr-app.side-off #sr-tabs { max-width: calc(100% - 160px); }
+.sr-tt { position: relative; display: flex; align-items: center; gap: 8px; padding: 5px 6px 5px 10px; border-radius: 8px; color: var(--mu); text-decoration: none; white-space: nowrap; flex: 0 0 auto; }
+.sr-tt:hover { background: var(--gl2); color: var(--tx); }
+.sr-tt.on { background: #f2f2f4; color: #050507; }
+.sr-tt.home { padding-right: 10px; } .sr-tt.home svg { width: 14px; height: 14px; flex: 0 0 auto; }
+.sr-tt i { width: 6px; height: 6px; border-radius: 50%; background: var(--te); flex: 0 0 auto; } .sr-tt i.neg { background: var(--re); }
+.sr-tt > span { display: grid; line-height: 1.2; }
+.sr-tt b { font-weight: 600; font-size: 12.5px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.sr-tt small { font-size: 10.5px; color: var(--dm); } .sr-tt.on small { color: #55555f; } .sr-tt.on small .pos { color: #0f8a6c; } .sr-tt.on small .neg { color: #c42a2f; }
+.sr-app .sr-tx { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; padding: 0; font-size: 15px; line-height: 1; color: inherit; opacity: .55; }
+.sr-app .sr-tx:hover { opacity: 1; background: rgba(127,127,127,.22); }
+.sr-app .s-tr.on-tab b::after { content: 'tab'; margin-left: 6px; font: 500 10px Manrope, sans-serif; color: var(--mu); border: 1px solid var(--ln); border-radius: 5px; padding: 0 4px; }
+#sr-boards { z-index: 7; top: 62px; left: 12px; width: 290px; padding: 6px; max-height: calc(100% - 140px); overflow-y: auto; }
 #sr-boards h6, #sr-props h6 { margin: 10px 10px 4px; font: 500 11.5px Manrope, sans-serif; color: var(--mu); text-transform: none; letter-spacing: 0; }
 #sr-boards a, #sr-boards > button { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px !important; border-radius: 8px; color: var(--tx); text-decoration: none; text-align: left; width: 100%; box-sizing: border-box; }
 #sr-boards a:hover, #sr-boards a.on, #sr-boards > button:hover { background: var(--gl2) !important; }
@@ -133,6 +148,8 @@
 
 /* zoom, hint, toast */
 #sr-zoom { bottom: 12px; left: 12px; display: flex; align-items: center; gap: 2px; padding: 4px; }
+#sr-zoom .sr-exp { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px 0 10px; border-radius: 8px; font-weight: 600; font-size: 12.5px; background: #f2f2f4; color: #050507; }
+#sr-zoom .sr-exp:hover { background: #fff; } #sr-zoom .sr-exp svg { width: 15px; height: 15px; }
 #sr-zoom output { min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; color: #c9c9d0; font-size: 12px; }
 .sr-hint { position: absolute; z-index: 4; bottom: 22px; left: 50%; transform: translateX(-50%); color: var(--dm); font-size: 12px; white-space: nowrap; pointer-events: none; }
 .sr-toast { position: absolute; z-index: 9; bottom: 64px; left: 50%; transform: translateX(-50%); background: #f2f2f4; color: #050507; padding: 8px 14px; border-radius: 99px; font-weight: 600; font-size: 12.5px; box-shadow: 0 10px 30px rgba(0,0,0,.4); }

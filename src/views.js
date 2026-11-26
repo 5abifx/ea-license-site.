@@ -169,7 +169,8 @@ function appShell(req, u, flashHtml, body, title) {
       <form method="post" action="/logout" class="tb-out"><button class="tb-tile">${cap('out')}<b>Sign out</b></button></form>`;
   const ownerTiles = u.is_admin ? `${tile('/admin/sales', 'insights', 'Sales', 'Revenue and sign-ups', on('/admin/sales'))}
       ${tile('/admin/usage', 'pulse', 'Feature usage', 'What members use', on('/admin/usage'))}
-      ${tile('/admin', 'shield', 'Admin', 'Members and licences', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/affiliates') && !on('/admin/usage') && !on('/admin/whatsnew') && !on('/admin/requests'))}
+      ${tile('/admin/storage', 'desk', 'Storage', 'Disk used per member', on('/admin/storage'))}
+      ${tile('/admin', 'shield', 'Admin', 'Members and licences', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/affiliates') && !on('/admin/usage') && !on('/admin/storage') && !on('/admin/whatsnew') && !on('/admin/requests'))}
       ${tile('/admin/eas', 'upload', 'EAs', 'Upload builds', on('/admin/eas'))}
       ${tile('/admin/whatsnew', 'star', "What's new", 'Post updates', on('/admin/whatsnew'))}
       ${tile('/admin/requests', 'chat', 'Requests', 'Features members asked for', on('/admin/requests'))}

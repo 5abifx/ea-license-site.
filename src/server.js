@@ -272,6 +272,7 @@ app.use((req, res, next) => { req.hasJournal = journalAccess(req.user); next(); 
 app.use((req, res, next) => { if (req.method === 'GET' && (req.socket.destroyed || req.destroyed)) return; next(); });
 // feature usage tracking + Admin > Feature usage (src/features.js); before the members routes so it sees them
 require('./features').setup(app, { db, express, requireAdmin, page });
+const storage = require('./storage').setup(app, { db, requireAdmin, page, DATA_DIR });   // Admin > Storage: disk used per member
 const { studentBox: mentorBox } = require('./mentor')(app, { db, page, flash, requireUser, requireAdmin });
 // guided first run after sign-up + Profile settings (src/onboard.js); stripe is set up further down, so it is looked up at request time
 const onboard = require('./onboard')(app, { db, page, flash, requireUser, trialDays,
@@ -715,7 +716,7 @@ app.get('/admin', requireAdmin, (req, res) => {
 
   page(req, res, 'Admin', `
   <h1>Admin</h1>
-  <div class="tabs"><a href="/admin/sales">Dashboard</a><a class="on" href="/admin">Users</a><a href="/admin/eas">EAs (${eas.length})</a><a href="/admin/mentorship">Mentorship</a><a href="/admin/security">Security</a></div>
+  <div class="tabs"><a href="/admin/sales">Dashboard</a><a class="on" href="/admin">Users</a><a href="/admin/eas">EAs (${eas.length})</a><a href="/admin/mentorship">Mentorship</a><a href="/admin/security">Security</a><a href="/admin/storage">Storage</a></div>
 
   <section class="card">
     <div class="row between">
@@ -872,6 +873,7 @@ app.get('/admin/users/:id', requireAdmin, (req, res) => {
   <p><a href="/admin">← All users</a></p>
   <h1>${esc(u.name || u.email)} <span class="status ${esc(u.status)}">${esc(u.status)}</span></h1>
   <p class="muted">${esc(u.email)} · joined ${fmtDate(u.created_at)}</p>
+  ${storage.userCard(u.id)}
 
   <section class="card">
     <div class="row between">
@@ -1041,7 +1043,7 @@ app.get('/admin/eas', requireAdmin, (req, res) => {
 
   page(req, res, 'EAs', `
   <h1>Admin</h1>
-  <div class="tabs"><a href="/admin/sales">Dashboard</a><a href="/admin">Users</a><a class="on" href="/admin/eas">EAs (${eas.length})</a><a href="/admin/mentorship">Mentorship</a><a href="/admin/security">Security</a></div>
+  <div class="tabs"><a href="/admin/sales">Dashboard</a><a href="/admin">Users</a><a class="on" href="/admin/eas">EAs (${eas.length})</a><a href="/admin/mentorship">Mentorship</a><a href="/admin/security">Security</a><a href="/admin/storage">Storage</a></div>
   ${eas.map((e) => `<section class="card">
     <div class="row between"><h2>${esc(e.name)} <span class="tag">v${esc(e.version)}</span> ${e.active ? '' : '<span class="tag warn">inactive</span>'}</h2>
     <span class="muted">${e.n_users} users · code <code>${esc(e.code)}</code></span></div>

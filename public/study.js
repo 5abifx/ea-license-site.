@@ -1,5 +1,6 @@
 // Study room (src/study.js): an open canvas like a whiteboard. Boards (one per setup + free boards) hold trade frames,
 // screenshots, sticky notes, handwriting and hand-drawn marks. The Trades panel lists trades by account; clicking a trade
+// there opens it on its own board in a new tab (like a browser tab), dragging it adds it to this board. Clicking a trade
 // on the board opens the one-question-at-a-time panel (environment, notes, grade) that saves it into a setup.
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -156,7 +157,9 @@
     const env = (t.env || []).flat(), setup = SETS.find((s) => s.id === t.setup);
     n.innerHTML = `<div class="s-fh"><b>${esc(t.symbol)} ${String(t.side).toLowerCase() === 'sell' ? 'sell' : 'buy'}</b><span class="s-tag">${esc(acctName(t.acct))}</span><span class="s-tag">${fLong(t.open)} · ${fTime(t.open)}</span>${setup ? `<span class="s-tag">${esc(setup.n)}</span>` : ''}<span class="s-r ${(t.r || t.net) < 0 ? 'neg' : 'pos'}">${t.r ? R(t.r) : money(t.net)}</span></div><canvas></canvas>
       <div class="s-ff">${env.map((w) => `<span>${esc(w)}</span>`).join('') || '<span class="mu">Click to answer: where, what happened, day, session</span>'}${t.grade ? `<span class="g">${esc(t.grade)}</span>` : ''}</div>`;
-    const c = n.querySelector('canvas'), W = Math.round(o.w * 2), Hh = Math.round(o.w); const src = realChart(t, W, Hh); c.width = W; c.height = Hh; c.getContext('2d').drawImage(src, 0, 0); c.style.height = (o.w / 2) + 'px'; }
+    const c = n.querySelector('canvas'), W = Math.round(o.w * 2), Hh = Math.round(o.w); const src = realChart(t, W, Hh); c.width = W; c.height = Hh; c.getContext('2d').drawImage(src, 0, 0); c.style.height = (o.w / 2) + 'px';
+    if (BOARD.trade === o.tid && !BD.view && !fitOnce) { fitOnce = true; requestAnimationFrame(fit); } }
+  let fitOnce = false;
   const getTrade = (id) => (TD[id] ? Promise.resolve(TD[id]) : fetch('/journal/study/trade/' + id + '.json', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.reject(new Error('gone')))).then((t) => (TD[id] = t)));
   function setupCard(n, o) { const s = SETS.find((x) => x.id === o.setup) || SETS.find((x) => x.id === BOARD.setup);
     if (!s) { n.innerHTML = '<div class="s-k">Setup</div><h3>No trades yet</h3>'; return; }
@@ -184,7 +187,7 @@
   /* ---------- top-left: boards ---------- */
   const isSetupBoard = Boolean(BOARD.setup);
   $('sr-tl').innerHTML = `<button type="button" class="s-ib" id="sr-menu" title="Boards" aria-label="Boards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-    <button type="button" class="sr-board" id="sr-bbtn"><span>${esc(BOARD.name)}</span><small>${isSetupBoard ? 'setup board' : 'board'}</small><svg width="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
+    <button type="button" class="sr-board" id="sr-bbtn"><span>${esc(BOARD.name)}</span><small>${BOARD.trade ? 'trade' : isSetupBoard ? 'setup board' : 'board'}</small><svg width="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
     <span class="sr-saved" id="sr-saved"><i></i><span>Saved</span></span>`;
   function boardsMenu() {
     const el = $('sr-boards'), sb = (D.boards || []).filter((b) => b.setup), fb = (D.boards || []).filter((b) => !b.setup);
@@ -198,6 +201,36 @@
     if ($('sr-renb')) $('sr-renb').onclick = (e) => ask(e.currentTarget, 'New name', BOARD.name, (name) => api('/journal/study/board/' + BOARD.id + '/rename', { name }).then(() => { BOARD.name = name; $('sr-bbtn').firstChild.textContent = name; (D.boards.find((b) => b.id === BOARD.id) || {}).name = name; boardsMenu(); }).catch((er) => toast(er.message)));
     const del = $('sr-delb'); if (del) del.onclick = () => { if (!del.classList.contains('arm')) { del.classList.add('arm'); del.textContent = 'Click again to delete it'; return; } api('/journal/study/board/' + BOARD.id + '/delete').then(() => { location.href = location.pathname; }).catch((er) => toast(er.message)); }; }
   $('sr-menu').onclick = $('sr-bbtn').onclick = () => { const el = $('sr-boards'); if (el.hidden) boardsMenu(); el.hidden = !el.hidden; $('sr-props').hidden = true; };
+
+  /* ---------- tabs: every trade opened from the list gets its own tab ---------- */
+  const TABS = D.tabs || [];
+  const nav = (href) => { const a = document.createElement('a'); a.href = href; a.hidden = true; app.appendChild(a); a.click(); a.remove(); };
+  if (!BOARD.trade) store.set('srBoard', String(BOARD.id));
+  function renderTabs() {
+    const el = $('sr-tabs'); if (!el) return;
+    if (!TABS.length) { el.hidden = true; return; }
+    const lb = +store.get('srBoard', 0), home = (D.boards || []).find((b) => b.id === (BOARD.trade ? lb : BOARD.id)) || (D.boards || [])[0];
+    el.hidden = false;
+    el.innerHTML = (home ? `<a class="sr-tt home${BOARD.trade ? '' : ' on'}" href="?b=${home.id}" title="${esc(home.name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg><span><b>${esc(home.name)}</b></span></a>` : '')
+      + TABS.map((t) => { const v = t.r || t.net; return `<a class="sr-tt${t.id === BOARD.id ? ' on' : ''}" href="?b=${t.id}" data-tab="${t.id}" title="${esc(t.name)}"><i class="${v < 0 ? 'neg' : 'pos'}"></i><span><b>${esc(t.name)}</b><small>${fDay(t.close)} · <span class="${v < 0 ? 'neg' : 'pos'}">${t.r ? R(t.r) : money(t.net)}</span></small></span><button type="button" class="sr-tx" data-x="${t.id}" title="Close this tab" aria-label="Close this tab">×</button></a>`; }).join('');
+    el.querySelectorAll('[data-x]').forEach((b) => (b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); closeTab(+b.dataset.x); }));
+    const on = el.querySelector('.sr-tt.on'); if (on) on.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+  function closeTab(id) {
+    const i = TABS.findIndex((t) => t.id === id); if (i < 0) return;
+    api('/journal/study/board/' + id + '/close').then(() => {
+      TABS.splice(i, 1);
+      if (id !== BOARD.id) { renderTabs(); list(); return; }
+      const nx = TABS[i] || TABS[i - 1], lb = +store.get('srBoard', 0);
+      if (dirtyB) saveBoard();
+      nav(nx ? '?b=' + nx.id : (D.boards || []).some((b) => b.id === lb) ? '?b=' + lb : location.pathname);
+    }).catch((er) => toast(er.message)); }
+  function openTrade(id, e) {
+    const has = TABS.find((t) => t.trade === id);
+    if (has && has.id === BOARD.id) { const o = items.find((q) => q.type === 'trade' && q.tid === id); if (o) { S.sel = o.id; renderAll(); } return; }
+    const href = has ? '?b=' + has.id : '?t=' + id;
+    if (e && (e.ctrlKey || e.metaKey || e.button === 1)) { window.open(href, '_blank'); return; }
+    if (dirtyB) saveBoard();
+    nav(href); }
 
   /* ---------- toolbar and ink options ---------- */
   const TOOLS = [['hand', 'H', 'Move around', 'M7 11V6a1.5 1.5 0 013 0v4M10 10V4.5a1.5 1.5 0 013 0V10M13 10V5.5a1.5 1.5 0 013 0V11M16 11V8a1.5 1.5 0 013 0v6a7 7 0 01-7 7h-1a6 6 0 01-5-2.7L4 14.5a1.6 1.6 0 012.5-2L8 14'],
@@ -259,7 +292,8 @@
   $('sr-zoom').innerHTML = `<button type="button" class="s-ib" id="sr-zo" aria-label="Zoom out" title="Zoom out (−)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg></button><output id="sr-zv">100%</output>
     <button type="button" class="s-ib" id="sr-zi" aria-label="Zoom in" title="Zoom in (+)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
     <button type="button" class="s-ib" id="sr-zf" aria-label="Fit everything" title="Fit everything (Shift+1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button><span class="s-sep"></span>
-    <button type="button" class="s-ib" id="sr-undo" aria-label="Undo" title="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3"/></svg></button>`;
+    <button type="button" class="s-ib" id="sr-undo" aria-label="Undo" title="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3"/></svg></button><span class="s-sep"></span>
+    <button type="button" class="sr-exp" id="sr-exp" title="Save a sharp PNG: the selected picture or trade at full quality, or the whole board when nothing is selected"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Export</span></button>`;
   const vc = () => { const r = vp.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
   $('sr-zi').onclick = () => zoomAt(...vc(), V.z * 1.2); $('sr-zo').onclick = () => zoomAt(...vc(), V.z / 1.2); $('sr-zf').onclick = fit; $('sr-undo').onclick = undo;
   function delSel() { if (!S.sel) return; const o = items.find((q) => q.id === S.sel);
@@ -279,9 +313,9 @@
   /* ---------- screenshots: choose, paste or drop; shrunk to a JPEG and kept with the board ---------- */
   function addPic(f, at) { if (!f || !/^image\//.test(f.type)) return toast('That is not a picture. Use a PNG or JPG screenshot.');
     if (D.shots.used >= D.shots.cap) return toast(`You have used all ${D.shots.cap} screenshots. Delete old ones to add more.`);
-    const im = new Image(); im.onload = () => { const s = Math.min(1, 1600 / im.width, 1000 / im.height), c = document.createElement('canvas'); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
+    const im = new Image(); im.onload = () => { const s = Math.min(1, 2560 / im.width, 1600 / im.height), c = document.createElement('canvas'); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
       const q = (k) => new Promise((ok) => c.toBlob(ok, 'image/jpeg', k)), name = (f.name && !/^image\.\w+$/.test(f.name) ? f.name.replace(/\.\w+$/, '') : 'Screenshot').slice(0, 30); toast('Saving the screenshot…');
-      q(0.82).then((b) => (b && b.size > 650000 ? q(0.6) : b)).then((b) => api('/journal/study/board/' + BOARD.id + '/shot?name=' + encodeURIComponent(name), b, true))
+      q(0.88).then((b) => (b && b.size > 1200000 ? q(0.8) : b)).then((b) => (b && b.size > 1800000 ? q(0.7) : b)).then((b) => api('/journal/study/board/' + BOARD.id + '/shot?name=' + encodeURIComponent(name), b, true))
         .then((j) => { D.shots.used = j.used; snap(); const [x, y] = at || center(), w = 420; const o = { id: uid(), type: 'shot', sid: j.id, name, x: Math.round(x - w / 2), y: Math.round(y - w * c.height / c.width / 2), w }; items.push(o); S.sel = o.id; renderItems(); changed(); drawer(); toast(`Saved. ${D.shots.used} of ${D.shots.cap} screenshots used.`); })
         .catch((er) => toast(er.message)); };
     im.onerror = () => toast('Could not read that picture.'); im.src = URL.createObjectURL(f); }
@@ -305,7 +339,7 @@
       <label class="s-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="sr-q" placeholder="Search symbol or setup" aria-label="Search trades" value="${esc(F.q)}"></label>
       <div class="s-chips">${[['todo', 'To study'], ['done', 'Studied'], ['all', 'All']].map(([k, n]) => `<button type="button" class="s-chip" data-st="${k}" aria-pressed="${F.st === k}">${n}</button>`).join('')}<span class="gap"></span>${[['all', 'All'], ['win', 'Wins'], ['loss', 'Losses']].map(([k, n]) => `<button type="button" class="s-chip" data-res="${k}" aria-pressed="${F.res === k}">${n}</button>`).join('')}</div></header>
       <div class="s-list" id="sr-list"></div>
-      <footer>Drag a trade onto the board, or click it. <span>${D.shots.used} of ${D.shots.cap} screenshots used</span></footer>`;
+      <footer>Click a trade to open it in its own tab. Drag it onto the board to compare. <span>${D.shots.used} of ${D.shots.cap} screenshots used</span></footer>`;
     el.querySelectorAll('[data-a]').forEach((b) => (b.onclick = () => { F.acct = b.dataset.a; store.set('srAcct', F.acct); el.querySelectorAll('[data-a]').forEach((x) => x.setAttribute('aria-pressed', x === b)); load(); }));
     el.querySelectorAll('[data-st]').forEach((b) => (b.onclick = () => { F.st = b.dataset.st; el.querySelectorAll('[data-st]').forEach((x) => x.setAttribute('aria-pressed', x === b)); load(); }));
     el.querySelectorAll('[data-res]').forEach((b) => (b.onclick = () => { F.res = b.dataset.res; el.querySelectorAll('[data-res]').forEach((x) => x.setAttribute('aria-pressed', x === b)); load(); }));
@@ -317,13 +351,13 @@
       .then((j) => { rows = append ? rows.concat(j.rows) : j.rows; more = j.more; total = j.total; F.off = rows.length; list(); }).catch(() => { const l = $('sr-list'); if (l) l.innerHTML = '<p class="s-empty">Could not load your trades. Check your connection.</p>'; }); }
   function list() { const l = $('sr-list'); if (!l) return;
     if (!rows.length) { l.innerHTML = `<p class="s-empty">${(D.accts || []).length ? 'No trades match. Try another account or filter.' : 'Your trades show up here once the Journal EA records them.'}</p>`; return; }
-    const on = new Set(items.filter((o) => o.type === 'trade').map((o) => o.tid)); let html = `<div class="s-cnt">${total.toLocaleString('en-US')} trade${total === 1 ? '' : 's'}</div>`, day = '';
+    const on = new Set(items.filter((o) => o.type === 'trade').map((o) => o.tid)), tabbed = new Set(TABS.map((t) => t.trade)); let html = `<div class="s-cnt">${total.toLocaleString('en-US')} trade${total === 1 ? '' : 's'}</div>`, day = '';
     rows.forEach((t) => { const dy = fLong(t.close); if (dy !== day) { day = dy; html += `<div class="s-day">${dy}</div>`; }
-      html += `<div class="s-tr${t.done ? ' done' : ''}${on.has(t.id) ? ' on-board' : ''}" draggable="true" data-id="${t.id}" tabindex="0" role="button"><b><span class="dot"></span>${esc(t.symbol)} <span class="s-side">${esc(String(t.side).toLowerCase())}</span></b><span class="v ${(t.r || t.net) < 0 ? 'neg' : 'pos'}">${t.r ? R(t.r) : money(t.net)}</span><small>${fTime(t.close)} · ${esc(t.setup || (F.acct ? 'No setup yet' : acctName(t.acct)))}</small><small class="s-r">${money(t.net)}</small></div>`; });
+      html += `<div class="s-tr${t.done ? ' done' : ''}${on.has(t.id) ? ' on-board' : ''}${tabbed.has(t.id) ? ' on-tab' : ''}" draggable="true" data-id="${t.id}" tabindex="0" role="button" title="Click to open in its own tab. Drag onto the board to compare."><b><span class="dot"></span>${esc(t.symbol)} <span class="s-side">${esc(String(t.side).toLowerCase())}</span></b><span class="v ${(t.r || t.net) < 0 ? 'neg' : 'pos'}">${t.r ? R(t.r) : money(t.net)}</span><small>${fTime(t.close)} · ${esc(t.setup || (F.acct ? 'No setup yet' : acctName(t.acct)))}</small><small class="s-r">${money(t.net)}</small></div>`; });
     if (more) html += '<button type="button" class="s-more" id="sr-more">Show more</button>';
     l.innerHTML = html;
     l.querySelectorAll('.s-tr').forEach((r) => { r.ondragstart = (e) => { e.dataTransfer.setData('text/x-trade', r.dataset.id); e.dataTransfer.effectAllowed = 'copy'; };
-      const go = () => { const [x, y] = center(); dropTrade(+r.dataset.id, x - 300, y - 180); }; r.onclick = go; r.onkeydown = (k) => { if (k.key === 'Enter') go(); }; });
+      r.onclick = (e) => openTrade(+r.dataset.id, e); r.onauxclick = (e) => { if (e.button === 1) openTrade(+r.dataset.id, e); }; r.onkeydown = (k) => { if (k.key === 'Enter') openTrade(+r.dataset.id, k); }; });
     if ($('sr-more')) $('sr-more').onclick = () => load(true); }
   function dropTrade(id, x, y) { const has = items.find((o) => o.type === 'trade' && o.tid === id); if (has) { S.sel = has.id; renderAll(); return toast('That trade is already on this board.'); }
     snap(); const o = { id: uid(), type: 'trade', tid: id, x: Math.round(x), y: Math.round(y), w: 600 }; items.push(o); S.sel = o.id; renderAll(); changed(); list(); }
@@ -399,11 +433,68 @@
   }
   function refreshFrame(o) { const n = world.querySelector(`.s-it[data-id="${o.id}"]`); if (n) tradeFrame(n, o); }
 
+  /* ---------- export: a sharp PNG to share (selected item at its full size, or the whole board) ---------- */
+  function exportPng() {
+    const sel = items.find((o) => o.id === S.sel), list = sel ? [sel] : items.slice();
+    if (!list.length && !shapes.length) return toast('Nothing on this board to export yet.');
+    const box = [1e9, 1e9, -1e9, -1e9], grow = (x0, y0, x1, y1) => { box[0] = Math.min(box[0], x0); box[1] = Math.min(box[1], y0); box[2] = Math.max(box[2], x1); box[3] = Math.max(box[3], y1); };
+    const hOf = (o) => { const n = world.querySelector(`.s-it[data-id="${o.id}"]`); return n ? n.offsetHeight : 200; };
+    list.forEach((o) => grow(o.x, o.y, o.x + o.w, o.y + hOf(o)));
+    const bb = (sh) => { const pts = sh.type === 'pen' ? (sh.pts || []) : sh.type === 'line' || sh.type === 'arrow' ? [[sh.x1, sh.y1], [sh.x2, sh.y2]] : [[sh.x, sh.y], [sh.x + sh.w, sh.y + sh.h]];
+      const xs = pts.map((p) => p[0] + (+sh.dx || 0)), ys = pts.map((p) => p[1] + (+sh.dy || 0)); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; };
+    // marks drawn on the selected item come with it; with nothing selected, every mark
+    const inks = shapes.filter((sh) => { const b = bb(sh); return !sel || (b[2] > box[0] && b[0] < box[2] && b[3] > box[1] && b[1] < box[3]); });
+    if (!sel) inks.forEach((sh) => { const b = bb(sh), m = (+sh.width || 3) * 3 + 20; grow(b[0] - m, b[1] - m, b[2] + m, b[3] + m); });
+    const pad = sel ? 0 : 40, W = box[2] - box[0] + pad * 2, Hh = box[3] - box[1] + pad * 2;
+    // scale: a picture exports at its own uploaded size (never blown up past it); the whole board at up to 3x
+    let want = 2; list.forEach((o) => { const im = o.type === 'shot' && world.querySelector(`.s-it[data-id="${o.id}"] img`); if (im && im.naturalWidth) want = Math.max(want, im.naturalWidth / (o.w - 2)); });
+    const k = Math.max(1, Math.min(want, sel ? 8 : 3, 12000 / Math.max(W, Hh), Math.sqrt((sel ? 16e6 : 20e6) / (W * Hh))));
+    const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(Hh * k);
+    const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.fillStyle = '#08080a'; g.fillRect(0, 0, c.width, c.height);
+    g.scale(k, k); g.translate(pad - box[0], pad - box[1]);
+    const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+    const hand = '"Architects Daughter", Caveat, cursive';
+    const wrap = (txt, x, y, maxW, lh) => { String(txt || '').split('\n').forEach((para) => { let line = ''; para.split(' ').forEach((w) => { const t = line ? line + ' ' + w : w; if (g.measureText(t).width > maxW && line) { g.fillText(line, x, y); y += lh; line = w; } else line = t; }); g.fillText(line, x, y); y += lh; }); };
+    list.forEach((o) => { const n = world.querySelector(`.s-it[data-id="${o.id}"]`); if (!n) return; const h = n.offsetHeight, x = o.x, y = o.y;
+      g.save();
+      if (o.type === 'trade' || o.type === 'shot') {
+        rr(x, y, o.w, h, 12); g.fillStyle = '#0c0c0f'; g.fill(); g.clip();
+        const fh = n.querySelector('.s-fh'), media = n.querySelector('canvas, img');
+        if (fh) { g.fillStyle = '#f2f2f4'; g.font = o.type === 'shot' ? '600 12.5px Manrope, sans-serif' : '600 14px Sora, Manrope, sans-serif'; g.textBaseline = 'middle';
+          const tb = fh.querySelector('b'); g.fillText(tb ? tb.textContent : '', x + 14, y + fh.offsetHeight / 2);
+          const r = fh.querySelector('.s-r'); if (r) { g.font = '700 16px Sora, sans-serif'; g.fillStyle = r.classList.contains('neg') ? '#f0464b' : '#26c6a0'; g.textAlign = 'right'; g.fillText(r.textContent, x + o.w - 14, y + fh.offsetHeight / 2); g.textAlign = 'left'; }
+          g.fillStyle = '#18181d'; g.fillRect(x, y + fh.offsetHeight - 1, o.w, 1); }
+        if (media) { const my = y + media.offsetTop, mh = media.offsetHeight;
+          if (o.type === 'trade' && TD[o.tid]) g.drawImage(realChart(TD[o.tid], Math.round(o.w * k), Math.round(mh * k)), x, my, o.w, mh);
+          else if (media.tagName === 'IMG' && media.complete && media.naturalWidth) g.drawImage(media, x, my, o.w, mh);
+          else if (media.tagName === 'CANVAS') g.drawImage(media, x, my, o.w, mh);
+          const ff = n.querySelector('.s-ff'); if (ff) { g.fillStyle = '#c9c9d0'; g.font = '11.5px Manrope, sans-serif'; g.textBaseline = 'middle'; g.fillText([...ff.children].map((e) => e.textContent).join('  ·  '), x + 14, my + mh + (h - (media.offsetTop + mh)) / 2); } }
+        g.restore(); g.save(); rr(x + 0.5, y + 0.5, o.w - 1, h - 1, 12); g.strokeStyle = '#1f1f24'; g.lineWidth = 1; g.stroke();
+      } else if (o.type === 'note') {
+        g.translate(x + o.w / 2, y + h / 2); g.rotate((o.rot || -1) * Math.PI / 180); g.translate(-o.w / 2, -h / 2);
+        rr(0, 0, o.w, h, 6); g.fillStyle = o.orange ? '#ff5a1f' : '#f2f2f4'; g.fill(); g.fillStyle = o.orange ? '#160600' : '#111'; g.font = '22px ' + hand; g.textBaseline = 'top'; wrap(o.text, 16, 14, o.w - 32, 27.5);
+      } else if (o.type === 'text') {
+        g.fillStyle = COLOK.test(o.color) ? o.color : '#f2f2f4'; g.font = '34px ' + hand; g.textBaseline = 'top'; wrap(o.text, x, y, o.w, 39);
+      } else if (o.type === 'setup') {
+        rr(x, y, o.w, h, 14); g.fillStyle = '#101013'; g.fill(); g.fillStyle = '#f2f2f4'; g.font = '600 22px Sora, sans-serif'; g.textBaseline = 'top'; const h3 = n.querySelector('h3'); g.fillText(h3 ? h3.textContent : 'Setup', x + 20, y + 40);
+        const cv = n.querySelector('canvas'); if (cv) g.drawImage(cv, x + cv.offsetLeft, y + cv.offsetTop, cv.offsetWidth, cv.offsetHeight);
+      }
+      g.restore(); });
+    inks.forEach((sh) => { const col = COLOK.test(sh.color) ? sh.color : '#ffffff', w = Math.min(12, Math.max(1, +sh.width || 3));
+      g.save(); g.translate(+sh.dx || 0, +sh.dy || 0); g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round'; if (sh.dash) g.setLineDash([w * 3, w * 3]);
+      paths(sh).forEach((d) => g.stroke(new Path2D(d))); g.restore(); });
+    const nm = (sel && sel.type === 'shot' ? sel.name : sel && sel.type === 'trade' && TD[sel.tid] ? TD[sel.tid].symbol + '-' + TD[sel.tid].side : BOARD.name) || 'study';
+    c.toBlob((b) => { if (!b) return toast('Could not make the picture. Try a smaller part of the board.');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'study-' + String(nm).replace(/\W+/g, '-').toLowerCase().replace(/^-|-$/g, '') + '.png'; a.setAttribute('data-no-swap', ''); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      toast(`Saved a ${c.width} × ${c.height} PNG.`); }, 'image/png'); }
+  $('sr-exp').onclick = () => document.fonts.ready.then(exportPng);
+
   /* ---------- boot ---------- */
   // a setup board always has its setup card
   if (isSetupBoard && !items.some((o) => o.type === 'setup')) items.unshift({ id: uid(), type: 'setup', setup: BOARD.setup, x: -560, y: 0, w: 480 });
-  $('sr-hint').textContent = items.length ? 'Scroll to move around · Ctrl + scroll to zoom · Shift + drag a frame to resize it' : 'Empty board. Drag trades here from the right, paste a screenshot, or draw anywhere.';
-  setTool('select'); drawer(); load(); renderAll(); apply();
+  $('sr-hint').textContent = items.length ? 'Scroll to move around · Ctrl + scroll to zoom · Shift + drag a frame to resize it' : 'Empty board. Drag trades here from the right (a click opens a trade in its own tab), paste a screenshot, or draw anywhere.';
+  if (BOARD.trade) { const o = items.find((q) => q.type === 'trade' && q.tid === BOARD.trade); if (o) S.sel = o.id; }
+  setTool('select'); renderTabs(); drawer(); load(); renderAll(); apply();
   if (!BD.view) requestAnimationFrame(fit);
   Promise.all(['Architects Daughter', 'Caveat'].map((f) => document.fonts.load(`30px "${f}"`).catch(() => {}))).then(() => renderItems());
 })();
