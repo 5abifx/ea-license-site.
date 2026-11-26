@@ -106,3 +106,78 @@
 .mx-lower { align-items: start; }
 .mx-box .th-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; }
 .mx-box .th-pic svg { height: 56px; }
+
+/* journal key + downloads by platform (MT5 / NinjaTrader 8 / Quantower) */
+.pf-logo { width: 34px; height: 34px; border-radius: 10px; display: inline-grid; place-items: center; flex: none; overflow: hidden; }
+.pf-logo img { width: 100%; height: 100%; display: block; }
+.pf-logo.pf-nt8 { background: #141416; padding: 7px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+.pf-logo.pf-qt { background: #111a2e; padding: 6px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+.pf-logo.lg { width: 52px; height: 52px; border-radius: 14px; }
+.pf-logo.lg.pf-nt8 { padding: 11px; } .pf-logo.lg.pf-qt { padding: 9px; }
+.pf-logo.xs { width: 18px; height: 18px; border-radius: 5px; padding: 0; }
+.pf-logo.xs.pf-nt8 { padding: 3px; } .pf-logo.xs.pf-qt { padding: 2px; }
+.mx-plats { display: inline-flex; align-items: center; gap: 4px; }
+.mx-plats .pf-logo:last-of-type { margin-right: 4px; }
+
+.mx-key { padding: 20px 22px; margin: 0 0 22px; display: grid; gap: 14px; }
+.mx-key-t { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: start; }
+.mx-key-t .ea-ico { width: 44px; height: 44px; border-radius: 14px; background: rgba(47,211,180,.12); color: var(--ok); display: grid; place-items: center; }
+.mx-key-t .ea-ico svg { width: 22px; height: 22px; }
+.mx-key h2 { font: 700 18px "Sora", sans-serif; letter-spacing: -.02em; margin: 0 0 2px; }
+.mx-key p { margin: 0; color: #c9c9d1; font-size: 14px; }
+.mx-key-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.mx-key .keybox { display: flex; gap: 8px; align-items: center; flex: 1 1 420px; min-width: 0; max-width: 640px; flex-wrap: wrap;
+  background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 6px 6px 6px 14px; }
+.mx-key .keybox code { flex: 1 1 200px; min-width: 0; font: 500 14px ui-monospace, Menlo, monospace; color: #f2f2f4; background: none; border: 0; padding: 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+body.private .mx-key-row .priv-mask { display: inline; }
+
+.mx-pf { margin: 0 0 22px; display: grid; gap: 12px; }
+.pf-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 6px; border-radius: 18px; }
+.pf-tab { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 13px; background: none; border: 1px solid transparent; color: #8a8a94; text-align: left;
+  font: 500 14px "Manrope", system-ui, sans-serif; text-transform: none; letter-spacing: 0; box-shadow: none; cursor: pointer; min-width: 0; width: 100%; }
+.pf-tab:hover { background: rgba(255,255,255,.04); color: #f2f2f4; }
+.pf-tab.on { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.12); color: #f2f2f4; }
+.pf-tab > span:last-child { min-width: 0; }
+.pf-tab b { display: block; font: 600 15px "Sora", sans-serif; color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-tab small { display: block; font-size: 12px; color: #6a6a74; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-tab.on small { color: #8a8a94; }
+.pf-tab:not(.on) .pf-logo { filter: grayscale(.6); opacity: .7; }
+.pf-panel[hidden] { display: none; }
+.pf-panel > * + * { margin-top: 14px; }
+.mx-tipline { margin: 0; }
+
+.pf-card { padding: 24px; display: grid; gap: 18px; overflow: hidden; }
+.pf-card::before { content: ""; position: absolute; top: -90px; right: -80px; width: 240px; height: 240px; border-radius: 50%; background: var(--glow); filter: blur(60px); opacity: .22; pointer-events: none; }
+.pf-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: start; }
+.pf-head h3 { font: 700 22px "Sora", sans-serif; letter-spacing: -.02em; margin: 2px 0 4px; text-transform: none; }
+.pf-head p { margin: 0; color: #c9c9d1; max-width: 62ch; font-size: 14px; }
+.pf-head .tag { white-space: nowrap; }
+.mx-soon { font-size: 13px; color: #ffb07a; padding: 8px 14px; border-radius: 99px; background: rgba(255,90,31,.1); border: 1px solid rgba(255,90,31,.25); }
+.pf-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 10px; }
+.pf-steps li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 14px; border-radius: 14px; background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.06); }
+.pf-steps i { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 600 13px "Sora", sans-serif; font-style: normal; background: #fff; color: #000; }
+.pf-steps li > div > b { display: block; font: 600 14px "Sora", sans-serif; margin: 3px 0 4px; }
+.pf-steps p b { color: #f2f2f4; font-weight: 600; }
+.pf-steps p { margin: 0; font-size: 13px; color: #b9b9c2; overflow-wrap: anywhere; }
+.pf-steps code { font-size: 12px; }
+
+.acc-pf { font-size: 11px; color: #8a8a94; border: 1px solid rgba(255,255,255,.12); border-radius: 99px; padding: 1px 8px; margin-left: 8px; white-space: nowrap; }
+.acc-how { display: grid; gap: 6px; }
+.acc-how p { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; color: #8a8a94; margin: 0; }
+.acc-how p .pf-logo { margin-top: 1px; }
+.acc-how span:last-child { flex: 1; }
+.mx-help-col { grid-template-columns: 1fr; margin: 0; align-content: start; }
+
+@media (max-width: 900px) {
+  .pf-tabs { gap: 4px; padding: 4px; }
+  .pf-tab { flex-direction: column; gap: 6px; padding: 10px 4px; text-align: center; }
+  .pf-tab b { font-size: 12px; white-space: normal; }
+  .pf-tab small { display: none; }
+  .pf-head { grid-template-columns: auto minmax(0, 1fr); }
+  .pf-head .tag { grid-column: 2; justify-self: start; }
+  .mx-key-t { grid-template-columns: auto minmax(0, 1fr); }
+  .mx-key-t .priv-toggle { grid-column: 2; justify-self: start; }
+  .mx-plats { display: none; }
+  .mx-key .keybox code { flex-basis: 100%; }
+}

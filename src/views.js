@@ -78,7 +78,7 @@ function layout(req, title, body, opts = {}) {
   const signup = process.env.SIGNUP_MODE !== 'closed';
   const link = (href, text) => `<a href="${href}"${req.path === href || req.path.startsWith(href + '/') ? ' class="on"' : ''}>${text}</a>`;
   const nav = u
-    ? `${link('/dashboard', 'My EAs')}
+    ? `${link('/dashboard', 'My Tools')}
        ${req.hasJournal ? link('/journal', 'Journal') : ''}
        ${u.is_admin ? link('/admin', 'Admin') : ''}
        ${u.google_sub ? '' : link('/password', 'Password')}
@@ -188,7 +188,7 @@ function appShell(req, u, flashHtml, body, title) {
 <header class="tb" id="tb">
   <nav class="tb-bar tb-glass" aria-label="Members menu">
     <a class="tb-orb" href="/" aria-label="5ABI.FX home"><img src="/logo.png" alt="" width="30" height="18"></a>
-    ${link('/dashboard', 'eas', 'My EAs', on('/dashboard'))}
+    ${link('/dashboard', 'eas', 'My Tools', on('/dashboard'))}
     ${req.hasJournal ? btn('j', 'journal', 'Journal', on('/journal') && !jOn.study) : ''}
     ${req.hasJournal ? link('/journal/study', 'study', 'Study room', jOn.study) : ''}
     ${btn('a', 'user', 'Account', acctOn)}
@@ -210,13 +210,13 @@ function appShell(req, u, flashHtml, body, title) {
   ${u.is_admin ? `<div class="tb-panel tb-glass tb-p-o" id="tbp-o">${sect('Owner', ownerTiles)}</div>` : ''}
   <div class="tb-panel tb-glass tb-p-m" id="tbp-m">
     ${planPill(u)}
-    ${sect('Trading', `${tile('/dashboard', 'eas', 'My EAs', 'Downloads', on('/dashboard'))}${journalTiles}`)}
+    ${sect('Trading', `${tile('/dashboard', 'eas', 'My Tools', 'Downloads', on('/dashboard'))}${journalTiles}`)}
     ${sect('Account', accountTiles)}${sect('Help', helpTiles)}${sect('Owner', ownerTiles)}
   </div>
   <nav class="tb-dock tb-glass" aria-label="Phone menu">
     ${req.hasJournal ? `${dock('/journal', 'journal', 'Journal', journalOn && !on('/journal/log'))}${dock('/journal/insights', 'insights', 'Insights', jOn.ins)}
     <a class="tb-plus${on('/journal/log') ? ' on' : ''}" href="/journal/log" aria-label="Log a trade"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></a>
-    ${dock('/journal/desk', 'desk', 'Desk', jOn.desk)}` : `${dock('/dashboard', 'eas', 'My EAs', on('/dashboard'))}${dock('/appearance', 'paint', 'Appearance', on('/appearance'))}`}
+    ${dock('/journal/desk', 'desk', 'Desk', jOn.desk)}` : `${dock('/dashboard', 'eas', 'My Tools', on('/dashboard'))}${dock('/appearance', 'paint', 'Appearance', on('/appearance'))}`}
     <button type="button" class="tb-dk" data-tbp="m" aria-expanded="false" aria-controls="tbp-m"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg><span>More</span></button>
   </nav>
   <div class="tb-scrim" data-tb-close></div>

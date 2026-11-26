@@ -11,7 +11,7 @@
   // sel = what to light up (first visible match); path = page it lives on; need = only for members who have it
   var BEGIN = [
     { t: 'Welcome to your desk', p: 'Five quick cards and you know where everything is. Takes under a minute.' },
-    { sel: '.tb-bar a[href="/dashboard"], .tb-dock [data-tbp="m"]', path: '/dashboard', t: 'My EAs', p: 'Download KATANA and the Journal EA here, then add your MT5 account number so they unlock on it.' },
+    { sel: '.tb-bar a[href="/dashboard"], .tb-dock [data-tbp="m"]', path: '/dashboard', t: 'My Tools', p: 'Downloads for MT5, NinjaTrader 8 and Quantower, your journal key, and your account numbers or names.' },
     { need: 'j', sel: '.tb-bar [data-tbp="j"], .tb-dock a[href="/journal"]', t: 'Journal', p: 'Every MT5 trade lands here by itself, day by day and account by account. Tap a day to see its trades.' },
     { need: 'j', sel: '.tb-bar [data-tbp="j"], .tb-dock [data-tbp="m"]', t: 'Plan a trade', p: 'Write the plan before you click. We match it to the real trade and show you where you followed it and where you did not.' },
     { need: 'j', sel: '.tb-bar [data-tbp="j"], .tb-dock a[href="/journal/insights"]', t: 'Insights', p: 'Your edge score and the habits that cost you money, each with one line on how to fix it.' },

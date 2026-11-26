@@ -1,8 +1,31 @@
-// My EAs page (/dashboard): one card per tool with what it does, its key features and the MT5 install steps.
+// My Tools page (/dashboard): downloads grouped per trading platform (MT5, NinjaTrader 8, Quantower),
+// each with its own install steps; the journal key every platform's Trade Journal needs; accounts.
 // Tools the member does not have yet still show, locked, with why they need it and where to unlock it.
-// Chart themes get their own section with a colour preview. Accounts show whether an EA checked in lately.
+// Chart themes sit in the MT5 tab with a colour preview. Accounts show whether an EA checked in lately.
+const crypto = require('crypto');
 const { esc, fmtDate } = require('./views');
 const { db } = require('./db');
+
+// platforms the Trade Journal runs on; MT5 also has KATANA, Compass (students) and the chart themes.
+// col = the eas column prefix of that build's upload (Admin > EAs), dl = /download/:id/<dl>
+const PLATFORMS = [
+  { key: 'mt5', name: 'MetaTrader 5', short: 'MT5', logo: '/platforms/mt5.webp', has: 'KATANA · Trade Journal · Chart themes' },
+  { key: 'nt8', name: 'NinjaTrader 8', short: 'NinjaTrader 8', logo: '/platforms/nt8.svg', has: 'Trade Journal', col: 'nt', dl: 'nt8', file: '.zip add-on',
+    steps: [
+      ['Import it', 'In NinjaTrader: <b>Tools → Import → NinjaScript Add-On</b> and pick the .zip you downloaded. No need to unzip it.'],
+      ['Add it to one chart', 'Open any chart, right-click → <b>Indicators</b>, add <b>5ABI Journal</b>. One chart is enough: it logs every account and instrument.'],
+      ['Paste your journal key', 'Paste the key from the top of this page into <b>Journal key</b> and press OK.'],
+      ['Add your account names', 'The panel on the chart lists each account name (e.g. <code>Sim101</code>). Add those names under <a href="#accounts">Your accounts</a> below.'],
+    ] },
+  { key: 'qt', name: 'Quantower', short: 'Quantower', logo: '/platforms/quantower.svg', has: 'Trade Journal', col: 'qt', dl: 'qt', file: '.zip folder',
+    steps: [
+      ['Unzip it into Quantower', 'Unzip the download. Copy the folder <b>5ABI Journal</b> into <code>Quantower\\Settings\\Scripts\\Strategies</code>, then restart Quantower.'],
+      ['Add it in Strategies Manager', 'Open <b>Strategies Manager</b> and add <b>5ABI Journal</b>.'],
+      ['Paste your journal key', 'Paste the key from the top of this page into <b>Journal key</b> and press <b>Start</b>.'],
+      ['Add your account names', 'Its panel lists each account name. Add those names under <a href="#accounts">Your accounts</a> below.'],
+    ] },
+];
+const platLogo = (p, cls = 'pf-logo') => `<span class="${cls} pf-${p.key}"><img src="${p.logo}" alt="" width="28" height="28"></span>`;
 
 // what each tool does; codes match Admin > EAs. Tools not listed here show only when the member has them.
 const TOOLS = {
@@ -18,7 +41,7 @@ const TOOLS = {
     kind: 'Trade journal', glow: 'rgba(47,211,180,.45)', icon: 'journal',
     why: 'Sends every closed trade to your journal with its real chart, so the Desk and Insights can find what costs you money.',
     feats: ['Every trade logged with entry, stop, target and candles', 'Trade replay and share cards come from it', 'Feeds the news calendar on your Desk', 'Light: runs on its own chart next to KATANA'],
-    steps: ['Copy your journal key from the Journal page.', 'Put the file in MQL5 → Experts and refresh the Navigator.',
+    steps: ['Copy your journal key from the top of this page.', 'Put the file in MQL5 → Experts and refresh the Navigator.',
       'Drag it onto any one chart (one chart is enough), paste the key, switch on Algo Trading.', 'Close a trade: it shows in your journal within a minute.'],
     unlock: { href: '/pricing', label: 'See plans' }, extra: { href: '/journal', label: 'Open journal' },
   },
@@ -67,10 +90,10 @@ function setupSteps({ eas, accounts, hasJournal, trades, site }) {
   const T = (ea && TOOLS[ea.code]) || { steps: [] };
   const dl = (e, label) => (e && e.file_path ? `<a class="mx-pill" href="/download/${e.id}">${esc(label)} <span aria-hidden="true">↓</span></a>` : '<span class="muted small">Download coming soon</span>');
   const steps = [
-    { key: 'acc', label: 'Add your MT5 account', short: 'Account', done: accounts.length > 0,
-      sub: accounts.length ? `${esc(accounts[0].account_number)} added` : 'The EAs only run on accounts listed here',
-      body: `<h2>Add your MT5 account number</h2>
-        <p>The EAs only run on account numbers listed here. Find yours in MT5 under <b>File → Login to Trade Account</b>, or at the top of the Navigator window.</p>
+    { key: 'acc', label: 'Add your trading account', short: 'Account', done: accounts.length > 0,
+      sub: accounts.length ? `<span class="priv-real">${esc(accounts[0].account_number)}</span><span class="priv-mask">Account</span> added` : 'The tools only run on accounts listed here',
+      body: `<h2>Add your trading account</h2>
+        <p>The tools only run on accounts listed here. MT5: the number under <b>File → Login to Trade Account</b>. NinjaTrader / Quantower: the account name the 5ABI Journal panel shows (e.g. Sim101).</p>
         <form method="post" action="/accounts" class="mx-inp">
           <input name="account_number" placeholder="MT5 number, e.g. 51234567, or NinjaTrader / Quantower account name" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,39}" required aria-label="Account number or name">
           <input name="label" placeholder="Note (optional), e.g. IC Markets live" maxlength="60" aria-label="Note">
@@ -89,9 +112,10 @@ function setupSteps({ eas, accounts, hasJournal, trades, site }) {
         <p class="mx-tip">This step ticks by itself a minute after the EA checks in from your account.</p>` }] : []),
     ...(hasJournal && jr && jr !== ea ? [{ key: 'jr', label: 'Connect the Trade Journal', short: 'Journal', done: trades > 0, sub: 'Ticks on your first trade',
       body: `<h2>Connect the Trade Journal</h2>
-        <ol class="mx-ol"><li>Copy your journal key from the Journal page.</li><li>Put the file in MQL5 → Experts and refresh the Navigator.</li>
+        <p>On NinjaTrader 8 or Quantower? Use the <a href="#platforms">platform tabs below</a> for their own download and steps.</p>
+        <ol class="mx-ol"><li>Copy your <a href="#key">journal key</a> from this page.</li><li>MT5: put the file in MQL5 → Experts and refresh the Navigator.</li>
           <li>Drag it onto one extra chart (any symbol), paste the key and switch on Algo Trading.</li><li>Close a trade: it shows in your journal within a minute.</li></ol>
-        <div class="mx-act">${dl(jr, 'Download Trade Journal')}<a class="mx-ghost" href="/journal">Get my journal key →</a></div>` }] : []),
+        <div class="mx-act">${dl(jr, 'Download for MT5')}<a class="mx-ghost" href="#key">My journal key →</a></div>` }] : []),
   ];
   steps.push({ key: 'app', label: 'Get the app', short: 'App', opt: true, done: false, sub: 'Optional, phone or PC',
     body: `<h2>Put 5ABI.FX on your home screen</h2>
@@ -100,7 +124,7 @@ function setupSteps({ eas, accounts, hasJournal, trades, site }) {
   return steps;
 }
 
-function html({ u, eas, allEas, accounts, full, student, hasJournal, notices, site, refCard, isStudentOnly }) {
+function html({ u, eas, allEas, accounts, full, student, hasJournal, notices, site, refCard, isStudentOnly, plat }) {
   const owned = new Set(eas.map((e) => e.code));
   // owned tools first, then the known tools they do not have yet (locked)
   const cards = [...eas.map((e) => ({ e, locked: false })),
@@ -142,13 +166,49 @@ function html({ u, eas, allEas, accounts, full, student, hasJournal, notices, si
   const last = accounts.filter((a) => a.last_check_at).sort((a, b) => String(b.last_check_at).localeCompare(String(a.last_check_at)))[0];
   const R = 58, C = +(2 * Math.PI * R).toFixed(1);
 
-  return `<link rel="stylesheet" href="/myeas.css?v=1">
+  // journal key: one key for the Trade Journal on every platform (made on first view)
+  let jkey = '';
+  if (hasJournal) {
+    jkey = u.journal_key || '';
+    if (!jkey) { jkey = crypto.randomBytes(16).toString('hex'); db.prepare('UPDATE users SET journal_key = ? WHERE id = ?').run(jkey, u.id); u.journal_key = jkey; }
+  }
+  const jea = eas.find((e) => e.code === 'JOURNAL') || allEas.find((e) => e.code === 'JOURNAL');
+  // open the tab of the platform this member last journaled from (?p= wins)
+  const lastPlat = hasJournal ? (db.prepare('SELECT platform FROM journal_trades WHERE user_id = ? ORDER BY id DESC LIMIT 1').get(u.id) || {}).platform : '';
+  const pick = PLATFORMS.find((p) => p.key === plat) ? plat : ({ NinjaTrader: 'nt8', Quantower: 'qt' }[lastPlat] || 'mt5');
+  const mt5Cards = cards;
+  const panel = (p) => {
+    if (p.key === 'mt5') return `<div class="ea-cards mx-tools">${mt5Cards.length ? mt5Cards.map(card).join('') : '<p class="muted">No tools are assigned to your account yet.</p>'}</div>
+      <section class="card mx-g mx-box ea-themes">
+        <div class="row between"><h2>Chart themes</h2><span class="muted small">KATANA and Compass match them</span></div>
+        <div class="th-grid">${THEMES.map((t, i) => `<div class="th">
+          <div class="th-pic">${themeSvg(t, 7 + i * 13)}</div>
+          <div class="th-row"><b>${t.name}</b><span><a href="/templates/5ABI.FX%20${t.name}.tpl" download>Download</a>${withCompass ? ` · <a href="/templates/5ABI.FX%20${t.name}%20Compass.tpl" download>with Compass</a>` : ''}</span></div></div>`).join('')}</div>
+        <p class="muted small">Put the file in <strong>MQL5 → Profiles → Templates</strong>, then right-click a chart → <strong>Templates</strong>.</p>
+        ${withCompass ? '<p class="muted small">Auction Compass unlocks by itself while the Trade Journal EA runs on any chart in the same MT5.</p>' : ''}
+      </section>
+      <p class="muted small mx-tipline">Every MT5 tool needs <code>${esc(site)}</code> in <b>Tools → Options → Expert Advisors → Allow WebRequest</b>.
+        Older journal trades missing? In the Trade Journal inputs set <b>On start, also send trades closed in the last N days</b> to <b>365</b>.</p>`;
+    const ready = jea && jea[`${p.col}_file_path`];
+    const cta = !hasJournal ? `<a class="mx-pill" href="/pricing">See plans <span aria-hidden="true">→</span></a><span class="muted small">The Trade Journal comes with the Journal and Pro plans.</span>`
+      : ready ? `<a class="mx-pill" href="/download/${jea.id}/${p.dl}">Download for ${esc(p.short)} <span aria-hidden="true">↓</span></a><span class="muted small">${esc(p.file)}</span>`
+        : '<span class="mx-soon">Download coming soon</span>';
+    return `<article class="mx-g pf-card" style="--glow:rgba(47,211,180,.4)">
+      <div class="pf-head">${platLogo(p, 'pf-logo lg')}<div><span class="mx-k">For ${esc(p.name)}</span><h3>5ABI Journal</h3>
+        <p>Sends every closed trade on every account to your journal: calendar, Desk, Insights and share cards. It never places trades.</p></div>
+        <span class="tag ${hasJournal ? 'ok' : 'lock'}">${hasJournal ? 'Unlocked' : 'Locked'}</span></div>
+      <div class="mx-act">${cta}</div>
+      <ol class="pf-steps">${p.steps.map(([h, b], i) => `<li><i>${i + 1}</i><div><b>${h}</b><p>${b}</p></div></li>`).join('')}</ol>
+    </article>`;
+  };
+
+  return `<link rel="stylesheet" href="/myeas.css">
   <div class="mx-amb" aria-hidden="true"><i></i><i></i><i></i></div>
   <section class="mx-hero">
     <div>
-      <div class="mx-chips"><span class="mx-chip mx-g"><b>${eas.length}</b> of ${cards.length} tools unlocked</span><span class="mx-chip mx-g"><b>${accounts.length}</b> of ${u.max_accounts} MT5 accounts</span></div>
-      <h1>${allDone ? `Welcome back${hi}. <em>${owned.has('KATANA') ? 'KATANA' : 'Your EA'}</em> is on guard.` : `Welcome${hi}. Let's get you <em>protected</em>.`}</h1>
-      <p class="mx-lede">${allDone ? 'Your tools are running. Downloads, accounts and chart themes are all here.' : `${need.length} short steps and your EAs are guarding your MT5 account. It takes about five minutes.`}</p>
+      <div class="mx-chips"><span class="mx-chip mx-g"><b>${eas.length}</b> of ${cards.length} tools unlocked</span><span class="mx-chip mx-g"><b>${accounts.length}</b> of ${u.max_accounts} accounts</span><span class="mx-chip mx-g mx-plats">${PLATFORMS.map((p) => platLogo(p, 'pf-logo xs')).join('')}MT5 · NinjaTrader 8 · Quantower</span></div>
+      <h1>${allDone ? `Welcome back${hi}. <em>${owned.has('KATANA') ? 'KATANA' : 'Your tools'}</em> ${owned.has('KATANA') ? 'is' : 'are'} on guard.` : `Welcome${hi}. Let's get you <em>protected</em>.`}</h1>
+      <p class="mx-lede">${allDone ? 'Your downloads, journal key, accounts and chart themes, for every platform you trade on.' : `${need.length} short steps and your tools are running on your trading account. It takes about five minutes.`}</p>
     </div>
     ${allDone ? '' : `<div class="mx-ring" role="img" aria-label="${doneN} of ${need.length} steps done">
       <svg viewBox="0 0 132 132"><defs><linearGradient id="mxg"><stop offset="0" stop-color="#ff5a1f"/><stop offset="1" stop-color="#ffb07a"/></linearGradient></defs>
@@ -157,49 +217,60 @@ function html({ u, eas, allEas, accounts, full, student, hasJournal, notices, si
       <div><b>${doneN}/${need.length}</b><span>steps done</span></div></div>`}
   </section>
   ${notices}
-  ${allDone ? `<section class="mx-done mx-g"><span class="mx-live"></span><span><b>All set.</b> <span class="muted">${last ? `EA seen ${ago(last.last_check_at)[1]} on ${esc(last.account_number)}` : ''}${hasJournal && trades ? ` · Journal has ${trades} trade${trades === 1 ? '' : 's'}` : ''}</span></span><button type="button" class="mx-ghost" data-open-setup>Setup steps</button></section>` : ''}
+  ${allDone ? `<section class="mx-done mx-g"><span class="mx-live"></span><span><b>All set.</b> <span class="muted">${last ? `EA seen ${ago(last.last_check_at)[1]} on <span class="priv-real">${esc(last.account_number)}</span><span class="priv-mask">your account</span>` : ''}${hasJournal && trades ? ` · Journal has ${trades} trade${trades === 1 ? '' : 's'}` : ''}</span></span><button type="button" class="mx-ghost" data-open-setup>Setup steps</button></section>` : ''}
   <section class="mx-setup mx-g" data-setup${allDone ? ' hidden' : ''} aria-label="Setup steps">
     <div class="mx-steps" role="tablist">${steps.map((s, i) => `<button type="button" role="tab" class="mx-st${s.done ? ' done' : ''}${s.opt ? ' opt' : ''}" data-step="${s.key}"${s.manual ? ' data-manual' : ''}>
       <i>${s.done ? '✓' : s.opt ? '+' : i + 1}</i><div><span class="l">${esc(s.label)}</span><span class="s">${esc(s.short)}</span><small>${s.sub}</small></div></button>`).join('')}</div>
     ${steps.map((s, i) => `<div class="mx-focus" data-panel="${s.key}" hidden><span class="mx-k">${s.opt ? 'Optional' : `Step ${i + 1} of ${need.length}`}${s.done ? ' · Done' : ''}</span>${s.body}</div>`).join('')}
   </section>
 
-  <div class="mx-sec"><h2>Your tools</h2><span>${eas.length} of ${cards.length} unlocked</span></div>
-  ${cards.length ? `<div class="ea-cards mx-tools">${cards.map(card).join('')}</div>` : '<section class="card mx-g"><p class="muted">No EAs are assigned to your account yet.</p></section>'}
+  ${hasJournal ? `<section class="mx-g mx-key" id="key">
+    <div class="mx-key-t"><span class="ea-ico">${icon('journal')}</span><div><h2>Your journal key</h2>
+      <p>One key for the Trade Journal on MT5, NinjaTrader 8 and Quantower. Paste it into the <b>Journal key</b> input. Keep it private.</p></div>
+      <button type="button" class="mx-ghost priv-toggle" aria-pressed="false" title="Hides account numbers and the journal key, so you can screenshot this page">Hide private info</button></div>
+    <div class="mx-key-row">
+      <span class="keybox priv-hide"><code class="block" data-key="${esc(jkey)}">••••••••••••••••••••••••••••••••</code>
+        <button type="button" class="mx-pill sm key-show">Show</button><button type="button" class="mx-pill sm key-copy">Copy</button></span>
+      <span class="priv-mask muted small">Key hidden while private info is hidden.</span>
+      <form method="post" action="/journal/key" class="priv-hide" onsubmit="return confirm('Make a new key? The old key stops working and you must paste the new one into the Trade Journal on every platform.')">
+        <button class="mx-ghost">Make a new key</button></form>
+    </div>
+  </section>` : ''}
+
+  <section class="mx-pf" id="platforms" data-pf="${pick}" aria-label="Downloads by platform">
+    <div class="mx-sec"><h2>Downloads by platform</h2><span>Pick the platform you trade on</span></div>
+    <div class="pf-tabs mx-g" role="tablist">${PLATFORMS.map((p) => `<button type="button" role="tab" class="pf-tab${p.key === pick ? ' on' : ''}" data-pf-tab="${p.key}" aria-selected="${p.key === pick}" aria-controls="pf-${p.key}">
+      ${platLogo(p)}<span><b>${esc(p.name)}</b><small>${esc(p.has)}</small></span></button>`).join('')}</div>
+    ${PLATFORMS.map((p) => `<div class="pf-panel" id="pf-${p.key}" role="tabpanel" data-pf-panel="${p.key}"${p.key === pick ? '' : ' hidden'}>${panel(p)}</div>`).join('')}
+  </section>
 
   <div class="mx-lower">
   <section class="card mx-g mx-box" id="accounts">
-    <div class="row between"><h2>Your MT5 accounts</h2><span class="muted small">${accounts.length} of ${u.max_accounts}</span></div>
-    ${accounts.length ? `<div class="acc-list">${accounts.map((a) => { const [st, txt] = seen(a); return `<div class="acc-row">
-      <span class="acc-n"><i class="acc-dot ${st}" aria-hidden="true"></i><strong>${esc(a.account_number)}</strong>${a.label ? `<span class="muted"> · ${esc(a.label)}</span>` : ''}</span>
-      <span class="muted small">${txt}</span>
-      <form method="post" action="/accounts/${a.id}/delete" onsubmit="return confirm('Remove account ${esc(a.account_number)}? The EA will stop on it.')"><button class="small danger">Remove</button></form></div>`; }).join('')}</div>` : '<p class="muted small">No accounts yet. The EAs only run on account numbers listed here.</p>'}
+    <div class="row between"><h2>Your accounts</h2><span class="muted small">${accounts.length} of ${u.max_accounts}</span></div>
+    ${accounts.length ? `<div class="acc-list">${accounts.map((a) => { const [st, txt] = seen(a); const isName = !/^\d+$/.test(a.account_number); return `<div class="acc-row">
+      <span class="acc-n"><i class="acc-dot ${st}" aria-hidden="true"></i><strong><span class="priv-real">${esc(a.account_number)}</span><span class="priv-mask">${isName ? 'Account' : `Account ••${esc(String(a.account_number).slice(-2))}`}</span></strong><span class="acc-pf">${isName ? 'NT8 / Quantower' : 'MT5'}</span>${a.label ? `<span class="muted priv-real"> · ${esc(a.label)}</span>` : ''}</span>
+      <span class="muted small">${isName ? (a.last_check_at ? txt.replace('EA', 'Journal') : 'Journal not seen yet') : txt}</span>
+      <form method="post" action="/accounts/${a.id}/delete" onsubmit="return confirm('Remove account ${esc(a.account_number)}? The tools will stop on it.')"><button class="small danger">Remove</button></form></div>`; }).join('')}</div>` : '<p class="muted small">No accounts yet. The tools only run on accounts listed here.</p>'}
     ${full ? '<p class="muted small">You have reached the maximum number of accounts. Remove one to add another.</p>' : `
     <form method="post" action="/accounts" class="mx-inp acc-add">
-      <input name="account_number" placeholder="MT5 number or NinjaTrader / Quantower name" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,39}" required aria-label="Account number or name">
+      <input name="account_number" placeholder="MT5 number or NinjaTrader / Quantower name" pattern="[A-Za-z0-9][A-Za-z0-9._\\-]{0,39}" required aria-label="Account number or name">
       <input name="label" placeholder="Note (optional)" maxlength="60" aria-label="Note">
       <button class="mx-pill sm">Add account</button>
     </form>`}
-    <p class="muted small">MT5: the number under File → Login to Trade Account. NinjaTrader / Quantower: the account name exactly as the 5ABI Journal panel shows it (e.g. Sim101).</p>
+    <div class="acc-how">
+      <p>${platLogo(PLATFORMS[0], 'pf-logo xs')}<span><b>MT5:</b> the number under File → Login to Trade Account.</span></p>
+      <p>${platLogo(PLATFORMS[1], 'pf-logo xs')}${platLogo(PLATFORMS[2], 'pf-logo xs')}<span><b>NinjaTrader / Quantower:</b> the account name exactly as the 5ABI Journal panel shows it (e.g. Sim101).</span></p>
+    </div>
   </section>
 
-  <section class="card mx-g mx-box ea-themes">
-    <div class="row between"><h2>Chart themes</h2><span class="muted small">KATANA and Compass match them</span></div>
-    <div class="th-grid">${THEMES.map((t, i) => `<div class="th">
-      <div class="th-pic">${themeSvg(t, 7 + i * 13)}</div>
-      <div class="th-row"><b>${t.name}</b><span><a href="/templates/5ABI.FX%20${t.name}.tpl" download>Download</a>${withCompass ? ` · <a href="/templates/5ABI.FX%20${t.name}%20Compass.tpl" download>with Compass</a>` : ''}</span></div></div>`).join('')}</div>
-    <p class="muted small">Put the file in <strong>MQL5 → Profiles → Templates</strong>, then right-click a chart → <strong>Templates</strong>.</p>
-    ${withCompass ? '<p class="muted small">Auction Compass unlocks by itself while the Trade Journal EA runs on any chart in the same MT5.</p>' : ''}
-  </section>
-  </div>
-
-  <div class="mx-help">
+  <div class="mx-help mx-help-col">
     <a class="mx-g" href="/faq"><b>Help and FAQ</b><span>Install, accounts, billing</span></a>
     <a class="mx-g" href="/help/ea-blocked"><b>EA blocked by my prop firm</b><span>Ready-to-send email for their support</span></a>
     <a class="mx-g" href="/pricing"><b>Plans</b><span>Unlock more tools</span></a>
   </div>
+  </div>
   ${refCard ? `<div class="mx-lower">${refCard}</div>` : ''}
-  <script src="/myeas.js?v=1"></script>`;
+  <script src="/myeas.js"></script>`;
 }
 
-module.exports = { html, TOOLS };
+module.exports = { html, TOOLS, PLATFORMS };

@@ -19,7 +19,7 @@ const tab = (r, t) => r.get('/journal/insights') && (r.q.tab || 'overview') === 
 
 const FEATURES = [
   // EAs
-  { key: 'my-eas', area: 'eas', name: 'My EAs page', page: (r) => r.get('/dashboard') },
+  { key: 'my-eas', area: 'eas', name: 'My Tools page', page: (r) => r.get('/dashboard') },
   { key: 'ea-download', area: 'eas', name: 'Download an EA', page: (r) => r.get(/^\/download\/\d+$/) },
   { key: 'add-account', area: 'eas', name: 'Add an MT5 account', page: (r) => r.post('/accounts') },
   { key: 'copy-site', area: 'eas', name: 'Copy the WebRequest address', click: '[data-copy]' },
