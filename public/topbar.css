@@ -125,3 +125,5 @@
 .tb-bar { view-transition-name: tb-bar; }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .22s; }
 @media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+/* What's new button: orange ring while there is something new (src/whatsnew.js) */
+.tb-round.wn-top.on { color: #ff8a52; box-shadow: inset 0 0 0 1px rgba(255,90,31,.45), 0 0 14px rgba(255,90,31,.22); }

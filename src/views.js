@@ -44,6 +44,7 @@ const ICONS = {
   app: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M12 7v7m0 0l-3-3m3 3l3-3M10 18h4"/>',
   cap: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5M22 9v6"/>',
   star: '<path d="M12 3l2.5 6 6.5.5-5 4 1.5 6.5L12 16l-5.5 4 1.5-6.5-5-4 6.5-.5z"/>',
+  news: '<rect x="3" y="8" width="18" height="5" rx="1"/><path d="M5 13v8h14v-8M12 8v13M12 8C10.5 4 7 3.5 7 6s5 2 5 2 5 .5 5-2-3.5-2-5 2"/>',
   tour: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
   study: '<path d="M4 19V6a2 2 0 012-2h5v15H6a2 2 0 00-2 2zM20 19V6a2 2 0 00-2-2h-5v15h5a2 2 0 012 2z"/>',
   a11y: '<circle cx="12" cy="4.5" r="1.8"/><path d="M5 8.5l7 1.5 7-1.5M12 10v4.5M12 14.5l-3.2 6M12 14.5l3.2 6"/>',
@@ -159,11 +160,12 @@ function appShell(req, u, flashHtml, body, title) {
       ${u.is_admin ? tile('/mentorship', 'cap', 'Mentorship', 'The live programme (hidden from members)', on('/mentorship')) : ''}
       ${tile('/pricing', 'plans', 'Plans', 'Your plan and billing', on('/pricing'))}
       ${tile('/profile', 'user', 'My page', 'Your public trader page', on('/profile'))}
+      <a class="tb-tile" href="#avatar" data-av-open>${cap('user')}<b>Profile picture</b><small>Photo, picture or letter</small></a>
       ${tile('/affiliate', 'gift', 'Affiliate', 'Share and earn', on('/affiliate'))}
       ${u.google_sub ? '' : tile('/password', 'lock', 'Password', 'Change your password', on('/password'))}
       <a class="tb-tile" href="#accessibility" data-a11y-open>${cap('a11y')}<b>Accessibility</b><small>Colour-blind colours, text, cursor</small></a>`;
   const helpTiles = `<a class="tb-tile" href="/?install=1" data-install style="display:none">${cap('app')}<b>Get the app</b><small>Add 5ABI.FX to your phone</small></a>
-      <a class="tb-tile${on('/whats-new') ? ' on' : ''}" href="/whats-new" data-wn-open>${cap('star', wnNew)}<b>What's new</b><small>${wnNew ? `${wnNew} new for you` : 'Latest updates'}</small></a>
+      <a class="tb-tile${on('/whats-new') ? ' on' : ''}" href="/whats-new" data-wn-open>${cap('news', wnNew)}<b>What's new</b><small>${wnNew ? `${wnNew} new for you` : 'Latest updates'}</small></a>
       ${tile('/faq', 'help', 'Help &amp; FAQ', 'Answers and guides', on('/faq'))}
       <a class="tb-tile" href="#tour" data-tour-open>${cap('tour')}<b>Show me around</b><small>A quick tour</small></a>
       <form method="post" action="/logout" class="tb-out"><button class="tb-tile">${cap('out')}<b>Sign out</b></button></form>`;
@@ -172,7 +174,7 @@ function appShell(req, u, flashHtml, body, title) {
       ${tile('/admin/storage', 'desk', 'Storage', 'Disk used per member', on('/admin/storage'))}
       ${tile('/admin', 'shield', 'Admin', 'Members and licences', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/affiliates') && !on('/admin/usage') && !on('/admin/storage') && !on('/admin/whatsnew') && !on('/admin/requests'))}
       ${tile('/admin/eas', 'upload', 'EAs', 'Upload builds', on('/admin/eas'))}
-      ${tile('/admin/whatsnew', 'star', "What's new", 'Post updates', on('/admin/whatsnew'))}
+      ${tile('/admin/whatsnew', 'news', "What's new", 'Automatic, add extras', on('/admin/whatsnew'))}
       ${tile('/admin/requests', 'chat', 'Requests', 'Features members asked for', on('/admin/requests'))}
       ${tile('/admin/affiliates', 'gift', 'Affiliates', 'Partners and payouts', on('/admin/affiliates'))}
       ${tile('/mentor', 'cap', 'Mentor', 'Student questions', on('/mentor'), req.mentorWaiting)}` : '';
@@ -196,14 +198,14 @@ function appShell(req, u, flashHtml, body, title) {
   </nav>
   <div class="tb-side tb-glass">
     ${planPill(u)}
-    <a class="tb-round wn-top${wnNew ? ' on' : ''}" href="/whats-new" data-wn-open aria-label="What's new" title="What's new">${icon('star')}${wnDot}</a>
-    <span class="tb-av" title="Signed in">${esc(((u.name || u.email || 'M').trim()[0] || 'M').toUpperCase())}</span>
+    <a class="tb-round wn-top${wnNew ? ' on' : ''}" href="/whats-new" data-wn-open aria-label="What's new" title="What's new">${icon('news')}${wnDot}</a>
+    <button type="button" class="tb-av" data-letter="${esc(((u.name || u.email || 'M').trim()[0] || 'M').toUpperCase())}" data-av-open aria-label="Change your profile picture" title="Profile picture">${require('./avatar').inner(u)}</button>
   </div>
   <div class="tb-m tb-glass">
     <a class="tb-orb" href="/" aria-label="5ABI.FX home"><img src="/logo.png" alt="" width="30" height="18"></a>
     <b class="tb-title">${esc(title)}</b>
-    <a class="tb-round wn-top${wnNew ? ' on' : ''}" href="/whats-new" data-wn-open aria-label="What's new">${icon('star')}${wnDot}</a>
-    <button type="button" class="tb-av tb-avb" data-tbp="m" aria-expanded="false" aria-controls="tbp-m" aria-label="Menu">${esc(((u.name || u.email || 'M').trim()[0] || 'M').toUpperCase())}</button>
+    <a class="tb-round wn-top${wnNew ? ' on' : ''}" href="/whats-new" data-wn-open aria-label="What's new">${icon('news')}${wnDot}</a>
+    <button type="button" class="tb-av tb-avb" data-letter="${esc(((u.name || u.email || 'M').trim()[0] || 'M').toUpperCase())}" data-tbp="m" aria-expanded="false" aria-controls="tbp-m" aria-label="Menu">${require('./avatar').inner(u)}</button>
   </div>
   ${req.hasJournal ? `<div class="tb-panel tb-glass tb-p-j" id="tbp-j"><div class="tb-grid">${journalTiles}</div></div>` : ''}
   <div class="tb-panel tb-glass tb-p-a" id="tbp-a">${sect('Account', accountTiles)}${sect('Help', helpTiles)}</div>
@@ -231,7 +233,8 @@ function appShell(req, u, flashHtml, body, title) {
 <script src="/privacy.js"></script>
 ${require('./features').clientTag()}
 ${require('./tour').script(req, u)}
-${require('./whatsnew').script(req, u)}`;
+${require('./whatsnew').script(req, u)}
+<link rel="stylesheet" href="/avatar.css"><script src="/avatar.js" defer></script>`;
 }
 
 // split sign-in / sign-up screen: brand pitch on the left, the form on the right
