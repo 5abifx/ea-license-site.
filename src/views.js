@@ -160,6 +160,7 @@ function appShell(req, u, flashHtml, body, title) {
       ${u.is_admin ? tile('/mentorship', 'cap', 'Mentorship', 'The live programme (hidden from members)', on('/mentorship')) : ''}
       ${tile('/pricing', 'plans', 'Plans', 'Your plan and billing', on('/pricing'))}
       ${tile('/profile', 'user', 'My page', 'Your public trader page', on('/profile'))}
+      <a class="tb-tile" href="#avatar" data-av-open>${cap('user')}<b>Profile picture</b><small>Photo, picture or letter</small></a>
       ${tile('/affiliate', 'gift', 'Affiliate', 'Share and earn', on('/affiliate'))}
       ${u.google_sub ? '' : tile('/password', 'lock', 'Password', 'Change your password', on('/password'))}
       <a class="tb-tile" href="#accessibility" data-a11y-open>${cap('a11y')}<b>Accessibility</b><small>Colour-blind colours, text, cursor</small></a>`;
@@ -198,13 +199,13 @@ function appShell(req, u, flashHtml, body, title) {
   <div class="tb-side tb-glass">
     ${planPill(u)}
     <a class="tb-round wn-top${wnNew ? ' on' : ''}" href="/whats-new" data-wn-open aria-label="What's new" title="What's new">${icon('news')}${wnDot}</a>
-    <span class="tb-av" title="Signed in">${esc(((u.name || u.email || 'M').trim()[0] || 'M').toUpperCase())}</span>
+    <button type="button" class="tb-av" data-letter="${esc(((u.name || u.email || 'M').trim()[0] || 'M').toUpperCase())}" data-av-open aria-label="Change your profile picture" title="Profile picture">${require('./avatar').inner(u)}</button>
   </div>
   <div class="tb-m tb-glass">
     <a class="tb-orb" href="/" aria-label="5ABI.FX home"><img src="/logo.png" alt="" width="30" height="18"></a>
     <b class="tb-title">${esc(title)}</b>
     <a class="tb-round wn-top${wnNew ? ' on' : ''}" href="/whats-new" data-wn-open aria-label="What's new">${icon('news')}${wnDot}</a>
-    <button type="button" class="tb-av tb-avb" data-tbp="m" aria-expanded="false" aria-controls="tbp-m" aria-label="Menu">${esc(((u.name || u.email || 'M').trim()[0] || 'M').toUpperCase())}</button>
+    <button type="button" class="tb-av tb-avb" data-letter="${esc(((u.name || u.email || 'M').trim()[0] || 'M').toUpperCase())}" data-tbp="m" aria-expanded="false" aria-controls="tbp-m" aria-label="Menu">${require('./avatar').inner(u)}</button>
   </div>
   ${req.hasJournal ? `<div class="tb-panel tb-glass tb-p-j" id="tbp-j"><div class="tb-grid">${journalTiles}</div></div>` : ''}
   <div class="tb-panel tb-glass tb-p-a" id="tbp-a">${sect('Account', accountTiles)}${sect('Help', helpTiles)}</div>
@@ -232,7 +233,8 @@ function appShell(req, u, flashHtml, body, title) {
 <script src="/privacy.js"></script>
 ${require('./features').clientTag()}
 ${require('./tour').script(req, u)}
-${require('./whatsnew').script(req, u)}`;
+${require('./whatsnew').script(req, u)}
+<link rel="stylesheet" href="/avatar.css"><script src="/avatar.js" defer></script>`;
 }
 
 // split sign-in / sign-up screen: brand pitch on the left, the form on the right

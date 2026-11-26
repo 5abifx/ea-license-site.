@@ -991,6 +991,11 @@ function client(base, ip) {
       assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM whatsnew WHERE note_id IS NOT NULL AND published_at IS NOT NULL').get().n, notes.length);
       notes.forEach((n) => { assert.ok(n.line.length <= 50 && n.name.length <= 30, 'What\'s new line too long: ' + n.id); assert.ok(n.audience === 'students' || !/compass/i.test(n.name + n.line), 'Compass is students only: ' + n.id); });
       assert.match((await wes.get('/dashboard')).text, /id="wn-data"/);
+      // profile picture: a site picture, an upload, back to the letter
+      assert.ok((await wes.post('/api/avatar', { pick: 'katana' })).text.includes('/look/katana.jpg'));
+      assert.match((await wes.get('/dashboard')).text, /class="av-img" src="\/look\/katana\.jpg"/);
+      await wes.post('/api/avatar', { pick: 'nope' });
+      assert.strictEqual(db.prepare("SELECT avatar FROM users WHERE email = 'wes@test.com'").get().avatar, '');
       db.prepare("UPDATE users SET whatsnew_seen = datetime('now', '-1 second') WHERE email = 'wes@test.com'").run();   // seen them (a second ago, so the next publish counts as newer)
       assert.doesNotMatch((await wes.get('/dashboard')).text, /id="wn-data"/);   // drafts are not shown
       await admin.post('/admin/whatsnew/publish');

@@ -4,5 +4,6 @@
   { "id": "2026-11-26-study-export", "name": "Sharper screenshots", "line": "Crisp pictures, and Export saves a PNG", "link": "/journal/study", "icon": "export" },
   { "id": "2026-11-26-journal-open", "name": "Faster journal", "line": "Opens with your month's P&L, then you're in", "link": "/journal", "icon": "chart" },
   { "id": "2026-11-26-smooth-pages", "name": "Smoother pages", "line": "Pages switch and save without a reload", "icon": "bolt" },
-  { "id": "2026-11-26-partials", "name": "Partial closes", "line": "Trades show after a partial (Journal EA 1.34)", "link": "/journal", "icon": "split" }
+  { "id": "2026-11-26-partials", "name": "Partial closes", "line": "Trades show after a partial (Journal EA 1.34)", "link": "/journal", "icon": "split" },
+  { "id": "2026-11-26-profile-picture", "name": "Profile picture", "line": "Tap your circle: add a photo or pick a picture", "icon": "user" }
 ]
