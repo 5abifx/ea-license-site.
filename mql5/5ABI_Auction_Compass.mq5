@@ -8,7 +8,7 @@
 //|  MT5 (indicators cannot reach the website themselves).          |
 //+------------------------------------------------------------------+
 #property copyright   "5ABI FX"
-#property version     "1.23"
+#property version     "1.24"
 #property description "5ABI FX · Auction Compass"
 #property indicator_chart_window
 #property indicator_buffers 0
@@ -142,16 +142,23 @@ bool LicCheck()
    return age > -600 && age < LIC_GRACE_H * 3600.0;
   }
 
+string g_lockKey = "";              // chart size the lock card was drawn for
+
 void LicLockScreen()
   {
-   ObjectsDeleteAll(0, PFX);
    int W = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
    int H = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
+   // already showing at this size: leave it alone (redrawing it every check made it flicker)
+   string key = IntegerToString(W) + "x" + IntegerToString(H);
+   if(key == g_lockKey && ObjectFind(0, PFX + "lockbg") >= 0)
+      return;
+   g_lockKey = key;
+   ObjectsDeleteAll(0, PFX);
    // MT5 cuts a label after 63 characters, so every line stays short
    string t[4];
    t[0] = "◆ " + InpBrand + " · Auction Compass is locked";
    t[1] = "Account " + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + " is not unlocked yet";
-   t[2] = "Add it on your dashboard at " + LIC_SERVER + " (paid plan)";
+   t[2] = "Unlock it on your dashboard at " + LIC_SERVER;
    t[3] = "and keep the Trade Journal EA running in this MT5";
    // a card behind the text, so it reads on dark and light charts and over candles
    int fs = InpFontSize + 1, lh = fs * 3, cw = IMin(W - 20, fs * 62), ch = lh * 4 + fs * 2;
@@ -199,6 +206,7 @@ bool LicOk()
       else if(!was)
         {
          ObjectsDeleteAll(0, PFX + "lock");
+         g_lockKey = "";
          g_licFresh = true;
         }
      }
@@ -234,6 +242,7 @@ int      g_tn = 0;
 double   g_nk[];         // naked POC prices
 datetime g_day = 0, g_lastData = 0, g_lastEval = 0;
 bool     g_needFull = true;
+datetime g_fullRetry = 0;
 int      g_zn = 0;
 uint     g_lastTick = 0;
 int      g_alertDir = 0;
@@ -274,6 +283,49 @@ color Mix(color fg, double t)
 //+------------------------------------------------------------------+
 //| Object helpers (create or update in place)                       |
 //+------------------------------------------------------------------+
+// Update-in-place sweep: instead of deleting a group of objects and drawing it again
+// (which makes MT5 show an empty chart for a moment = flicker), we remember every object
+// drawn between SweepBegin and SweepEnd and only delete the ones that were NOT drawn again.
+string g_touched[];
+int    g_sweepDepth = 0;
+
+void Touch(const string nm)
+  {
+   if(g_sweepDepth <= 0)
+      return;
+   int n = ArraySize(g_touched);
+   ArrayResize(g_touched, n + 1, 256);
+   g_touched[n] = nm;
+  }
+
+int SweepBegin()
+  {
+   g_sweepDepth++;
+   return ArraySize(g_touched);
+  }
+
+void SweepEnd(const string pfx, const int from)
+  {
+   int n = ArraySize(g_touched), lp = StringLen(pfx);
+   for(int i = ObjectsTotal(0, -1, -1) - 1; i >= 0; i--)
+     {
+      string nm = ObjectName(0, i, -1, -1);
+      if(StringSubstr(nm, 0, lp) != pfx)
+         continue;
+      bool keep = false;
+      for(int j = from; j < n && !keep; j++)
+         keep = (g_touched[j] == nm);
+      if(!keep)
+         ObjectDelete(0, nm);
+     }
+   g_sweepDepth--;
+   if(g_sweepDepth <= 0)
+     {
+      g_sweepDepth = 0;
+      ArrayResize(g_touched, 0, 256);
+     }
+  }
+
 void Common(string nm, bool back)
   {
    ObjectSetInteger(0, nm, OBJPROP_BACK, back);
@@ -283,6 +335,7 @@ void Common(string nm, bool back)
 
 void Rect(string nm, datetime t1, double p1, datetime t2, double p2, color c)
   {
+   Touch(nm);
    if(ObjectFind(0, nm) < 0)
      {
       ObjectCreate(0, nm, OBJ_RECTANGLE, 0, t1, p1, t2, p2);
@@ -299,6 +352,7 @@ void Rect(string nm, datetime t1, double p1, datetime t2, double p2, color c)
 
 void Seg(string nm, datetime t1, datetime t2, double p, color c, ENUM_LINE_STYLE st, int w, bool ray)
   {
+   Touch(nm);
    if(ObjectFind(0, nm) < 0)
      {
       ObjectCreate(0, nm, OBJ_TREND, 0, t1, p, t2, p);
@@ -318,6 +372,7 @@ void Seg(string nm, datetime t1, datetime t2, double p, color c, ENUM_LINE_STYLE
 
 void Txt(string nm, datetime t, double p, string s, color c, ENUM_ANCHOR_POINT a)
   {
+   Touch(nm);
    if(ObjectFind(0, nm) < 0)
      {
       ObjectCreate(0, nm, OBJ_TEXT, 0, t, p);
@@ -335,6 +390,7 @@ void Txt(string nm, datetime t, double p, string s, color c, ENUM_ANCHOR_POINT a
 // Thin vertical bar at a fixed pixel width (marks beside a profile)
 void VBar(string nm, datetime t, double p1, double p2, color c, int w, string tip)
   {
+   Touch(nm);
    if(ObjectFind(0, nm) < 0)
      {
       ObjectCreate(0, nm, OBJ_TREND, 0, t, p1, t, p2);
@@ -361,6 +417,7 @@ void Tip(string nm, string tip)
 
 void PxRect(string nm, int x, int y, int w, int h, color c)
   {
+   Touch(nm);
    if(ObjectFind(0, nm) < 0)
      {
       ObjectCreate(0, nm, OBJ_RECTANGLE_LABEL, 0, 0, 0);
@@ -378,6 +435,7 @@ void PxRect(string nm, int x, int y, int w, int h, color c)
 
 void PxText(string nm, int x, int y, string s, color c, ENUM_ANCHOR_POINT a, string font, string tip)
   {
+   Touch(nm);
    if(ObjectFind(0, nm) < 0)
      {
       ObjectCreate(0, nm, OBJ_LABEL, 0, 0, 0);
@@ -647,9 +705,14 @@ void DrawProfile(CProf &p, string tag, bool dev)
 // hs / ls = highest / lowest traded since the session ended (filled marks are hidden).
 void DrawMarks(CProf &p, string tag, double hs, double ls)
   {
-   ObjectsDeleteAll(0, PFX + tag + "m");
-   if(!p.ok)
-      return;
+   int sw = SweepBegin();
+   if(p.ok)
+      DrawMarksIn(p, tag, hs, ls);
+   SweepEnd(PFX + tag + "m", sw);
+  }
+
+void DrawMarksIn(CProf &p, string tag, double hs, double ls)
+  {
    long bs = PeriodSeconds(_Period);
    datetime tEdge = (datetime)(p.t0 - bs);       // tails + TPO POC, right at the profile edge
    datetime tOut  = (datetime)(p.t0 - 2 * bs);   // single prints, set out from the profile
@@ -785,7 +848,13 @@ void OpenLvl(string nm, datetime t1, datetime tLive, double px, color c, ENUM_LI
 
 void DrawNaked()
   {
-   ObjectsDeleteAll(0, PFX + "n");
+   int sw = SweepBegin();
+   DrawNakedIn();
+   SweepEnd(PFX + "n", sw);
+  }
+
+void DrawNakedIn()
+  {
    ArrayResize(g_nk, 0);
    color cn = Mix(g_cPoc, 0.65), cp = Mix(g_cBear, 0.32), cv = Mix(TC(), 0.35);
    datetime tLive = (datetime)(TimeCurrent() + 3 * PeriodSeconds(_Period));
@@ -1332,17 +1401,18 @@ void DrawPixels()
       ObjectsDeleteAll(0, PFX + "pxW");
 
    // Higher-timeframe candles over the weekly profile (2nd TF on the right)
-   ObjectsDeleteAll(0, PFX + "pxH");
+   int swH = SweepBegin();
    if(InpShowHTF)
      {
       int w2 = HTFGroup(2, InpHTF2, xR - 8, 12, 5, H);
       int w1 = HTFGroup(1, InpHTF1, xR - 8 - w2 - (w2 > 0 ? 16 : 0), 8, 4, H);
       xL = IMin(xL, xR - 8 - w2 - (w2 > 0 ? 16 : 0) - w1);
      }
+   SweepEnd(PFX + "pxH", swH);
    DrawTimers();
 
    // Price tags in a column just left of the weekly
-   ObjectsDeleteAll(0, PFX + "pxT");
+   int swT = SweepBegin();
    int n = ArraySize(g_tgPx);
    if(n > 0)
      {
@@ -1376,6 +1446,7 @@ void DrawPixels()
          PxText(PFX + "pxT" + IntegerToString(i), xT, y, g_tgTx[k], g_tgC[k], ANCHOR_LEFT, InpFont, "");
         }
      }
+   SweepEnd(PFX + "pxT", swT);
 
    // Status strip, three stacked lines, no background
    if(InpShowStrip)
@@ -1437,9 +1508,12 @@ void Refresh()
    datetime d0 = iTime(_Symbol, PERIOD_D1, 0);
    if(d0 == 0)
       return;
-   if(d0 != g_day || g_needFull)
+   // a full rebuild that failed (history still loading) is retried every 10 s, not on every
+   // refresh, so the session profiles don't keep disappearing and coming back
+   if(d0 != g_day || (g_needFull && TimeLocal() >= g_fullRetry))
      {
       g_needFull = !FullRedraw();
+      g_fullRetry = g_needFull ? TimeLocal() + 10 : 0;
       g_day = d0;
       g_lastData = 0;
       ObjectsDeleteAll(0, PFX + "d_");
@@ -1488,10 +1562,30 @@ void OnTimer()
      }
   }
 
+// MT5 also sends CHART_CHANGE when another program on the chart (e.g. KATANA) changes a chart
+// setting such as mouse scrolling. Only redraw when the view itself moved or was resized.
+string g_viewKey = "";
+bool ViewMoved()
+  {
+   string k = IntegerToString(ChartGetInteger(0, CHART_FIRST_VISIBLE_BAR)) + "|"
+              + IntegerToString(ChartGetInteger(0, CHART_WIDTH_IN_BARS)) + "|"
+              + IntegerToString(ChartGetInteger(0, CHART_WIDTH_IN_PIXELS)) + "|"
+              + IntegerToString(ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0)) + "|"
+              + DoubleToString(ChartGetDouble(0, CHART_PRICE_MAX, 0), _Digits) + "|"
+              + DoubleToString(ChartGetDouble(0, CHART_PRICE_MIN, 0), _Digits) + "|"
+              + IntegerToString(ChartGetInteger(0, CHART_COLOR_BACKGROUND));
+   if(k == g_viewKey)
+      return false;
+   g_viewKey = k;
+   return true;
+  }
+
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
   {
    if(id == CHARTEVENT_CHART_CHANGE)
      {
+      if(!ViewMoved())
+         return;
       if(!g_lic)
         {
          g_licNext = 0;
