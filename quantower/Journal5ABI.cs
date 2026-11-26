@@ -8,7 +8,7 @@
 // It reads every connected account. Each account name must be added on My EAs on the website.
 //
 // Build (owner only): Visual Studio + Quantower Algo extension, or reference
-//   <Quantower folder>\TradingPlatform\<version>\bin\TradingPlatform.BusinessLayer.dll (target .NET 8, class library).
+//   <Quantower folder>\TradingPlatform\<version>\bin\TradingPlatform.BusinessLayer.dll (target .NET 10, class library).
 // Files: %AppData%\5ABI\journal-qt\ (trades waiting to send, and the list already sent)
 using System;
 using System.Collections.Generic;
