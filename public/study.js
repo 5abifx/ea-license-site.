@@ -292,7 +292,8 @@
   $('sr-zoom').innerHTML = `<button type="button" class="s-ib" id="sr-zo" aria-label="Zoom out" title="Zoom out (−)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg></button><output id="sr-zv">100%</output>
     <button type="button" class="s-ib" id="sr-zi" aria-label="Zoom in" title="Zoom in (+)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
     <button type="button" class="s-ib" id="sr-zf" aria-label="Fit everything" title="Fit everything (Shift+1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button><span class="s-sep"></span>
-    <button type="button" class="s-ib" id="sr-undo" aria-label="Undo" title="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3"/></svg></button>`;
+    <button type="button" class="s-ib" id="sr-undo" aria-label="Undo" title="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3"/></svg></button><span class="s-sep"></span>
+    <button type="button" class="sr-exp" id="sr-exp" title="Save a sharp PNG: the selected picture or trade at full quality, or the whole board when nothing is selected"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Export</span></button>`;
   const vc = () => { const r = vp.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
   $('sr-zi').onclick = () => zoomAt(...vc(), V.z * 1.2); $('sr-zo').onclick = () => zoomAt(...vc(), V.z / 1.2); $('sr-zf').onclick = fit; $('sr-undo').onclick = undo;
   function delSel() { if (!S.sel) return; const o = items.find((q) => q.id === S.sel);
@@ -312,9 +313,9 @@
   /* ---------- screenshots: choose, paste or drop; shrunk to a JPEG and kept with the board ---------- */
   function addPic(f, at) { if (!f || !/^image\//.test(f.type)) return toast('That is not a picture. Use a PNG or JPG screenshot.');
     if (D.shots.used >= D.shots.cap) return toast(`You have used all ${D.shots.cap} screenshots. Delete old ones to add more.`);
-    const im = new Image(); im.onload = () => { const s = Math.min(1, 1600 / im.width, 1000 / im.height), c = document.createElement('canvas'); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
+    const im = new Image(); im.onload = () => { const s = Math.min(1, 3840 / im.width, 2400 / im.height), c = document.createElement('canvas'); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
       const q = (k) => new Promise((ok) => c.toBlob(ok, 'image/jpeg', k)), name = (f.name && !/^image\.\w+$/.test(f.name) ? f.name.replace(/\.\w+$/, '') : 'Screenshot').slice(0, 30); toast('Saving the screenshot…');
-      q(0.82).then((b) => (b && b.size > 650000 ? q(0.6) : b)).then((b) => api('/journal/study/board/' + BOARD.id + '/shot?name=' + encodeURIComponent(name), b, true))
+      q(0.93).then((b) => (b && b.size > 3800000 ? q(0.86) : b)).then((b) => (b && b.size > 3800000 ? q(0.75) : b)).then((b) => api('/journal/study/board/' + BOARD.id + '/shot?name=' + encodeURIComponent(name), b, true))
         .then((j) => { D.shots.used = j.used; snap(); const [x, y] = at || center(), w = 420; const o = { id: uid(), type: 'shot', sid: j.id, name, x: Math.round(x - w / 2), y: Math.round(y - w * c.height / c.width / 2), w }; items.push(o); S.sel = o.id; renderItems(); changed(); drawer(); toast(`Saved. ${D.shots.used} of ${D.shots.cap} screenshots used.`); })
         .catch((er) => toast(er.message)); };
     im.onerror = () => toast('Could not read that picture.'); im.src = URL.createObjectURL(f); }
@@ -431,6 +432,62 @@
     pb.querySelectorAll('.s-rec .s-r').forEach((r) => (r.onclick = () => { E.qn = +r.dataset.i; hintT = ''; renderInsp(); }));
   }
   function refreshFrame(o) { const n = world.querySelector(`.s-it[data-id="${o.id}"]`); if (n) tradeFrame(n, o); }
+
+  /* ---------- export: a sharp PNG to share (selected item at its full size, or the whole board) ---------- */
+  function exportPng() {
+    const sel = items.find((o) => o.id === S.sel), list = sel ? [sel] : items.slice();
+    if (!list.length && !shapes.length) return toast('Nothing on this board to export yet.');
+    const box = [1e9, 1e9, -1e9, -1e9], grow = (x0, y0, x1, y1) => { box[0] = Math.min(box[0], x0); box[1] = Math.min(box[1], y0); box[2] = Math.max(box[2], x1); box[3] = Math.max(box[3], y1); };
+    const hOf = (o) => { const n = world.querySelector(`.s-it[data-id="${o.id}"]`); return n ? n.offsetHeight : 200; };
+    list.forEach((o) => grow(o.x, o.y, o.x + o.w, o.y + hOf(o)));
+    const bb = (sh) => { const pts = sh.type === 'pen' ? (sh.pts || []) : sh.type === 'line' || sh.type === 'arrow' ? [[sh.x1, sh.y1], [sh.x2, sh.y2]] : [[sh.x, sh.y], [sh.x + sh.w, sh.y + sh.h]];
+      const xs = pts.map((p) => p[0] + (+sh.dx || 0)), ys = pts.map((p) => p[1] + (+sh.dy || 0)); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; };
+    // marks drawn on the selected item come with it; with nothing selected, every mark
+    const inks = shapes.filter((sh) => { const b = bb(sh); return !sel || (b[2] > box[0] && b[0] < box[2] && b[3] > box[1] && b[1] < box[3]); });
+    if (!sel) inks.forEach((sh) => { const b = bb(sh), m = (+sh.width || 3) * 3 + 20; grow(b[0] - m, b[1] - m, b[2] + m, b[3] + m); });
+    const pad = sel ? 0 : 40, W = box[2] - box[0] + pad * 2, Hh = box[3] - box[1] + pad * 2;
+    // scale: as sharp as the sharpest picture on it (screenshots keep their own pixels), at least 2x, within browser limits
+    let want = 2; list.forEach((o) => { const im = o.type === 'shot' && world.querySelector(`.s-it[data-id="${o.id}"] img`); if (im && im.naturalWidth) want = Math.max(want, im.naturalWidth / (o.w - 2)); });
+    const k = Math.max(1, Math.min(want, sel ? 10 : 6, 16000 / Math.max(W, Hh), Math.sqrt((sel ? 60e6 : 36e6) / (W * Hh))));
+    const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(Hh * k);
+    const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.fillStyle = '#08080a'; g.fillRect(0, 0, c.width, c.height);
+    g.scale(k, k); g.translate(pad - box[0], pad - box[1]);
+    const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+    const hand = '"Architects Daughter", Caveat, cursive';
+    const wrap = (txt, x, y, maxW, lh) => { String(txt || '').split('\n').forEach((para) => { let line = ''; para.split(' ').forEach((w) => { const t = line ? line + ' ' + w : w; if (g.measureText(t).width > maxW && line) { g.fillText(line, x, y); y += lh; line = w; } else line = t; }); g.fillText(line, x, y); y += lh; }); };
+    list.forEach((o) => { const n = world.querySelector(`.s-it[data-id="${o.id}"]`); if (!n) return; const h = n.offsetHeight, x = o.x, y = o.y;
+      g.save();
+      if (o.type === 'trade' || o.type === 'shot') {
+        rr(x, y, o.w, h, 12); g.fillStyle = '#0c0c0f'; g.fill(); g.clip();
+        const fh = n.querySelector('.s-fh'), media = n.querySelector('canvas, img');
+        if (fh) { g.fillStyle = '#f2f2f4'; g.font = o.type === 'shot' ? '600 12.5px Manrope, sans-serif' : '600 14px Sora, Manrope, sans-serif'; g.textBaseline = 'middle';
+          const tb = fh.querySelector('b'); g.fillText(tb ? tb.textContent : '', x + 14, y + fh.offsetHeight / 2);
+          const r = fh.querySelector('.s-r'); if (r) { g.font = '700 16px Sora, sans-serif'; g.fillStyle = r.classList.contains('neg') ? '#f0464b' : '#26c6a0'; g.textAlign = 'right'; g.fillText(r.textContent, x + o.w - 14, y + fh.offsetHeight / 2); g.textAlign = 'left'; }
+          g.fillStyle = '#18181d'; g.fillRect(x, y + fh.offsetHeight - 1, o.w, 1); }
+        if (media) { const my = y + media.offsetTop, mh = media.offsetHeight;
+          if (o.type === 'trade' && TD[o.tid]) g.drawImage(realChart(TD[o.tid], Math.round(o.w * k), Math.round(mh * k)), x, my, o.w, mh);
+          else if (media.tagName === 'IMG' && media.complete && media.naturalWidth) g.drawImage(media, x, my, o.w, mh);
+          else if (media.tagName === 'CANVAS') g.drawImage(media, x, my, o.w, mh);
+          const ff = n.querySelector('.s-ff'); if (ff) { g.fillStyle = '#c9c9d0'; g.font = '11.5px Manrope, sans-serif'; g.textBaseline = 'middle'; g.fillText([...ff.children].map((e) => e.textContent).join('  ·  '), x + 14, my + mh + (h - (media.offsetTop + mh)) / 2); } }
+        g.restore(); g.save(); rr(x + 0.5, y + 0.5, o.w - 1, h - 1, 12); g.strokeStyle = '#1f1f24'; g.lineWidth = 1; g.stroke();
+      } else if (o.type === 'note') {
+        g.translate(x + o.w / 2, y + h / 2); g.rotate((o.rot || -1) * Math.PI / 180); g.translate(-o.w / 2, -h / 2);
+        rr(0, 0, o.w, h, 6); g.fillStyle = o.orange ? '#ff5a1f' : '#f2f2f4'; g.fill(); g.fillStyle = o.orange ? '#160600' : '#111'; g.font = '22px ' + hand; g.textBaseline = 'top'; wrap(o.text, 16, 14, o.w - 32, 27.5);
+      } else if (o.type === 'text') {
+        g.fillStyle = COLOK.test(o.color) ? o.color : '#f2f2f4'; g.font = '34px ' + hand; g.textBaseline = 'top'; wrap(o.text, x, y, o.w, 39);
+      } else if (o.type === 'setup') {
+        rr(x, y, o.w, h, 14); g.fillStyle = '#101013'; g.fill(); g.fillStyle = '#f2f2f4'; g.font = '600 22px Sora, sans-serif'; g.textBaseline = 'top'; const h3 = n.querySelector('h3'); g.fillText(h3 ? h3.textContent : 'Setup', x + 20, y + 40);
+        const cv = n.querySelector('canvas'); if (cv) g.drawImage(cv, x + cv.offsetLeft, y + cv.offsetTop, cv.offsetWidth, cv.offsetHeight);
+      }
+      g.restore(); });
+    inks.forEach((sh) => { const col = COLOK.test(sh.color) ? sh.color : '#ffffff', w = Math.min(12, Math.max(1, +sh.width || 3));
+      g.save(); g.translate(+sh.dx || 0, +sh.dy || 0); g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round'; if (sh.dash) g.setLineDash([w * 3, w * 3]);
+      paths(sh).forEach((d) => g.stroke(new Path2D(d))); g.restore(); });
+    const nm = (sel && sel.type === 'shot' ? sel.name : sel && sel.type === 'trade' && TD[sel.tid] ? TD[sel.tid].symbol + '-' + TD[sel.tid].side : BOARD.name) || 'study';
+    c.toBlob((b) => { if (!b) return toast('Could not make the picture. Try a smaller part of the board.');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'study-' + String(nm).replace(/\W+/g, '-').toLowerCase().replace(/^-|-$/g, '') + '.png'; a.setAttribute('data-no-swap', ''); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      toast(`Saved a ${c.width} × ${c.height} PNG.`); }, 'image/png'); }
+  $('sr-exp').onclick = () => document.fonts.ready.then(exportPng);
 
   /* ---------- boot ---------- */
   // a setup board always has its setup card

@@ -148,6 +148,8 @@
 
 /* zoom, hint, toast */
 #sr-zoom { bottom: 12px; left: 12px; display: flex; align-items: center; gap: 2px; padding: 4px; }
+#sr-zoom .sr-exp { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px 0 10px; border-radius: 8px; font-weight: 600; font-size: 12.5px; background: #f2f2f4; color: #050507; }
+#sr-zoom .sr-exp:hover { background: #fff; } #sr-zoom .sr-exp svg { width: 15px; height: 15px; }
 #sr-zoom output { min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; color: #c9c9d0; font-size: 12px; }
 .sr-hint { position: absolute; z-index: 4; bottom: 22px; left: 50%; transform: translateX(-50%); color: var(--dm); font-size: 12px; white-space: nowrap; pointer-events: none; }
 .sr-toast { position: absolute; z-index: 9; bottom: 64px; left: 50%; transform: translateX(-50%); background: #f2f2f4; color: #050507; padding: 8px 14px; border-radius: 99px; font-weight: 600; font-size: 12.5px; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
