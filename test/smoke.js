@@ -355,6 +355,23 @@ function client(base, ip) {
     assert.strictEqual(jr.status, 200, await jr.text());
     jr = await send({ key, account: '1001', currency: 'USD', trade: { ...trade, net: 1390 } });   // resend updates, no duplicate
     assert.strictEqual(jr.status, 200);
+    // NinjaTrader / Quantower journals: account names (Sim101), platform tag on the account tab
+    await admin.post(`/admin/users/${bobId}`, [['name', 'Bob'], ['status', 'active'], ['max_accounts', '12'], ['expires_at', ''], ['ea', '1'], ['ea', '2']]);
+    r = await bob.post('/accounts', { account_number: 'bad name!' });
+    assert.match(r.text, /letters, digits/);
+    r = await bob.post('/accounts', { account_number: 'Sim101' });
+    assert.match(r.text, /Account Sim101 added/);
+    assert.strictEqual((await check('JOURNAL', 'Sim101')).valid, true);
+    jr = await send({ key, platform: 'NinjaTrader', account: 'Sim101', broker: 'Simulation', currency: 'USD',
+      trade: { ...trade, position_id: 'NT1793200000MNQ', symbol: 'MNQ', candles: [] } });
+    assert.strictEqual(jr.status, 200, await jr.text());
+    r = await bob.get('/journal?account=Sim101');
+    assert.match(r.text, /MNQ/);
+    assert.match(r.text, /class="plat">NT8</);
+    assert.match(r.text, /NinjaTrader 8<\/h3>/);
+    assert.strictEqual((await bob.get('/download/2/nt8')).status, 404);   // nothing uploaded yet
+    await bob.post('/accounts/' + (await bob.get('/dashboard')).text.match(/\/accounts\/(\d+)\/delete" onsubmit="return confirm\('Remove account Sim101/)[1] + '/delete', {});
+    await admin.post(`/admin/users/${bobId}`, [['name', 'Bob'], ['status', 'active'], ['max_accounts', '10'], ['expires_at', ''], ['ea', '1'], ['ea', '2']]);
     r = await bob.get('/journal');
     assert.match(r.text, /XAUUSD/);
     assert.strictEqual(new Set(r.text.match(/href="\/journal\/\d+"/g) || []).size, 1);   // one trade (links to it appear in the calendar and the recap)
