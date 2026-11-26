@@ -181,7 +181,7 @@ function html({ u, eas, allEas, accounts, full, student, hasJournal, notices, si
     });
     tools.push(node({ ico: 'palette', name: 'Chart themes', kind: 'MT5 chart templates', why: 'KATANA and Compass are drawn to match them.', tag: 'Free', tagCls: 'ok',
       extra: `<div class="th-grid pn-themes">${THEMES.map((t, i) => `<div class="th"><div class="th-pic">${themeSvg(t, 7 + i * 13)}</div>
-        <div class="th-row"><b>${t.name}</b><span><a href="/templates/5ABI.FX%20${t.name}.tpl" download>Download</a>${withCompass ? `<a href="/templates/5ABI.FX%20${t.name}%20Compass.tpl" download>With Compass</a>` : ''}</span></div></div>`).join('')}</div>`,
+        <a class="th-dl" href="/templates/5ABI.FX%20${t.name}.tpl" download><b>${t.name}</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg></a>${withCompass ? `<a class="th-dl th-cp" href="/templates/5ABI.FX%20${t.name}%20Compass.tpl" download><span>+ Compass</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg></a>` : ''}</div>`).join('')}</div>`,
       steps: ['Put the file in MQL5 → Profiles → Templates.', 'Right-click a chart → Templates and pick it.'], cta: '' }));
     return tools;
   };
