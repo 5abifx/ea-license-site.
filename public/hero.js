@@ -1,7 +1,6 @@
 // Journal hero: a short "profit loading" screen once per visit (the month's P&L counting up), then the
 // big number on the page counts up too. Tap to skip. Shown again after the browser tab is closed.
 (function () {
-  const sc = document.currentScript, VER = sc && sc.src.includes('?') ? sc.src.slice(sc.src.indexOf('?')) : '';
   const hero = document.querySelector('.pl-hero, .jv-hero');
   const PHONE = matchMedia('(max-width: 760px), (pointer: coarse) and (max-width: 1024px)').matches;
   if (!hero) return;
@@ -26,7 +25,7 @@
   // the loading screen
   const unitEl = hero.querySelector('.pl-big .u');
   const ov = document.createElement('div');
-  ov.className = 'plx ' + (target >= 0 ? 'pos' : 'neg');
+  ov.className = 'plx lite ' + (target >= 0 ? 'pos' : 'neg');
   ov.setAttribute('aria-hidden', 'true');
   ov.innerHTML = `<div class="plx-in"><img src="/logo.png" alt="" width="64" height="40">
     <span class="plx-k">${(hero.dataset.label || '').toUpperCase()} · NET P&amp;L</span>
@@ -34,27 +33,17 @@
     <i class="plx-bar"><i></i></i><span class="plx-s">Syncing your trades</span></div>`;
   document.body.appendChild(ov);
   num.textContent = fmt(0);
-  let closed = false, stopRun = null;
+  let closed = false;
   const close = () => {
     if (closed) return; closed = true;
     ov.classList.add('out');
-    setTimeout(() => { ov.remove(); if (stopRun) stopRun(); }, 700);
+    setTimeout(() => ov.remove(), 700);
     count(num, 900);
   };
   ov.addEventListener('click', close);
   requestAnimationFrame(() => ov.classList.add('go'));
-  const nEl = ov.querySelector('.plx-n'), sEl = ov.querySelector('.plx-s'), bar = ov.querySelector('.plx-bar i');
+  const nEl = ov.querySelector('.plx-n'), sEl = ov.querySelector('.plx-s');
   const landed = () => { sEl.textContent = target >= 0 ? 'In profit' : 'Review the leaks'; setTimeout(close, 650); };
-  // Night run: the car crosses the screen as the number counts (3D, loaded only for this intro). If it is not ready
-  // within 3.5s (very slow connection, no WebGL) the plain count runs instead and the car is dropped.
-  let started = false;
-  const plain = () => { if (started) return; started = true; count(nEl, PHONE ? 1100 : 1500, landed); };
-  // Phones (owner, Nov 22): just the P&L counting up. No car: the 3D model is heavy to load and lagged on iPhone.
-  if (PHONE) { ov.classList.add('lite'); plain(); return; }
-  const wait = setTimeout(plain, 3500);
-  import('/nightrun.js' + VER).then((m) => m.prepare(ov, nEl)).then((play) => {
-    if (started || closed) { const c = ov.querySelector('.plx-cv'); if (c) c.remove(); return; }
-    clearTimeout(wait); started = true; ov.classList.add('run');
-    stopRun = play((p) => { nEl.textContent = fmt(target * p); bar.style.transform = `scaleX(${p})`; }, landed);
-  }).catch(() => { clearTimeout(wait); plain(); });
+  // Just the P&L counting up, on every device (owner, Nov 26: the 3D car intro lagged on PC too, so it is gone).
+  count(nEl, PHONE ? 1100 : 1400, landed);
 })();

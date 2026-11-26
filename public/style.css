@@ -1097,19 +1097,13 @@ select option:disabled { color: #6b6b73; }
 .plx.pos .plx-n { color: var(--ok); }
 .plx.neg .plx-n { color: var(--danger); }
 /* headlight wash over the number: only its opacity changes (no filters on the text) */
-.plx-wash { position: absolute; left: 50%; width: 900px; max-width: 92vw; height: 260px; margin-left: -450px; pointer-events: none; opacity: 0; will-change: opacity; background: radial-gradient(closest-side, rgba(255,246,230,.3), rgba(255,246,230,0)); }
-@media (max-width: 978px) { .plx-wash { margin-left: -46vw; } }
 .plx-in small { font-family: var(--mono); color: var(--muted); margin-top: -6px; }
 .plx-bar { width: min(260px, 60vw); height: 2px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden; margin-top: 8px; }
 .plx-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--accent), #ffb07a); transform-origin: left; transform: scaleX(0); }
 .plx.go .plx-bar i { transform: scaleX(1); transition: transform 1.5s cubic-bezier(.2,.7,.2,1); }
 .plx-s { font-size: 12px; color: var(--muted); letter-spacing: .06em; }
-/* Night run intro (public/nightrun.js): the 3D road fills the screen, the number sits above the car's lane */
-.plx-cv { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; }
-.plx.run::after { opacity: .5; }
-.plx.run .plx-in { top: -14vh; }
-.plx.run.go .plx-bar i { transition: none; }
-.plx.lite.go .plx-bar i { transition-duration: 1.1s; }   /* phones: P&L only, no car (hero.js) */
+.plx.lite.go .plx-bar i { transition-duration: 1.4s; }   /* P&L only, no car (hero.js) */
+@media (max-width: 760px) { .plx.lite.go .plx-bar i { transition-duration: 1.1s; } }
 
 /* recap row */
 .recap { display: grid; grid-template-columns: 1fr 1fr 1.35fr; gap: 12px; margin-bottom: 4px; align-items: start; }

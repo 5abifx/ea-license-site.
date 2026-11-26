@@ -311,7 +311,7 @@
     var g = R.querySelector('.sc-garage canvas');
     // the 3D car is the heaviest thing on the page: start it only after the page has loaded and gone quiet,
     // so switching pages stays smooth, then fade it in
-    // wait while the journal intro (Night run) is on screen: two 3D scenes starting at once made the intro stutter
+    // wait while the journal P&L intro is on screen so it stays smooth
     var go = function () { if (document.querySelector('.plx')) { setTimeout(go, 400); return; } go2(); };
     var go2 = function () { import('/side/garage.js' + VER).then(function (m) { m.default(R.querySelector('.sc-garage')); }).catch(function () { R.querySelector('.sc-garage').remove(); }); };
     var idle = function () { setTimeout(function () { (window.requestIdleCallback || function (f) { setTimeout(f, 1); })(go, { timeout: 2500 }); }, 700); };
