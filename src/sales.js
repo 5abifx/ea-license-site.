@@ -243,7 +243,7 @@ function routes(app, { db, page, requireAdmin, stripe, mentorPlans, backup }) {
 
     page(req, res, 'Sales dashboard', `
   <h1>Admin</h1>
-  <div class="tabs"><a class="on" href="/admin/sales">Dashboard</a><a href="/admin">Users</a><a href="/admin/eas">EAs</a><a href="/admin/mentorship">Mentorship</a><a href="/admin/security">Security</a></div>
+  <div class="tabs"><a class="on" href="/admin/sales">Dashboard</a><a href="/admin">Users</a><a href="/admin/eas">EAs</a><a href="/admin/mentorship">Mentorship</a><a href="/admin/security">Security</a><a href="/admin/storage">Storage</a></div>
   <div class="row between sd-head">
     <h2>Sales dashboard</h2>
     <form method="get" action="/admin/sales" class="seg" role="group" aria-label="Period">${Object.entries(PERIODS).map(([k, t]) => `<button name="p" value="${k}" aria-pressed="${k === p}">${t}</button>`).join('')}</form>

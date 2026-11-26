@@ -102,7 +102,7 @@ module.exports = function security(app, { db, page, flash, requireAdmin, rateLim
   });
 
   // ---- Admin > Security ----
-  const tabs = '<div class="tabs"><a href="/admin/sales">Dashboard</a><a href="/admin">Users</a><a href="/admin/eas">EAs</a><a href="/admin/mentorship">Mentorship</a><a class="on" href="/admin/security">Security</a></div>';
+  const tabs = '<div class="tabs"><a href="/admin/sales">Dashboard</a><a href="/admin">Users</a><a href="/admin/eas">EAs</a><a href="/admin/mentorship">Mentorship</a><a class="on" href="/admin/security">Security</a><a href="/admin/storage">Storage</a></div>';
   const when = (iso) => iso ? new Date(iso).toLocaleString('en-CA', { timeZone: 'America/Vancouver', dateStyle: 'medium', timeStyle: 'short' }) + ' (Vancouver)' : 'never';
 
   function codeCard(u, recovery) {
