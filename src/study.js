@@ -5,9 +5,9 @@
 //   Trades   - right panel: account buttons, search, To study / Studied, wins / losses; drag a trade onto the board
 //   Question - click a trade: the same one-question-at-a-time panel as sign-up (environment), notes, grade, save to setup
 // Rooms: students get the order flow room; others the room for the edge picked at sign-up (price action, ICT, own).
-// Screenshots are stored as JPEG BLOBs (full quality, up to 3840 px wide) with a per-member cap. PC only (phones get a short note).
+// Screenshots are stored as JPEG BLOBs (good quality, up to 2560 px wide) with a per-member cap. PC only (phones get a short note).
 const express = require('express');
-const CAP = Number(process.env.STUDY_SHOT_CAP) || 150;     // screenshots per member (5 GB disk; 0.5-3 MB each at full quality)
+const CAP = Number(process.env.STUDY_SHOT_CAP) || 150;     // screenshots per member (5 GB disk; ~0.3-0.8 MB each)
 const PER_TRADE = 6;                                         // screenshots per trade
 const ROOMS = ['flow', 'pa', 'ict', 'own'];
 const clean = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u0008\u000b-\u001f<>]/g, '').trim().slice(0, n);
@@ -183,7 +183,7 @@ module.exports = (app, { db, page, requireUser }) => {
     db.prepare('DELETE FROM study_boards WHERE id = ?').run(b.id); res.json({ ok: true });
   });
   // screenshot dropped on a board (not tied to one trade)
-  app.post('/journal/study/board/:id/shot', requireUser, journalOnly, express.raw({ type: 'image/jpeg', limit: '4mb' }), (req, res) => {
+  app.post('/journal/study/board/:id/shot', requireUser, journalOnly, express.raw({ type: 'image/jpeg', limit: '2mb' }), (req, res) => {
     const uid = req.user.id, bd = ownBoard(uid, req.params.id); if (!bd) return res.status(404).json({ error: 'Board not found.' });
     const b = req.body;
     if (!Buffer.isBuffer(b) || b.length < 100 || b[0] !== 0xff || b[1] !== 0xd8) return res.status(400).json({ error: 'That is not a picture.' });
@@ -244,7 +244,7 @@ module.exports = (app, { db, page, requireUser }) => {
     res.json({ ok: true });
   });
   // screenshots: upload (JPEG, already shrunk in the browser), marks, picture, delete
-  app.post('/journal/study/:id/shot', requireUser, journalOnly, express.raw({ type: 'image/jpeg', limit: '4mb' }), (req, res) => {
+  app.post('/journal/study/:id/shot', requireUser, journalOnly, express.raw({ type: 'image/jpeg', limit: '2mb' }), (req, res) => {
     const uid = req.user.id, t = ownTrade(uid, req.params.id); if (!t) return res.status(404).json({ error: 'Trade not found.' });
     const b = req.body;
     if (!Buffer.isBuffer(b) || b.length < 100 || b[0] !== 0xff || b[1] !== 0xd8) return res.status(400).json({ error: 'That is not a picture.' });

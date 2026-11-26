@@ -313,9 +313,9 @@
   /* ---------- screenshots: choose, paste or drop; shrunk to a JPEG and kept with the board ---------- */
   function addPic(f, at) { if (!f || !/^image\//.test(f.type)) return toast('That is not a picture. Use a PNG or JPG screenshot.');
     if (D.shots.used >= D.shots.cap) return toast(`You have used all ${D.shots.cap} screenshots. Delete old ones to add more.`);
-    const im = new Image(); im.onload = () => { const s = Math.min(1, 3840 / im.width, 2400 / im.height), c = document.createElement('canvas'); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
+    const im = new Image(); im.onload = () => { const s = Math.min(1, 2560 / im.width, 1600 / im.height), c = document.createElement('canvas'); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
       const q = (k) => new Promise((ok) => c.toBlob(ok, 'image/jpeg', k)), name = (f.name && !/^image\.\w+$/.test(f.name) ? f.name.replace(/\.\w+$/, '') : 'Screenshot').slice(0, 30); toast('Saving the screenshot…');
-      q(0.93).then((b) => (b && b.size > 3800000 ? q(0.86) : b)).then((b) => (b && b.size > 3800000 ? q(0.75) : b)).then((b) => api('/journal/study/board/' + BOARD.id + '/shot?name=' + encodeURIComponent(name), b, true))
+      q(0.88).then((b) => (b && b.size > 1200000 ? q(0.8) : b)).then((b) => (b && b.size > 1800000 ? q(0.7) : b)).then((b) => api('/journal/study/board/' + BOARD.id + '/shot?name=' + encodeURIComponent(name), b, true))
         .then((j) => { D.shots.used = j.used; snap(); const [x, y] = at || center(), w = 420; const o = { id: uid(), type: 'shot', sid: j.id, name, x: Math.round(x - w / 2), y: Math.round(y - w * c.height / c.width / 2), w }; items.push(o); S.sel = o.id; renderItems(); changed(); drawer(); toast(`Saved. ${D.shots.used} of ${D.shots.cap} screenshots used.`); })
         .catch((er) => toast(er.message)); };
     im.onerror = () => toast('Could not read that picture.'); im.src = URL.createObjectURL(f); }
@@ -446,9 +446,9 @@
     const inks = shapes.filter((sh) => { const b = bb(sh); return !sel || (b[2] > box[0] && b[0] < box[2] && b[3] > box[1] && b[1] < box[3]); });
     if (!sel) inks.forEach((sh) => { const b = bb(sh), m = (+sh.width || 3) * 3 + 20; grow(b[0] - m, b[1] - m, b[2] + m, b[3] + m); });
     const pad = sel ? 0 : 40, W = box[2] - box[0] + pad * 2, Hh = box[3] - box[1] + pad * 2;
-    // scale: as sharp as the sharpest picture on it (screenshots keep their own pixels), at least 2x, within browser limits
+    // scale: a picture exports at its own uploaded size (never blown up past it); the whole board at up to 3x
     let want = 2; list.forEach((o) => { const im = o.type === 'shot' && world.querySelector(`.s-it[data-id="${o.id}"] img`); if (im && im.naturalWidth) want = Math.max(want, im.naturalWidth / (o.w - 2)); });
-    const k = Math.max(1, Math.min(want, sel ? 10 : 6, 16000 / Math.max(W, Hh), Math.sqrt((sel ? 60e6 : 36e6) / (W * Hh))));
+    const k = Math.max(1, Math.min(want, sel ? 8 : 3, 12000 / Math.max(W, Hh), Math.sqrt((sel ? 16e6 : 20e6) / (W * Hh))));
     const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(Hh * k);
     const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.fillStyle = '#08080a'; g.fillRect(0, 0, c.width, c.height);
     g.scale(k, k); g.translate(pad - box[0], pad - box[1]);
