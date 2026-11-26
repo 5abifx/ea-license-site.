@@ -21,6 +21,8 @@ string   RELAY_CODES[] = { "COMPASS" };   // licence codes of the indicators (Ad
 datetime g_relayNext   = 0;
 string   g_relayStatus = "checking...";
 bool     g_relayAllOk  = false;
+int      g_relayFails  = 0;              // site not reachable this many times in a row
+datetime g_relayStart  = 0;              // first timer call (fast re-checks only right after start)
 
 //--- the same signature the indicators compute
 double RelaySign(const string code, const long login, const double at)
@@ -44,7 +46,8 @@ int RelayAsk(const string code, const long login)
    char data[], res[];
    string hdr;
    ResetLastError();
-   int http = WebRequest("GET", url, "", 10000, data, res, hdr);
+   // short timeout: WebRequest pauses the EA while it waits for the site
+   int http = WebRequest("GET", url, "", 5000, data, res, hdr);
    if(http != 200) return -1;
    string body = CharArrayToString(res, 0, WHOLE_ARRAY, CP_UTF8);
    bool valid = StringFind(body, "\"valid\":true") >= 0 &&
@@ -84,13 +87,35 @@ bool RelayCheckAll()
    return reached;
   }
 
-//--- call from OnTimer: every hour once unlocked, every 2 minutes while not (so a newly
-//--- added account or product unlocks quickly), every minute while the site is unreachable
+//--- call from OnTimer. Unlocked: every hour (+ a few random minutes so it never lines up with
+//--- the EA's own licence check). Not unlocked: every 2 minutes for the first 20 minutes after
+//--- start (so a newly added account unlocks quickly), then every 30 minutes. Site not
+//--- reachable: 1, 2, 5, 10, then every 15 minutes. The indicator keeps a 48 h grace period,
+//--- so slower re-checks never lock it.
 void RelayOnTimer()
   {
-   if(TimeLocal() < g_relayNext) return;
+   datetime now = TimeLocal();
+   if(g_relayStart == 0)
+     {
+      g_relayStart = now;
+      g_relayNext  = now + 20;           // let the EA's own licence check go first
+     }
+   if(now < g_relayNext) return;
+   if(AccountInfoInteger(ACCOUNT_LOGIN) <= 0) { g_relayNext = now + 15; return; }   // still connecting
    bool ok = RelayCheckAll();
-   g_relayNext = TimeLocal() + (!ok ? 60 : g_relayAllOk ? 3600 : 120);
+   now = TimeLocal();
+   if(!ok)
+     {
+      int waits[5] = { 1, 2, 5, 10, 15 };
+      g_relayNext = now + waits[g_relayFails < 4 ? g_relayFails : 4] * 60;
+      g_relayFails++;
+      return;
+     }
+   g_relayFails = 0;
+   if(g_relayAllOk)
+      g_relayNext = now + 3600 + MathRand() % 600;
+   else
+      g_relayNext = now + (now - g_relayStart < 20 * 60 ? 120 : 1800);
   }
 
 #endif

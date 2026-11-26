@@ -107,11 +107,13 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const positionId = s(t.position_id, 40);
     if (!positionId || !s(t.symbol)) return fail(400, 'Missing position_id or symbol');
 
-    // partial closes: every closing deal except the final one
+    // partial closes: every closing deal except the final one. While the trade is still open
+    // (sent right after a partial booking) every closing deal so far is a partial.
+    const stillOpen = t.still_open === true || t.still_open === 1 || t.still_open === '1';
     const outs = (Array.isArray(t.partials) ? t.partials : []).slice(0, 100)
       .map((p) => ({ time: s(p.time, 25), price: n(p.price), lots: n(p.lots), profit: n(p.profit) }))
       .filter((p) => p.price !== null);
-    const partials = outs.slice(0, -1);
+    const partials = stillOpen ? outs : outs.slice(0, -1);
     const candles = (Array.isArray(t.candles) ? t.candles : []).slice(-1500)
       .filter((k) => Array.isArray(k) && k.length >= 5 && k.slice(0, 5).every((v) => Number.isFinite(Number(v))))
       .map((k) => k.slice(0, 5).map(Number));
@@ -126,7 +128,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       mfe: n(t.mfe), mae: n(t.mae), magic: n(t.magic), comment: s(t.comment, 64),
       currency: s(b.currency, 8), broker: s(b.broker, 80), tf: s(t.tf, 8),
       platform: PLATFORMS.includes(b.platform) ? b.platform : 'MT5',
-      partials: JSON.stringify(partials), candles: JSON.stringify(candles),
+      partials: JSON.stringify(partials), candles: JSON.stringify(candles), still_open: stillOpen ? 1 : 0,
     };
     // break-even / trailed stop is not the risk: no R or risk % from it
     if (row.sl !== null && row.entry !== null && (side === 'BUY' ? row.sl >= row.entry : row.sl <= row.entry)) {
@@ -235,7 +237,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const latest = db.prepare(`SELECT MAX(close_time) AS t FROM journal_trades WHERE ${where}`).get(...args).t;
     const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(req.query.month || '') ? req.query.month
       : (latest || new Date().toISOString()).slice(0, 7);
-    const trades = db.prepare(`SELECT id, account_number, symbol, side, lots, net, r, open_time, close_time, balance_after, setup, currency, broker
+    const trades = db.prepare(`SELECT id, account_number, symbol, side, lots, net, r, open_time, close_time, balance_after, setup, currency, broker, still_open
         FROM journal_trades WHERE ${where} AND substr(close_time, 1, 7) = ? ORDER BY close_time`).all(...args, month);
     TP.match(db, u);
     const plans = plansByTrade(u.id);
@@ -321,7 +323,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         <p class="muted">${l.length} trade${l.length > 1 ? 's' : ''} · <strong class="${cls(s)}">${money(s, cur)}</strong></p>
         <div class="dayp-scroll"><table><tbody>${l.map((t) => `<tr>
           <td class="muted">${esc(t.close_time.slice(11, 16))}</td>
-          <td><strong>${esc(t.symbol)}</strong> ${esc(t.side)} ${t.lots ?? ''}${!sel && liveAccts.length > 1 ? `<br><span class="muted small">${priv(`${esc(t.broker || 'Account')} · ${esc(t.account_number)}`, `Account ••${esc(String(t.account_number).slice(-2))}`)}</span>` : ''}${t.setup ? `<br><span class="muted small">${esc(t.setup)}</span>` : ''}${planTag(plans[t.id])}</td>
+          <td><strong>${esc(t.symbol)}</strong> ${esc(t.side)} ${t.lots ?? ''}${t.still_open ? ' <span class="muted small" title="Partial booked, the rest of the position is still running">· partial, still open</span>' : ''}${!sel && liveAccts.length > 1 ? `<br><span class="muted small">${priv(`${esc(t.broker || 'Account')} · ${esc(t.account_number)}`, `Account ••${esc(String(t.account_number).slice(-2))}`)}</span>` : ''}${t.setup ? `<br><span class="muted small">${esc(t.setup)}</span>` : ''}${planTag(plans[t.id])}</td>
           <td class="right"><span class="${cls(t.net)}">${money(t.net)}</span><br><a class="small" href="/journal/${t.id}">Open ›</a></td></tr>`).join('')}
         </tbody></table></div></div>`;
     }).join('');
@@ -972,6 +974,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <link rel="stylesheet" href="/studio.css">
     <p><a href="/journal">← All trades</a></p>
     <h1>${esc(t.symbol)} ${esc(t.side)} <span class="${cls(t.net)}">${money(t.net, t.currency)}</span></h1>
+    ${t.still_open ? '<p class="muted small">Partial booked: this is the profit taken so far. The rest of the position is still running and updates here when it closes.</p>' : ''}
     <p class="muted"><span class="priv"><span class="priv-real">Account ${esc(t.account_number)} · position ${esc(t.position_id)}</span><span class="priv-mask">Account ••${esc(String(t.account_number).slice(-2))}</span></span> · ${fmtDate(t.open_time)} → ${fmtDate(t.close_time)} (broker time)${t.manual ? '' : ` · ${esc(t.platform || 'MT5')}`}</p>
 
     <nav class="ttabs" id="ttabs" aria-label="Trade page">

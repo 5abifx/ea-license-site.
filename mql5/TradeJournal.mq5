@@ -8,7 +8,7 @@
 //| symbols and all EAs on that account.                             |
 //+------------------------------------------------------------------+
 #property copyright "5ABI.FX"
-#property version   "1.33"
+#property version   "1.34"
 #property description "Trade Journal: logs closed trades, partials and candles to your journal,"
 #property description "and sends MT5's economic calendar for the Desk's news catalysts."
 
@@ -30,7 +30,8 @@ input bool            SendNews       = true;        // Send the MT5 economic cal
 
 #define JOURNAL_DIR    "TradeJournal\\"
 #define MAX_CANDLES    1500
-#define SEND_PER_TIMER 15         // old trades go out a few at a time, so MT5 never freezes
+#define SEND_PER_TIMER 5          // old trades go out a few at a time, so MT5 never freezes
+#define SEND_BUDGET_MS 4000       // and never more than ~4 s of sending per timer
 
 struct QueueItem
   {
@@ -40,6 +41,8 @@ struct QueueItem
 
 QueueItem g_queue[];
 string    g_lastSync = "nothing sent yet";
+datetime  g_netWait  = 0;         // site not reachable / not allowed yet: no sends before this time
+int       g_netFails = 0;
 int       g_sentCount = 0;
 
 //--- small helpers ------------------------------------------------------
@@ -166,9 +169,12 @@ double SavedLevel(const ulong id, const string what)
 
 //--- build the trade from the account history -----------------------------
 // Returns false while the position is still open or has no closing deal.
-bool BuildTrade(const ulong id, string &json, datetime &closeTime)
+// stillOpen = true: a partial was booked but the rest of the position is still running.
+// The trade is sent with what is closed so far and sent again when it fully closes.
+bool BuildTrade(const ulong id, string &json, datetime &closeTime, bool &stillOpen)
   {
-   if(IsPositionOpen(id) || !HistorySelectByPosition(id)) return false;
+   stillOpen = IsPositionOpen(id);
+   if(!HistorySelectByPosition(id)) return false;
 
    string symbol = "", comment = "", side = "";
    long   magic = 0;
@@ -319,6 +325,7 @@ bool BuildTrade(const ulong id, string &json, datetime &closeTime)
           + JN("risk_money", riskMoney, 2) + "," + JN("risk_pct", riskPct, 2) + "," + JN("pct", pct, 2) + ","
           + JN("balance_after", balance, 2) + "," + JN("mfe", mfe, digits) + "," + JN("mae", mae, digits) + ","
           + JN("magic", (double)magic, 0) + "," + J("comment", comment) + "," + J("tf", TfName(tf)) + ","
+          + "\"still_open\":" + (stillOpen ? "true" : "false") + ","
           + "\"partials\":[" + partials + "],\"candles\":[" + candles + "]}}";
 
    return true;
@@ -349,7 +356,7 @@ int PostJson(const string path, const string json, string &msg)
    ArrayResize(data, MathMax(0, len - 1));                    // drop the trailing zero
    ResetLastError();
    int http = WebRequest("POST", LICENSE_SERVER + path, "Content-Type: application/json\r\n",
-                         15000, data, result, resHeaders);
+                         8000, data, result, resHeaders);
    if(http == -1)
      {
       int err = GetLastError();
@@ -371,25 +378,36 @@ void ProcessQueue()
    if(!LicenseIsValid()) return;
    if(JournalKey == "") { g_lastSync = "enter your Journal key in the EA inputs"; return; }
 
+   // after a failed send, wait before trying again instead of trying every queued trade
+   // (each try can pause the EA for seconds while MT5 waits for the site)
+   if(TimeLocal() < g_netWait) return;
+
    datetime now = TimeCurrent();
    int sends = 0;
+   uint t0 = GetTickCount();
    for(int i = ArraySize(g_queue) - 1; i >= 0; i--)
      {
       if(g_queue[i].due > now) continue;
       if(sends >= SEND_PER_TIMER) break;     // the rest go on the next timer (10 s)
+      if(sends > 0 && GetTickCount() - t0 > SEND_BUDGET_MS) break;
       sends++;
       ulong id = g_queue[i].position_id;
       string json, msg;
       datetime closeTime;
-      if(!BuildTrade(id, json, closeTime)) { Dequeue(i); continue; }
+      bool stillOpen;
+      if(!BuildTrade(id, json, closeTime, stillOpen)) { Dequeue(i); continue; }
 
       int r = Send(json, msg);
+      if(r == 1 || r == 0) g_netFails = 0;
       if(r == 1)
         {
          datetime complete = closeTime + BarsAfter * PeriodSeconds(ChartTimeframe);
          g_sentCount++;
-         g_lastSync = TimeToString(TimeLocal(), TIME_MINUTES) + " sent position " + IntegerToString((long)id);
-         if(now >= complete)
+         g_lastSync = TimeToString(TimeLocal(), TIME_MINUTES) + " sent position " + IntegerToString((long)id)
+                      + (stillOpen ? " (partial)" : "");
+         if(stillOpen)
+            Dequeue(i);                       // the final close queues it again
+         else if(now >= complete)
            {
             MarkSent(id);
             LogLocally(json, id);
@@ -404,6 +422,8 @@ void ProcessQueue()
          // so trades closed before the account was added are not lost
          g_lastSync = "waiting: " + msg;
          g_queue[i].due = now + 300;
+         g_netWait = TimeLocal() + 300;       // the same answer applies to every trade: stop for now
+         break;
         }
       else if(r == 0)
         {
@@ -414,8 +434,14 @@ void ProcessQueue()
         }
       else
         {
+         // site not reachable: try again after 1, 2, 5, 10, then every 15 minutes
+         int waits[5] = { 1, 2, 5, 10, 15 };
+         int w = waits[g_netFails < 4 ? g_netFails : 4] * 60;
+         g_netFails++;
          g_lastSync = "waiting: " + msg;
-         g_queue[i].due = now + 60;
+         g_queue[i].due = now + w;
+         g_netWait = TimeLocal() + w;
+         break;
         }
      }
   }
@@ -438,7 +464,7 @@ void CatchUp()
       if(!dup) { int n = ArraySize(ids); ArrayResize(ids, n + 1); ids[n] = id; }
      }
    for(int k = 0; k < ArraySize(ids); k++)
-      if(!IsPositionOpen(ids[k]) && (ResendHistory || !WasSent(ids[k]))) Enqueue(ids[k], now);
+      if(ResendHistory || !WasSent(ids[k]) || IsPositionOpen(ids[k])) Enqueue(ids[k], now);   // open = partial booked
   }
 
 
@@ -551,6 +577,7 @@ void CalendarOnTimer()
   {
    if(!SendNews || MQLInfoInteger(MQL_TESTER)) return;
    if(!LicenseIsValid() || JournalKey == "") return;
+   if(TimeLocal() < g_netWait) return;      // site not reachable just now: trades retry first
    datetime now = TimeTradeServer();
    if(now < g_calNext) return;
    g_calNext = now + 30 * 60;
@@ -585,13 +612,14 @@ void UpdatePanel()
          pnl += HistoryDealGetDouble(d, DEAL_PROFIT) + HistoryDealGetDouble(d, DEAL_COMMISSION)
                 + HistoryDealGetDouble(d, DEAL_SWAP) + HistoryDealGetDouble(d, DEAL_FEE);
         }
-   Comment("5ABI.FX TRADE JOURNAL\n",
-           "License: ", LicenseIsValid() ? "OK" : "not active", "\n",
-           "Today: ", trades, " closes, ", DoubleToString(pnl, 2), " ", AccountInfoString(ACCOUNT_CURRENCY), "\n",
-           "Waiting to send: ", ArraySize(g_queue), "\n",
-           "Last sync: ", g_lastSync, "\n",
-           "Indicators: ", g_relayStatus, "\n",
-           "News: ", SendNews ? g_calStatus : "off");
+   // LicComment only redraws the chart when the text really changed
+   LicComment("5ABI.FX TRADE JOURNAL\n"
+              + "License: " + (LicenseIsValid() ? "OK" : "not active") + "\n"
+              + "Today: " + IntegerToString(trades) + " closes, " + DoubleToString(pnl, 2) + " " + AccountInfoString(ACCOUNT_CURRENCY) + "\n"
+              + "Waiting to send: " + IntegerToString(ArraySize(g_queue)) + "\n"
+              + "Last sync: " + g_lastSync + "\n"
+              + "Indicators: " + g_relayStatus + "\n"
+              + "News: " + (SendNews ? g_calStatus : "off"));
   }
 
 //--- events ----------------------------------------------------------------
@@ -612,8 +640,7 @@ int OnInit()
    EventSetTimer(10);
    g_calNext = TimeTradeServer() + 20;      // news a little after start, trades first
    RememberLevels();
-   CatchUp();
-   ProcessQueue();
+   CatchUp();                               // sending starts on the first timer, so the chart opens fast
    UpdatePanel();
    return INIT_SUCCEEDED;
   }
@@ -643,8 +670,7 @@ void OnTradeTransaction(const MqlTradeTransaction &trans, const MqlTradeRequest 
    long entry = HistoryDealGetInteger(trans.deal, DEAL_ENTRY);
    if(entry != DEAL_ENTRY_OUT && entry != DEAL_ENTRY_OUT_BY && entry != DEAL_ENTRY_INOUT) return;
    ulong id = (ulong)HistoryDealGetInteger(trans.deal, DEAL_POSITION_ID);
-   if(IsPositionOpen(id)) return;           // a partial close: logged with the final close
-   Enqueue(id, TimeCurrent());
+   Enqueue(id, TimeCurrent());              // a partial close goes to the journal now, and again on the final close
    ProcessQueue();
    UpdatePanel();
   }
