@@ -1,5 +1,6 @@
 // Study room (src/study.js): an open canvas like a whiteboard. Boards (one per setup + free boards) hold trade frames,
 // screenshots, sticky notes, handwriting and hand-drawn marks. The Trades panel lists trades by account; clicking a trade
+// there opens it on its own board in a new tab (like a browser tab), dragging it adds it to this board. Clicking a trade
 // on the board opens the one-question-at-a-time panel (environment, notes, grade) that saves it into a setup.
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -156,7 +157,9 @@
     const env = (t.env || []).flat(), setup = SETS.find((s) => s.id === t.setup);
     n.innerHTML = `<div class="s-fh"><b>${esc(t.symbol)} ${String(t.side).toLowerCase() === 'sell' ? 'sell' : 'buy'}</b><span class="s-tag">${esc(acctName(t.acct))}</span><span class="s-tag">${fLong(t.open)} · ${fTime(t.open)}</span>${setup ? `<span class="s-tag">${esc(setup.n)}</span>` : ''}<span class="s-r ${(t.r || t.net) < 0 ? 'neg' : 'pos'}">${t.r ? R(t.r) : money(t.net)}</span></div><canvas></canvas>
       <div class="s-ff">${env.map((w) => `<span>${esc(w)}</span>`).join('') || '<span class="mu">Click to answer: where, what happened, day, session</span>'}${t.grade ? `<span class="g">${esc(t.grade)}</span>` : ''}</div>`;
-    const c = n.querySelector('canvas'), W = Math.round(o.w * 2), Hh = Math.round(o.w); const src = realChart(t, W, Hh); c.width = W; c.height = Hh; c.getContext('2d').drawImage(src, 0, 0); c.style.height = (o.w / 2) + 'px'; }
+    const c = n.querySelector('canvas'), W = Math.round(o.w * 2), Hh = Math.round(o.w); const src = realChart(t, W, Hh); c.width = W; c.height = Hh; c.getContext('2d').drawImage(src, 0, 0); c.style.height = (o.w / 2) + 'px';
+    if (BOARD.trade === o.tid && !BD.view && !fitOnce) { fitOnce = true; requestAnimationFrame(fit); } }
+  let fitOnce = false;
   const getTrade = (id) => (TD[id] ? Promise.resolve(TD[id]) : fetch('/journal/study/trade/' + id + '.json', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.reject(new Error('gone')))).then((t) => (TD[id] = t)));
   function setupCard(n, o) { const s = SETS.find((x) => x.id === o.setup) || SETS.find((x) => x.id === BOARD.setup);
     if (!s) { n.innerHTML = '<div class="s-k">Setup</div><h3>No trades yet</h3>'; return; }
@@ -184,7 +187,7 @@
   /* ---------- top-left: boards ---------- */
   const isSetupBoard = Boolean(BOARD.setup);
   $('sr-tl').innerHTML = `<button type="button" class="s-ib" id="sr-menu" title="Boards" aria-label="Boards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-    <button type="button" class="sr-board" id="sr-bbtn"><span>${esc(BOARD.name)}</span><small>${isSetupBoard ? 'setup board' : 'board'}</small><svg width="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
+    <button type="button" class="sr-board" id="sr-bbtn"><span>${esc(BOARD.name)}</span><small>${BOARD.trade ? 'trade' : isSetupBoard ? 'setup board' : 'board'}</small><svg width="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>
     <span class="sr-saved" id="sr-saved"><i></i><span>Saved</span></span>`;
   function boardsMenu() {
     const el = $('sr-boards'), sb = (D.boards || []).filter((b) => b.setup), fb = (D.boards || []).filter((b) => !b.setup);
@@ -198,6 +201,36 @@
     if ($('sr-renb')) $('sr-renb').onclick = (e) => ask(e.currentTarget, 'New name', BOARD.name, (name) => api('/journal/study/board/' + BOARD.id + '/rename', { name }).then(() => { BOARD.name = name; $('sr-bbtn').firstChild.textContent = name; (D.boards.find((b) => b.id === BOARD.id) || {}).name = name; boardsMenu(); }).catch((er) => toast(er.message)));
     const del = $('sr-delb'); if (del) del.onclick = () => { if (!del.classList.contains('arm')) { del.classList.add('arm'); del.textContent = 'Click again to delete it'; return; } api('/journal/study/board/' + BOARD.id + '/delete').then(() => { location.href = location.pathname; }).catch((er) => toast(er.message)); }; }
   $('sr-menu').onclick = $('sr-bbtn').onclick = () => { const el = $('sr-boards'); if (el.hidden) boardsMenu(); el.hidden = !el.hidden; $('sr-props').hidden = true; };
+
+  /* ---------- tabs: every trade opened from the list gets its own tab ---------- */
+  const TABS = D.tabs || [];
+  const nav = (href) => { const a = document.createElement('a'); a.href = href; a.hidden = true; app.appendChild(a); a.click(); a.remove(); };
+  if (!BOARD.trade) store.set('srBoard', String(BOARD.id));
+  function renderTabs() {
+    const el = $('sr-tabs'); if (!el) return;
+    if (!TABS.length) { el.hidden = true; return; }
+    const lb = +store.get('srBoard', 0), home = (D.boards || []).find((b) => b.id === (BOARD.trade ? lb : BOARD.id)) || (D.boards || [])[0];
+    el.hidden = false;
+    el.innerHTML = (home ? `<a class="sr-tt home${BOARD.trade ? '' : ' on'}" href="?b=${home.id}" title="${esc(home.name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg><span><b>${esc(home.name)}</b></span></a>` : '')
+      + TABS.map((t) => { const v = t.r || t.net; return `<a class="sr-tt${t.id === BOARD.id ? ' on' : ''}" href="?b=${t.id}" data-tab="${t.id}" title="${esc(t.name)}"><i class="${v < 0 ? 'neg' : 'pos'}"></i><span><b>${esc(t.name)}</b><small>${fDay(t.close)} · <span class="${v < 0 ? 'neg' : 'pos'}">${t.r ? R(t.r) : money(t.net)}</span></small></span><button type="button" class="sr-tx" data-x="${t.id}" title="Close this tab" aria-label="Close this tab">×</button></a>`; }).join('');
+    el.querySelectorAll('[data-x]').forEach((b) => (b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); closeTab(+b.dataset.x); }));
+    const on = el.querySelector('.sr-tt.on'); if (on) on.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+  function closeTab(id) {
+    const i = TABS.findIndex((t) => t.id === id); if (i < 0) return;
+    api('/journal/study/board/' + id + '/close').then(() => {
+      TABS.splice(i, 1);
+      if (id !== BOARD.id) { renderTabs(); list(); return; }
+      const nx = TABS[i] || TABS[i - 1], lb = +store.get('srBoard', 0);
+      if (dirtyB) saveBoard();
+      nav(nx ? '?b=' + nx.id : (D.boards || []).some((b) => b.id === lb) ? '?b=' + lb : location.pathname);
+    }).catch((er) => toast(er.message)); }
+  function openTrade(id, e) {
+    const has = TABS.find((t) => t.trade === id);
+    if (has && has.id === BOARD.id) { const o = items.find((q) => q.type === 'trade' && q.tid === id); if (o) { S.sel = o.id; renderAll(); } return; }
+    const href = has ? '?b=' + has.id : '?t=' + id;
+    if (e && (e.ctrlKey || e.metaKey || e.button === 1)) { window.open(href, '_blank'); return; }
+    if (dirtyB) saveBoard();
+    nav(href); }
 
   /* ---------- toolbar and ink options ---------- */
   const TOOLS = [['hand', 'H', 'Move around', 'M7 11V6a1.5 1.5 0 013 0v4M10 10V4.5a1.5 1.5 0 013 0V10M13 10V5.5a1.5 1.5 0 013 0V11M16 11V8a1.5 1.5 0 013 0v6a7 7 0 01-7 7h-1a6 6 0 01-5-2.7L4 14.5a1.6 1.6 0 012.5-2L8 14'],
@@ -305,7 +338,7 @@
       <label class="s-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="sr-q" placeholder="Search symbol or setup" aria-label="Search trades" value="${esc(F.q)}"></label>
       <div class="s-chips">${[['todo', 'To study'], ['done', 'Studied'], ['all', 'All']].map(([k, n]) => `<button type="button" class="s-chip" data-st="${k}" aria-pressed="${F.st === k}">${n}</button>`).join('')}<span class="gap"></span>${[['all', 'All'], ['win', 'Wins'], ['loss', 'Losses']].map(([k, n]) => `<button type="button" class="s-chip" data-res="${k}" aria-pressed="${F.res === k}">${n}</button>`).join('')}</div></header>
       <div class="s-list" id="sr-list"></div>
-      <footer>Drag a trade onto the board, or click it. <span>${D.shots.used} of ${D.shots.cap} screenshots used</span></footer>`;
+      <footer>Click a trade to open it in its own tab. Drag it onto the board to compare. <span>${D.shots.used} of ${D.shots.cap} screenshots used</span></footer>`;
     el.querySelectorAll('[data-a]').forEach((b) => (b.onclick = () => { F.acct = b.dataset.a; store.set('srAcct', F.acct); el.querySelectorAll('[data-a]').forEach((x) => x.setAttribute('aria-pressed', x === b)); load(); }));
     el.querySelectorAll('[data-st]').forEach((b) => (b.onclick = () => { F.st = b.dataset.st; el.querySelectorAll('[data-st]').forEach((x) => x.setAttribute('aria-pressed', x === b)); load(); }));
     el.querySelectorAll('[data-res]').forEach((b) => (b.onclick = () => { F.res = b.dataset.res; el.querySelectorAll('[data-res]').forEach((x) => x.setAttribute('aria-pressed', x === b)); load(); }));
@@ -317,13 +350,13 @@
       .then((j) => { rows = append ? rows.concat(j.rows) : j.rows; more = j.more; total = j.total; F.off = rows.length; list(); }).catch(() => { const l = $('sr-list'); if (l) l.innerHTML = '<p class="s-empty">Could not load your trades. Check your connection.</p>'; }); }
   function list() { const l = $('sr-list'); if (!l) return;
     if (!rows.length) { l.innerHTML = `<p class="s-empty">${(D.accts || []).length ? 'No trades match. Try another account or filter.' : 'Your trades show up here once the Journal EA records them.'}</p>`; return; }
-    const on = new Set(items.filter((o) => o.type === 'trade').map((o) => o.tid)); let html = `<div class="s-cnt">${total.toLocaleString('en-US')} trade${total === 1 ? '' : 's'}</div>`, day = '';
+    const on = new Set(items.filter((o) => o.type === 'trade').map((o) => o.tid)), tabbed = new Set(TABS.map((t) => t.trade)); let html = `<div class="s-cnt">${total.toLocaleString('en-US')} trade${total === 1 ? '' : 's'}</div>`, day = '';
     rows.forEach((t) => { const dy = fLong(t.close); if (dy !== day) { day = dy; html += `<div class="s-day">${dy}</div>`; }
-      html += `<div class="s-tr${t.done ? ' done' : ''}${on.has(t.id) ? ' on-board' : ''}" draggable="true" data-id="${t.id}" tabindex="0" role="button"><b><span class="dot"></span>${esc(t.symbol)} <span class="s-side">${esc(String(t.side).toLowerCase())}</span></b><span class="v ${(t.r || t.net) < 0 ? 'neg' : 'pos'}">${t.r ? R(t.r) : money(t.net)}</span><small>${fTime(t.close)} · ${esc(t.setup || (F.acct ? 'No setup yet' : acctName(t.acct)))}</small><small class="s-r">${money(t.net)}</small></div>`; });
+      html += `<div class="s-tr${t.done ? ' done' : ''}${on.has(t.id) ? ' on-board' : ''}${tabbed.has(t.id) ? ' on-tab' : ''}" draggable="true" data-id="${t.id}" tabindex="0" role="button" title="Click to open in its own tab. Drag onto the board to compare."><b><span class="dot"></span>${esc(t.symbol)} <span class="s-side">${esc(String(t.side).toLowerCase())}</span></b><span class="v ${(t.r || t.net) < 0 ? 'neg' : 'pos'}">${t.r ? R(t.r) : money(t.net)}</span><small>${fTime(t.close)} · ${esc(t.setup || (F.acct ? 'No setup yet' : acctName(t.acct)))}</small><small class="s-r">${money(t.net)}</small></div>`; });
     if (more) html += '<button type="button" class="s-more" id="sr-more">Show more</button>';
     l.innerHTML = html;
     l.querySelectorAll('.s-tr').forEach((r) => { r.ondragstart = (e) => { e.dataTransfer.setData('text/x-trade', r.dataset.id); e.dataTransfer.effectAllowed = 'copy'; };
-      const go = () => { const [x, y] = center(); dropTrade(+r.dataset.id, x - 300, y - 180); }; r.onclick = go; r.onkeydown = (k) => { if (k.key === 'Enter') go(); }; });
+      r.onclick = (e) => openTrade(+r.dataset.id, e); r.onauxclick = (e) => { if (e.button === 1) openTrade(+r.dataset.id, e); }; r.onkeydown = (k) => { if (k.key === 'Enter') openTrade(+r.dataset.id, k); }; });
     if ($('sr-more')) $('sr-more').onclick = () => load(true); }
   function dropTrade(id, x, y) { const has = items.find((o) => o.type === 'trade' && o.tid === id); if (has) { S.sel = has.id; renderAll(); return toast('That trade is already on this board.'); }
     snap(); const o = { id: uid(), type: 'trade', tid: id, x: Math.round(x), y: Math.round(y), w: 600 }; items.push(o); S.sel = o.id; renderAll(); changed(); list(); }
@@ -402,8 +435,9 @@
   /* ---------- boot ---------- */
   // a setup board always has its setup card
   if (isSetupBoard && !items.some((o) => o.type === 'setup')) items.unshift({ id: uid(), type: 'setup', setup: BOARD.setup, x: -560, y: 0, w: 480 });
-  $('sr-hint').textContent = items.length ? 'Scroll to move around · Ctrl + scroll to zoom · Shift + drag a frame to resize it' : 'Empty board. Drag trades here from the right, paste a screenshot, or draw anywhere.';
-  setTool('select'); drawer(); load(); renderAll(); apply();
+  $('sr-hint').textContent = items.length ? 'Scroll to move around · Ctrl + scroll to zoom · Shift + drag a frame to resize it' : 'Empty board. Drag trades here from the right (a click opens a trade in its own tab), paste a screenshot, or draw anywhere.';
+  if (BOARD.trade) { const o = items.find((q) => q.type === 'trade' && q.tid === BOARD.trade); if (o) S.sel = o.id; }
+  setTool('select'); renderTabs(); drawer(); load(); renderAll(); apply();
   if (!BD.view) requestAnimationFrame(fit);
   Promise.all(['Architects Daughter', 'Caveat'].map((f) => document.fonts.load(`30px "${f}"`).catch(() => {}))).then(() => renderItems());
 })();
