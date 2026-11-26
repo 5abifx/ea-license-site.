@@ -270,3 +270,22 @@ html.calm .app-body :not(.plx, .plx *) { transition-duration: .12s !important; }
 .pc-body { overflow: hidden; }
 /* the request form lives in the help panel now: the right column only keeps clear of the help button */
 @media (min-width: 1200px) and (pointer: fine) { html.sc-wide .sc-r { bottom: 86px; } }
+
+/* ---------- side columns: both sides match (owner, 2026-11-26) ----------
+   Same top and same bottom on the left and the right: both stop above the help button corner (or both run to the
+   screen edge when the help button is hidden). The last card of each column stretches down, so the two columns
+   always end on the same line. When a column is taller than the screen it scrolls, and the cut edge fades softly
+   instead of leaving a hard empty band above or below the cards. */
+@media (min-width: 1200px) and (pointer: fine) {
+  .sc-col { --scb: 86px; }
+  html.sc-nohelp .sc-col { --scb: 14px; }
+  .sc-col.sc-l, .sc-col.sc-r, html.sc-wide .sc-col.sc-r { top: 76px; bottom: var(--scb); }
+  .sc-col > .sc-card:last-of-type { flex-grow: 1; }
+  .sc-col.ft { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 36px); mask-image: linear-gradient(to bottom, transparent 0, #000 36px); }
+  .sc-col.fb { -webkit-mask-image: linear-gradient(to top, transparent 0, #000 36px); mask-image: linear-gradient(to top, transparent 0, #000 36px); }
+  .sc-col.ft.fb { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 36px, #000 calc(100% - 36px), transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 36px, #000 calc(100% - 36px), transparent 100%); }
+  /* the "+" request button (only shown when there is no help button) takes the help button's corner */
+  html.sc-wide .fr { right: 29px; bottom: 29px; }
+  html.sc-wide .fr-pop { right: 29px; bottom: 72px; }
+}

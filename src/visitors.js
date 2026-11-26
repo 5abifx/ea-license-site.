@@ -100,7 +100,7 @@ function section(db, { q, from, days, srcLabel, TRACKED }) {
   const signRows = db.prepare(`SELECT source AS s, campaign AS c, COUNT(*) AS n, SUM(CASE WHEN plan != '' OR mentor_plan != '' THEN 1 ELSE 0 END) AS paid
     FROM users WHERE is_admin = 0 AND created_at >= ? GROUP BY source, campaign`).all(days ? from : '0000');
   const sk = (s, c) => `${s}|${c}`, signs = Object.fromEntries(signRows.map((r) => [sk(r.s, r.c), r]));
-  const opt = (name, cur, list, all) => `<select name="${name}" aria-label="${all}" onchange="this.form.submit()"><option value="">${all}</option>${list.map(([v, l]) => `<option value="${esc(v)}"${String(cur ?? '') === String(v) ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  const opt = (name, cur, list, all) => `<select name="${name}" aria-label="${all}" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()"><option value="">${all}</option>${list.map(([v, l]) => `<option value="${esc(v)}"${String(cur ?? '') === String(v) ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
   const allSrc = db.prepare('SELECT DISTINCT src FROM visits').all().map((r) => r.src);
   const allCtry = db.prepare("SELECT DISTINCT ctry FROM visits WHERE ctry != '' ORDER BY ctry").all().map((r) => r.ctry);
   const bars = (rows, name) => { const m = Math.max(1, ...rows.map((r) => r.n)); return rows.length ? rows.slice(0, 7).map((r) => `<div class="vz-b"><span>${esc(name(r.k))}</span><span class="vz-t"><i style="width:${Math.round((r.n / m) * 100)}%"></i></span><b>${total ? Math.round((r.n / total) * 100) : 0}%</b></div>`).join('') : '<p class="muted small">No visits yet.</p>'; };

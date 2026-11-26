@@ -92,6 +92,20 @@ app.use((req, res, next) => {
   if (req.secure) res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   next();
 });
+// Members forms are sent in the background by public/swap.js (header X-Swap: 1), so a Save / Delete / Tag button acts
+// in place instead of reloading the whole page. The page after the form is then swapped in like any other members
+// page, so a redirect is answered with its address (X-Swap-Location) instead of a 302 the browser would follow blind.
+app.use((req, res, next) => {
+  if (req.method !== 'POST' || req.get('X-Swap') !== '1') return next();
+  const redirect = res.redirect.bind(res);
+  res.redirect = (a, b) => {
+    const status = typeof a === 'number' ? a : 302, url = typeof a === 'number' ? b : a;
+    if (status === 307 || status === 308) return redirect(status, url);   // re-post to another route: let fetch follow it
+    res.set({ 'X-Swap-Location': String(url), 'Cache-Control': 'no-store' });
+    res.status(200).type('text').end();
+  };
+  next();
+});
 app.use(express.urlencoded({ extended: false }));
 app.use((req, res, next) => { req.body = req.body || {}; next(); });
 // Every deploy gets a new version tag on our CSS/JS links, so browsers and Cloudflare

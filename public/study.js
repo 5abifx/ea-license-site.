@@ -194,9 +194,9 @@
       ${(D.rooms || []).length > 1 ? `<h6>Room</h6><div class="s-rooms">${D.rooms.map(([r, n]) => `<a href="?room=${r}" class="s-chip${r === ROOM ? ' on' : ''}">${n}</a>`).join('')}</div>` : ''}`;
     const ask = (btn, ph, val, go) => { const i = document.createElement('input'); i.className = 'sr-in'; i.placeholder = ph; i.value = val || ''; i.maxLength = 50; btn.replaceWith(i); i.focus(); i.select();
       i.onkeydown = (k) => { if (k.key === 'Enter' && i.value.trim()) go(i.value.trim()); if (k.key === 'Escape') boardsMenu(); }; };
-    $('sr-newb').onclick = (e) => ask(e.currentTarget, 'Board name, e.g. This week', '', (name) => api('/journal/study/boards/new', { name }).then((j) => { location.href = '?b=' + j.id; }).catch((er) => toast(er.message)));
+    $('sr-newb').onclick = (e) => ask(e.currentTarget, 'Board name, e.g. This week', '', (name) => api('/journal/study/boards/new', { name }).then((j) => { const to = '?b=' + j.id; if (window.swapGo) window.swapGo(to); else location.href = to; }).catch((er) => toast(er.message)));
     if ($('sr-renb')) $('sr-renb').onclick = (e) => ask(e.currentTarget, 'New name', BOARD.name, (name) => api('/journal/study/board/' + BOARD.id + '/rename', { name }).then(() => { BOARD.name = name; $('sr-bbtn').firstChild.textContent = name; (D.boards.find((b) => b.id === BOARD.id) || {}).name = name; boardsMenu(); }).catch((er) => toast(er.message)));
-    const del = $('sr-delb'); if (del) del.onclick = () => { if (!del.classList.contains('arm')) { del.classList.add('arm'); del.textContent = 'Click again to delete it'; return; } api('/journal/study/board/' + BOARD.id + '/delete').then(() => { location.href = location.pathname; }).catch((er) => toast(er.message)); }; }
+    const del = $('sr-delb'); if (del) del.onclick = () => { if (!del.classList.contains('arm')) { del.classList.add('arm'); del.textContent = 'Click again to delete it'; return; } api('/journal/study/board/' + BOARD.id + '/delete').then(() => { if (window.swapGo) window.swapGo(location.pathname); else location.href = location.pathname; }).catch((er) => toast(er.message)); }; }
   $('sr-menu').onclick = $('sr-bbtn').onclick = () => { const el = $('sr-boards'); if (el.hidden) boardsMenu(); el.hidden = !el.hidden; $('sr-props').hidden = true; };
 
   /* ---------- toolbar and ink options ---------- */

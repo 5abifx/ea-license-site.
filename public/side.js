@@ -17,10 +17,27 @@
   // Appearance > Layout: 'pin' keeps the cards on screen, 'slide' gives the middle the full width and the cards slide in
   var sidePref = (window.__LOOK && window.__LOOK.side) || 'pin';
   // the middle column's own width drives the page layout (public/fit.css): mid-m < 1180px, mid-s < 900px
+  var edgeQ = [];
+  function edge(c) {
+    if (edgeQ.indexOf(c) > -1) return;
+    edgeQ.push(c);
+    if (edgeQ.length === 1) requestAnimationFrame(function () {
+      edgeQ.splice(0).forEach(function (k) {
+        var t = k.scrollTop, room = k.scrollHeight - k.clientHeight;
+        k.classList.toggle('ft', room > 2 && t > 2); k.classList.toggle('fb', room > 2 && t < room - 2);
+      });
+    });
+  }
+  function edges() { document.querySelectorAll('.sc-col').forEach(edge); }
   function fit() {
     var b = document.querySelector('.app-main > .app-body'), w = b ? b.getBoundingClientRect().width : innerWidth;
     root.classList.toggle('mid-m', w > 0 && w < 1180); root.classList.toggle('mid-s', w > 0 && w < 900);
+    corner(); edges();
   }
+  // both columns end on the same line: above the help button corner, or at the screen edge when it is hidden (fit.css)
+  function corner() { root.classList.toggle('sc-nohelp', !document.querySelector('.sup:not([hidden]), body > .fr')); }
+  addEventListener('sup:show', function () { setTimeout(corner, 0); });
+  document.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('.sup-hide')) setTimeout(corner, 0); }, true);
   function mode() { root.classList.toggle('sc-wide', wide.matches && sidePref !== 'slide'); fit(); }
   mode(); wide.addEventListener && wide.addEventListener('change', mode);
   addEventListener('look:side', function (e) { sidePref = e.detail; mode(); });
@@ -51,6 +68,7 @@
   }
   var fr = el('button', 'fr', '+'); fr.type = 'button'; fr.title = 'Request a feature'; fr.setAttribute('aria-label', 'Request a feature');
   if (!supList) document.body.appendChild(fr);
+  corner(); if (document.readyState !== 'complete') addEventListener('load', corner);
   var pop = null;
   fr.addEventListener('click', function () {
     if (pop) { pop.remove(); pop = null; return; }
@@ -75,6 +93,12 @@
   var L = el('aside', 'sc-col sc-l'), R = el('aside', 'sc-col sc-r');
   L.setAttribute('aria-label', 'Focus and sessions'); R.setAttribute('aria-label', 'Today');
   document.body.appendChild(L); document.body.appendChild(R);
+  // a column taller than the screen scrolls: fade the cut edge (top and/or bottom) instead of a hard line
+  [L, R].forEach(function (c) {
+    c.addEventListener('scroll', function () { edge(c); }, { passive: true });
+    if (window.ResizeObserver) new ResizeObserver(function () { edge(c); }).observe(c);
+    if (window.MutationObserver) new MutationObserver(function () { edge(c); }).observe(c, { childList: true, subtree: true });
+  });
   document.body.appendChild(el('span', 'sc-tab l')); document.body.appendChild(el('span', 'sc-tab r'));
   addEventListener('pointermove', function (e) {
     if (root.classList.contains('sc-wide')) return;

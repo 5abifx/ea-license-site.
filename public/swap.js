@@ -91,7 +91,7 @@
     if (a.target && a.target !== '_self') return null;
     if (e && (e.defaultPrevented || e.button > 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) return null;
     var u; try { u = new URL(a.href, location.href); } catch (x) { return null; }
-    if (u.origin !== location.origin || u.pathname === '/' || SKIP.test(u.pathname)) return null;
+    if (u.origin !== location.origin || SKIP.test(u.pathname)) return null;   // "/" too: signed in, it opens the Desk
     if (u.hash && u.pathname === location.pathname && u.search === location.search) return null;   // same-page jump
     if (a.getAttribute('href').charAt(0) === '#') return null;
     return u;
@@ -113,7 +113,7 @@
         + 'background:linear-gradient(90deg,transparent,#ff5a1f 40%,#ffb38f);transform:scaleX(0);transform-origin:0 50%;opacity:0;'
         + 'transition:transform 1.6s cubic-bezier(.1,.7,.2,1),opacity .25s}'
         + '#swap-bar.on{opacity:1;transform:scaleX(.8)}#swap-bar.done{opacity:0;transform:scaleX(1);transition:transform .2s,opacity .35s .15s}'
-        + '.app-main.swap-out{opacity:.55;transition:opacity .15s}'
+        + '.app-main.swap-out{opacity:.55;transition:opacity .15s .12s}'
         + '.app-main.swap-in{animation:swapIn .28s cubic-bezier(.2,.7,.2,1)}'
         + '.app-main h1[tabindex="-1"]:focus{outline:none}'
         + '@keyframes swapIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}';
@@ -155,7 +155,7 @@
     }, Promise.resolve());
   }
 
-  function swapTo(url, push, y) {
+  function swapTo(url, push, y, resp) {
     if (busy) busy.abort = true;
     var me = busy = { abort: false };
     var main = D.querySelector('.app-main');
@@ -164,7 +164,7 @@
     // a toggle or filter on the same page (New York / MT5 time, period, account...): swap in place, no fade, same scroll
     var inPlace = push && url.pathname === location.pathname, keepY = W.scrollY;
     bar(true); if (!inPlace) main.classList.add('swap-out');
-    get(url).then(function (r) {
+    (resp || get(url)).then(function (r) {
       var type = r.headers.get('content-type') || '';
       if (!/text\/html/.test(type) || (r.status >= 400 && r.status !== 404)) throw new Error('not a page');
       var final = new URL(r.url || url.href);
@@ -227,6 +227,12 @@
           var c = D.importNode(s, true); Node.prototype.appendChild.call(D.body, c); shell.push(c);
         });
         var pageScripts = [].slice.call(fresh.querySelectorAll('script'));
+        // download every new script at once; they still run one after another, in order
+        pageScripts.concat(shell).forEach(function (sc) {
+          var src = sc.getAttribute('src'), p = src && path(src);
+          if (!src || ran[p] || /^https?:/i.test(src) || D.querySelector('link[rel="preload"][href="' + src.replace(/"/g, '') + '"]')) return;
+          var l = D.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = src; D.head.appendChild(l);
+        });
         return runScripts(pageScripts, true).then(function () { return runScripts(shell, false); }).then(function () {
           // a script that waits for DOMContentLoaded/load without checking readyState gets its event again
           try { W.dispatchEvent(new CustomEvent('swap:load', { detail: { url: finalUrl } })); } catch (e) { /* ignore */ }
@@ -275,6 +281,23 @@
       if (!pre[k]) pre[k] = { t: Date.now(), p: fetch(k, { credentials: 'same-origin', headers: { 'X-Swap': '1' } }) };
     };
     D.addEventListener('pointerdown', early, { passive: true });
+    // a mouse resting on a link for a moment starts loading too, so the page is often ready on click.
+    // Not for pages that change something just by opening them (What's new marks itself read).
+    var NO_HOVER = /^\/(whats-new|mentor\b|admin\/requests)/, hoverT = 0;
+    D.addEventListener('pointerover', function (e) {
+      if (e.pointerType && e.pointerType !== 'mouse') return;
+      var a = e.target.closest && e.target.closest('a[href]'), u = eligible(a, null);
+      W.clearTimeout(hoverT);
+      if (!u || NO_HOVER.test(u.pathname) || u.href.split('#')[0] === location.href.split('#')[0]) return;
+      hoverT = nST.call(W, function () {
+        var k = u.href.split('#')[0], hit = pre[k];
+        if (hit && Date.now() - hit.t < 8000) return;
+        var pr = fetch(k, { credentials: 'same-origin', headers: { 'X-Swap': '1' } });
+        pr.catch(function () { /* the click will try again */ });
+        pre[k] = { t: Date.now(), p: pr };
+      }, 120);
+    }, { passive: true });
+    D.addEventListener('pointerout', function () { W.clearTimeout(hoverT); }, { passive: true });
     // GET forms (filters) swap too
     D.addEventListener('submit', function (e) {
       var f = e.target;
@@ -286,6 +309,58 @@
       e.preventDefault();
       swapTo(u, true);
     });
+    // POST forms (Save, Delete, Tag, settings...) are sent in the background and the page after them is swapped in,
+    // so a button acts like a button instead of reloading everything. Payments and sign-out still leave the page.
+    var POST_SKIP = /^\/(billing|subscribe|start|pricing|mentorship\/(checkout|waitlist)|login|signup|password)/i;
+    D.addEventListener('submit', function (e) {
+      var f = e.target, sub = e.submitter;
+      var method = ((sub && sub.getAttribute('formmethod')) || f.getAttribute('method') || 'get').toLowerCase();
+      if (e.defaultPrevented || method !== 'post' || (f.target && f.target !== '_self') || f.hasAttribute('data-no-swap') || (sub && sub.hasAttribute('data-no-swap'))) return;
+      var u; try { u = new URL((sub && sub.getAttribute('formaction')) || f.getAttribute('action') || location.href, location.href); } catch (x) { return; }
+      if (u.origin !== location.origin || SKIP.test(u.pathname) || POST_SKIP.test(u.pathname) || count + 1 > 30) return;
+      e.preventDefault();
+      if (f.__swapBusy) return;   // a second click while the first is on its way
+      f.__swapBusy = true; count++; pre = {};   // pages loaded ahead of time are out of date after a save
+      var body = new FormData(f, sub || undefined);
+      if (!/multipart/i.test(f.getAttribute('enctype') || '')) body = new URLSearchParams(body);
+      if (sub) sub.classList.add('is-busy');
+      var done = function () { f.__swapBusy = false; if (sub) sub.classList.remove('is-busy'); };
+      bar(true);
+      fetch(u.href, { method: 'POST', body: body, credentials: 'same-origin', headers: { 'X-Swap': '1' } }).then(function (r) {
+        var loc = r.headers.get('X-Swap-Location');
+        if (loc) {
+          done();
+          var to = new URL(loc, u.href);
+          if (to.origin === location.origin && !SKIP.test(to.pathname)) swapTo(to, true);
+          else location.assign(to.href);
+          return;
+        }
+        var cd = r.headers.get('content-disposition') || '';
+        if (/attachment/i.test(cd)) {   // a file: save it, stay on the page
+          return r.blob().then(function (b) {
+            var m = /filename="?([^";]+)"?/i.exec(cd), a = D.createElement('a');
+            a.href = URL.createObjectURL(b); a.download = m ? m[1] : 'download'; Node.prototype.appendChild.call(D.body, a); a.click(); a.remove();
+            done(); bar(false);
+          });
+        }
+        return r.text().then(function (html) {
+          done();
+          var doc = new DOMParser().parseFromString(html, 'text/html');
+          if (/text\/html/.test(r.headers.get('content-type') || '') && doc.querySelector('.app-main') && doc.getElementById('tb') && ver(doc) === MY_VER) {
+            swapTo(new URL(r.url || u.href), true, 0, Promise.resolve(new Response(html, { status: 200, headers: { 'content-type': 'text/html' } })));
+          } else { D.open(); D.write(html); D.close(); }   // anything else: show it as the browser would have
+        });
+      }).catch(function () {
+        // never reached the server (offline...): send it the normal way
+        done(); bar(false); f.setAttribute("data-no-swap", ""); if (f.requestSubmit) f.requestSubmit(sub || undefined); else HTMLFormElement.prototype.submit.call(f);
+      });
+    });
+    // for page scripts: go to a members page in place (falls back to a normal load)
+    W.swapGo = function (href) {
+      var u; try { u = new URL(href, location.href); } catch (x) { location.href = href; return; }
+      if (u.origin !== location.origin || SKIP.test(u.pathname) || ++count > 30) { location.href = u.href; return; }
+      swapTo(u, true);
+    };
     addEventListener('popstate', function (e) {
       var here = location.pathname + location.search;
       if (here === shown) return;   // only the #part changed
