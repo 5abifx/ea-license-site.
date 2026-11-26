@@ -1,5 +1,7 @@
 // "What's new" for signed-in members (public/whatsnew.js, public/whatsnew.css).
-// The owner adds one short line per feature in Admin > What's new (/admin/whatsnew). Lines wait as a draft
+// AUTOMATIC: every member-facing change adds its lines to src/whatsnew-notes.json in the same PR. On start-up
+// (= each deploy) lines whose id is not in the database yet are published at once, so the owner does nothing.
+// The owner can still add a line by hand in Admin > What's new (/admin/whatsnew). Hand-made lines wait as a draft
 // until "Publish to members"; each member then sees the new lines once, as a popup (a bottom sheet on phones),
 // with an orange dot on "What's new" in the menu until they close it. /whats-new lists every past update.
 //
@@ -21,9 +23,31 @@ const ICONS = {
   phone: 'M8 2h8v20H8zM11 18h2',
   user: 'M12 4a4 4 0 1 0 0 8a4 4 0 1 0 0-8zM4 21c1-4 5-6 8-6s7 2 8 6',
   shield: 'M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z',
+  spark: 'M12 2v5M12 17v5M2 12h5M17 12h5M5 5l3.5 3.5M15.5 15.5L19 19M5 19l3.5-3.5M15.5 8.5L19 5',
+  tools: 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z',
+  study: 'M4 19V6a2 2 0 0 1 2-2h5v15H6a2 2 0 0 0-2 2zM20 19V6a2 2 0 0 0-2-2h-5v15h5a2 2 0 0 1 2 2z',
+  export: 'M12 4v11M7 10l5 5 5-5M5 20h14',
+  bolt: 'M13 2L4 14h7l-1 8 9-12h-7z',
+  split: 'M3 12h7l4-6h7M14 18h7M10 12l4 6',
 };
 const MAX_LINE = 50, MAX_NAME = 30;
-const svg = (k, s = 18) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[k] || ICONS.star}"/></svg>`;
+const svg = (k, s = 18) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[k] || ICONS.spark}"/></svg>`;
+// the popup gets the icon's path, so public/whatsnew.js needs no copy of the set
+const forPop = (r) => ({ name: r.name, line: r.line, link: r.link, icon: ICONS[r.icon] || ICONS.spark });
+
+// src/whatsnew-notes.json -> published lines (one timestamp per deploy, so they show as one update)
+function syncNotes() {
+  let notes = [];
+  try { notes = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'whatsnew-notes.json'), 'utf8')); } catch (e) { console.error('whatsnew-notes.json:', e.message); return; }
+  const have = new Set(db.prepare('SELECT note_id FROM whatsnew WHERE note_id IS NOT NULL').all().map((r) => r.note_id));
+  const fresh = notes.filter((n) => n && n.id && n.name && n.line && !have.has(String(n.id)));
+  if (!fresh.length) return;
+  const at = db.prepare("SELECT datetime('now') AS t").get().t;
+  const ins = db.prepare('INSERT INTO whatsnew (note_id, name, line, link, icon, audience, pos, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  fresh.forEach((n, i) => ins.run(String(n.id), String(n.name).slice(0, MAX_NAME), String(n.line).slice(0, MAX_LINE), cleanLink(n.link),
+    ICONS[n.icon] ? n.icon : 'spark', AUD[n.audience] ? n.audience : 'all', i, at));
+  console.log(`What's new: published ${fresh.length} line(s) from whatsnew-notes.json`);
+}
 
 const isStudent = (u) => !!(u.student || u.mentor_plan || u.is_admin);
 const audienceSql = (u) => (u.is_admin ? "('all','students','admins')" : isStudent(u) ? "('all','students')" : "('all')");
@@ -48,6 +72,7 @@ module.exports = function whatsnew(app, ctx) {
     published_at TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   const cols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   if (!cols.includes('whatsnew_seen')) db.exec('ALTER TABLE users ADD COLUMN whatsnew_seen TEXT');
+  if (!db.prepare('PRAGMA table_info(whatsnew)').all().some((c) => c.name === 'note_id')) db.exec('ALTER TABLE whatsnew ADD COLUMN note_id TEXT');
   // first start: the recent features wait as a draft, ready for the owner to check and publish
   if (!db.prepare('SELECT 1 FROM whatsnew LIMIT 1').get()) {
     const ins = db.prepare('INSERT INTO whatsnew (name, line, link, icon, pos) VALUES (?, ?, ?, ?, ?)');
@@ -60,6 +85,7 @@ module.exports = function whatsnew(app, ctx) {
       ['Guided tour', 'Replay it any time from the menu', '#tour', 'star'],
     ].forEach((r, i) => ins.run(...r, i));
   }
+  syncNotes();
 
   // the member closed the popup (or opened /whats-new)
   app.post('/api/whatsnew/seen', requireUser, (req, res) => {
@@ -74,7 +100,7 @@ module.exports = function whatsnew(app, ctx) {
     db.prepare("UPDATE users SET whatsnew_seen = datetime('now') WHERE id = ?").run(u.id);
     const groups = [];
     rows.forEach((r) => { const g = groups[groups.length - 1]; if (g && g.at === r.published_at) g.rows.push(r); else groups.push({ at: r.published_at, rows: [r] }); });
-    page(req, res, "What's new", `<link rel="stylesheet" href="/whatsnew.css?v=1">
+    page(req, res, "What's new", `<link rel="stylesheet" href="/whatsnew.css">
       <div class="wn-page">
         <h1 class="wn-h">What's <em>new</em></h1>
         <p class="wn-sub">Short notes on what we added to the site.</p>
@@ -92,15 +118,15 @@ module.exports = function whatsnew(app, ctx) {
   app.get('/admin/whatsnew', requireAdmin, (req, res) => {
     const drafts = db.prepare('SELECT * FROM whatsnew WHERE published_at IS NULL ORDER BY pos, id').all();
     const edit = req.query.edit ? db.prepare('SELECT * FROM whatsnew WHERE id = ?').get(Number(req.query.edit)) : null;
-    const f = edit || { name: '', line: '', link: '', icon: 'star', audience: 'all' };
+    const f = edit || { name: '', line: '', link: '', icon: 'spark', audience: 'all' };
     const past = db.prepare(`SELECT published_at AS at, COUNT(*) AS n, GROUP_CONCAT(name, ', ') AS names FROM whatsnew
       WHERE published_at IS NOT NULL GROUP BY published_at ORDER BY published_at DESC LIMIT 12`).all();
     const seen = (at) => db.prepare('SELECT COUNT(*) AS n FROM users WHERE is_admin = 0 AND whatsnew_seen >= ?').get(at).n;
-    const preview = JSON.stringify(drafts.map((d) => ({ name: d.name, line: d.line, link: d.link, icon: d.icon })));
-    page(req, res, "What's new", `<link rel="stylesheet" href="/whatsnew.css?v=1">
+    const preview = JSON.stringify(drafts.map(forPop));
+    page(req, res, "What's new", `<link rel="stylesheet" href="/whatsnew.css">
       <div class="wn-admin">
         <div><h1 class="wn-h">What's <em>new</em></h1>
-          <p class="wn-sub">Add one short line per feature. Members see new lines once, the next time they open the site.</p></div>
+          <p class="wn-sub">Site updates add their own lines automatically when they go live. Use this only for something extra, like an event or a new video.</p></div>
         <div class="wn-cols">
           <form class="wn-glass wn-form" method="post" action="/admin/whatsnew${edit ? `/${edit.id}` : ''}">
             <b class="wn-ft">${edit ? 'Edit line' : 'Add a line'}</b>
@@ -127,13 +153,13 @@ module.exports = function whatsnew(app, ctx) {
           </div>
         </div>
       </div>
-      <script src="/whatsnew.js?v=1" defer data-admin></script>`);
+      <script src="/whatsnew.js" defer data-admin></script>`);
   });
 
   const form = express.urlencoded({ extended: false });
   const read = (b) => ({
     name: String(b.name || '').trim().slice(0, MAX_NAME), line: String(b.line || '').trim().slice(0, MAX_LINE),
-    link: cleanLink(b.link), icon: ICONS[b.icon] ? b.icon : 'star', audience: AUD[b.audience] ? b.audience : 'all',
+    link: cleanLink(b.link), icon: ICONS[b.icon] ? b.icon : 'spark', audience: AUD[b.audience] ? b.audience : 'all',
   });
   app.post('/admin/whatsnew', requireAdmin, form, (req, res) => {
     const r = read(req.body || {});
@@ -179,7 +205,7 @@ module.exports.script = (req, u) => {
   if (u.tour == null) return '';   // the guided tour asks first; What's new waits for the next page
   const items = unseen(u);
   if (!items.length) return '';
-  const data = { at: fmtDay(items[0].published_at), items: items.map((r) => ({ name: r.name, line: r.line, link: r.link, icon: r.icon })) };
-  return `<link rel="stylesheet" href="/whatsnew.css?v=1"><script type="application/json" id="wn-data">${JSON.stringify(data).replace(/</g, '\\u003c')}</script><script src="/whatsnew.js?v=1" defer></script>`;
+  const data = { at: fmtDay(items[0].published_at), items: items.map(forPop) };
+  return `<link rel="stylesheet" href="/whatsnew.css"><script type="application/json" id="wn-data">${JSON.stringify(data).replace(/</g, '\\u003c')}</script><script src="/whatsnew.js" defer></script>`;
 };
 module.exports.ICONS = ICONS;

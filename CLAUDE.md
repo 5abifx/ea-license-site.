@@ -22,6 +22,12 @@ Each of these broke once, got fixed, then came back in a later redesign. Read be
 - MT5 chart label text is cut at 63 characters: keep every label short.
 - KATANA is named on broker/help pages; never name 5ABI.FX there. Never name "Bookmap" (say "heatmap") and never reveal the mentorship method publicly.
 
+## What's new (automatic, the owner never writes it)
+- Every PR that changes something members can see adds 1-3 lines to `src/whatsnew-notes.json`
+  (`id` unique like `2026-11-26-my-tools`, `name` ≤30 chars, `line` ≤50 chars in plain words, optional `link`, `icon`
+  from src/whatsnew.js ICONS, `audience` all/students/admins). They publish by themselves on the next deploy.
+- Anything about Compass gets `"audience": "students"`. Never edit or reuse an old id (members would see it twice).
+
 ## How we work (saves credits)
 - New designs: show a mockup or screenshots to the owner FIRST, open a PR only after they approve. The owner merges.
 - Before every PR run the screenshot check and attach the shots:

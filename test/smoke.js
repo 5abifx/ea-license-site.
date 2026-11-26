@@ -986,6 +986,12 @@ function client(base, ip) {
       const wes = client(base, '10.9.9.9');
       db.prepare("UPDATE users SET status = 'active', tour = 'skip', created_at = datetime('now', '-1 day') WHERE email = 'wes@test.com'").run();
       await wes.post('/login', { email: 'wes@test.com', password: 'wespass123' });
+      // lines in src/whatsnew-notes.json are published by themselves on start-up
+      const notes = require('../src/whatsnew-notes.json');
+      assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM whatsnew WHERE note_id IS NOT NULL AND published_at IS NOT NULL').get().n, notes.length);
+      notes.forEach((n) => { assert.ok(n.line.length <= 50 && n.name.length <= 30, 'What\'s new line too long: ' + n.id); assert.ok(n.audience === 'students' || !/compass/i.test(n.name + n.line), 'Compass is students only: ' + n.id); });
+      assert.match((await wes.get('/dashboard')).text, /id="wn-data"/);
+      db.prepare("UPDATE users SET whatsnew_seen = datetime('now', '-1 second') WHERE email = 'wes@test.com'").run();   // seen them (a second ago, so the next publish counts as newer)
       assert.doesNotMatch((await wes.get('/dashboard')).text, /id="wn-data"/);   // drafts are not shown
       await admin.post('/admin/whatsnew/publish');
       r = await wes.get('/dashboard');
