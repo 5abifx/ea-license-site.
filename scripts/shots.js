@@ -45,6 +45,15 @@ for (let d = 40; d >= 0; d--) {
   }
 }
 
+// a NinjaTrader account too, so the platform tags on the account tabs show
+db.prepare("INSERT INTO accounts (user_id, account_number, label) VALUES (?, 'Sim101', 'NinjaTrader')").run(uid);
+for (let d = 6; d >= 0; d--) {
+  const t = new Date(Date.now() - d * 864e5).toISOString().slice(0, 10) + 'T16:00:00', r = rnd() < 0.5 ? 1.4 : -1;
+  db.prepare(`INSERT INTO journal_trades (user_id, account_number, position_id, symbol, side, lots, entry, exit, sl, tp, digits, open_time, close_time,
+    profit, net, r, currency, broker, platform) VALUES (?, 'Sim101', ?, 'MNQ', 'BUY', 2, 21000, 21010, 20990, 21020, 2, ?, ?, ?, ?, ?, 'USD', 'Simulation', 'NinjaTrader')`)
+    .run(uid, 'NT' + d, t, t.replace(':00:00', ':20:00'), r * 40, r * 40, r);
+}
+
 const SIZES = [['pc-2560', 2560, 1300], ['laptop-1366', 1366, 768], ['phone-390', 390, 844]];
 
 const server = app.listen(0, async () => {

@@ -190,8 +190,9 @@ function isExpired(u) {
   return u.expires_at && new Date(u.expires_at + 'Z') < new Date();
 }
 function cleanAccount(v) {
+  // MT5 logins are digits; NinjaTrader / Quantower accounts are names like Sim101 or APEX-12345-01
   const s = String(v || '').trim();
-  return /^\d{1,20}$/.test(s) ? s : null;
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/.test(s) ? s : null;
 }
 function daysLeft(u) {
   return u.expires_at ? Math.max(0, Math.ceil((new Date(u.expires_at + 'Z') - Date.now()) / 86400000)) : null;
@@ -614,10 +615,10 @@ app.post('/accounts', requireUser, (req, res) => {
   const u = req.user;
   if (u.status !== 'active') return res.redirect('/dashboard');
   const num = cleanAccount(req.body.account_number);
-  if (!num) { flash(req, 'error', 'Account number must contain digits only.'); return res.redirect('/dashboard'); }
+  if (!num) { flash(req, 'error', 'Use the MT5 account number, or the NinjaTrader / Quantower account name (letters, digits, - _ . only).'); return res.redirect('/dashboard'); }
   const count = db.prepare('SELECT COUNT(*) AS n FROM accounts WHERE user_id = ?').get(u.id).n;
   if (count >= u.max_accounts) { flash(req, 'error', `You can register at most ${u.max_accounts} accounts.`); return res.redirect('/dashboard'); }
-  if (u.trial || stripe.needsCardTrial(u)) {
+  if ((u.trial || stripe.needsCardTrial(u)) && /^\d+$/.test(num)) {   // shared names like Sim101 are not trial-locked
     const used = db.prepare('SELECT user_id FROM trial_accounts WHERE account_number = ?').get(num);
     if (used && used.user_id !== u.id) {
       flash(req, 'error', `MT5 account ${num} has already used a free trial. Subscribe to keep using it.`);
@@ -627,7 +628,7 @@ app.post('/accounts', requireUser, (req, res) => {
   const r = db.prepare('INSERT OR IGNORE INTO accounts (user_id, account_number, label) VALUES (?, ?, ?)')
     .run(u.id, num, String(req.body.label || '').trim().slice(0, 60));
   if (r.changes) onboard.prefillProp(u, r.lastInsertRowid);   // prop firm guard from the sign-up answers
-  if (u.trial && r.changes) db.prepare('INSERT OR IGNORE INTO trial_accounts (account_number, user_id) VALUES (?, ?)').run(num, u.id);
+  if (u.trial && r.changes && /^\d+$/.test(num)) db.prepare('INSERT OR IGNORE INTO trial_accounts (account_number, user_id) VALUES (?, ?)').run(num, u.id);
   flash(req, r.changes ? 'ok' : 'error', r.changes ? `Account ${num} added.` : `Account ${num} is already on your list.`);
   res.redirect('/dashboard');
 });
@@ -645,6 +646,17 @@ app.get('/download/:id', requireUser, (req, res) => {
     || studentEas(u).find((x) => String(x.id) === String(req.params.id));
   if (u.status !== 'active' || !e || !e.file_path || (isStudentOnly(e) && !isStudent(u))) return res.status(404).send('Not found');
   res.download(path.join(FILES_DIR, e.file_path), e.file_name);
+});
+
+// other-platform builds of an EA (Trade Journal for NinjaTrader 8 / Quantower): same access as the MT5 file
+app.get('/download/:id/:plat', requireUser, (req, res) => {
+  const u = req.user;
+  const col = { nt8: 'nt', qt: 'qt' }[req.params.plat];
+  const e = col && db.prepare(`SELECT e.* FROM eas e JOIN user_eas ue ON ue.ea_id = e.id
+                        WHERE e.id = ? AND ue.user_id = ? AND e.active = 1`).get(req.params.id, u.id);
+  const ok = e || (col && u.is_admin && db.prepare('SELECT * FROM eas WHERE id = ?').get(req.params.id));
+  if (u.status !== 'active' || !ok || !ok[`${col}_file_path`]) return res.status(404).send('Not found');
+  res.download(path.join(FILES_DIR, ok[`${col}_file_path`]), ok[`${col}_file_name`]);
 });
 
 // ---------- license check API (called by the EA) ----------
@@ -894,7 +906,7 @@ app.get('/admin/users/:id', requireAdmin, (req, res) => {
   <section class="card">
     <h2>MT5 accounts <span class="tag">${accounts.length} / ${u.max_accounts}</span></h2>
     <form method="post" action="/admin/users/${u.id}/accounts" class="row">
-      <input name="account_number" placeholder="Add account number" pattern="[0-9]{1,20}" required>
+      <input name="account_number" placeholder="Account number or name" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,39}" required>
       <input name="label" placeholder="Note (optional)">
       <button class="secondary">Add</button>
     </form>
@@ -1020,6 +1032,8 @@ app.get('/admin/eas', requireAdmin, (req, res) => {
       <label>Version<input name="version" value="${esc(e.version || '1.0')}" required></label>
       <label>Description<input name="description" value="${esc(e.description)}"></label>
       <label>File (.ex5 or .zip)${e.file_name ? ` <span class="muted">current: ${esc(e.file_name)}</span>` : ''}<input type="file" name="file" accept=".ex5,.zip,.set,.rar"></label>
+      ${e.code === 'JOURNAL' ? `<label>NinjaTrader 8 file (exported .zip)${e.nt_file_name ? ` <span class="muted">current: ${esc(e.nt_file_name)}</span>` : ''}<input type="file" name="nt_file" accept=".zip"></label>
+      <label>Quantower file (.zip with the 5ABI Journal folder)${e.qt_file_name ? ` <span class="muted">current: ${esc(e.qt_file_name)}</span>` : ''}<input type="file" name="qt_file" accept=".zip,.dll"></label>` : ''}
       <label class="check"><input type="checkbox" name="active" value="1" ${e.id === undefined || e.active ? 'checked' : ''}> Active</label>
       ${e.id ? '' : '<label class="check"><input type="checkbox" name="grant_all" value="1" checked> Give to all active users</label>'}
       <div><button>${e.id ? 'Save' : 'Add EA'}</button></div>
@@ -1065,17 +1079,25 @@ app.post('/admin/eas', requireAdmin, upload.single('file'), (req, res) => {
   res.redirect('/admin/eas');
 });
 
-app.post('/admin/eas/:id', requireAdmin, upload.single('file'), (req, res) => {
+const eaUploads = upload.fields([{ name: 'file', maxCount: 1 }, { name: 'nt_file', maxCount: 1 }, { name: 'qt_file', maxCount: 1 }]);
+app.post('/admin/eas/:id', requireAdmin, eaUploads, (req, res) => {
+  const files = req.files || {};
+  req.file = (files.file || [])[0];
+  const extra = ['nt', 'qt'].map((k) => (files[`${k}_file`] || [])[0]).filter(Boolean);
   const e = db.prepare('SELECT * FROM eas WHERE id = ?').get(req.params.id);
-  if (!e) return res.redirect('/admin/eas');
+  if (!e) { extra.forEach((f) => fs.rm(f.path, { force: true }, () => {})); return res.redirect('/admin/eas'); }
   const code = String(req.body.code || '').trim();
   const clash = db.prepare('SELECT 1 FROM eas WHERE code = ? AND id != ?').get(code, e.id);
   if (!/^[A-Za-z0-9_-]{2,40}$/.test(code) || clash) {
-    if (req.file) fs.rm(req.file.path, { force: true }, () => {});
+    [req.file, ...extra].filter(Boolean).forEach((x) => fs.rm(x.path, { force: true }, () => {}));
     flash(req, 'error', 'License code must be 2 to 40 letters, digits, _ or -, and unique.');
     return res.redirect('/admin/eas');
   }
   const f = saveUpload(req.file, e.file_path) || { file_name: e.file_name, file_path: e.file_path };
+  for (const k of ['nt', 'qt']) {
+    const x = saveUpload((files[`${k}_file`] || [])[0], e[`${k}_file_path`]);
+    if (x) db.prepare(`UPDATE eas SET ${k}_file_name = ?, ${k}_file_path = ? WHERE id = ?`).run(x.file_name, x.file_path, e.id);
+  }
   db.prepare(`UPDATE eas SET code = ?, name = ?, version = ?, description = ?, file_name = ?, file_path = ?, active = ?, updated_at = datetime('now') WHERE id = ?`)
     .run(code, String(req.body.name || code).trim(), String(req.body.version || '1.0').trim(),
       String(req.body.description || '').trim(), f.file_name, f.file_path, req.body.active ? 1 : 0, e.id);
