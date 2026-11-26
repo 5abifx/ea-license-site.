@@ -225,10 +225,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
   app.get('/journal', requireUser, requireJournal, (req, res) => {
     const u = req.user;
-    const key = ensureKey(u);
-    // NinjaTrader / Quantower downloads of the Trade Journal (uploaded in Admin > EAs)
-    const jea = db.prepare('SELECT id, nt_file_path, qt_file_path FROM eas WHERE code = ?').get(JOURNAL_CODE) || {};
-    const jdl = (plat, label) => (jea[`${plat === 'nt8' ? 'nt' : 'qt'}_file_path`] ? `<a href="/download/${jea.id}/${plat}">${label}</a>` : `${label} <span class="muted">(coming soon)</span>`);
+    ensureKey(u);
 
     const sc = scope(req);
     const { accts, liveAccts, removedAccts, sel, where, args } = sc;
@@ -388,7 +385,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <script src="/logtrade.js" defer></script>
 
     ${sel && sel.removed ? `<section class="card notice">
-      <p><strong>Account ${esc(sel.account_number)} is no longer on <a href="/dashboard">My EAs</a>.</strong> Its ${sel.n} trades are kept here and left out of "All accounts". Add the account again on My EAs to bring it back, or delete these trades for good.</p>
+      <p><strong>Account ${esc(sel.account_number)} is no longer on <a href="/dashboard">My Tools</a>.</strong> Its ${sel.n} trades are kept here and left out of "All accounts". Add the account again on My Tools to bring it back, or delete these trades for good.</p>
       <form method="post" action="/journal/accounts/${esc(sel.account_number)}/delete" onsubmit="return confirm('Delete all ${sel.n} trades of account ${esc(sel.account_number)}? This cannot be undone.')">
         <button class="small danger">Delete these trades</button></form>
     </section>` : ''}
@@ -403,7 +400,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
         ${wkSums.length ? `<div class="cal-wks cx" data-unit="r">${wkSums.map(([n, l]) => `<div><small>Week ${n}</small><b>${both(l)}</b></div>`).join('')}</div>` : ''}
         <div class="cal-list cx" data-unit="r">${list || '<p class="muted">No trades this month.</p>'}</div>
         ${calNote ? `<p class="cal-note">${calNote}</p>` : ''}`
-        : '<p class="muted">No trades yet. Connect the Trade Journal EA below; every trade you close will appear here.</p>'}
+        : '<p class="muted">No trades yet. Connect the Trade Journal from <a href="/dashboard#platforms">My Tools</a>; every trade you close will appear here.</p>'}
       </section>
       <aside class="card day-panel" aria-live="polite">${panels || `<p class="muted">${accts.length ? 'No trades this month. Use ‹ › to change month.' : 'Tap a day to see its trades.'}</p>`}</aside>
     </div>
@@ -415,32 +412,12 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
     ${insightsHtml}
 
-    <details class="card connect priv-hide"${accts.length ? '' : ' open'}>
-      <summary><h2>Connect the Trade Journal EA</h2><span class="muted small">Journal key and setup steps · MT5, NinjaTrader, Quantower</span></summary>
-      <h3 class="small">MT5</h3>
-      <ol class="steps">
-        <li>Download <strong>Trade Journal</strong> from <a href="/dashboard">My EAs</a> and attach it to <strong>one extra chart</strong> on each MT5 account (MT5 allows one EA per chart, so open a new chart for it; any symbol works). It reads the whole account, so it logs every symbol and every EA, and it never trades, so it runs safely next to KATANA.</li>
-        <li>Paste this key into the EA's <strong>Journal key</strong> input:
-          <span class="keybox"><code class="block" data-key="${esc(key)}">••••••••••••••••••••••••••••••••</code>
-          <button type="button" class="small secondary key-show">Show</button><button type="button" class="small secondary key-copy">Copy</button></span></li>
-        <li>Make sure the account number is on <a href="/dashboard">My EAs</a>, and that MT5 allows <code>${esc(site)}</code> under Tools → Options → Expert Advisors → Allow WebRequest.</li>
-      </ol>
-      <h3 class="small">NinjaTrader 8</h3>
-      <ol class="steps">
-        <li>${jdl('nt8', 'Download the NinjaTrader journal')}, then in NinjaTrader: <strong>Tools → Import → NinjaScript Add-On</strong> and pick the .zip (no need to unzip it).</li>
-        <li>Open any chart, right-click → <strong>Indicators</strong>, add <strong>5ABI Journal</strong>, paste the key above into <strong>Journal key</strong>, press OK. One chart is enough: it logs every account and instrument.</li>
-        <li>The panel on the chart lists each account name. Add those names (e.g. <code>Sim101</code>) on <a href="/dashboard">My EAs</a>.</li>
-      </ol>
-      <h3 class="small">Quantower</h3>
-      <ol class="steps">
-        <li>${jdl('qt', 'Download the Quantower journal')} and unzip it. Copy the folder <strong>5ABI Journal</strong> into <code>Quantower\Settings\Scripts\Strategies</code>, then restart Quantower.</li>
-        <li>Open <strong>Strategies Manager</strong>, add <strong>5ABI Journal</strong>, paste the key above into <strong>Journal key</strong> and press <strong>Start</strong>.</li>
-        <li>Its panel lists each account name. Add those names on <a href="/dashboard">My EAs</a>.</li>
-      </ol>
-      <p class="muted small">Older trades missing? Open the EA's inputs (double-click the EA name on the chart, or the small face top-right → Inputs), set <strong>On start, also send trades closed in the last N days</strong> to <strong>365</strong> and press OK. The EA then sends the past year a few trades at a time. If some still don't show, also set <strong>Send those days again</strong> to <strong>true</strong> once, then back to false.</p>
-      <form method="post" action="/journal/key" onsubmit="return confirm('Make a new key? The old key stops working and you must paste the new one into the EA.')">
-        <button class="small secondary">Make a new key</button></form>
-    </details>`);
+    <section class="card connect-to priv-hide">
+      <div><h2>Connect your platform</h2>
+      <p class="muted small">Downloads, install steps and your journal key for MT5, NinjaTrader 8 and Quantower are on My Tools.</p></div>
+      <span class="ct-logos"><a href="/dashboard?p=mt5#platforms" title="MetaTrader 5"><img src="/platforms/mt5.webp" alt="MetaTrader 5" width="26" height="26"></a><a href="/dashboard?p=nt8#platforms" title="NinjaTrader 8" class="ct-nt"><img src="/platforms/nt8.svg" alt="NinjaTrader 8" width="26" height="26"></a><a href="/dashboard?p=qt#platforms" title="Quantower" class="ct-qt"><img src="/platforms/quantower.svg" alt="Quantower" width="26" height="26"></a></span>
+      <a class="btn small" href="/dashboard#key">Journal key and downloads →</a>
+    </section>`);
   });
 
   // ---------- account report: share cards of a whole account (or all accounts) ----------
@@ -633,8 +610,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
   app.post('/journal/key', requireUser, requireJournal, (req, res) => {
     db.prepare('UPDATE users SET journal_key = ? WHERE id = ?').run(crypto.randomBytes(16).toString('hex'), req.user.id);
-    flash(req, 'ok', 'New journal key created. Paste it into the EA inputs.');
-    res.redirect('/journal');
+    flash(req, 'ok', 'New journal key created. Paste it into the Trade Journal on every platform you use.');
+    res.redirect('/dashboard#key');
   });
 
   // ---------- full Insights page ----------
@@ -690,7 +667,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       } else if (liveAccts.length) {
         const dk = deskCards(u, liveAccts, cur, insHref);
         body = `<p class="muted small">Pick an account above to type or change its rules.</p><div class="dk-grid">${dk.map((x) => x.html).join('')}</div>`;
-      } else body = '<section class="card"><p class="muted">No live accounts. Add one on My EAs.</p></section>';
+      } else body = '<section class="card"><p class="muted">No live accounts. Add one on My Tools.</p></section>';
     }
     const tabsNav = `<nav class="ins-tabs" aria-label="Insights">${Object.entries(TABS).map(([k, l]) => `<a href="/journal/insights${qs({ tab: k === 'overview' ? '' : k })}"${k === tab ? ' class="on" aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
     page(req, res, 'Insights', `

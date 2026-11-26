@@ -80,7 +80,7 @@ function client(base, ip) {
     assert.match((await bob2.get('/dashboard')).text, /Gold Scalper/);
     // My EAs: setup steps with the next step open, own stylesheet
     { const d = (await bob2.get('/dashboard')).text;
-      assert.match(d, /data-setup/); assert.match(d, /Add your MT5 account/); assert.match(d, /myeas\.css/); }
+      assert.match(d, /data-setup/); assert.match(d, /Add your trading account/); assert.match(d, /data-pf-tab="nt8"/); assert.match(d, /\/platforms\/quantower\.svg/); assert.match(d, /myeas\.css/); }
     // student intro: not for regular members, on for admins
     assert.equal(JSON.parse((await bob2.get('/api/intro')).text).ok, false);
     assert.doesNotMatch((await bob2.get('/dashboard')).text, /intro\.js/);
@@ -339,7 +339,8 @@ function client(base, ip) {
     await admin.post(`/admin/users/${bobId}`, [['name', 'Bob'], ['status', 'active'], ['max_accounts', '10'], ['expires_at', ''], ['ea', '1'], ['ea', '2']]);
     r = await bob.get('/journal');
     assert.match(r.text, /No trades yet/);
-    const key = r.text.match(/<code class="block" data-key="([0-9a-f]{32})">/)[1];
+    assert.match(r.text, /dashboard#key/);                    // journal points to My Tools for the key and downloads
+    const key = (await bob.get('/dashboard')).text.match(/<code class="block" data-key="([0-9a-f]{32})">/)[1];
 
     const send = (body) => fetch(`${base}/api/journal/trades`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     const trade = { position_id: '777', symbol: 'XAUUSD', side: 'BUY', lots: 0.5, entry: 2641.2, exit: 2668.9, sl: 2631.2, tp: 2668.9, digits: 2,
@@ -368,7 +369,8 @@ function client(base, ip) {
     r = await bob.get('/journal?account=Sim101');
     assert.match(r.text, /MNQ/);
     assert.match(r.text, /class="plat">NT8</);
-    assert.match(r.text, /NinjaTrader 8<\/h3>/);
+    { const d = (await bob.get('/dashboard')).text;          // My Tools: per-platform downloads, the NT8 tab opens after an NT8 trade
+      assert.match(d, /data-pf="nt8"/); assert.match(d, /Trade journal for NinjaTrader 8/); assert.match(d, /Download coming soon/); }
     assert.strictEqual((await bob.get('/download/2/nt8')).status, 404);   // nothing uploaded yet
     await bob.post('/accounts/' + (await bob.get('/dashboard')).text.match(/\/accounts\/(\d+)\/delete" onsubmit="return confirm\('Remove account Sim101/)[1] + '/delete', {});
     await admin.post(`/admin/users/${bobId}`, [['name', 'Bob'], ['status', 'active'], ['max_accounts', '10'], ['expires_at', ''], ['ea', '1'], ['ea', '2']]);

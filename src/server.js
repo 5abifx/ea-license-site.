@@ -622,8 +622,8 @@ app.get('/dashboard', requireUser, (req, res) => {
   ${u.stripe_customer ? `<form method="post" action="/billing" class="row"><span class="muted">${u.stripe_sub ? 'Card subscription active.' : 'Card subscription ended.'}</span><button class="small secondary">Manage billing</button></form>` : ''}`;
   // every known tool, so the ones this member does not have show as locked
   const allEas = db.prepare('SELECT * FROM eas WHERE active = 1 ORDER BY name').all();
-  page(req, res, 'My EAs', myeas.html({ u, eas, allEas, accounts, full, student, hasJournal: req.hasJournal, notices, isStudentOnly,
-    site: req.protocol + '://' + req.get('host'), refCard: u.is_admin ? '' : refs.card(req, u) }));
+  page(req, res, 'My Tools', myeas.html({ u, eas, allEas, accounts, full, student, hasJournal: req.hasJournal, notices, isStudentOnly,
+    site: req.protocol + '://' + req.get('host'), refCard: u.is_admin ? '' : refs.card(req, u), plat: String(req.query.p || '') }));
 });
 
 app.post('/accounts', requireUser, (req, res) => {
