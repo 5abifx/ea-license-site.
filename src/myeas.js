@@ -72,7 +72,7 @@ function setupSteps({ eas, accounts, hasJournal, trades, site }) {
       body: `<h2>Add your MT5 account number</h2>
         <p>The EAs only run on account numbers listed here. Find yours in MT5 under <b>File → Login to Trade Account</b>, or at the top of the Navigator window.</p>
         <form method="post" action="/accounts" class="mx-inp">
-          <input name="account_number" placeholder="MT5 account number, e.g. 51234567" inputmode="numeric" pattern="[0-9]{1,20}" required aria-label="MT5 account number">
+          <input name="account_number" placeholder="MT5 number, e.g. 51234567, or NinjaTrader / Quantower account name" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,39}" required aria-label="Account number or name">
           <input name="label" placeholder="Note (optional), e.g. IC Markets live" maxlength="60" aria-label="Note">
           <button class="mx-pill">Add account <span aria-hidden="true">→</span></button></form>` },
     { key: 'allow', label: 'Allow this website in MT5', short: 'Allow site', done: seenAny, manual: true, sub: 'One setting, once',
@@ -176,11 +176,11 @@ function html({ u, eas, allEas, accounts, full, student, hasJournal, notices, si
       <form method="post" action="/accounts/${a.id}/delete" onsubmit="return confirm('Remove account ${esc(a.account_number)}? The EA will stop on it.')"><button class="small danger">Remove</button></form></div>`; }).join('')}</div>` : '<p class="muted small">No accounts yet. The EAs only run on account numbers listed here.</p>'}
     ${full ? '<p class="muted small">You have reached the maximum number of accounts. Remove one to add another.</p>' : `
     <form method="post" action="/accounts" class="mx-inp acc-add">
-      <input name="account_number" placeholder="MT5 account number" inputmode="numeric" pattern="[0-9]{1,20}" required aria-label="MT5 account number">
+      <input name="account_number" placeholder="MT5 number or NinjaTrader / Quantower name" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,39}" required aria-label="Account number or name">
       <input name="label" placeholder="Note (optional)" maxlength="60" aria-label="Note">
       <button class="mx-pill sm">Add account</button>
     </form>`}
-    <p class="muted small">Find the number in MT5 under File → Login to Trade Account.</p>
+    <p class="muted small">MT5: the number under File → Login to Trade Account. NinjaTrader / Quantower: the account name exactly as the 5ABI Journal panel shows it (e.g. Sim101).</p>
   </section>
 
   <section class="card mx-g mx-box ea-themes">

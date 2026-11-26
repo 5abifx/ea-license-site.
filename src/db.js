@@ -115,6 +115,11 @@ if (!jCols.includes('followed')) db.exec("ALTER TABLE journal_trades ADD COLUMN 
 if (!jCols.includes('manual')) db.exec('ALTER TABLE journal_trades ADD COLUMN manual INTEGER NOT NULL DEFAULT 0');
 // 1 = part of the position is closed (partial booked) but the rest is still running; the EA re-sends it on the final close
 if (!jCols.includes('still_open')) db.exec('ALTER TABLE journal_trades ADD COLUMN still_open INTEGER NOT NULL DEFAULT 0');
+// trading platform that sent the trade: MT5, NinjaTrader or Quantower (journal shows it per account)
+if (!jCols.includes('platform')) db.exec("ALTER TABLE journal_trades ADD COLUMN platform TEXT NOT NULL DEFAULT 'MT5'");
+// extra downloads of an EA for other platforms (Trade Journal for NinjaTrader 8 / Quantower)
+const eaCols = db.prepare('PRAGMA table_info(eas)').all().map((c) => c.name);
+for (const c of ['nt_file_name', 'nt_file_path', 'qt_file_name', 'qt_file_path']) if (!eaCols.includes(c)) db.exec(`ALTER TABLE eas ADD COLUMN ${c} TEXT`);
 // days the trader chose not to trade, with why and how they felt
 db.exec(`CREATE TABLE IF NOT EXISTS journal_days (
   user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

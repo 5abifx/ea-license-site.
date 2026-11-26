@@ -18,6 +18,7 @@ const tagForm = (cur) => { const have = new Set(TP.setupTags(cur)); return `<div
 
 const JOURNAL_CODE = process.env.JOURNAL_EA_CODE || 'JOURNAL';
 
+const PLATFORMS = ['MT5', 'NinjaTrader', 'Quantower'];   // what the journal plugins send as "platform"
 const KEEP_IF_EDITED = ['sl', 'r', 'risk_money', 'risk_pct'];   // columns the trader can correct
 
 module.exports = function registerJournal(app, { db, page, flash, requireUser, isExpired, cleanAccount, mentorBox, setJournalAccess, onboard }) {
@@ -126,6 +127,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       risk_pct: n(t.risk_pct) || null, pct: n(t.pct), balance_after: n(t.balance_after),
       mfe: n(t.mfe), mae: n(t.mae), magic: n(t.magic), comment: s(t.comment, 64),
       currency: s(b.currency, 8), broker: s(b.broker, 80), tf: s(t.tf, 8),
+      platform: PLATFORMS.includes(b.platform) ? b.platform : 'MT5',
       partials: JSON.stringify(partials), candles: JSON.stringify(candles), still_open: stillOpen ? 1 : 0,
     };
     // break-even / trailed stop is not the risk: no R or risk % from it
@@ -153,6 +155,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   // private text (account numbers, broker servers): hidden when "Hide private info" is on
   const priv = (real, mask) => `<span class="priv"><span class="priv-real">${real}</span><span class="priv-mask">${mask}</span></span>`;
   const acctLabel = (a) => (a.account_number === LT.MANUAL ? 'Manual trades' : priv(`${esc(a.broker || 'Account')} · ${esc(a.account_number)}`, `Account ••${esc(String(a.account_number).slice(-2))}`));
+  // small platform tag on each account tab: MT5 / NinjaTrader / Quantower
+  const platTag = (a) => (a.platform && a.account_number !== LT.MANUAL ? `<span class="plat">${esc(a.platform === 'NinjaTrader' ? 'NT8' : a.platform)}</span> · ` : '');
 
   // accounts: live ones are still on My EAs; removed ones keep their trades in their own tab;
   // hidden ones (user's choice) are left out of the tabs and "All accounts" until shown again.
@@ -162,7 +166,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     const live = new Set(db.prepare('SELECT account_number FROM accounts WHERE user_id = ?').all(u.id).map((a) => a.account_number));
     live.add(LT.MANUAL);   // trades logged by hand are always live
     const hidden = new Set(db.prepare('SELECT account_number FROM journal_hidden WHERE user_id = ?').all(u.id).map((a) => a.account_number));
-    const accts = db.prepare(`SELECT account_number, COUNT(*) AS n, SUM(net) AS net, MAX(broker) AS broker, MAX(currency) AS cur
+    const accts = db.prepare(`SELECT account_number, COUNT(*) AS n, SUM(net) AS net, MAX(broker) AS broker, MAX(currency) AS cur,
+        MAX(CASE WHEN manual = 1 THEN '' ELSE platform END) AS platform
         FROM journal_trades WHERE user_id = ? GROUP BY account_number ORDER BY MAX(close_time) DESC`).all(u.id);
     accts.forEach((a) => { a.removed = !live.has(a.account_number); a.hidden = hidden.has(a.account_number); });
     const shown = accts.filter((a) => !a.hidden);
@@ -191,9 +196,9 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
       : `<form method="post" action="/journal/accounts/${esc(sel.account_number)}/hide?back=${encodeURIComponent(base)}" class="inline"><button class="small secondary" title="Leaves this account out of the tabs and All accounts. Its trades stay saved and you can show it again.">Hide this account</button></form>`}</div>` : '';
     return `<div class="accts" role="navigation" aria-label="Accounts">
       ${liveAccts.length > 1 || removedAccts.length || (hiddenAccts.length && liveAccts.length) ? `<a class="acct${sel ? '' : ' on'}" href="${base}${qs({ account: '' })}"><small>All accounts</small><b class="${cls(allNet)}">${money(allNet, cur)}</b><small>${allN} trades</small></a>` : ''}
-      ${liveAccts.map((a) => chip(a, acctLabel(a), `${a.n} trades`, `${base}${qs({ account: a.account_number })}`, sel === a || (!sel && liveAccts.length === 1 && !removedAccts.length && !hiddenAccts.length))).join('')}
-      ${removedAccts.map((a) => chip(a, acctLabel(a), '<span class="tag">Removed</span>', `${base}${qs({ account: a.account_number })}`, sel === a)).join('')}
-      ${openHidden ? hiddenAccts.map((a) => chip(a, acctLabel(a), '<span class="tag">Hidden</span>', `${base}${qs({ account: a.account_number })}`, sel === a)).join('')
+      ${liveAccts.map((a) => chip(a, platTag(a) + acctLabel(a), `${a.n} trades`, `${base}${qs({ account: a.account_number })}`, sel === a || (!sel && liveAccts.length === 1 && !removedAccts.length && !hiddenAccts.length))).join('')}
+      ${removedAccts.map((a) => chip(a, platTag(a) + acctLabel(a), '<span class="tag">Removed</span>', `${base}${qs({ account: a.account_number })}`, sel === a)).join('')}
+      ${openHidden ? hiddenAccts.map((a) => chip(a, platTag(a) + acctLabel(a), '<span class="tag">Hidden</span>', `${base}${qs({ account: a.account_number })}`, sel === a)).join('')
         : hiddenAccts.length ? `<a class="acct acct-more" href="${base}${qs({ hidden: '1' })}"><small>Hidden accounts</small><b>${hiddenAccts.length}</b><small>Tap to see</small></a>` : ''}
     </div><script src="/acct-dial.js"></script>${bar}`;
   };
@@ -221,6 +226,9 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
   app.get('/journal', requireUser, requireJournal, (req, res) => {
     const u = req.user;
     const key = ensureKey(u);
+    // NinjaTrader / Quantower downloads of the Trade Journal (uploaded in Admin > EAs)
+    const jea = db.prepare('SELECT id, nt_file_path, qt_file_path FROM eas WHERE code = ?').get(JOURNAL_CODE) || {};
+    const jdl = (plat, label) => (jea[`${plat === 'nt8' ? 'nt' : 'qt'}_file_path`] ? `<a href="/download/${jea.id}/${plat}">${label}</a>` : `${label} <span class="muted">(coming soon)</span>`);
 
     const sc = scope(req);
     const { accts, liveAccts, removedAccts, sel, where, args } = sc;
@@ -408,13 +416,26 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     ${insightsHtml}
 
     <details class="card connect priv-hide"${accts.length ? '' : ' open'}>
-      <summary><h2>Connect the Trade Journal EA</h2><span class="muted small">Journal key and setup steps</span></summary>
+      <summary><h2>Connect the Trade Journal EA</h2><span class="muted small">Journal key and setup steps · MT5, NinjaTrader, Quantower</span></summary>
+      <h3 class="small">MT5</h3>
       <ol class="steps">
         <li>Download <strong>Trade Journal</strong> from <a href="/dashboard">My EAs</a> and attach it to <strong>one extra chart</strong> on each MT5 account (MT5 allows one EA per chart, so open a new chart for it; any symbol works). It reads the whole account, so it logs every symbol and every EA, and it never trades, so it runs safely next to KATANA.</li>
         <li>Paste this key into the EA's <strong>Journal key</strong> input:
           <span class="keybox"><code class="block" data-key="${esc(key)}">••••••••••••••••••••••••••••••••</code>
           <button type="button" class="small secondary key-show">Show</button><button type="button" class="small secondary key-copy">Copy</button></span></li>
         <li>Make sure the account number is on <a href="/dashboard">My EAs</a>, and that MT5 allows <code>${esc(site)}</code> under Tools → Options → Expert Advisors → Allow WebRequest.</li>
+      </ol>
+      <h3 class="small">NinjaTrader 8</h3>
+      <ol class="steps">
+        <li>${jdl('nt8', 'Download the NinjaTrader journal')}, then in NinjaTrader: <strong>Tools → Import → NinjaScript Add-On</strong> and pick the .zip (no need to unzip it).</li>
+        <li>Open any chart, right-click → <strong>Indicators</strong>, add <strong>5ABI Journal</strong>, paste the key above into <strong>Journal key</strong>, press OK. One chart is enough: it logs every account and instrument.</li>
+        <li>The panel on the chart lists each account name. Add those names (e.g. <code>Sim101</code>) on <a href="/dashboard">My EAs</a>.</li>
+      </ol>
+      <h3 class="small">Quantower</h3>
+      <ol class="steps">
+        <li>${jdl('qt', 'Download the Quantower journal')} and unzip it. Copy the folder <strong>5ABI Journal</strong> into <code>Quantower\Settings\Scripts\Strategies</code>, then restart Quantower.</li>
+        <li>Open <strong>Strategies Manager</strong>, add <strong>5ABI Journal</strong>, paste the key above into <strong>Journal key</strong> and press <strong>Start</strong>.</li>
+        <li>Its panel lists each account name. Add those names on <a href="/dashboard">My EAs</a>.</li>
       </ol>
       <p class="muted small">Older trades missing? Open the EA's inputs (double-click the EA name on the chart, or the small face top-right → Inputs), set <strong>On start, also send trades closed in the last N days</strong> to <strong>365</strong> and press OK. The EA then sends the past year a few trades at a time. If some still don't show, also set <strong>Send those days again</strong> to <strong>true</strong> once, then back to false.</p>
       <form method="post" action="/journal/key" onsubmit="return confirm('Make a new key? The old key stops working and you must paste the new one into the EA.')">
@@ -954,7 +975,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <p><a href="/journal">← All trades</a></p>
     <h1>${esc(t.symbol)} ${esc(t.side)} <span class="${cls(t.net)}">${money(t.net, t.currency)}</span></h1>
     ${t.still_open ? '<p class="muted small">Partial booked: this is the profit taken so far. The rest of the position is still running and updates here when it closes.</p>' : ''}
-    <p class="muted"><span class="priv"><span class="priv-real">Account ${esc(t.account_number)} · position ${esc(t.position_id)}</span><span class="priv-mask">Account ••${esc(String(t.account_number).slice(-2))}</span></span> · ${fmtDate(t.open_time)} → ${fmtDate(t.close_time)} (broker time)</p>
+    <p class="muted"><span class="priv"><span class="priv-real">Account ${esc(t.account_number)} · position ${esc(t.position_id)}</span><span class="priv-mask">Account ••${esc(String(t.account_number).slice(-2))}</span></span> · ${fmtDate(t.open_time)} → ${fmtDate(t.close_time)} (broker time)${t.manual ? '' : ` · ${esc(t.platform || 'MT5')}`}</p>
 
     <nav class="ttabs" id="ttabs" aria-label="Trade page">
       <button type="button" data-go="chart" aria-pressed="true">Chart</button><button type="button" data-go="review" aria-pressed="false">Review${LT.gradeOf(t) ? ` · ${esc(LT.gradeOf(t))}` : ''}</button><button type="button" data-go="share" aria-pressed="false">Share</button>

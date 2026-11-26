@@ -1,5 +1,5 @@
 // The garage cars (picked in Appearance, look.car), shared by the 3D garage (garage.js) and the journal intro
-// (nightrun.js). Each model is one scanned mesh; the wheels are cut out of it by position:
+// (the journal intro used them too until Nov 26). Each model is one scanned mesh; the wheels are cut out of it by position:
 // axles [centre x, centre y, radius, rear?] in the model's own units (+x is the rear, -x the nose), zCut = how far out a
 // point must be to count as wheel, zMid = the wheel's centre plane, zFace = its outer face (for the speed blur disc).
 // head / tail = lamp points (one side; mirrored in z) for the intro's lights. No badges or logos on any model.
