@@ -196,7 +196,7 @@ function setup(app, { db, express, requireAdmin, page }) {
       return d > 2 ? `<span class="fu-up">▲ ${d}</span>` : d < -2 ? `<span class="fu-down">▼ ${-d}</span>` : '<span class="muted">●</span>';
     };
     const decision = (r) => `<form method="post" action="/admin/usage/${esc(r.key)}${qs({})}" class="fu-dec">
-        <select name="status" aria-label="Decision for ${esc(r.name)}" onchange="this.form.submit()">${Object.entries(STATUS).map(([k, l]) => `<option value="${k}"${r.meta.status === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
+        <select name="status" aria-label="Decision for ${esc(r.name)}" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">${Object.entries(STATUS).map(([k, l]) => `<option value="${k}"${r.meta.status === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
         <input name="note" value="${esc(r.meta.note || '')}" placeholder="Note" maxlength="200" aria-label="Note"><button class="small secondary">Save</button></form>`;
     const row = (r) => `<tr id="f-${esc(r.key)}" class="fu-${r.verdict}">
         <td><b>${esc(r.name)}</b><small class="muted">${esc(AREAS[r.area])}${r.click ? ' · tap' : ' · page'}${r.verdict === 'new' ? ` · added ${r.age}d ago` : ''}</small></td>
@@ -213,8 +213,8 @@ function setup(app, { db, express, requireAdmin, page }) {
     const body = `<section class="card fu">
       <div class="row between"><h1>Feature usage</h1>
         <form method="get" action="/admin/usage" class="vz-filters">
-          <select name="p" aria-label="Period" onchange="this.form.submit()">${Object.entries(P).map(([k, l]) => `<option value="${k}"${Number(k) === days ? ' selected' : ''}>${l}</option>`).join('')}</select>
-          <label class="check small"><input type="checkbox" name="me" value="1"${me ? ' checked' : ''} onchange="this.form.submit()"> Include my own use</label>
+          <select name="p" aria-label="Period" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">${Object.entries(P).map(([k, l]) => `<option value="${k}"${Number(k) === days ? ' selected' : ''}>${l}</option>`).join('')}</select>
+          <label class="check small"><input type="checkbox" name="me" value="1"${me ? ' checked' : ''} onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()"> Include my own use</label>
           <noscript><button class="small">Apply</button></noscript>
         </form></div>
       <p class="muted small">What members actually use in the members area. Grow what they love, and retire what nobody touches so the site stays fast and simple. ${me ? 'Your own use is included.' : 'Your own use (admins) is left out.'}</p>

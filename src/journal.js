@@ -467,7 +467,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     page(req, res, 'Share Studio', `
     <link rel="stylesheet" href="/studio.css">
     <div class="ss">
-      <div class="ss-top"><h1 class="ss-title">Share Studio</h1>${acctOpts.length > 1 ? `<form method="get" class="ss-acct"><select name="account" onchange="this.form.submit()" aria-label="Account">${acctOpts.map(([v, l]) => `<option value="${esc(v)}"${(sel ? sel.account_number : '') === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></form>` : ''}</div>
+      <div class="ss-top"><h1 class="ss-title">Share Studio</h1>${acctOpts.length > 1 ? `<form method="get" class="ss-acct"><select name="account" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()" aria-label="Account">${acctOpts.map(([v, l]) => `<option value="${esc(v)}"${(sel ? sel.account_number : '') === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></form>` : ''}</div>
       ${trades.length ? `<nav class="ss-steps" id="steps" aria-label="Steps"></nav><div class="ss-bar"><i id="pb"></i></div>
       <div class="ss-wrap"><canvas id="pv"></canvas><div id="q" class="ss-q" aria-live="polite"></div></div>
       <input type="file" id="own" accept="image/*,video/*" hidden>` : `<p class="muted">No trades in the last year yet. Once the Journal EA sends trades (or you log one), your cards show up here.</p>`}
@@ -573,8 +573,8 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
     <section class="card report-card">
       <p class="muted">Your whole account as two story cards (Instagram, WhatsApp) or one big picture (Discord, X, iPad). Account numbers are never shown.</p>
       <form method="get" action="/journal/report" class="card-controls report-pick">
-        <label>Period <select name="period" onchange="this.form.submit()">${opts.map(([k, l]) => `<option value="${esc(k)}"${k === period ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
-        ${acctOpts.length > 1 ? `<label>Account <select name="account" onchange="this.form.submit()">${acctOpts.map(([k, l]) => `<option value="${esc(k)}"${(sel ? sel.account_number : '') === k ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>` : sel ? `<input type="hidden" name="account" value="${esc(sel.account_number)}">` : ''}
+        <label>Period <select name="period" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">${opts.map(([k, l]) => `<option value="${esc(k)}"${k === period ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
+        ${acctOpts.length > 1 ? `<label>Account <select name="account" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">${acctOpts.map(([k, l]) => `<option value="${esc(k)}"${(sel ? sel.account_number : '') === k ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>` : sel ? `<input type="hidden" name="account" value="${esc(sel.account_number)}">` : ''}
         <label>Show <select id="rmode">
           <option value="money">Money ($)</option>${N.start ? '<option value="pct">Percent of account</option>' : ''}<option value="r">R only (hide money)</option></select></label>
         <label class="check"><input type="checkbox" id="rkat" checked> KATANA line</label>
