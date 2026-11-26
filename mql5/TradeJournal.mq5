@@ -169,9 +169,12 @@ double SavedLevel(const ulong id, const string what)
 
 //--- build the trade from the account history -----------------------------
 // Returns false while the position is still open or has no closing deal.
-bool BuildTrade(const ulong id, string &json, datetime &closeTime)
+// stillOpen = true: a partial was booked but the rest of the position is still running.
+// The trade is sent with what is closed so far and sent again when it fully closes.
+bool BuildTrade(const ulong id, string &json, datetime &closeTime, bool &stillOpen)
   {
-   if(IsPositionOpen(id) || !HistorySelectByPosition(id)) return false;
+   stillOpen = IsPositionOpen(id);
+   if(!HistorySelectByPosition(id)) return false;
 
    string symbol = "", comment = "", side = "";
    long   magic = 0;
@@ -322,6 +325,7 @@ bool BuildTrade(const ulong id, string &json, datetime &closeTime)
           + JN("risk_money", riskMoney, 2) + "," + JN("risk_pct", riskPct, 2) + "," + JN("pct", pct, 2) + ","
           + JN("balance_after", balance, 2) + "," + JN("mfe", mfe, digits) + "," + JN("mae", mae, digits) + ","
           + JN("magic", (double)magic, 0) + "," + J("comment", comment) + "," + J("tf", TfName(tf)) + ","
+          + "\"still_open\":" + (stillOpen ? "true" : "false") + ","
           + "\"partials\":[" + partials + "],\"candles\":[" + candles + "]}}";
 
    return true;
@@ -390,7 +394,8 @@ void ProcessQueue()
       ulong id = g_queue[i].position_id;
       string json, msg;
       datetime closeTime;
-      if(!BuildTrade(id, json, closeTime)) { Dequeue(i); continue; }
+      bool stillOpen;
+      if(!BuildTrade(id, json, closeTime, stillOpen)) { Dequeue(i); continue; }
 
       int r = Send(json, msg);
       if(r == 1 || r == 0) g_netFails = 0;
@@ -398,8 +403,11 @@ void ProcessQueue()
         {
          datetime complete = closeTime + BarsAfter * PeriodSeconds(ChartTimeframe);
          g_sentCount++;
-         g_lastSync = TimeToString(TimeLocal(), TIME_MINUTES) + " sent position " + IntegerToString((long)id);
-         if(now >= complete)
+         g_lastSync = TimeToString(TimeLocal(), TIME_MINUTES) + " sent position " + IntegerToString((long)id)
+                      + (stillOpen ? " (partial)" : "");
+         if(stillOpen)
+            Dequeue(i);                       // the final close queues it again
+         else if(now >= complete)
            {
             MarkSent(id);
             LogLocally(json, id);
@@ -456,7 +464,7 @@ void CatchUp()
       if(!dup) { int n = ArraySize(ids); ArrayResize(ids, n + 1); ids[n] = id; }
      }
    for(int k = 0; k < ArraySize(ids); k++)
-      if(!IsPositionOpen(ids[k]) && (ResendHistory || !WasSent(ids[k]))) Enqueue(ids[k], now);
+      if(ResendHistory || !WasSent(ids[k]) || IsPositionOpen(ids[k])) Enqueue(ids[k], now);   // open = partial booked
   }
 
 
@@ -662,8 +670,7 @@ void OnTradeTransaction(const MqlTradeTransaction &trans, const MqlTradeRequest 
    long entry = HistoryDealGetInteger(trans.deal, DEAL_ENTRY);
    if(entry != DEAL_ENTRY_OUT && entry != DEAL_ENTRY_OUT_BY && entry != DEAL_ENTRY_INOUT) return;
    ulong id = (ulong)HistoryDealGetInteger(trans.deal, DEAL_POSITION_ID);
-   if(IsPositionOpen(id)) return;           // a partial close: logged with the final close
-   Enqueue(id, TimeCurrent());
+   Enqueue(id, TimeCurrent());              // a partial close goes to the journal now, and again on the final close
    ProcessQueue();
    UpdatePanel();
   }
