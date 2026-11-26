@@ -370,7 +370,7 @@ function client(base, ip) {
     assert.match(r.text, /MNQ/);
     assert.match(r.text, /class="plat">NT8</);
     { const d = (await bob.get('/dashboard')).text;          // My Tools: per-platform downloads, the NT8 tab opens after an NT8 trade
-      assert.match(d, /data-pf="nt8"/); assert.match(d, /For NinjaTrader 8/); assert.match(d, /Download coming soon/); }
+      assert.match(d, /data-pf="nt8"/); assert.match(d, /Trade journal for NinjaTrader 8/); assert.match(d, /Download coming soon/); }
     assert.strictEqual((await bob.get('/download/2/nt8')).status, 404);   // nothing uploaded yet
     await bob.post('/accounts/' + (await bob.get('/dashboard')).text.match(/\/accounts\/(\d+)\/delete" onsubmit="return confirm\('Remove account Sim101/)[1] + '/delete', {});
     await admin.post(`/admin/users/${bobId}`, [['name', 'Bob'], ['status', 'active'], ['max_accounts', '10'], ['expires_at', ''], ['ea', '1'], ['ea', '2']]);

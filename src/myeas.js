@@ -60,6 +60,7 @@ const ICONS = {
   journal: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   compass: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  palette: '<path d="M3 3v18h18"/><path d="M7 15v-4M11 15V7M15 15v-6M19 15v-3"/>',
   bot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01"/>',
 };
 const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k] || ICONS.bot}</svg>`;
@@ -129,21 +130,6 @@ function html({ u, eas, allEas, accounts, full, student, hasJournal, notices, si
   // owned tools first, then the known tools they do not have yet (locked)
   const cards = [...eas.map((e) => ({ e, locked: false })),
     ...allEas.filter((e) => TOOLS[e.code] && !owned.has(e.code)).map((e) => ({ e, locked: true }))];
-  const card = ({ e, locked }) => {
-    const T = TOOLS[e.code] || { kind: e.description || 'Expert Advisor', feats: [], steps: [], glow: 'rgba(140,140,150,.35)', icon: 'bot' };
-    const cta = locked
-      ? `<a class="mx-ghost hi" href="${T.unlock.href}">${esc(T.unlock.label)} →</a>`
-      : `${e.file_path ? `<a class="mx-pill" href="/download/${e.id}">Download <span aria-hidden="true">↓</span></a>` : '<span class="muted small">Coming soon</span>'}${T.extra && hasJournal ? `<a class="mx-ghost" href="${T.extra.href}">${esc(T.extra.label)}</a>` : ''}`;
-    return `<article class="ea-card mx-g mx-tool${locked ? ' locked' : ''}" style="--glow:${T.glow}">
-      <div class="ea-top"><span class="ea-ico">${icon(locked ? 'lock' : T.icon)}</span>
-        <div><div class="ea-name">${esc(e.name)}</div><div class="ea-kind">${esc(T.kind)}</div></div>
-        <span class="tag ${locked ? 'lock' : 'ok'}">${locked ? (T.unlock.note ? esc(T.unlock.note) : 'Locked') : 'Unlocked'}</span></div>
-      ${T.why ? `<p class="ea-why">${esc(T.why)}</p>` : e.description ? `<p class="ea-why">${esc(e.description)}</p>` : ''}
-      ${T.feats.length ? `<ul class="ea-feat">${T.feats.slice(0, 3).map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
-      ${!locked && T.steps.length ? `<details class="ea-how"><summary>How to install</summary><ol>${T.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol></details>` : ''}
-      <div class="ea-foot">${cta}${locked ? '' : `<span class="mx-ver">v${esc(e.version)}</span>`}</div>
-    </article>`;
-  };
   const now = Date.now();
   const ago = (t) => {
     const h = (now - Date.parse(String(t).replace(' ', 'T') + 'Z')) / 3600e3;
@@ -176,31 +162,39 @@ function html({ u, eas, allEas, accounts, full, student, hasJournal, notices, si
   // open the tab of the platform this member last journaled from (?p= wins)
   const lastPlat = hasJournal ? (db.prepare('SELECT platform FROM journal_trades WHERE user_id = ? ORDER BY id DESC LIMIT 1').get(u.id) || {}).platform : '';
   const pick = PLATFORMS.find((p) => p.key === plat) ? plat : ({ NinjaTrader: 'nt8', Quantower: 'qt' }[lastPlat] || 'mt5');
-  const mt5Cards = cards;
-  const panel = (p) => {
-    if (p.key === 'mt5') return `<div class="ea-cards mx-tools">${mt5Cards.length ? mt5Cards.map(card).join('') : '<p class="muted">No tools are assigned to your account yet.</p>'}</div>
-      <section class="card mx-g mx-box ea-themes">
-        <div class="row between"><h2>Chart themes</h2><span class="muted small">KATANA and Compass match them</span></div>
-        <div class="th-grid">${THEMES.map((t, i) => `<div class="th">
-          <div class="th-pic">${themeSvg(t, 7 + i * 13)}</div>
-          <div class="th-row"><b>${t.name}</b><span><a href="/templates/5ABI.FX%20${t.name}.tpl" download>Download</a>${withCompass ? ` · <a href="/templates/5ABI.FX%20${t.name}%20Compass.tpl" download>with Compass</a>` : ''}</span></div></div>`).join('')}</div>
-        <p class="muted small">Put the file in <strong>MQL5 → Profiles → Templates</strong>, then right-click a chart → <strong>Templates</strong>.</p>
-        ${withCompass ? '<p class="muted small">Auction Compass unlocks by itself while the Trade Journal EA runs on any chart in the same MT5.</p>' : ''}
-      </section>
-      <p class="muted small mx-tipline">Every MT5 tool needs <code>${esc(site)}</code> in <b>Tools → Options → Expert Advisors → Allow WebRequest</b>.
-        Older journal trades missing? In the Trade Journal inputs set <b>On start, also send trades closed in the last N days</b> to <b>365</b>.</p>`;
-    const ready = jea && jea[`${p.col}_file_path`];
-    const cta = !hasJournal ? `<a class="mx-pill" href="/pricing">See plans <span aria-hidden="true">→</span></a><span class="muted small">The Trade Journal comes with the Journal and Pro plans.</span>`
-      : ready ? `<a class="mx-pill" href="/download/${jea.id}/${p.dl}">Download for ${esc(p.short)} <span aria-hidden="true">↓</span></a><span class="muted small">${esc(p.file)}</span>`
-        : '<span class="mx-soon">Download coming soon</span>';
-    return `<article class="mx-g pf-card" style="--glow:rgba(47,211,180,.4)">
-      <div class="pf-head">${platLogo(p, 'pf-logo lg')}<div><span class="mx-k">For ${esc(p.name)}</span><h3>5ABI Journal</h3>
-        <p>Sends every closed trade on every account to your journal: calendar, Desk, Insights and share cards. It never places trades.</p></div>
-        <span class="tag ${hasJournal ? 'ok' : 'lock'}">${hasJournal ? 'Unlocked' : 'Locked'}</span></div>
-      <div class="mx-act">${cta}</div>
-      <ol class="pf-steps">${p.steps.map(([h, b], i) => `<li><i>${i + 1}</i><div><b>${h}</b><p>${b}</p></div></li>`).join('')}</ol>
+  // one tool on a platform's branch: icon, name, status, why, download, install steps (folded unless open)
+  const node = ({ ico, name, kind, why, tag, tagCls, cta, steps, open, extra }) => `<article class="pf-node mx-g">
+      <div class="pn-top"><span class="ea-ico">${icon(ico)}</span><div class="pn-name"><b>${esc(name)}</b><small>${esc(kind)}</small></div><span class="tag ${tagCls}">${esc(tag)}</span></div>
+      ${why ? `<p class="pn-why">${why}</p>` : ''}
+      ${extra || ''}
+      ${open ? `<div class="pn-act">${cta}</div>` : ''}
+      ${steps && steps.length ? `<details class="pn-how"${open ? ' open' : ''}><summary>How to install</summary><ol class="pn-steps">${steps.map((x, i) => `<li><i>${i + 1}</i><div>${Array.isArray(x) ? `<b>${x[0]}</b><p>${x[1]}</p>` : `<p>${esc(x)}</p>`}</div></li>`).join('')}</ol></details>` : ''}
+      ${open ? '' : `<div class="pn-act">${cta}</div>`}
     </article>`;
+  const mt5Nodes = () => {
+    const tools = cards.map(({ e, locked }) => {
+      const T = TOOLS[e.code] || { kind: e.description || 'Expert Advisor', feats: [], steps: [], icon: 'bot' };
+      const cta = locked ? `<a class="mx-ghost hi" href="${T.unlock.href}">${esc(T.unlock.label)} →</a>`
+        : `${e.file_path ? `<a class="mx-pill sm" href="/download/${e.id}">Download <span aria-hidden="true">↓</span></a>` : '<span class="mx-soon">Coming soon</span>'}${T.extra && hasJournal ? `<a class="mx-ghost" href="${T.extra.href}">${esc(T.extra.label)}</a>` : ''}<span class="mx-ver">v${esc(e.version)}</span>`;
+      return node({ ico: locked ? 'lock' : T.icon, name: e.name, kind: T.kind, why: esc(T.why || e.description || ''), tag: locked ? (T.unlock.note || 'Locked') : 'Unlocked',
+        tagCls: locked ? 'lock' : 'ok', cta, steps: locked ? [] : T.steps });
+    });
+    tools.push(node({ ico: 'palette', name: 'Chart themes', kind: 'MT5 chart templates', why: 'KATANA and Compass are drawn to match them.', tag: 'Free', tagCls: 'ok',
+      extra: `<div class="th-grid pn-themes">${THEMES.map((t, i) => `<div class="th"><div class="th-pic">${themeSvg(t, 7 + i * 13)}</div>
+        <div class="th-row"><b>${t.name}</b><span><a href="/templates/5ABI.FX%20${t.name}.tpl" download>Download</a>${withCompass ? `<a href="/templates/5ABI.FX%20${t.name}%20Compass.tpl" download>With Compass</a>` : ''}</span></div></div>`).join('')}</div>`,
+      steps: ['Put the file in MQL5 → Profiles → Templates.', 'Right-click a chart → Templates and pick it.'], cta: '' }));
+    return tools;
   };
+  const otherNodes = (p) => {
+    const ready = jea && jea[`${p.col}_file_path`];
+    const cta = !hasJournal ? '<a class="mx-ghost hi" href="/pricing">See plans →</a><span class="muted small">Comes with the Journal and Pro plans.</span>'
+      : ready ? `<a class="mx-pill sm" href="/download/${jea.id}/${p.dl}">Download for ${esc(p.short)} <span aria-hidden="true">↓</span></a><span class="muted small">${esc(p.file)}</span>`
+        : '<span class="mx-soon">Download coming soon</span>';
+    return [node({ ico: 'journal', name: '5ABI Journal', kind: `Trade journal for ${p.name}`, tag: hasJournal ? 'Unlocked' : 'Locked', tagCls: hasJournal ? 'ok' : 'lock',
+      why: 'Sends every closed trade on every account to your journal: calendar, Desk, Insights and share cards. It never places trades.', cta, steps: p.steps, open: hasJournal })];
+  };
+  const branch = (p) => (p.key === 'mt5' ? mt5Nodes() : otherNodes(p));
+  const counts = Object.fromEntries(PLATFORMS.map((p) => [p.key, branch(p).length]));
 
   return `<link rel="stylesheet" href="/myeas.css">
   <div class="mx-amb" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -237,11 +231,15 @@ function html({ u, eas, allEas, accounts, full, student, hasJournal, notices, si
     </div>
   </section>` : ''}
 
-  <section class="mx-pf" id="platforms" data-pf="${pick}" aria-label="Downloads by platform">
-    <div class="mx-sec"><h2>Downloads by platform</h2><span>Pick the platform you trade on</span></div>
-    <div class="pf-tabs mx-g" role="tablist">${PLATFORMS.map((p) => `<button type="button" role="tab" class="pf-tab${p.key === pick ? ' on' : ''}" data-pf-tab="${p.key}" aria-selected="${p.key === pick}" aria-controls="pf-${p.key}">
-      ${platLogo(p)}<span><b>${esc(p.name)}</b><small>${esc(p.has)}</small></span></button>`).join('')}</div>
-    ${PLATFORMS.map((p) => `<div class="pf-panel" id="pf-${p.key}" role="tabpanel" data-pf-panel="${p.key}"${p.key === pick ? '' : ' hidden'}>${panel(p)}</div>`).join('')}
+  <section class="mx-pf" id="platforms" data-pf="${pick}" aria-label="Your platforms">
+    <div class="mx-sec"><h2>Your platforms</h2><span>Pick the one you trade on to see its tools</span></div>
+    <div class="pf-main" role="tablist">${PLATFORMS.map((p) => `<button type="button" role="tab" class="pf-tab mx-g${p.key === pick ? ' on' : ''}" data-pf-tab="${p.key}" aria-selected="${p.key === pick}" aria-controls="pf-${p.key}">
+      ${platLogo(p, 'pf-logo lg')}<span class="pf-tx"><b>${esc(p.name)}</b><small>${counts[p.key]} tool${counts[p.key] === 1 ? '' : 's'}</small></span><span class="pf-chk" aria-hidden="true"></span></button>`).join('')}</div>
+    ${PLATFORMS.map((p) => `<div class="pf-panel" id="pf-${p.key}" role="tabpanel" data-pf-panel="${p.key}"${p.key === pick ? '' : ' hidden'}>
+      <div class="pf-trunk"><span>${platLogo(p, 'pf-logo xs')}${esc(p.name)} tools</span></div>
+      <div class="pf-branch">${branch(p).join('')}</div>
+      ${p.key === 'mt5' ? `<p class="muted small mx-tipline">Every MT5 tool needs <code>${esc(site)}</code> in <b>Tools → Options → Expert Advisors → Allow WebRequest</b>. Older journal trades missing? In the Trade Journal inputs set <b>On start, also send trades closed in the last N days</b> to <b>365</b>.</p>` : ''}
+    </div>`).join('')}
   </section>
 
   <div class="mx-lower">
