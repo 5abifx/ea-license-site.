@@ -9,7 +9,15 @@
   var btn = root.querySelector('[data-lv-bgbtn]'), tiles = pn.querySelector('[data-lv-tiles]'), own = pn.querySelector('[data-lv-own]');
   var dimIn = pn.querySelector('[data-lv-dim]'), bwIn = pn.querySelector('[data-lv-bw]'), note = pn.querySelector('[data-lv-bgn]');
   var store = { get: function (k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }, set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
-  var S = Object.assign({ k: 'none', dim: 0.5, bw: false, clip: null }, store.get('lv.bg') || {});
+  /* one design per kind of screen, saved on the account: PC, iPad / tablet, phone */
+  var HERE = (function () {
+    var sw = Math.min(screen.width, screen.height), lw = Math.max(screen.width, screen.height), touch = navigator.maxTouchPoints > 0;
+    return sw < 600 ? 'phone' : touch && lw <= 1400 ? 'tab' : 'pc';
+  })();
+  var NAMES = { pc: 'PC', tab: 'iPad', phone: 'phone' };
+  var B = {}, bgs = D.bgs || {};
+  ['pc', 'tab', 'phone'].forEach(function (d) { B[d] = Object.assign({ k: 'none', dim: 0.5, bw: false, clip: null }, bgs[d] || (d === HERE ? store.get('lv.bg') : null) || {}); });
+  var EDIT = HERE, S = B[EDIT], devs = pn.querySelector('.lv-devs'), devn = pn.querySelector('[data-lv-devn]');
 
   var BUILT = [['none', 'None', 'linear-gradient(135deg,#141416,#0a0a0b)'], ['smoke', 'Smoke', 'radial-gradient(circle at 35% 40%,#6b6b72,#141416 70%)'],
     ['ember', 'Ember', 'radial-gradient(circle at 50% 70%,#ff5a1f,#3a1206 60%,#0a0a0b)'], ['floor', 'Trading floor', 'linear-gradient(180deg,#0a0a0b 40%,#3a3a40)']];
@@ -46,7 +54,8 @@
     if (S.k === 'none') return;
     if (S.k === 'own') {
       idb('readonly', function (st) { return st.get('own'); }).then(function (f) {
-        if (!f || S.k !== 'own') return; url = URL.createObjectURL(f); media(url, /^video\//.test(f.type)); shade();
+        if (!f) { root.classList.remove('has-bg'); if (!pn.hidden) note.textContent = 'Your picture is kept on the device you added it on. Tap My own to add it on this one.'; return; }
+        if (S.k !== 'own') return; url = URL.createObjectURL(f); media(url, /^video\//.test(f.type)); shade();
       }).catch(function () {});
       return;
     }
@@ -107,7 +116,21 @@
     else note.textContent = 'Your own picture or clip stays on this device. It is never uploaded.';
   }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function save() { store.set('lv.bg', S); }
+  var sendT = 0;
+  function save() {
+    if (EDIT === HERE) store.set('lv.bg', S);
+    var dev = EDIT, bg = JSON.stringify(S);
+    clearTimeout(sendT); sendT = setTimeout(function () {   // saved on the account, so it comes back on any screen of this kind
+      fetch('/journal/live/bg', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'dev=' + dev + '&bg=' + encodeURIComponent(bg) }).catch(function () {});
+    }, 500);
+  }
+  function syncDevs() {
+    [].forEach.call(devs.querySelectorAll('[data-dev]'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.dev === EDIT)); b.classList.toggle('here', b.dataset.dev === HERE); });
+    devn.textContent = EDIT === HERE ? 'This is your ' + NAMES[HERE] + ' design. It comes back on any ' + NAMES[HERE] + ' you sign in on.'
+      : 'Editing your ' + NAMES[EDIT] + ' design, shown here as a preview. This screen goes back to its own design when you close this.';
+  }
+  function edit(dev) { EDIT = dev; S = B[dev]; syncDevs(); dimIn.value = S.dim; bwIn.checked = !!S.bw; drawTiles(); paint(); credit(); }
+  devs.addEventListener('click', function (e) { var b = e.target.closest('[data-dev]'); if (b && b.dataset.dev !== EDIT) edit(b.dataset.dev); });
 
   /* ---------- the panel ---------- */
   function drawTiles() {
@@ -122,7 +145,8 @@
   var thumbsAsked = false;
   function open(on) {
     pn.hidden = !on; btn.setAttribute('aria-expanded', String(on));
-    if (!on) return;
+    if (!on) { if (EDIT !== HERE) edit(HERE); return; }
+    syncDevs();
     var r = btn.getBoundingClientRect(); pn.style.top = (r.bottom + 8) + 'px';
     if (innerWidth < 560) { pn.style.left = '12px'; pn.style.right = '12px'; } else { pn.style.left = 'auto'; pn.style.right = Math.max(12, innerWidth - r.right) + 'px'; }
     dimIn.value = S.dim; bwIn.checked = !!S.bw; drawTiles(); credit();
@@ -137,6 +161,7 @@
   }
   btn.addEventListener('click', function (e) { e.stopPropagation(); open(pn.hidden); });
   pn.querySelector('[data-lv-bgx]').onclick = function () { open(false); };
+  pn.addEventListener('click', function (e) { e.stopPropagation(); });   // tiles are redrawn on click; keep the panel open
   document.addEventListener('click', function (e) { if (!pn.hidden && !pn.contains(e.target) && e.target !== btn) open(false); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !pn.hidden) open(false); });
   tiles.addEventListener('click', function (e) {

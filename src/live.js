@@ -6,6 +6,27 @@
 const { esc } = require('./views');
 
 module.exports = function registerLive(app, { db, page, requireUser, requireJournal, scope, acctBar, desk, prep, DESK_COLS, PROP_COLS, limitsOf }) {
+  // one background design per kind of screen (PC, iPad / tablet, phone), saved on the account so it comes back on any device of that kind.
+  // An own picture / clip is never uploaded: the design only remembers "own" and each device keeps its own file.
+  if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'live_bg')) db.exec("ALTER TABLE users ADD COLUMN live_bg TEXT NOT NULL DEFAULT ''");
+  const DEVS = ['pc', 'tab', 'phone'], KINDS = /^(none|smoke|ember|floor|own|racing|dark|war|beast|fight|supercars|money|watches|fire)$/;
+  const cleanBg = (o) => {
+    if (!o || typeof o !== 'object' || !KINDS.test(o.k)) return null;
+    const dim = Math.min(0.85, Math.max(0.2, Number(o.dim) || 0.5));
+    const c = o.clip && typeof o.clip === 'object' && /^https:\/\/[^\s"'<>]{8,600}$/.test(o.clip.url || '') ? o.clip : null;
+    const str = (v, n) => String(v || '').slice(0, n);
+    return { k: o.k, dim, bw: o.bw === true, clip: c ? { k: str(c.k, 20), url: c.url, by: str(c.by, 80), page: /^https:\/\//.test(c.page || '') ? str(c.page, 400) : '', src: str(c.src, 20) } : null };
+  };
+  const bgsOf = (u) => { let o = {}; try { o = JSON.parse(u.live_bg || '{}') || {}; } catch (e) {} const r = {}; DEVS.forEach((d) => { const v = cleanBg(o[d]); if (v) r[d] = v; }); return r; };
+  app.post('/journal/live/bg', requireUser, (req, res) => {
+    let raw = null; try { raw = JSON.parse(String(req.body.bg || '').slice(0, 4000)); } catch (e) {}
+    const dev = DEVS.includes(req.body.dev) ? req.body.dev : null, bg = cleanBg(raw);
+    if (!dev || !bg) return res.status(400).json({ ok: false });
+    const row = db.prepare('SELECT live_bg FROM users WHERE id = ?').get(req.user.id) || {}, all = bgsOf(row);
+    all[dev] = bg; db.prepare('UPDATE users SET live_bg = ? WHERE id = ?').run(JSON.stringify(all), req.user.id);
+    res.json({ ok: true });
+  });
+
   app.get('/journal/live', requireUser, requireJournal, (req, res) => {
     const u = req.user;
     const sc = scope(req);
@@ -41,6 +62,7 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
     let streak = 0;
     for (let i = rows.length - 1; i >= 0 && rows[i].net < 0; i--) streak++;
     const data = {
+      bgs: bgsOf(db.prepare('SELECT live_bg FROM users WHERE id = ?').get(req.user.id) || {}),
       stock: !!(process.env.PEXELS_API_KEY || process.env.PIXABAY_API_KEY),   // clip tiles, same free clips as Share Studio
       cur, demo: req.query.demo === '1',
       acct: one ? `Account ••${String(one.account_number).slice(-2)}` : '',
@@ -123,6 +145,9 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
       </div>
       <div class="ov-pn lv-bgp" data-lv-bgp hidden role="dialog" aria-label="Background">
         <div class="lv-bgp-h"><b>Background</b><button type="button" class="lv-x" data-lv-bgx aria-label="Close">×</button></div>
+        <div class="lv-devs" role="group" aria-label="Design for"><span>Design for</span>
+          <button type="button" data-dev="pc">PC</button><button type="button" data-dev="tab">iPad</button><button type="button" data-dev="phone">Phone</button></div>
+        <p class="lv-devn" data-lv-devn></p>
         <div class="lv-tiles" data-lv-tiles></div>
         <div class="lv-bgp-row"><label>Darken <input type="range" min="0.2" max="0.85" step="0.05" data-lv-dim></label>
           <label class="lv-tog"><input type="checkbox" data-lv-bw> Black and white</label></div>
