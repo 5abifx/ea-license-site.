@@ -8,9 +8,10 @@
 //| symbols and all EAs on that account.                             |
 //+------------------------------------------------------------------+
 #property copyright "5ABI.FX"
-#property version   "1.34"
+#property version   "1.35"
 #property description "Trade Journal: logs closed trades, partials and candles to your journal,"
-#property description "and sends MT5's economic calendar for the Desk's news catalysts."
+#property description "sends MT5's economic calendar for the Desk's news catalysts,"
+#property description "and a small live pulse (open trades, floating P&L) for the Live screen."
 
 #define EA_CODE        "JOURNAL"                  // must match the license code in Admin > EAs
 #define LICENSE_SERVER "https://5abifx.com"  // your website address, no trailing slash
@@ -27,6 +28,7 @@ input bool            ResendHistory  = false;       // Send those days again, ev
 input double          PipSize        = 0;           // Pip size (0 = automatic)
 input bool            ShowPanel      = true;        // Show the journal panel on the chart
 input bool            SendNews       = true;        // Send the MT5 economic calendar (news on your Desk)
+input bool            LivePulse      = true;        // Live screen: send open trades + floating P&L (every ~2 s in a trade)
 
 #define JOURNAL_DIR    "TradeJournal\\"
 #define MAX_CANDLES    1500
@@ -41,6 +43,12 @@ struct QueueItem
 
 QueueItem g_queue[];
 string    g_lastSync = "nothing sent yet";
+//--- live pulse state (see PulseOnTimer)
+string g_pulseLast  = "";      // last snapshot sent (without the time), to skip sends when nothing changed
+ulong  g_pulseNext  = 0;       // GetTickCount64() when the next send is allowed
+ulong  g_pulseBeat  = 0;       // last send (for the once-a-minute heartbeat when flat)
+int    g_pulseWait  = 0;       // back-off in ms after a slow or failed send
+string g_pulseState = "";      // shown on the panel
 datetime  g_netWait  = 0;         // site not reachable / not allowed yet: no sends before this time
 int       g_netFails = 0;
 int       g_sentCount = 0;
@@ -619,7 +627,72 @@ void UpdatePanel()
               + "Waiting to send: " + IntegerToString(ArraySize(g_queue)) + "\n"
               + "Last sync: " + g_lastSync + "\n"
               + "Indicators: " + g_relayStatus + "\n"
-              + "News: " + (SendNews ? g_calStatus : "off"));
+              + "News: " + (SendNews ? g_calStatus : "off") + "\n"
+              + "Live screen: " + (!LivePulse ? "off" : g_pulseState == "" ? "starting" : g_pulseState));
+  }
+
+//--- live pulse (Live screen) ---------------------------------------------
+// One small snapshot of the open trades. Runs from OnTimer only, never OnTick. WebRequest blocks the EA, so:
+// short timeout, sent only when something changed (or once a minute when flat), and it backs off when the site is slow.
+
+void PulseOnTimer()
+  {
+   if(!LivePulse || JournalKey == "" || MQLInfoInteger(MQL_TESTER)) return;
+   ulong now = GetTickCount64();
+   if(now < g_pulseNext) return;
+   //--- the snapshot
+   string pos = "";
+   int n = PositionsTotal();
+   for(int i = 0; i < n && i < 200; i++)
+     {
+      ulong t = PositionGetTicket(i);
+      if(t == 0 || !PositionSelectByTicket(t)) continue;
+      string sym = PositionGetString(POSITION_SYMBOL);
+      long   type = PositionGetInteger(POSITION_TYPE);
+      double lots = PositionGetDouble(POSITION_VOLUME), entry = PositionGetDouble(POSITION_PRICE_OPEN);
+      double sl = PositionGetDouble(POSITION_SL), tp = PositionGetDouble(POSITION_TP);
+      double pnl = PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
+      int    dg = (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
+      ENUM_ORDER_TYPE ot = type == POSITION_TYPE_SELL ? ORDER_TYPE_SELL : ORDER_TYPE_BUY;
+      double risk = 0, reward = 0, v = 0;
+      if(sl > 0 && OrderCalcProfit(ot, sym, lots, entry, sl, v)) risk = -v;      // money lost at the stop (negative = stop in profit)
+      if(tp > 0 && OrderCalcProfit(ot, sym, lots, entry, tp, v)) reward = v;
+      if(pos != "") pos += ",";
+      pos += "{" + J("id", IntegerToString((long)PositionGetInteger(POSITION_IDENTIFIER))) + "," + J("sym", sym) + ","
+           + J("side", type == POSITION_TYPE_SELL ? "SELL" : "BUY") + "," + JN("lots", lots, 2) + ","
+           + JN("entry", entry, dg) + "," + JN("sl", sl, dg) + "," + JN("tp", tp, dg) + "," + JN("pnl", pnl, 2) + ","
+           + JN("risk", risk, 2) + "," + JN("reward", reward, 2) + "," + JN("digits", dg, 0) + ","
+           + "\"open\":" + IntegerToString((long)PositionGetInteger(POSITION_TIME)) + ","
+           + "\"magic\":" + IntegerToString(PositionGetInteger(POSITION_MAGIC)) + "}";
+     }
+   string snap = "\"pos\":[" + pos + "]";
+   bool open = pos != "";
+   // flat and nothing changed: only a heartbeat once a minute
+   if(snap == g_pulseLast && (open || now - g_pulseBeat < 60000)) { g_pulseNext = now + 1000; return; }
+   string json = "{" + J("key", JournalKey) + "," + J("account", Login()) + "," + J("cur", AccountInfoString(ACCOUNT_CURRENCY)) + ","
+               + "\"srv\":" + IntegerToString((long)TimeTradeServer()) + "," + JN("eq", AccountInfoDouble(ACCOUNT_EQUITY), 2) + "," + JN("bal", AccountInfoDouble(ACCOUNT_BALANCE), 2) + "," + snap + "}";
+   //--- send (short timeout so MT5 never hangs on a slow site)
+   char data[], result[]; string hdr;
+   int len = StringToCharArray(json, data, 0, WHOLE_ARRAY, CP_UTF8);
+   ArrayResize(data, MathMax(0, len - 1));
+   ResetLastError();
+   ulong t0 = GetTickCount64();
+   int http = WebRequest("POST", LICENSE_SERVER + "/api/journal/pulse", "Content-Type: application/json\r\n", 2500, data, result, hdr);
+   ulong took = GetTickCount64() - t0;
+   g_pulseBeat = GetTickCount64();
+   if(http == 200)
+     {
+      g_pulseLast = snap; g_pulseState = open ? "live" : "on";
+      // fast and fine: next in ~2 s while a trade is open; slow: wait longer
+      g_pulseWait = took > 1500 ? MathMin(60000, MathMax(4000, g_pulseWait * 2)) : 0;
+      g_pulseNext = g_pulseBeat + (open ? MathMax(2000, g_pulseWait) : MathMax(1000, g_pulseWait));
+      return;
+     }
+   if(http == 401 || http == 403) { g_pulseState = "off (" + LicJsonString(CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8), "message") + ")"; g_pulseNext = g_pulseBeat + 600000; return; }
+   // no connection, error or too busy: back off 4 s, 8 s ... up to 60 s
+   g_pulseWait = MathMin(60000, MathMax(4000, g_pulseWait * 2));
+   g_pulseNext = g_pulseBeat + g_pulseWait;
+   g_pulseState = "retrying";
   }
 
 //--- events ----------------------------------------------------------------
@@ -637,7 +710,7 @@ int OnInit()
      }
    if(JournalKey == "")
       Alert("Trade Journal: paste your Journal key (from your dashboard on ", LICENSE_SERVER, ") into the EA inputs.");
-   EventSetTimer(10);
+   EventSetTimer(2);                        // live pulse every ~2 s; the other jobs still run every 10 s
    g_calNext = TimeTradeServer() + 20;      // news a little after start, trades first
    RememberLevels();
    CatchUp();                               // sending starts on the first timer, so the chart opens fast
@@ -650,8 +723,11 @@ void OnDeinit(const int reason)
    LicenseOnDeinit();
   }
 
+int g_timerN = 0;
 void OnTimer()
   {
+   PulseOnTimer();
+   if(g_timerN++ % 5 != 0) return;          // the jobs below every 10 s, as before
    LicenseOnTimer();
    RelayOnTimer();
    RememberLevels();
