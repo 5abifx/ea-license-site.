@@ -5,10 +5,11 @@
 // Open trades need the Journal EA live pulse (not sent yet): until then ?demo=1 plays a sample trade.
 const { esc } = require('./views');
 
-module.exports = function registerLive(app, { db, page, requireUser, requireJournal, scope, desk, prep, DESK_COLS, PROP_COLS, limitsOf }) {
+module.exports = function registerLive(app, { db, page, requireUser, requireJournal, scope, acctBar, desk, prep, DESK_COLS, PROP_COLS, limitsOf }) {
   app.get('/journal/live', requireUser, requireJournal, (req, res) => {
     const u = req.user;
-    const { liveAccts, sel, where, args } = scope(req);
+    const sc = scope(req);
+    const { liveAccts, sel, where, args } = sc;
     const off = u.ny_offset ?? desk.NY_DEFAULT;
     const today = desk.serverToday(off);
     const rows = db.prepare(`SELECT ${DESK_COLS} FROM journal_trades WHERE ${where} AND substr(close_time, 1, 10) = ? ORDER BY close_time`).all(...args, today);
@@ -43,89 +44,65 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
       news,
     };
     req.noSide = true;   // the live screen uses the full width: no side cards
+    const qs = (o) => '?' + new URLSearchParams(Object.entries({ account: sel ? sel.account_number : '', ...o }).filter(([, v]) => v)).toString();
+    const btn = (attr, label, title) => `<button type="button" class="small secondary" ${attr} title="${title}">${label}</button>`;
     page(req, res, 'Live', `
       <link rel="stylesheet" href="/live.css">
       <div class="lv" data-lv data-state="flat">
         <script type="application/json" data-lv-data>${JSON.stringify(data).replace(/</g, '\\u003c')}</script>
-        <div class="lv-glow" aria-hidden="true"><i></i><i></i><i></i></div>
-        <header class="lv-top">
-          <div class="lv-ttl"><h1>Live</h1><span class="lv-pulse" data-lv-conn><em></em><span>${data.demo ? 'Sample trade' : 'Waiting for MT5'}</span></span></div>
-          <div class="lv-chips">
-            ${data.acct ? `<span class="lv-chip">${esc(data.acct)}</span>` : ''}
-            <span class="lv-chip" data-lv-sess>New York</span>
-            <span class="lv-chip lv-clock" data-lv-clock>--:--</span>
+        <div class="row between page-head lv-head"><h1>Live <span class="lv-pulse" data-lv-conn><em></em><span>${data.demo ? 'Sample trade' : 'Waiting for MT5'}</span></span></h1>
+          <span class="head-btns">${btn('data-lv-priv aria-pressed="false"', 'Hide private info', 'Blurs the money amounts, so you can film or stream')}${btn('data-lv-full', 'Full screen', 'Fill the whole screen')}</span></div>
+        ${acctBar ? acctBar(req, '/journal/live', qs, sc, cur) : ''}
+
+        <section class="lv-hero">
+          <canvas class="lv-line" data-lv-line aria-hidden="true"></canvas>
+          <div class="lv-lbl" data-lv-lbl>Today P&amp;L</div>
+          <div class="lv-num" data-lv-num data-no-ig>$0</div>
+          <div class="lv-subl" data-lv-subl></div>
+          <dl class="lv-stats">
+            <div><dt>Today</dt><dd data-lv-today data-no-ig>–</dd></div>
+            <div><dt>Today R</dt><dd data-lv-todayr>–</dd></div>
+            <div><dt>Trades</dt><dd data-lv-trades>–</dd></div>
+            <div data-lv-dlw><dt>Daily loss used</dt><dd data-lv-used data-no-ig>–</dd><i class="lv-bar"><b data-lv-usedbar></b></i></div>
+            <div><dt>Losses</dt><dd data-lv-loss>–</dd></div>
+            <div data-lv-news><dt data-lv-nn>Next red news</dt><dd data-lv-cd data-no-ig>None</dd></div>
+          </dl>
+        </section>
+
+        <section class="lv-run" data-lv-run>
+          <div class="lv-track"><i class="lv-fill" data-lv-fill></i><i class="lv-ent"></i><i class="lv-dot" data-lv-dot></i></div>
+          <div class="lv-tl"><span>Stop <b class="neg" data-lv-sl></b></span><span>Entry <b data-lv-ep></b></span><span>Target <b class="pos" data-lv-tp></b></span></div>
+        </section>
+
+        <section class="lv-check" data-lv-check>
+          <div class="lv-lbl">Before you click buy or sell</div>
+          <div class="lv-chk">
+            <label><input type="checkbox"><span>My setup is on the chart, not in my head</span></label>
+            <label><input type="checkbox"><span>Stop sits where the idea is wrong</span></label>
+            <label><input type="checkbox"><span>Risk is my normal size or less</span></label>
+            <label><input type="checkbox"><span>No red news in the next 15 minutes</span></label>
           </div>
-          <div class="lv-btns">
-            <button type="button" class="lv-ib" data-lv-priv title="Hide private info" aria-label="Hide private info"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
-            <button type="button" class="lv-ib" data-lv-full title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
-          </div>
-        </header>
+        </section>
 
-        <div class="lv-grid">
-          <section class="lv-t lv-today">
-            <div class="lv-lbl">Today</div>
-            <div class="lv-big" data-lv-today data-no-ig>$0</div>
-            <div class="lv-sub"><b data-lv-todayr></b> <span data-lv-todayn></span></div>
-            <div class="lv-dots" data-lv-dots></div>
-            <canvas class="lv-cv" data-lv-eq aria-hidden="true"></canvas>
-          </section>
-
-          <section class="lv-t lv-trade">
-            <div class="lv-flat" data-lv-flat>
-              <div class="lv-lbl">No open trade</div>
-              <h2 class="lv-q">Before you click buy or sell</h2>
-              <div class="lv-chk">
-                <label><input type="checkbox"><span>My setup is on the chart, not in my head</span></label>
-                <label><input type="checkbox"><span>Stop sits where the idea is wrong</span></label>
-                <label><input type="checkbox"><span>Risk is my normal size or less</span></label>
-                <label><input type="checkbox"><span>No red news in the next 15 minutes</span></label>
-              </div>
-            </div>
-            <div class="lv-open" data-lv-open>
-              <div class="lv-hd"><b class="lv-sym" data-lv-sym>XAUUSD</b><span class="lv-side" data-lv-side>Buy 0.40</span><span class="lv-tim" data-lv-tim></span></div>
-              <div class="lv-big lv-fl" data-lv-fl data-no-ig>$0</div>
-              <div class="lv-sub"><b data-lv-flr></b> <span>right now</span></div>
-              <canvas class="lv-cv lv-path" data-lv-path aria-hidden="true"></canvas>
-              <div class="lv-tube">
-                <canvas data-lv-tube aria-hidden="true"></canvas>
-                <div class="lv-tl"><span>Stop <b class="l" data-lv-sl></b></span><span>Entry</span><span>Target <b class="w" data-lv-tp></b></span></div>
-              </div>
-              <div class="lv-facts"><div><small>Risk</small><b data-lv-risk>0.25%</b></div><div><small>Planned</small><b data-lv-plan>1 : 2</b></div><div><small>Stop moved</small><b>No</b></div></div>
-            </div>
-          </section>
-
-          <section class="lv-t lv-guard">
-            <div class="lv-lbl">Guard rails</div>
-            <div class="lv-orbw"><canvas class="lv-orb" data-lv-orb aria-hidden="true"></canvas><div class="lv-orbt"><b data-lv-used data-no-ig>0%</b><span data-lv-left>of daily loss used</span></div></div>
-            <div class="lv-rows">
-              <div><span>Losses today</span><b data-lv-loss></b></div>
-              <div><span>Trades today</span><b data-lv-trades></b></div>
-              <div><span>KATANA</span><b class="w" data-lv-kat>Armed</b></div>
-            </div>
-            <div class="lv-news" data-lv-news><small>Next red news</small><b data-lv-nn>None today</b><span class="lv-cd" data-lv-cd data-no-ig></span></div>
-          </section>
+        <div class="ov-btns lv-btns">
+          <span class="lv-feel" role="group" aria-label="How do you feel?"><button type="button" class="ov-btn" aria-pressed="false">Calm</button><button type="button" class="ov-btn" aria-pressed="false">Focused</button><button type="button" class="ov-btn" aria-pressed="false">Unsure</button><button type="button" class="ov-btn" aria-pressed="false">FOMO</button><button type="button" class="ov-btn" aria-pressed="false">Revenge</button></span>
+          <button type="button" class="ov-btn o lv-mark" data-lv-mark>Mark this moment</button>
         </div>
 
-        <div class="lv-tap" data-lv-tap>
-          <span class="lv-tq">How do you feel?</span>
-          <div class="lv-feel" role="group" aria-label="How do you feel?"><button type="button" aria-pressed="false">Calm</button><button type="button" aria-pressed="false">Focused</button><button type="button" aria-pressed="false">Unsure</button><button type="button" aria-pressed="false">FOMO</button><button type="button" aria-pressed="false">Revenge</button></div>
-          <button type="button" class="lv-mark" data-lv-mark>Mark this moment</button>
-        </div>
-
-        <div class="lv-ov lv-rev" data-lv-rev hidden><div class="lv-box">
+        <div class="lv-ov" data-lv-rev hidden><div class="ov-pn lv-box">
           <div class="lv-lbl" data-lv-revh>Trade closed</div>
-          <div class="lv-big" data-lv-revn data-no-ig></div>
+          <div class="lv-num lv-num-s" data-lv-revn data-no-ig></div>
           <p class="lv-oq">Did you follow your plan?</p>
-          <div class="lv-opts"><button type="button">Yes</button><button type="button">Partly</button><button type="button">No</button></div>
+          <div class="lv-opts"><button type="button" class="ov-btn">Yes</button><button type="button" class="ov-btn">Partly</button><button type="button" class="ov-btn">No</button></div>
           <p class="lv-oq">Grade it</p>
-          <div class="lv-opts"><button type="button">A+</button><button type="button">A</button><button type="button">B</button><button type="button">C</button><button type="button">F</button></div>
+          <div class="lv-opts"><button type="button" class="ov-btn">A+</button><button type="button" class="ov-btn">A</button><button type="button" class="ov-btn">B</button><button type="button" class="ov-btn">C</button><button type="button" class="ov-btn">F</button></div>
           <p class="lv-fine" data-lv-revt>Closes by itself in 8 s</p>
         </div></div>
 
-        <div class="lv-ov lv-lock" data-lv-lock hidden><div class="lv-box">
+        <div class="lv-ov" data-lv-lock hidden><div class="ov-pn lv-box">
           <div class="lv-lbl">Two losses in a row</div>
-          <div class="lv-breath"><canvas data-lv-breath aria-hidden="true"></canvas><span data-lv-bt>Breathe in</span></div>
-          <div class="lv-big lv-lcd" data-lv-lcd data-no-ig>30:00</div>
+          <div class="lv-num lv-num-s" data-lv-lcd data-no-ig>30:00</div>
+          <div class="lv-breath"><i></i><span data-lv-bt>Breathe in</span></div>
           <p>Lost the battle, not the war. Step away until the timer ends.</p>
         </div></div>
 

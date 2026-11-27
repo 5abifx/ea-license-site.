@@ -683,7 +683,7 @@ module.exports = function registerJournal(app, { db, page, flash, requireUser, i
 
   // the Desk: mistake forecast, today's rules, day map, next trade check, you vs your rules
   // second-screen live view (src/live.js); before /journal/:id
-  require('./live')(app, { db, page, requireUser, requireJournal, scope, desk, prep, DESK_COLS, PROP_COLS, limitsOf });
+  require('./live')(app, { db, page, requireUser, requireJournal, scope, acctBar, desk, prep, DESK_COLS, PROP_COLS, limitsOf });
 
   app.get('/journal/desk', requireUser, requireJournal, (req, res) => {
     const u = req.user;
