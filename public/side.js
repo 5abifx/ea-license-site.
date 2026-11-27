@@ -72,8 +72,13 @@
   var pop = null;
   fr.addEventListener('click', function () {
     if (pop) { pop.remove(); pop = null; return; }
-    pop = el('div', 'fr-pop', '<b>Request a feature</b><div class="sc-sub">What would make your journal better?</div><textarea maxlength="1000" placeholder="I wish I could…"></textarea><button type="button">Send</button>');
+    pop = el('div', 'fr-pop', '<b>Request a feature</b><div class="sc-sub">What would make your journal better?</div><textarea maxlength="1000" placeholder="I wish I could…"></textarea><button type="button">Send</button>' +
+      (window.bugForm ? '<a href="#bug" class="fr-bug">Found a bug? Report it</a>' : ''));
     document.body.appendChild(pop);
+    var fb = pop.querySelector('.fr-bug');
+    if (fb) fb.addEventListener('click', function (e) {   // public/bug.js: same form as in the help panel
+      e.preventDefault(); pop.innerHTML = ''; pop.appendChild(window.bugForm(function () { if (pop) { pop.remove(); pop = null; } }, true));
+    });
     var ta = pop.querySelector('textarea'), b = pop.querySelector('button'); ta.focus();
     b.addEventListener('click', function () {
       if (ta.value.trim().length < 3) { ta.focus(); return; }

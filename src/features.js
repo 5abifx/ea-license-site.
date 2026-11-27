@@ -73,6 +73,7 @@ const FEATURES = [
   { key: 'mentor-share', area: 'mentor', name: 'Share journal with mentor', page: (r) => r.post('/journal/mentor/share') },
   { key: 'mentor-ask', area: 'mentor', name: 'Ask the mentor on a trade', page: (r) => r.post(/^\/journal\/\d+\/note$/) },
   // Account & help
+  { key: 'bug-report', area: 'account', name: 'Report a bug', click: '.sup-bug, .fr-bug' },
   { key: 'mentorship', area: 'account', name: 'Mentorship page (signed in)', page: (r) => r.get('/mentorship') },
   { key: 'plans', area: 'account', name: 'Plans page', page: (r) => r.get('/pricing') },
   { key: 'help', area: 'account', name: 'Help & FAQ', page: (r) => r.get('/faq') || r.get(/^\/help\//) },

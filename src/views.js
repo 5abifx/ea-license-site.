@@ -38,6 +38,7 @@ const ICONS = {
   upload: '<path d="M12 21V9m0 0l-5 5m5-5l5 5M4 3h16"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 2-2.5 2-2.5 4M12 17h.01"/>',
   out: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>',
+  bug: '<rect x="7" y="7" width="10" height="13" rx="5"/><path d="M9 7a3 3 0 016 0M12 11v9M3 13h4M17 13h4M4 7l3 2M20 7l-3 2M4 20l3-2M20 20l-3-2"/>',
   chat: '<path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12z"/><path d="M8.5 11h7M8.5 14h4"/>',
   pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
@@ -114,7 +115,7 @@ ${require('./seo').headTags(req, opts)}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@200;300;400;600&family=Manrope:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/style.css">
 ${u && !opts.wide ? swapHead() : ''}
-${u && !opts.wide ? '<link rel="stylesheet" href="/look.css"><link rel="stylesheet" href="/topbar.css"><link rel="stylesheet" href="/compact.css"><link rel="stylesheet" href="/dock.css"><link rel="stylesheet" href="/side.css"><link rel="stylesheet" href="/fit.css"><script src="/side.js" defer></script><link rel="stylesheet" href="/select-ui.css"><script src="/select-ui.js" defer></script>' : ''}
+${u && !opts.wide ? '<link rel="stylesheet" href="/look.css"><link rel="stylesheet" href="/topbar.css"><link rel="stylesheet" href="/compact.css"><link rel="stylesheet" href="/dock.css"><link rel="stylesheet" href="/side.css"><link rel="stylesheet" href="/fit.css"><script src="/side.js" defer></script><link rel="stylesheet" href="/bug.css"><script src="/bug.js" defer></script><link rel="stylesheet" href="/select-ui.css"><script src="/select-ui.js" defer></script>' : ''}
 <link rel="stylesheet" href="/guards.css">
 ${require('./look').a11yHead(u)}
 </head><body>
@@ -172,10 +173,11 @@ function appShell(req, u, flashHtml, body, title) {
   const ownerTiles = u.is_admin ? `${tile('/admin/sales', 'insights', 'Sales', 'Revenue and sign-ups', on('/admin/sales'))}
       ${tile('/admin/usage', 'pulse', 'Feature usage', 'What members use', on('/admin/usage'))}
       ${tile('/admin/storage', 'desk', 'Storage', 'Disk used per member', on('/admin/storage'))}
-      ${tile('/admin', 'shield', 'Admin', 'Members and licences', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/affiliates') && !on('/admin/usage') && !on('/admin/storage') && !on('/admin/whatsnew') && !on('/admin/requests'))}
+      ${tile('/admin', 'shield', 'Admin', 'Members and licences', adminPage && !on('/admin/eas') && !on('/admin/sales') && !on('/admin/affiliates') && !on('/admin/usage') && !on('/admin/storage') && !on('/admin/whatsnew') && !on('/admin/requests') && !on('/admin/bugs'))}
       ${tile('/admin/eas', 'upload', 'EAs', 'Upload builds', on('/admin/eas'))}
       ${tile('/admin/whatsnew', 'news', "What's new", 'Automatic, add extras', on('/admin/whatsnew'))}
       ${tile('/admin/requests', 'chat', 'Requests', 'Features members asked for', on('/admin/requests'))}
+      ${tile('/admin/bugs', 'bug', 'Bug reports', 'Problems members reported', on('/admin/bugs'), req.bugsNew)}
       ${tile('/admin/affiliates', 'gift', 'Affiliates', 'Partners and payouts', on('/admin/affiliates'))}
       ${tile('/mentor', 'cap', 'Mentor', 'Student questions', on('/mentor'), req.mentorWaiting)}` : '';
 
