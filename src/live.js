@@ -5,7 +5,7 @@
 // Open trades need the Journal EA live pulse (not sent yet): until then ?demo=1 plays a sample trade.
 const { esc } = require('./views');
 
-module.exports = function registerLive(app, { db, page, requireUser, requireJournal, scope, acctBar, desk, prep, DESK_COLS, PROP_COLS, limitsOf }) {
+module.exports = function registerLive(app, { db, page, requireUser, requireJournal, scope, acctBar, desk, prep, DESK_COLS, PROP_COLS, limitsOf, hasJournal }) {
   // one background design per kind of screen (PC, iPad / tablet, phone), saved on the account so it comes back on any device of that kind.
   // An own picture / clip is never uploaded: the design only remembers "own" and each device keeps its own file.
   if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'live_bg')) db.exec("ALTER TABLE users ADD COLUMN live_bg TEXT NOT NULL DEFAULT ''");
@@ -27,6 +27,42 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
     const row = db.prepare('SELECT live_bg FROM users WHERE id = ?').get(req.user.id) || {}, all = bgsOf(row);
     all[dev] = bg; db.prepare('UPDATE users SET live_bg = ? WHERE id = ?').run(JSON.stringify(all), req.user.id);
     res.json({ ok: true });
+  });
+
+  /* ---------- live pulse from the Journal EA (1.35+): open trades + floating P&L ----------
+     Kept in memory only (never written to the database): one small snapshot per account, replaced on every pulse.
+     The EA sends every ~2 s while a trade is open and only when something changed, every 60 s when flat. */
+  const PULSE = new Map();                         // `${userId}:${account}` -> { at, eq, bal, cur, pos: [...] }
+  const keyCache = new Map();                      // journal key -> { uid, ok, at } for 60 s, so a pulse costs no DB read
+  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+  const str = (v, n) => String(v ?? '').slice(0, n);
+  app.post('/api/journal/pulse', require('express').json({ limit: '64kb' }), (req, res) => {
+    const b = req.body || {}, key = str(b.key, 80), account = str(b.account, 20).replace(/[^0-9]/g, '');
+    if (!key || !account) return res.status(400).json({ ok: false, message: 'Missing key or account' });
+    let k = keyCache.get(key);
+    if (!k || Date.now() - k.at > 60e3) {
+      const u = db.prepare('SELECT * FROM users WHERE journal_key = ?').get(key);
+      k = { uid: u ? u.id : 0, ok: !!u && hasJournal(u), accts: u ? new Set(db.prepare('SELECT account_number FROM accounts WHERE user_id = ?').all(u.id).map((a) => String(a.account_number))) : new Set(), at: Date.now() };
+      keyCache.set(key, k); if (keyCache.size > 5000) keyCache.clear();
+    }
+    if (!k.uid) return res.status(403).json({ ok: false, message: 'Wrong journal key' });
+    if (!k.ok) return res.status(403).json({ ok: false, message: 'Trade Journal license is not active' });
+    if (!k.accts.has(account)) return res.status(403).json({ ok: false, message: `Account ${account} is not registered on your dashboard` });
+    const pos = (Array.isArray(b.pos) ? b.pos : []).slice(0, 200).map((p) => ({
+      id: str(p.id, 30), sym: str(p.sym, 30), side: str(p.side, 4).toUpperCase() === 'SELL' ? 'SELL' : 'BUY', lots: num(p.lots) || 0,
+      entry: num(p.entry), sl: num(p.sl), tp: num(p.tp), pnl: num(p.pnl) || 0, risk: num(p.risk), reward: num(p.reward),
+      open: num(p.open), digits: Math.max(0, Math.min(8, num(p.digits) || 2)), magic: num(p.magic) || 0,
+    }));
+    PULSE.set(`${k.uid}:${account}`, { at: Date.now(), srv: num(b.srv), eq: num(b.eq), bal: num(b.bal), cur: str(b.cur, 6) || 'USD', pos });
+    if (PULSE.size > 20000) { const old = Date.now() - 3600e3; for (const [kk, v] of PULSE) if (v.at < old) PULSE.delete(kk); }
+    res.json({ ok: true, next: pos.length ? 2 : 60 });   // seconds until the EA should send again (it may send sooner on a change)
+  });
+  // the page asks every 2 s for the accounts in view (?account= like the page)
+  app.get('/api/live/pulse', requireUser, requireJournal, (req, res) => {
+    const sc = scope(req), list = sc.sel ? [sc.sel] : sc.liveAccts;
+    let at = 0, pos = [], cur = '', bal = 0, srvNow = 0;
+    list.forEach((a) => { const p = PULSE.get(`${req.user.id}:${a.account_number}`); if (!p) return; at = Math.max(at, p.at); cur = cur || p.cur; bal += p.bal || 0; if (p.srv) srvNow = Math.max(srvNow, p.srv + Math.round((Date.now() - p.at) / 1000)); p.pos.forEach((x) => pos.push(Object.assign({ acct: String(a.account_number).slice(-2) }, x))); });
+    res.set('Cache-Control', 'no-store').json({ at, age: at ? Math.round((Date.now() - at) / 1000) : null, cur, bal, srvNow, pos });
   });
 
   app.get('/journal/live', requireUser, requireJournal, (req, res) => {

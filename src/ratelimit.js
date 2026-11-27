@@ -2,6 +2,7 @@
 // cannot slow the site down for everyone. Files in public/ (pictures, styles, scripts) are
 // served before this and never count.
 //   RATE_LIMIT_PER_MIN      pages and forms per network per minute (default 100, 0 = off)
+//   RATE_LIMIT_PULSE_PER_MIN Live screen pulses (EA + page) per network per minute (default 3000)
 //   RATE_LIMIT_API_PER_MIN  EA licence checks + journal uploads per network per minute (default 600):
 //                           higher because one VPS can run many MT5 terminals
 // Also works out the visitor's real address when the site sits behind Cloudflare (orange cloud):
@@ -37,9 +38,12 @@ const num = (v, d) => { const n = Number(v); return Number.isFinite(n) && v !== 
 function limiter(req, res, next) {
   if (req.path === '/api/stripe/webhook') return next();   // Stripe retries from many servers; signed anyway
   const api = req.path.startsWith('/api/');
-  const max = api ? num(process.env.RATE_LIMIT_API_PER_MIN, 600) : num(process.env.RATE_LIMIT_PER_MIN, 100);
+  // Live screen pulses (EA every ~2 s per terminal, each open Live screen every 2 s) get their own, larger bucket,
+  // so a VPS with many terminals or a home with an iPad + phone + PC never trips the normal limits.
+  const pulse = req.path === '/api/journal/pulse' || req.path === '/api/live/pulse';
+  const max = pulse ? num(process.env.RATE_LIMIT_PULSE_PER_MIN, 3000) : api ? num(process.env.RATE_LIMIT_API_PER_MIN, 600) : num(process.env.RATE_LIMIT_PER_MIN, 100);
   if (!max) return next();
-  const key = `${api ? 'a' : 'p'}:${req.ip}`;
+  const key = `${pulse ? 'l' : api ? 'a' : 'p'}:${req.ip}`;
   const now = Date.now();
   let w = windows.get(key);
   if (!w || w.reset <= now) { w = { n: 0, reset: now + 60 * 1000 }; windows.set(key, w); }

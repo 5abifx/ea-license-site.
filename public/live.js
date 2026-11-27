@@ -71,14 +71,14 @@
       return;
     }
     if (inTrade()) {
-      var P = S.pos, R = P.pnl / P.risk;
-      $('lbl').textContent = P.sym + ' · ' + (P.side === 'SELL' ? 'Sell ' : 'Buy ') + P.lots.toFixed(2) + ' · ' + mmss((Date.now() - P.since) / 1000);
+      var P = S.pos, R = P.risk > 0 ? P.pnl / P.risk : null;
+      $('lbl').textContent = P.sym + ' · ' + (P.side === 'SELL' ? 'Sell ' : P.side === 'MIX' ? 'Both ' : 'Buy ') + P.lots.toFixed(2) + ' · ' + mmss((Date.now() - P.since) / 1000);
       num.set(P.pnl); $('num').style.color = P.pnl < 0 ? 'var(--neg)' : 'var(--pos)';
-      sub.innerHTML = '<span><b class="' + (R < 0 ? 'neg' : 'pos') + '">' + fmtR(R) + '</b> right now</span><span>Risk <b>' + P.riskPct + '%</b></span><span>Planned <b>1 : ' + P.rr + '</b></span><span>Stop moved <b>No</b></span>';
-      var x = P.pnl < 0 ? (1 + P.pnl / P.risk) / 3 : 1 / 3 + (P.pnl / (P.risk * P.rr)) * 2 / 3; x = Math.max(0, Math.min(1, x)) * 100;
+      sub.innerHTML = '<span><b class="' + (R < 0 ? 'neg' : 'pos') + '">' + fmtR(R) + '</b> right now</span>' + (P.risk > 0 ? '<span>Risk <b>' + P.riskPct + '%</b></span><span>Planned <b>1 : ' + P.rr + '</b></span>' : '<span>Stop <b>None</b></span>') + (P.n > 1 ? '<span>Open <b>' + P.n + '</b></span>' : '') + (P.live ? '' : '<span>Stop moved <b>No</b></span>');
+      var x = !(P.risk > 0) ? 1 / 3 : P.pnl < 0 ? (1 + P.pnl / P.risk) / 3 : 1 / 3 + (P.pnl / (P.risk * (P.rr || 2))) * 2 / 3; x = Math.max(0, Math.min(1, x)) * 100;
       $('dot').style.left = x + '%';
       var f = $('fill'); f.style.left = Math.min(x, 33.3) + '%'; f.style.width = Math.abs(x - 33.3) + '%'; f.classList.toggle('dn', P.pnl < 0);
-      $('sl').textContent = fmtM(-P.risk); $('tp').textContent = fmtM(P.risk * P.rr); $('ep').textContent = P.entry;
+      $('sl').textContent = P.risk > 0 ? fmtM(-P.risk) : 'None'; $('tp').textContent = P.reward > 0 ? fmtM(P.reward) : P.risk > 0 && !P.live ? fmtM(P.risk * P.rr) : 'None'; $('ep').textContent = P.entry;
     } else {
       $('lbl').textContent = S.state === 'lock' ? 'Today P&L · paused' : 'Today P&L';
       num.set(T.net); $('num').style.color = T.net < 0 ? 'var(--neg)' : '#f4f4f5';
@@ -146,7 +146,7 @@
       box.classList.toggle('hot', left < 5 * 60);
     } else { nn.textContent = 'Next red news'; cd.textContent = 'None'; box.classList.remove('hot'); }
     if (S.state === 'lock') $('lcd').textContent = mmss((S.lockEnd - Date.now()) / 1000);
-    if (S.state === 'closed') { var r = Math.ceil((S.revEnd - Date.now()) / 1000); $('revt').textContent = r > 0 ? 'Closes by itself in ' + r + ' s · change it later in the journal' : 'Saved to the trade'; if (r <= -2 && !D.demo) go('flat'); }
+    if (S.state === 'closed') { var r = Math.ceil((S.revEnd - Date.now()) / 1000); $('revt').textContent = r > 0 ? 'Closes by itself in ' + r + ' s · change it later in the journal' : 'Saved to the trade'; if (r <= -2 && !D.demo) { if (S.fromPulse) location.reload(); else go('flat'); } }
     if (S.state === 'lock') $('bt').textContent = (Date.now() / 4000 | 0) % 2 ? 'Breathe out' : 'Breathe in';
     if (inTrade()) paint();
   }
@@ -169,7 +169,7 @@
     if (b.closest('[data-lv-rev]')) S.revEnd = Math.max(S.revEnd, Date.now() + 8000);
     var grp = b.closest('.lv-feel, .lv-opts');
     if (grp) { var on = b.getAttribute('aria-pressed') === 'true'; grp.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); b.setAttribute('aria-pressed', String(!on)); return; }
-    if (b.hasAttribute('data-lv-done')) { go('flat'); return; }
+    if (b.hasAttribute('data-lv-done')) { if (S.fromPulse && !D.demo) location.reload(); else go('flat'); return; }
     if (b.hasAttribute('data-lv-mark')) {
       var t = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(new Date());
       b.textContent = 'Marked ' + t; b.classList.add('done'); setTimeout(function () { b.textContent = 'Mark this moment'; b.classList.remove('done'); }, 1800); return;
@@ -177,6 +177,50 @@
     if (b.hasAttribute('data-lv-priv')) { var p = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', String(p)); root.classList.toggle('lv-private', p); return; }
     if (b.hasAttribute('data-lv-full')) { var d = document; if (d.fullscreenElement) d.exitFullscreen(); else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen().catch(function () {}); }
   });
+  // ---------- live pulse: the Journal EA (1.35+) sends open trades every ~2 s; the page asks the site every 2 s ----------
+  var seen = 0, poll = 0;
+  function pulse() {
+    clearTimeout(poll);
+    if (document.hidden) { poll = setTimeout(pulse, 5000); return; }
+    var acct = new URLSearchParams(location.search).get('account');
+    fetch('/api/live/pulse' + (acct ? '?account=' + encodeURIComponent(acct) : ''), { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (j) onPulse(j); poll = setTimeout(pulse, j && j.age !== null && j.age < 120 ? 2000 : 4000); })
+      .catch(function () { poll = setTimeout(pulse, 10000); });
+  }
+  function onPulse(j) {
+    var conn = $('conn'), fresh = j.age !== null && j.age < 120;
+    conn.querySelector('span').textContent = fresh ? (j.pos.length ? 'Live from MT5' : 'MT5 connected') : 'Waiting for MT5';
+    conn.classList.toggle('on', fresh);
+    if (!fresh) return;
+    var P = j.pos, sum = function (k) { return P.reduce(function (a, p) { return a + (p[k] > 0 || k === 'pnl' ? p[k] || 0 : 0); }, 0); };
+    if (S.state === 'algo') { S.algo = S.algo || {}; S.algo.open = P.length; S.algo.float = sum('pnl'); paint(); return; }
+    if (P.length) {
+      P.sort(function (a, b) { return a.open - b.open; });
+      var f = P[0], risk = sum('risk'), reward = sum('reward'), syms = {};
+      P.forEach(function (p) { syms[p.sym] = 1; });
+      var first = !S.pos || !S.pos.live || S.pos.id !== f.id;
+      S.pos = { live: true, id: f.id, n: P.length, sym: Object.keys(syms).length > 1 ? f.sym + ' +' + (Object.keys(syms).length - 1) : f.sym,
+        side: P.every(function (p) { return p.side === f.side; }) ? f.side : 'MIX', lots: sum('lots'), pnl: sum('pnl'), risk: risk, reward: reward,
+        rr: risk > 0 && reward > 0 ? Math.round(reward / risk * 10) / 10 : 2, riskPct: j.bal ? Math.round(risk / j.bal * 1000) / 10 : '–',
+        entry: Number(f.entry).toLocaleString('en-US', { minimumFractionDigits: f.digits, maximumFractionDigits: f.digits }),
+        since: j.srvNow && f.open ? Date.now() - Math.max(0, j.srvNow - f.open) * 1000 : (S.pos && S.pos.since) || Date.now() };
+      if (first) S.hist = [];
+      S.hist.push(S.pos.pnl); if (S.hist.length > 300) S.hist.shift();
+      var dl = S.guard.daily, near = dl && dl.allow && (dl.used - Math.min(0, S.pos.pnl)) / dl.allow >= 0.8;
+      var want = near ? 'near' : 'trade';
+      if (S.state !== want) go(want); else paint();
+      S.fromPulse = true;
+      return;
+    }
+    if (S.pos && S.pos.live && (S.state === 'trade' || S.state === 'near')) {   // it just closed
+      var last = S.pos.pnl;
+      go('closed'); S.revEnd = Date.now() + 8000;
+      $('revn').textContent = fmtM(last, 2); $('revn').style.color = last < 0 ? 'var(--neg)' : 'var(--pos)';
+      $('revh').textContent = S.pos.sym + ' ' + (S.pos.side === 'SELL' ? 'sell' : 'buy') + ' closed';
+    }
+  }
+
   // keep the screen awake while the live screen is open (iPad / phone on a stand)
   var lock = null;
   function wake() { if (navigator.wakeLock && !document.hidden) navigator.wakeLock.request('screen').then(function (l) { lock = l; l.addEventListener('release', function () { lock = null; }); }).catch(function () {}); }
@@ -189,6 +233,6 @@
   go(['flat', 'trade', 'near', 'closed', 'lock', 'algo'].indexOf(st) > -1 ? st : 'flat');
   num.v = 0;
   clocks(); setInterval(clocks, 1000);
-  if (D.demo) setInterval(tick, 700);
+  if (D.demo) setInterval(tick, 700); else pulse();
   requestAnimationFrame(frame);
 })();

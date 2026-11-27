@@ -167,3 +167,4 @@ html.calm .lv-pulse em, html.calm .lv-breath i { animation: none; }
   background: rgba(255,255,255,.04); color: #6e6e74; text-decoration: line-through; text-decoration-color: rgba(255,255,255,.25); }
 .lv-shows button[aria-pressed="true"] { background: rgba(255,255,255,.12); color: #f4f4f5; text-decoration: none; }
 .lv-btns .lv-mark { margin-left: auto; }
+.lv .lv-pulse.on em { background: var(--pos); }
