@@ -88,7 +88,6 @@ html.sc-wide body .app-main > .app-body:has(.lv), html body .app-main > .app-bod
 .app-body .lv-demo button[aria-pressed="true"] { background: #f4f4f5; color: #0b0b0c; }
 
 /* Hide private info: money blurred, R and counts stay */
-.lv.lv-private [data-lv-num], .lv.lv-private [data-lv-today], .lv.lv-private [data-lv-sl], .lv.lv-private [data-lv-tp], .lv.lv-private [data-lv-revn] { filter: blur(14px); }
 
 /* ---------- widths of the live area ---------- */
 /* iPad upright / half a screen: stats move under the number */

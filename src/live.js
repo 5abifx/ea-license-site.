@@ -120,7 +120,7 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
       <div class="lv" data-lv data-state="flat">
         <script type="application/json" data-lv-data>${JSON.stringify(data).replace(/</g, '\\u003c')}</script>
         <div class="row between page-head lv-head"><h1>Live <span class="lv-pulse" data-lv-conn><em></em><span>${data.demo ? 'Sample trade' : 'Waiting for MT5'}</span></span></h1>
-          <span class="head-btns">${btn('data-lv-bgbtn aria-expanded="false"', 'Customize', 'Background, and what shows on this screen')}${btn('data-lv-priv aria-pressed="false"', 'Hide private info', 'Blurs the money amounts, so you can film or stream')}${btn('data-lv-full', 'Full screen', 'Fill the whole screen')}</span></div>
+          <span class="head-btns">${btn('data-lv-bgbtn aria-expanded="false"', 'Customize', 'Background, and what shows on this screen')}${btn('data-lv-full', 'Full screen', 'Fill the whole screen')}</span></div>
         <div data-h="accts">${acctBar ? acctBar(req, '/journal/live', qs, sc, cur) : ''}</div>
 
         <section class="lv-hero">

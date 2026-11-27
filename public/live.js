@@ -174,7 +174,6 @@
       var t = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(new Date());
       b.textContent = 'Marked ' + t; b.classList.add('done'); setTimeout(function () { b.textContent = 'Mark this moment'; b.classList.remove('done'); }, 1800); return;
     }
-    if (b.hasAttribute('data-lv-priv')) { var p = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', String(p)); root.classList.toggle('lv-private', p); return; }
     if (b.hasAttribute('data-lv-full')) { var d = document; if (d.fullscreenElement) d.exitFullscreen(); else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen().catch(function () {}); }
   });
   // ---------- live pulse: the Journal EA (1.35+) sends open trades every ~2 s; the page asks the site every 2 s ----------
