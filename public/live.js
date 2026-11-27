@@ -19,15 +19,23 @@
   // numbers glide to the new value
   function Tw(el, fmt) { this.el = el; this.fmt = fmt; this.v = 0; this.to = 0; }
   Tw.prototype.set = function (v, now) { this.to = v; if (now) this.v = v; };
-  Tw.prototype.step = function () { if (!this.el) return; var d = this.to - this.v; this.v = Math.abs(d) < 0.01 ? this.to : this.v + d * 0.12; this.el.textContent = this.fmt(this.v); };
+  Tw.prototype.step = function () { if (!this.el) return; var d = this.to - this.v; this.v = Math.abs(d) < 0.01 ? this.to : this.v + d * 0.12; var t = this.fmt(this.v); if (t !== this.t) { this.t = t; this.el.textContent = t; } };
   var num = new Tw($('num'), function (v) { return fmtM(Math.round(v)); });
 
   var S = { state: 'flat', today: D.today || { net: 0, r: null, n: 0, list: [] }, guard: D.guard || {}, news: D.news, pos: null, hist: [], lockEnd: 0, revEnd: 0 };
 
   // ---------- the line behind the number (same feel as the Desk's month line) ----------
+  // the size is read only when the box changes and the line is drawn only when its data changes:
+  // reading the layout and repainting every frame made the page shake while scrolling on iPhone
+  var lsz = { w: 0, h: 0 }, lkey = '';
+  function measure(c) { var r = c.getBoundingClientRect(); lsz.w = Math.round(r.width * dpr); lsz.h = Math.round(r.height * dpr); lkey = ''; }
   function line(c, pts, col, live) {
-    var r = c.getBoundingClientRect(), W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
-    if (!W || !H) return; if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+    if (!lsz.w) measure(c);
+    var W = lsz.w, H = lsz.h;
+    if (!W || !H) return;
+    var key = W + 'x' + H + col + live + pts.length + ':' + pts[0] + ':' + pts[pts.length - 1] + ':' + pts[pts.length >> 1] + (live ? ':' + Math.round(performance.now() / 50) : '');
+    if (key === lkey) return; lkey = key;
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
     var g = c.getContext('2d'); g.clearRect(0, 0, W, H);
     if (pts.length < 2) return;
     var lo = Math.min.apply(null, pts), hi = Math.max.apply(null, pts); if (hi - lo < 1e-6) { hi += 1; lo -= 1; }
@@ -151,9 +159,12 @@
     if (inTrade()) paint();
   }
 
+  var scrolled = 0;
+  window.addEventListener('scroll', function () { scrolled = Date.now(); }, { passive: true });
+  window.addEventListener('touchmove', function () { scrolled = Date.now(); }, { passive: true });
   function frame() {
     num.step();
-    if (!document.hidden) {
+    if (!document.hidden && Date.now() - scrolled > 250) {   // nothing is redrawn while the finger scrolls
       var c = $('line');
       if (inTrade() && S.state !== 'closed') line(c, S.hist, S.pos.pnl < 0 ? NEG : POS, true);
       else if (S.today.eq) line(c, S.today.eq, S.today.net < 0 ? NEG : (S.state === 'algo' ? POS : ACC), S.state === 'algo');
@@ -174,7 +185,6 @@
       var t = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(new Date());
       b.textContent = 'Marked ' + t; b.classList.add('done'); setTimeout(function () { b.textContent = 'Mark this moment'; b.classList.remove('done'); }, 1800); return;
     }
-    if (b.hasAttribute('data-lv-priv')) { var p = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', String(p)); root.classList.toggle('lv-private', p); return; }
     if (b.hasAttribute('data-lv-full')) { var d = document; if (d.fullscreenElement) d.exitFullscreen(); else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen().catch(function () {}); }
   });
   // ---------- live pulse: the Journal EA (1.35+) sends open trades every ~2 s; the page asks the site every 2 s ----------
@@ -234,5 +244,7 @@
   num.v = 0;
   clocks(); setInterval(clocks, 1000);
   if (D.demo) setInterval(tick, 700); else pulse();
+  if (window.ResizeObserver) new ResizeObserver(function () { measure($('line')); }).observe($('line'));
+  else window.addEventListener('resize', function () { measure($('line')); });
   requestAnimationFrame(frame);
 })();

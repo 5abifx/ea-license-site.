@@ -4,7 +4,7 @@
    so a shrunk window, an iPad, a phone or a side monitor each get their own arrangement. */
 .app-body:has(.lv) { padding-bottom: 20px; }
 html.sc-wide body .app-main > .app-body:has(.lv), html body .app-main > .app-body:has(.lv) { max-width: 1680px; }
-.lv { min-height: calc(100dvh - 120px); --pos: var(--ok, #26c6a0); --neg: var(--danger, #f0464b); --warn: #f5a524; position: relative; container: lv / inline-size; display: flex; flex-direction: column; color: #f4f4f5; }
+.lv { min-height: calc(100vh - 120px); min-height: calc(100svh - 120px); overflow-anchor: none; --pos: var(--ok, #26c6a0); --neg: var(--danger, #f0464b); --warn: #f5a524; position: relative; container: lv / inline-size; display: flex; flex-direction: column; color: #f4f4f5; }
 .lv .pos { color: var(--pos); } .lv .neg { color: var(--neg); }
 
 /* head: same as the Desk ("Desk" + small secondary buttons) */
@@ -87,12 +87,13 @@ html.sc-wide body .app-main > .app-body:has(.lv), html body .app-main > .app-bod
 .app-body .lv-demo button { min-height: 0; padding: 6px 12px; font: 600 12px Manrope, Inter, sans-serif; letter-spacing: 0; text-transform: none; border-radius: 99px; border: 0; background: transparent; color: #8b8b8f; box-shadow: none; cursor: pointer; white-space: nowrap; }
 .app-body .lv-demo button[aria-pressed="true"] { background: #f4f4f5; color: #0b0b0c; }
 
-/* Hide private info: money blurred, R and counts stay */
-.lv.lv-private [data-lv-num], .lv.lv-private [data-lv-today], .lv.lv-private [data-lv-sl], .lv.lv-private [data-lv-tp], .lv.lv-private [data-lv-revn] { filter: blur(14px); }
 
 /* ---------- widths of the live area ---------- */
 /* iPad upright / half a screen: stats move under the number */
-@media (max-width: 900px) { .lv { min-height: calc(100dvh - 210px); } }
+/* iPad/phone: fixed heights only. 100dvh changes while Safari's toolbar hides on scroll,
+   which resized the page and the line canvas mid-scroll (page shook, then stuck scrolling up) */
+@media (max-width: 900px) { .lv { min-height: calc(100svh - 210px); } }
+@media (max-width: 600px) { .lv { min-height: 0; } }
 @container lv (max-width: 959px) {
   .lv-stats { position: static; grid-template-columns: repeat(3, minmax(0, 1fr)); text-align: left; margin-top: 26px; gap: 18px 16px; }
   .lv-bar b { margin-left: 0; }
@@ -106,7 +107,7 @@ html.sc-wide body .app-main > .app-body:has(.lv), html body .app-main > .app-bod
   .lv-num { font-size: clamp(54px, 19cqi, 84px); }
   .lv-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lv-stats dd { font-size: 19px; }
-  .lv-hero .lv-line { min-height: 100px; max-height: 150px; }
+  .lv-hero .lv-line { flex: none; height: 120px; min-height: 0; max-height: none; }
   .lv-chk { grid-template-columns: 1fr; }
   .lv-feel { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; flex-basis: 100%; }
   .lv-mark { flex: 1; justify-content: center; }

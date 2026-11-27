@@ -85,11 +85,18 @@
   }
 
   /* built-in looks: light and slow, no canvas blur (phones) */
-  var t0 = 0;
+  var t0 = 0, scrolled = 0, box = { w: 0, h: 0 };
+  window.addEventListener('scroll', function () { scrolled = Date.now(); }, { passive: true });
+  window.addEventListener('touchmove', function () { scrolled = Date.now(); }, { passive: true });
+  if (window.ResizeObserver) new ResizeObserver(function () { box.w = 0; }).observe(layer);
+  else window.addEventListener('resize', function () { box.w = 0; });
   function loop(now) {
     if (!cv) return;
     if (!t0) t0 = now; var tm = (now - t0) / 1000;
-    var W = layer.clientWidth, H = layer.clientHeight; if (!W || !H) { raf = requestAnimationFrame(loop); return; }
+    // paused while the finger scrolls, and the size is read only when the box changes (iPhone scroll shake)
+    if (Date.now() - scrolled < 250) { raf = requestAnimationFrame(loop); return; }
+    if (!box.w) { box.w = layer.clientWidth; box.h = layer.clientHeight; }
+    var W = box.w, H = box.h; if (!W || !H) { box.w = 0; raf = requestAnimationFrame(loop); return; }
     if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     var a = cv.getContext('2d'); a.fillStyle = '#0a0a0c'; a.fillRect(0, 0, W, H);
     var g, i;
