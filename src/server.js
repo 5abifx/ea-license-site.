@@ -286,6 +286,7 @@ app.use((req, res, next) => { req.hasJournal = journalAccess(req.user); next(); 
 app.use((req, res, next) => { if (req.method === 'GET' && (req.socket.destroyed || req.destroyed)) return; next(); });
 // feature usage tracking + Admin > Feature usage (src/features.js); before the members routes so it sees them
 require('./features').setup(app, { db, express, requireAdmin, page });
+require('./bugs')(app, { db, express, page, requireUser, requireAdmin });   // Report a bug: note + screenshot -> Admin > Bug reports (public/bug.js)
 const storage = require('./storage').setup(app, { db, requireAdmin, page, DATA_DIR });   // Admin > Storage: disk used per member
 const { studentBox: mentorBox } = require('./mentor')(app, { db, page, flash, requireUser, requireAdmin });
 // guided first run after sign-up + Profile settings (src/onboard.js); stripe is set up further down, so it is looked up at request time
