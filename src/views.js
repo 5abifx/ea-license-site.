@@ -224,7 +224,7 @@ function appShell(req, u, flashHtml, body, title) {
     <button type="button" class="tb-dk" data-tbp="m" aria-expanded="false" aria-controls="tbp-m"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg><span>More</span></button>
   </nav>
   <div class="tb-scrim" data-tb-close></div>
-  ${req.hasJournal ? '<div class="sc" data-sc hidden></div>' : ''}
+  ${req.hasJournal && !req.noSide ? '<div class="sc" data-sc hidden></div>' : ''}
 </header>
 <div class="app-main">
   <main class="app-body">${flashHtml}${body}</main>
