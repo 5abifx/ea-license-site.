@@ -174,3 +174,13 @@ html.lk .app-body .btn:not(.secondary):not(.link), html.lk .app-body button[type
 .ap-hint { margin: 8px 0 0; font-size: 12px; color: var(--warn, #f5a524); }
 /* the Desk overview keeps its own greens unless the member picked colours */
 html.pl-own .ov { --ovg: var(--ok); --ovr: var(--danger); }
+/* member's own profit / loss colours also reach the Desk calendar and its panels (they use fixed shades otherwise) */
+html.pl-own .pc-tot.pos, html.pl-own .pc-wk > b button small.pos, html.pl-own .pc-mh .pos, html.pl-own .pc-g.big b.pos,
+html.pl-own .pc-bar b.pos, html.pl-own .pc-ses b.pos, html.pl-own .sc-pace.up, html.pl-own .cal-grid .day.win .v, html.pl-own .cal-list.cx .pos { color: var(--ok); }
+html.pl-own .pc-tot.neg, html.pl-own .pc-wk > b button small.neg, html.pl-own .pc-mh .neg, html.pl-own .pc-g.big b.neg,
+html.pl-own .pc-bar b.neg, html.pl-own .pc-ses b.neg, html.pl-own .cal-grid .day.loss .v, html.pl-own .cal-list.cx .neg { color: var(--danger); }
+html.pl-own .pc-g.big > span.g { background: rgba(var(--ok-rgb), .12); } html.pl-own .pc-g.big > span.r { background: rgba(var(--danger-rgb), .12); }
+html.pl-own .pc-bar i.g { background: linear-gradient(var(--ok), rgba(var(--ok-rgb), .3)); } html.pl-own .pc-bar i.r { background: linear-gradient(rgba(var(--danger-rgb), .3), var(--danger)); }
+html.pl-own .pc-tr i.g { background: rgba(var(--ok-rgb), .7); } html.pl-own .pc-tr i.r { background: rgba(var(--danger-rgb), .7); }
+html.pl-own .app-body .pos, html.pl-own .app-body .acct b.pos { color: var(--ok); }
+html.pl-own .app-body .neg, html.pl-own .app-body .acct b.neg { color: var(--danger); }
