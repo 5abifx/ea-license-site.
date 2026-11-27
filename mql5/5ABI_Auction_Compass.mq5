@@ -8,7 +8,7 @@
 //|  MT5 (indicators cannot reach the website themselves).          |
 //+------------------------------------------------------------------+
 #property copyright   "5ABI FX"
-#property version     "1.24"
+#property version     "1.25"
 #property description "5ABI FX · Auction Compass"
 #property indicator_chart_window
 #property indicator_buffers 0
@@ -104,6 +104,17 @@ input int     InpFontSize          = 9;                // Font size
 input string  InpFont              = "Segoe UI";       // Font
 
 #define PFX "5ABI_"
+#include <Generic\HashMap.mqh>
+
+// Every chart call that asks the chart something (ObjectFind, ChartGetInteger, ...) makes this
+// indicator WAIT until the chart has finished all its queued work. All indicators of one symbol
+// share one thread in MT5, so many such calls per refresh (and several charts of the same
+// symbol) kept MT5 busy and made the charts and trade buttons lag. Now we remember what we
+// drew and only talk to the chart when something really changed.
+CHashMap<string, string> g_obj;     // objects drawn by Compass -> their last properties
+CHashMap<string, string> g_tips;    // tooltips set with Tip()
+bool     g_dirty = false;           // something changed since the last ChartRedraw
+color    g_bgC   = clrBlack;        // chart background, read once per refresh
 
 //+------------------------------------------------------------------+
 //| Licence: read the signed note left by the Trade Journal EA       |
@@ -154,6 +165,7 @@ void LicLockScreen()
       return;
    g_lockKey = key;
    ObjectsDeleteAll(0, PFX);
+   ForgetAll();
    // MT5 cuts a label after 63 characters, so every line stays short
    string t[4];
    t[0] = "◆ " + InpBrand + " · Auction Compass is locked";
@@ -244,6 +256,7 @@ datetime g_day = 0, g_lastData = 0, g_lastEval = 0;
 bool     g_needFull = true;
 datetime g_fullRetry = 0;
 int      g_zn = 0;
+datetime g_zT = 0;
 uint     g_lastTick = 0;
 int      g_alertDir = 0;
 bool     g_alertInit = false;
@@ -264,7 +277,7 @@ string Px(double p)     { return DoubleToString(p, _Digits); }
 // Text colour that reads on the current chart background (dark or light)
 color TC()
   {
-   int b = (int)ChartGetInteger(0, CHART_COLOR_BACKGROUND);
+   int b = (int)g_bgC;
    double lum = 0.299 * (b & 0xFF) + 0.587 * ((b >> 8) & 0xFF) + 0.114 * ((b >> 16) & 0xFF);
    return lum > 140 ? InpTextLight : InpText;
   }
@@ -273,7 +286,7 @@ color TC()
 color Mix(color fg, double t)
   {
    int f = (int)fg;
-   int b = (int)ChartGetInteger(0, CHART_COLOR_BACKGROUND);
+   int b = (int)g_bgC;
    int r = (int)MathRound((f & 0xFF) * t + (b & 0xFF) * (1.0 - t));
    int g = (int)MathRound(((f >> 8) & 0xFF) * t + ((b >> 8) & 0xFF) * (1.0 - t));
    int u = (int)MathRound(((f >> 16) & 0xFF) * t + ((b >> 16) & 0xFF) * (1.0 - t));
@@ -304,19 +317,87 @@ int SweepBegin()
    return ArraySize(g_touched);
   }
 
+//--- objects we know about (no chart call) ------------------------------------------------
+void Remember(const string nm, const string sig)
+  {
+   if(!g_obj.TrySetValue(nm, sig))
+      g_obj.Add(nm, sig);
+   g_dirty = true;
+  }
+
+// true = the object already shows exactly sig: nothing to send to the chart.
+// exists = the object is on the chart (asks the chart only for objects we never drew).
+bool Same(const string nm, const string sig, bool &exists)
+  {
+   Touch(nm);
+   string old;
+   exists = g_obj.TryGetValue(nm, old);
+   if(exists && old == sig)
+      return true;
+   if(!exists)
+      exists = ObjectFind(0, nm) >= 0;
+   return false;
+  }
+
+void Del(const string nm)
+  {
+   string o;
+   if(!g_obj.TryGetValue(nm, o))
+      return;
+   g_obj.Remove(nm);
+   g_tips.Remove(nm);
+   ObjectDelete(0, nm);
+   g_dirty = true;
+  }
+
+// delete every object whose name starts with pfx (only if we drew any)
+void DelAll(const string pfx)
+  {
+   string keys[], vals[];
+   int n = g_obj.CopyTo(keys, vals);
+   int lp = StringLen(pfx);
+   bool any = false;
+   for(int i = 0; i < n; i++)
+      if(StringSubstr(keys[i], 0, lp) == pfx)
+        {
+         g_obj.Remove(keys[i]);
+         g_tips.Remove(keys[i]);
+         any = true;
+        }
+   if(any)
+     {
+      ObjectsDeleteAll(0, pfx);
+      g_dirty = true;
+     }
+  }
+
+void ForgetAll()
+  {
+   g_obj.Clear();
+   g_tips.Clear();
+  }
+
+void Redraw()
+  {
+   if(!g_dirty)
+      return;
+   g_dirty = false;
+   ChartRedraw();
+  }
+
 void SweepEnd(const string pfx, const int from)
   {
-   int n = ArraySize(g_touched), lp = StringLen(pfx);
-   for(int i = ObjectsTotal(0, -1, -1) - 1; i >= 0; i--)
+   string keys[], vals[];
+   int n = g_obj.CopyTo(keys, vals), nt = ArraySize(g_touched), lp = StringLen(pfx);
+   for(int i = 0; i < n; i++)
      {
-      string nm = ObjectName(0, i, -1, -1);
-      if(StringSubstr(nm, 0, lp) != pfx)
+      if(StringSubstr(keys[i], 0, lp) != pfx)
          continue;
       bool keep = false;
-      for(int j = from; j < n && !keep; j++)
-         keep = (g_touched[j] == nm);
+      for(int j = from; j < nt && !keep; j++)
+         keep = (g_touched[j] == keys[i]);
       if(!keep)
-         ObjectDelete(0, nm);
+         Del(keys[i]);
      }
    g_sweepDepth--;
    if(g_sweepDepth <= 0)
@@ -335,8 +416,11 @@ void Common(string nm, bool back)
 
 void Rect(string nm, datetime t1, double p1, datetime t2, double p2, color c)
   {
-   Touch(nm);
-   if(ObjectFind(0, nm) < 0)
+   bool ex;
+   string sig = IntegerToString((long)(t1)) + "|" + DoubleToString(p1, 8) + "|" + IntegerToString((long)(t2)) + "|" + DoubleToString(p2, 8) + "|" + IntegerToString((long)(c));
+   if(Same(nm, sig, ex))
+      return;
+   if(!ex)
      {
       ObjectCreate(0, nm, OBJ_RECTANGLE, 0, t1, p1, t2, p2);
       Common(nm, true);
@@ -348,12 +432,16 @@ void Rect(string nm, datetime t1, double p1, datetime t2, double p2, color c)
       ObjectMove(0, nm, 1, t2, p2);
      }
    ObjectSetInteger(0, nm, OBJPROP_COLOR, c);
+   Remember(nm, sig);
   }
 
 void Seg(string nm, datetime t1, datetime t2, double p, color c, ENUM_LINE_STYLE st, int w, bool ray)
   {
-   Touch(nm);
-   if(ObjectFind(0, nm) < 0)
+   bool ex;
+   string sig = IntegerToString((long)(t1)) + "|" + IntegerToString((long)(t2)) + "|" + DoubleToString(p, 8) + "|" + IntegerToString((long)(c)) + "|" + IntegerToString((long)(st)) + "|" + IntegerToString((long)(w)) + (ray ? "|r" : "");
+   if(Same(nm, sig, ex))
+      return;
+   if(!ex)
      {
       ObjectCreate(0, nm, OBJ_TREND, 0, t1, p, t2, p);
       Common(nm, true);
@@ -368,12 +456,16 @@ void Seg(string nm, datetime t1, datetime t2, double p, color c, ENUM_LINE_STYLE
    ObjectSetInteger(0, nm, OBJPROP_STYLE, st);
    ObjectSetInteger(0, nm, OBJPROP_WIDTH, w);
    ObjectSetInteger(0, nm, OBJPROP_RAY_RIGHT, ray);
+   Remember(nm, sig);
   }
 
 void Txt(string nm, datetime t, double p, string s, color c, ENUM_ANCHOR_POINT a)
   {
-   Touch(nm);
-   if(ObjectFind(0, nm) < 0)
+   bool ex;
+   string sig = IntegerToString((long)(t)) + "|" + DoubleToString(p, 8) + "|" + s + "|" + IntegerToString((long)(c)) + "|" + IntegerToString((long)(a));
+   if(Same(nm, sig, ex))
+      return;
+   if(!ex)
      {
       ObjectCreate(0, nm, OBJ_TEXT, 0, t, p);
       Common(nm, false);
@@ -385,13 +477,17 @@ void Txt(string nm, datetime t, double p, string s, color c, ENUM_ANCHOR_POINT a
    ObjectSetInteger(0, nm, OBJPROP_FONTSIZE, InpFontSize);
    ObjectSetInteger(0, nm, OBJPROP_COLOR, c);
    ObjectSetInteger(0, nm, OBJPROP_ANCHOR, a);
+   Remember(nm, sig);
   }
 
 // Thin vertical bar at a fixed pixel width (marks beside a profile)
 void VBar(string nm, datetime t, double p1, double p2, color c, int w, string tip)
   {
-   Touch(nm);
-   if(ObjectFind(0, nm) < 0)
+   bool ex;
+   string sig = IntegerToString((long)(t)) + "|" + DoubleToString(p1, 8) + "|" + DoubleToString(p2, 8) + "|" + IntegerToString((long)(c)) + "|" + IntegerToString((long)(w)) + "|" + tip;
+   if(Same(nm, sig, ex))
+      return;
+   if(!ex)
      {
       ObjectCreate(0, nm, OBJ_TREND, 0, t, p1, t, p2);
       Common(nm, false);
@@ -407,18 +503,28 @@ void VBar(string nm, datetime t, double p1, double p2, color c, int w, string ti
    ObjectSetInteger(0, nm, OBJPROP_WIDTH, w);
    ObjectSetInteger(0, nm, OBJPROP_STYLE, STYLE_SOLID);
    ObjectSetString(0, nm, OBJPROP_TOOLTIP, tip);
+   Remember(nm, sig);
   }
 
 void Tip(string nm, string tip)
   {
-   if(ObjectFind(0, nm) >= 0)
-      ObjectSetString(0, nm, OBJPROP_TOOLTIP, tip);
+   string o;
+   if(!g_obj.TryGetValue(nm, o))
+      return;                          // not drawn
+   if(g_tips.TryGetValue(nm, o) && o == tip)
+      return;                          // already set
+   if(!g_tips.TrySetValue(nm, tip))
+      g_tips.Add(nm, tip);
+   ObjectSetString(0, nm, OBJPROP_TOOLTIP, tip);
   }
 
 void PxRect(string nm, int x, int y, int w, int h, color c)
   {
-   Touch(nm);
-   if(ObjectFind(0, nm) < 0)
+   bool ex;
+   string sig = IntegerToString((long)(x)) + "|" + IntegerToString((long)(y)) + "|" + IntegerToString((long)(w)) + "|" + IntegerToString((long)(h)) + "|" + IntegerToString((long)(c));
+   if(Same(nm, sig, ex))
+      return;
+   if(!ex)
      {
       ObjectCreate(0, nm, OBJ_RECTANGLE_LABEL, 0, 0, 0);
       Common(nm, false);
@@ -431,12 +537,16 @@ void PxRect(string nm, int x, int y, int w, int h, color c)
    ObjectSetInteger(0, nm, OBJPROP_YSIZE, h);
    ObjectSetInteger(0, nm, OBJPROP_BGCOLOR, c);
    ObjectSetInteger(0, nm, OBJPROP_COLOR, c);
+   Remember(nm, sig);
   }
 
 void PxText(string nm, int x, int y, string s, color c, ENUM_ANCHOR_POINT a, string font, string tip)
   {
-   Touch(nm);
-   if(ObjectFind(0, nm) < 0)
+   bool ex;
+   string sig = IntegerToString((long)(x)) + "|" + IntegerToString((long)(y)) + "|" + s + "|" + IntegerToString((long)(c)) + "|" + IntegerToString((long)(a)) + "|" + font + "|" + tip;
+   if(Same(nm, sig, ex))
+      return;
+   if(!ex)
      {
       ObjectCreate(0, nm, OBJ_LABEL, 0, 0, 0);
       Common(nm, false);
@@ -451,6 +561,7 @@ void PxText(string nm, int x, int y, string s, color c, ENUM_ANCHOR_POINT a, str
    ObjectSetInteger(0, nm, OBJPROP_ANCHOR, a);
    ObjectSetString(0, nm, OBJPROP_TOOLTIP, tip == "" ? "\n" : tip);
    ObjectSetInteger(0, nm, OBJPROP_ZORDER, 100);
+   Remember(nm, sig);
   }
 
 //+------------------------------------------------------------------+
@@ -491,10 +602,20 @@ bool DoubleDist(CProf &p)
 
 // Shares today's profile with KATANA (PLAN button): shape and the levels, as terminal global variables
 double ShapeCode(string sh) { return sh == "P" ? 1 : sh == "b" ? 2 : sh == "D" ? 3 : sh == "T" ? 4 : sh == "B" ? 5 : 0; }
+string   g_pubKey = "";
+datetime g_pubAt = 0;
 void PublishLevels()
   {
    string b = "5ABI.CMP." + _Symbol + ".";
    bool dv = g_dev.ok, pv = g_hn > 0 && g_h[0].ok;
+   // write only when a level changed, or every 5 minutes so KATANA sees the data is fresh
+   string key = (dv ? g_dev.shape + DoubleToString(g_dev.poc, 8) + DoubleToString(g_dev.vah, 8) + DoubleToString(g_dev.val, 8) : "-")
+                + (pv ? g_h[0].shape + DoubleToString(g_h[0].poc, 8) + DoubleToString(g_h[0].vah, 8) + DoubleToString(g_h[0].val, 8)
+                        + (g_h[0].poorHi ? "H" : "") + (g_h[0].poorLo ? "L" : "") : "-");
+   if(key == g_pubKey && TimeCurrent() - g_pubAt < 300)
+      return;
+   g_pubKey = key;
+   g_pubAt = TimeCurrent();
    GlobalVariableSet(b + "SHP", ShapeCode(dv ? g_dev.shape : pv ? g_h[0].shape : ""));
    GlobalVariableSet(b + "DPOC", dv ? g_dev.poc : 0);
    GlobalVariableSet(b + "DVAH", dv ? g_dev.vah : 0);
@@ -680,7 +801,7 @@ void DrawProfile(CProf &p, string tag, bool dev)
       string nm = PFX + tag + "r" + IntegerToString(k);
       if(p.vol[k] <= 0)
         {
-         ObjectDelete(0, nm);
+         Del(nm);
          continue;
         }
       long w = (long)(p.vol[k] / p.mx * span * InpWidthPct / 100.0);
@@ -777,6 +898,7 @@ struct SLev
 void DrawZones()
   {
    g_zn = 0;
+   g_zT = 0;
    if(g_hn < 2)
       return;
    double tol = InpZoneTol / 100.0 * (g_h[0].vah - g_h[0].val);
@@ -895,8 +1017,8 @@ void DrawNakedIn()
 
 bool FullRedraw()
   {
-   ObjectsDeleteAll(0, PFX + "h");
-   ObjectsDeleteAll(0, PFX + "z");
+   DelAll(PFX + "h");
+   DelAll(PFX + "z");
    int N = IMax(2, InpSessions);
    ArrayResize(g_h, N);
    g_hn = 0;
@@ -1053,8 +1175,15 @@ void LiveUpdate()
       g_wkTrail += "·";
      }
 
-   for(int z = 0; z < g_zn; z++)
-      ObjectSetInteger(0, PFX + "z" + IntegerToString(z), OBJPROP_TIME, 1, TimeCurrent());
+   // zones reach the live candle: move their right edge once a minute, not on every refresh
+   if(TimeCurrent() - g_zT >= 60)
+     {
+      g_zT = TimeCurrent();
+      for(int z = 0; z < g_zn; z++)
+         ObjectSetInteger(0, PFX + "z" + IntegerToString(z), OBJPROP_TIME, 1, g_zT);
+      if(g_zn > 0)
+         g_dirty = true;
+     }
 
    ArrayResize(g_tgPx, 0);
    ArrayResize(g_tgTx, 0);
@@ -1208,12 +1337,14 @@ void LiveUpdate()
 //+------------------------------------------------------------------+
 //| Pixel layer: weekly profile, tags, strip                          |
 //+------------------------------------------------------------------+
+// price -> pixel row, from the chart's visible price range (read once per DrawPixels)
+double g_pMax = 0, g_pMin = 0;
+int    g_pH = 0;
 int YOf(double price)
   {
-   int x = 0, y = 0;
-   datetime t = iTime(_Symbol, _Period, 0);
-   ChartTimePriceToXY(0, 0, t, price, x, y);
-   return y;
+   if(g_pMax <= g_pMin || g_pH <= 0)
+      return -1;
+   return (int)MathRound((g_pMax - price) / (g_pMax - g_pMin) * g_pH);
   }
 
 //+------------------------------------------------------------------+
@@ -1296,7 +1427,11 @@ string TfStr(ENUM_TIMEFRAMES tf)
 //+------------------------------------------------------------------+
 void TimerLabel(string nm, int x, int y, string s, color c)
   {
-   if(ObjectFind(0, nm) < 0)
+   bool ex;
+   string sig = IntegerToString((long)(x)) + "|" + IntegerToString((long)(y)) + "|" + s + "|" + IntegerToString((long)(c));
+   if(Same(nm, sig, ex))
+      return;
+   if(!ex)
      {
       ObjectCreate(0, nm, OBJ_LABEL, 0, 0, 0);
       Common(nm, false);
@@ -1310,13 +1445,14 @@ void TimerLabel(string nm, int x, int y, string s, color c)
    ObjectSetInteger(0, nm, OBJPROP_YDISTANCE, y);
    ObjectSetString(0, nm, OBJPROP_TEXT, s);
    ObjectSetInteger(0, nm, OBJPROP_COLOR, c);
+   Remember(nm, sig);
   }
 
 void DrawTimers()
   {
    if(!InpShowTimers || !g_lic)
      {
-      ObjectsDeleteAll(0, PFX + "pxCT");
+      DelAll(PFX + "pxCT");
       return;
      }
    ENUM_TIMEFRAMES all[8] = {PERIOD_M1, PERIOD_M5, PERIOD_M15, PERIOD_M30, PERIOD_H1, PERIOD_H4, PERIOD_D1, PERIOD_W1};
@@ -1350,6 +1486,9 @@ void DrawPixels()
   {
    int W = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
    int H = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS, 0);
+   g_pMax = ChartGetDouble(0, CHART_PRICE_MAX, 0);
+   g_pMin = ChartGetDouble(0, CHART_PRICE_MIN, 0);
+   g_pH = H;
    int lh = IMax(12, InpFontSize * 2);
    // (i) legend: hover to see what each mark means
    if(InpShowLegend)
@@ -1364,7 +1503,7 @@ void DrawPixels()
              "Dotted line = untouched VAH / VAL (until grabbed)\n"
              "Hover any mark for its prices");
    else
-      ObjectDelete(0, PFX + "pxLg");
+      Del(PFX + "pxLg");
    int xR = W - InpWeekMarginPx;
    int xL = xR;
 
@@ -1379,7 +1518,7 @@ void DrawPixels()
          int y1 = YOf(g_wk.lo + (k + 1) * g_wk.step), y2 = YOf(g_wk.lo + k * g_wk.step);
          if(g_wk.vol[k] <= 0 || y2 < 0 || y1 > H)
            {
-            ObjectDelete(0, nm);
+            Del(nm);
             continue;
            }
          int w = IMax(1, (int)MathRound(g_wk.vol[k] / g_wk.mx * InpWeekWidthPx));
@@ -1398,7 +1537,7 @@ void DrawPixels()
       PxText(PFX + "pxWl2", xL, yT, g_wkTrail, Mix(TC(), 0.8), ANCHOR_LEFT_LOWER, InpFont, "How the week developed, day by day");
      }
    else
-      ObjectsDeleteAll(0, PFX + "pxW");
+      DelAll(PFX + "pxW");
 
    // Higher-timeframe candles over the weekly profile (2nd TF on the right)
    int swH = SweepBegin();
@@ -1461,13 +1600,14 @@ void DrawPixels()
       PxText(PFX + "pxS3", x, y0 + 2 * lh, g_s3, Mix(TC(), 0.8), a, InpFont, g_tip3);
      }
    else
-      ObjectsDeleteAll(0, PFX + "pxS");
+      DelAll(PFX + "pxS");
   }
 
 void PickTheme()
   {
    color bg = (color)ChartGetInteger(0, CHART_COLOR_BACKGROUND);
    color bu = (color)ChartGetInteger(0, CHART_COLOR_CANDLE_BULL);
+   g_bgC = bg;
    if(bg == g_thBg && bu == g_thBull)
       return;
    g_thBg = bg;
@@ -1497,6 +1637,7 @@ void PickTheme()
 //+------------------------------------------------------------------+
 void Refresh()
   {
+   g_lastTick = GetTickCount();
    if(!LicOk())
       return;
    PickTheme();
@@ -1516,7 +1657,7 @@ void Refresh()
       g_fullRetry = g_needFull ? TimeLocal() + 10 : 0;
       g_day = d0;
       g_lastData = 0;
-      ObjectsDeleteAll(0, PFX + "d_");
+      DelAll(PFX + "d_");
      }
    datetime b0 = iTime(_Symbol, InpDataTF, 0);
    if(b0 != g_lastData)
@@ -1526,12 +1667,14 @@ void Refresh()
      }
    LiveUpdate();
    DrawPixels();
-   ChartRedraw();
+   Redraw();
   }
 
 int OnInit()
   {
    IndicatorSetString(INDICATOR_SHORTNAME, "5ABI Auction Compass");
+   ObjectsDeleteAll(0, PFX);           // start clean: the cache below only knows what it drew
+   ForgetAll();
    PickTheme();
    if(InpAutoShift)
      {
@@ -1546,6 +1689,7 @@ void OnDeinit(const int reason)
   {
    EventKillTimer();
    ObjectsDeleteAll(0, PFX);
+   ForgetAll();
    ChartRedraw();
   }
 
@@ -1553,12 +1697,13 @@ uint g_tmTick = 0;
 void OnTimer()
   {
    // timers tick every second; the heavier refresh stays at every 2 seconds
-   if((++g_tmTick & 1) == 0)
+   // (skipped when a new tick already refreshed in the last 1.5 s)
+   if((++g_tmTick & 1) == 0 && GetTickCount() - g_lastTick >= 1500)
       Refresh();
    else if(g_lic)
      {
       DrawTimers();
-      ChartRedraw();
+      Redraw();
      }
   }
 
@@ -1593,7 +1738,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          return;
         }
       DrawPixels();
-      ChartRedraw();
+      Redraw();
      }
   }
 
@@ -1602,11 +1747,9 @@ int OnCalculate(const int rates_total, const int prev_calculated, const datetime
                 const long &tick_volume[], const long &volume[], const int &spread[])
   {
    uint t = GetTickCount();
-   if(prev_calculated == 0 || t - g_lastTick > 750)
-     {
-      g_lastTick = t;
+   // new ticks refresh at most once a second (gold ticks many times a second)
+   if(prev_calculated == 0 || t - g_lastTick >= 1000)
       Refresh();
-     }
    return rates_total;
   }
 //+------------------------------------------------------------------+
