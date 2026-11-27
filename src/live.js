@@ -10,12 +10,14 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
   // An own picture / clip is never uploaded: the design only remembers "own" and each device keeps its own file.
   if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'live_bg')) db.exec("ALTER TABLE users ADD COLUMN live_bg TEXT NOT NULL DEFAULT ''");
   const DEVS = ['pc', 'tab', 'phone'], KINDS = /^(none|smoke|ember|floor|own|racing|dark|war|beast|fight|supercars|money|watches|fire)$/;
+  const HIDES = ['accts', 'sub', 'line', 'today', 'todayr', 'trades', 'used', 'loss', 'news', 'check', 'feel', 'mark'];
   const cleanBg = (o) => {
     if (!o || typeof o !== 'object' || !KINDS.test(o.k)) return null;
     const dim = Math.min(0.85, Math.max(0.2, Number(o.dim) || 0.5));
     const c = o.clip && typeof o.clip === 'object' && /^https:\/\/[^\s"'<>]{8,600}$/.test(o.clip.url || '') ? o.clip : null;
     const str = (v, n) => String(v || '').slice(0, n);
-    return { k: o.k, dim, bw: o.bw === true, clip: c ? { k: str(c.k, 20), url: c.url, by: str(c.by, 80), page: /^https:\/\//.test(c.page || '') ? str(c.page, 400) : '', src: str(c.src, 20) } : null };
+    const hide = Array.isArray(o.hide) ? [...new Set(o.hide.filter((h) => HIDES.includes(h)))] : [];
+    return { k: o.k, dim, bw: o.bw === true, hide, clip: c ? { k: str(c.k, 20), url: c.url, by: str(c.by, 80), page: /^https:\/\//.test(c.page || '') ? str(c.page, 400) : '', src: str(c.src, 20) } : null };
   };
   const bgsOf = (u) => { let o = {}; try { o = JSON.parse(u.live_bg || '{}') || {}; } catch (e) {} const r = {}; DEVS.forEach((d) => { const v = cleanBg(o[d]); if (v) r[d] = v; }); return r; };
   app.post('/journal/live/bg', requireUser, (req, res) => {
@@ -82,22 +84,22 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
       <div class="lv" data-lv data-state="flat">
         <script type="application/json" data-lv-data>${JSON.stringify(data).replace(/</g, '\\u003c')}</script>
         <div class="row between page-head lv-head"><h1>Live <span class="lv-pulse" data-lv-conn><em></em><span>${data.demo ? 'Sample trade' : 'Waiting for MT5'}</span></span></h1>
-          <span class="head-btns">${btn('data-lv-bgbtn aria-expanded="false"', 'Background', 'Put a look, a clip or your own picture behind your P&L')}${btn('data-lv-priv aria-pressed="false"', 'Hide private info', 'Blurs the money amounts, so you can film or stream')}${btn('data-lv-full', 'Full screen', 'Fill the whole screen')}</span></div>
-        ${acctBar ? acctBar(req, '/journal/live', qs, sc, cur) : ''}
+          <span class="head-btns">${btn('data-lv-bgbtn aria-expanded="false"', 'Customize', 'Background, and what shows on this screen')}${btn('data-lv-priv aria-pressed="false"', 'Hide private info', 'Blurs the money amounts, so you can film or stream')}${btn('data-lv-full', 'Full screen', 'Fill the whole screen')}</span></div>
+        <div data-h="accts">${acctBar ? acctBar(req, '/journal/live', qs, sc, cur) : ''}</div>
 
         <section class="lv-hero">
           <div class="lv-bg" data-lv-bg aria-hidden="true"></div>
-          <canvas class="lv-line" data-lv-line aria-hidden="true"></canvas>
+          <canvas class="lv-line" data-lv-line data-h="line" aria-hidden="true"></canvas>
           <div class="lv-lbl" data-lv-lbl>Today P&amp;L</div>
           <div class="lv-num" data-lv-num data-no-ig>$0</div>
-          <div class="lv-subl" data-lv-subl></div>
+          <div class="lv-subl" data-lv-subl data-h="sub"></div>
           <dl class="lv-stats">
-            <div><dt>Today</dt><dd data-lv-today data-no-ig>–</dd></div>
-            <div><dt>Today R</dt><dd data-lv-todayr>–</dd></div>
-            <div><dt>Trades</dt><dd data-lv-trades>–</dd></div>
-            <div data-lv-dlw><dt>Daily loss used</dt><dd data-lv-used data-no-ig>–</dd><i class="lv-bar"><b data-lv-usedbar></b></i></div>
-            <div><dt>Losses</dt><dd data-lv-loss>–</dd></div>
-            <div data-lv-news><dt data-lv-nn>Next red news</dt><dd data-lv-cd data-no-ig>None</dd></div>
+            <div data-h="today"><dt>Today</dt><dd data-lv-today data-no-ig>–</dd></div>
+            <div data-h="todayr"><dt>Today R</dt><dd data-lv-todayr>–</dd></div>
+            <div data-h="trades"><dt>Trades</dt><dd data-lv-trades>–</dd></div>
+            <div data-lv-dlw data-h="used"><dt>Daily loss used</dt><dd data-lv-used data-no-ig>–</dd><i class="lv-bar"><b data-lv-usedbar></b></i></div>
+            <div data-h="loss"><dt>Losses</dt><dd data-lv-loss>–</dd></div>
+            <div data-lv-news data-h="news"><dt data-lv-nn>Next red news</dt><dd data-lv-cd data-no-ig>None</dd></div>
           </dl>
         </section>
 
@@ -106,7 +108,7 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
           <div class="lv-tl"><span>Stop <b class="neg" data-lv-sl></b></span><span>Entry <b data-lv-ep></b></span><span>Target <b class="pos" data-lv-tp></b></span></div>
         </section>
 
-        <section class="lv-check" data-lv-check>
+        <section class="lv-check" data-lv-check data-h="check">
           <div class="lv-lbl">Before you click buy or sell</div>
           <div class="lv-chk">
             <label><input type="checkbox"><span>My setup is on the chart, not in my head</span></label>
@@ -117,8 +119,8 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
         </section>
 
         <div class="ov-btns lv-btns">
-          <span class="lv-feel" role="group" aria-label="How do you feel?"><button type="button" class="ov-btn" aria-pressed="false">Calm</button><button type="button" class="ov-btn" aria-pressed="false">Focused</button><button type="button" class="ov-btn" aria-pressed="false">Unsure</button><button type="button" class="ov-btn" aria-pressed="false">FOMO</button><button type="button" class="ov-btn" aria-pressed="false">Revenge</button></span>
-          <button type="button" class="ov-btn o lv-mark" data-lv-mark>Mark this moment</button>
+          <span class="lv-feel" data-h="feel" role="group" aria-label="How do you feel?"><button type="button" class="ov-btn" aria-pressed="false">Calm</button><button type="button" class="ov-btn" aria-pressed="false">Focused</button><button type="button" class="ov-btn" aria-pressed="false">Unsure</button><button type="button" class="ov-btn" aria-pressed="false">FOMO</button><button type="button" class="ov-btn" aria-pressed="false">Revenge</button></span>
+          <button type="button" class="ov-btn o lv-mark" data-lv-mark data-h="mark">Mark this moment</button>
         </div>
 
         <div class="lv-ov" data-lv-rev hidden><div class="ov-pn lv-box">
@@ -143,15 +145,18 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
           <button type="button" data-lv-go="flat">Flat</button><button type="button" data-lv-go="trade" aria-pressed="true">In a trade</button>
           <button type="button" data-lv-go="near">Near limit</button><button type="button" data-lv-go="closed">Just closed</button><button type="button" data-lv-go="lock">Cooldown</button><button type="button" data-lv-go="algo">Algo day</button></div>` : ''}
       </div>
-      <div class="ov-pn lv-bgp" data-lv-bgp hidden role="dialog" aria-label="Background">
-        <div class="lv-bgp-h"><b>Background</b><button type="button" class="lv-x" data-lv-bgx aria-label="Close">×</button></div>
+      <div class="ov-pn lv-bgp" data-lv-bgp hidden role="dialog" aria-label="Customize">
+        <div class="lv-bgp-h"><b>Customize</b><button type="button" class="lv-x" data-lv-bgx aria-label="Close">×</button></div>
         <div class="lv-devs" role="group" aria-label="Design for"><span>Design for</span>
           <button type="button" data-dev="pc">PC</button><button type="button" data-dev="tab">iPad</button><button type="button" data-dev="phone">Phone</button></div>
         <p class="lv-devn" data-lv-devn></p>
+        <div class="lv-sec">Background</div>
         <div class="lv-tiles" data-lv-tiles></div>
         <div class="lv-bgp-row"><label>Darken <input type="range" min="0.2" max="0.85" step="0.05" data-lv-dim></label>
           <label class="lv-tog"><input type="checkbox" data-lv-bw> Black and white</label></div>
         <p class="lv-bgp-n" data-lv-bgn>Your own picture or clip stays on this device. It is never uploaded.</p>
+        <div class="lv-sec">Show on this screen <small>Tap to hide, for a clean look or a video</small></div>
+        <div class="lv-shows" data-lv-shows></div>
         <input type="file" accept="image/*,video/*" data-lv-own hidden style="display:none">
       </div>
       <script src="/live.js"></script>

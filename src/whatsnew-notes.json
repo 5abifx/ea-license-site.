@@ -9,5 +9,6 @@
   { "id": "2026-11-27-report-bug", "name": "Report a bug", "line": "Need help? › Report a bug, with a screenshot", "icon": "shield" },
   { "id": "2026-11-27-live-screen", "name": "Live second screen", "line": "Keep today's P&L on an iPad or phone as you trade", "link": "/journal/live", "icon": "phone" },
   { "id": "2026-11-27-pl-colours", "name": "Your P&L colours", "line": "Pick your own profit and loss colours", "link": "/appearance", "icon": "spark" },
-  { "id": "2026-11-27-live-backgrounds", "name": "Live backgrounds", "line": "A look, clip or photo for PC, iPad and phone", "link": "/journal/live", "icon": "video" }
+  { "id": "2026-11-27-live-backgrounds", "name": "Live backgrounds", "line": "A look, clip or photo for PC, iPad and phone", "link": "/journal/live", "icon": "video" },
+  { "id": "2026-11-27-live-hide", "name": "Clean Live screen", "line": "Hide the checklist, accounts or any stat", "link": "/journal/live", "icon": "phone" }
 ]
