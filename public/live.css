@@ -4,7 +4,7 @@
    so a shrunk window, an iPad, a phone or a side monitor each get their own arrangement. */
 .app-body:has(.lv) { padding-bottom: 20px; }
 html.sc-wide body .app-main > .app-body:has(.lv), html body .app-main > .app-body:has(.lv) { max-width: 1680px; }
-.lv { min-height: calc(100dvh - 120px); --pos: #26c6a0; --neg: #f0464b; --warn: #f5a524; position: relative; container: lv / inline-size; display: flex; flex-direction: column; color: #f4f4f5; }
+.lv { min-height: calc(100dvh - 120px); --pos: var(--ok, #26c6a0); --neg: var(--danger, #f0464b); --warn: #f5a524; position: relative; container: lv / inline-size; display: flex; flex-direction: column; color: #f4f4f5; }
 .lv .pos { color: var(--pos); } .lv .neg { color: var(--neg); }
 
 /* head: same as the Desk ("Desk" + small secondary buttons) */
@@ -72,7 +72,9 @@ html.sc-wide body .app-main > .app-body:has(.lv), html body .app-main > .app-bod
 .lv-num-s { font-size: clamp(44px, 14cqi, 72px); margin-top: 12px; }
 .lv-oq { font-size: 13px; color: #8b8b8f; margin: 18px 0 10px; }
 .lv-opts { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-.lv-fine { font-size: 12px; color: #6b6b70; margin: 18px 0 0; }
+.lv-fine { font-size: 12px; color: #6b6b70; margin: 14px 0 0; }
+.lv-share { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.06); }
+.lv-share .ov-btn { text-decoration: none; }
 .lv-box p { color: #c8c8cc; font-size: 14px; line-height: 1.55; margin: 0; }
 .lv-breath { position: relative; width: 120px; height: 120px; margin: 18px auto; display: grid; place-items: center; }
 .lv-breath i { position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); box-shadow: 0 0 30px rgba(255,255,255,.08) inset; animation: lv-br 8s ease-in-out infinite; }
@@ -112,3 +114,7 @@ html.sc-wide body .app-main > .app-body:has(.lv), html body .app-main > .app-bod
 }
 /* Appearance > Reduce motion */
 html.calm .lv-pulse em, html.calm .lv-breath i { animation: none; }
+
+/* algo day (a bot placing hundreds of trades): the whole day, no checklist, no feelings, no per-trade review */
+.lv[data-state="algo"] .lv-feel, .lv[data-state="algo"] .lv-check, .lv[data-state="algo"] .lv-run { display: none; }
+.lv[data-state="algo"] .lv-btns { justify-content: flex-end; }

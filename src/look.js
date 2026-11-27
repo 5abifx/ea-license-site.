@@ -31,7 +31,9 @@ function clean(raw) {
     paint: PAINT.has(o.paint) ? o.paint : 'original',   // 3D garage car colour (wide PC side column)
     car: CAR.has(o.car) ? o.car : 'hyper',               // which garage car
     side: SIDE.has(o.side) ? o.side : 'pin',              // PC side cards: always on screen, or hidden at the edges (full-width middle)
-    calm: o.calm === true,                                // Reduce motion: no number sweeps or slide-ins (intro + garage stay)
+    calm: o.calm === true,
+    pos: HEX.test(o.pos) ? o.pos : '',                   // own profit colour (Appearance > Colours), '' = site default / accessibility choice
+    neg: HEX.test(o.neg) ? o.neg : '',                   // own loss colour                                // Reduce motion: no number sweeps or slide-ins (intro + garage stay)
   };
 }
 
@@ -106,6 +108,20 @@ module.exports = function setup(app, { db, page, requireUser }) {
         <button type="button" data-v="onyx"><i style="background:#050507"></i>Onyx</button>
         <button type="button" data-v="graphite"><i style="background:#2a2b31"></i>Graphite</button>
       </div>
+      <div class="ap-sub">Profit and loss <small>The colour of every winning and losing number</small></div>
+      <div class="ap-chips2" id="apPL">
+        <button type="button" data-pl=""><i style="background:linear-gradient(90deg,#26c6a0 50%,#f0464b 50%)"></i>Teal and red</button>
+        <button type="button" data-pl="#3ddc84,#ef3b36"><i style="background:linear-gradient(90deg,#3ddc84 50%,#ef3b36 50%)"></i>Green and red</button>
+        <button type="button" data-pl="#4ea8ff,#ff8a3d"><i style="background:linear-gradient(90deg,#4ea8ff 50%,#ff8a3d 50%)"></i>Blue and orange</button>
+        <button type="button" data-pl="#f5c542,#b06cff"><i style="background:linear-gradient(90deg,#f5c542 50%,#b06cff 50%)"></i>Gold and purple</button>
+        <button type="button" data-pl="#f4f4f5,#8e8e96"><i style="background:linear-gradient(90deg,#f4f4f5 50%,#8e8e96 50%)"></i>White and grey</button>
+      </div>
+      <div class="ap-pl">
+        <label>Profit <input type="color" id="apPos" value="#26c6a0"></label>
+        <label>Loss <input type="color" id="apNeg" value="#f0464b"></label>
+        <span class="ap-plv" id="apPLv"><b class="p">+$412</b><b class="n">−$250</b></span>
+      </div>
+      <p class="ap-hint" id="apPLh" hidden></p>
       <div class="ap-sub">Accent <small>Buttons, highlights, the page you are on</small></div>
       <div class="ap-grp">Metallic</div><div class="ap-dots" id="apMetal"></div>
       <div class="ap-grp">Matte</div><div class="ap-dots" id="apMatte"></div>

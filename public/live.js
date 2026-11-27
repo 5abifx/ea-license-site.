@@ -13,7 +13,8 @@
   var mmss = function (s) { s = Math.max(0, Math.round(s)); return (s >= 3600 ? Math.floor(s / 3600) + ':' + two(Math.floor(s / 60) % 60) : two(Math.floor(s / 60))) + ':' + two(s % 60); };
   var dpr = Math.min(2, window.devicePixelRatio || 1);
   var ACC = (getComputedStyle(root).getPropertyValue('--accent') || '').trim() || '#ff5a1f';
-  var POS = '#26c6a0', NEG = '#f0464b';
+  var cssv = function (k, d) { var v = (getComputedStyle(document.documentElement).getPropertyValue(k) || '').trim(); return /^#[0-9a-f]{6}$/i.test(v) ? v : d; };
+  var POS = cssv('--ok', '#26c6a0'), NEG = cssv('--danger', '#f0464b');
 
   // numbers glide to the new value
   function Tw(el, fmt) { this.el = el; this.fmt = fmt; this.v = 0; this.to = 0; }
@@ -60,6 +61,15 @@
     $('usedbar').style.width = (used || 0) + '%';
     $('dlw').title = dl ? fmtM(Math.max(0, dl.allow - dl.used)).replace('+', '') + ' left today' : 'Set your daily limit on the Desk';
     var sub = $('subl');
+    if (S.state === 'algo') {
+      var A = S.algo || {}, wonA = T.won || 0;
+      $('lbl').textContent = 'Today P&L · algo day';
+      num.set(T.net + (A.float || 0)); $('num').style.color = T.net + (A.float || 0) < 0 ? 'var(--neg)' : 'var(--pos)';
+      $('trades').textContent = T.n.toLocaleString('en-US');
+      lo.textContent = T.n ? Math.round(wonA / T.n * 100) + '%' : '–'; lo.className = '';
+      sub.innerHTML = '<span><b>' + T.n.toLocaleString('en-US') + '</b> trades today</span><span><b>' + (A.perHour || 0) + '</b> an hour</span><span>Open <b>' + (A.open || 0) + '</b></span><span>Floating <b class="' + ((A.float || 0) < 0 ? 'neg' : 'pos') + '">' + fmtM(A.float || 0) + '</b></span>';
+      return;
+    }
     if (inTrade()) {
       var P = S.pos, R = P.pnl / P.risk;
       $('lbl').textContent = P.sym + ' · ' + (P.side === 'SELL' ? 'Sell ' : 'Buy ') + P.lots.toFixed(2) + ' · ' + mmss((Date.now() - P.since) / 1000);
@@ -78,6 +88,9 @@
 
   function go(st) {
     S.state = st; root.dataset.state = st;
+    var algo = st === 'algo';
+    root.querySelector('[data-lv-trades]').previousElementSibling.textContent = algo ? 'Trades today' : 'Trades';
+    root.querySelector('[data-lv-loss]').previousElementSibling.textContent = algo ? 'Win rate' : 'Losses';
     root.querySelectorAll('[data-lv-go]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.lvGo === st)); });
     $('rev').hidden = st !== 'closed'; $('lock').hidden = st !== 'lock';
     if (D.demo) demo(st);
@@ -88,12 +101,16 @@
   var base = null;
   function demo(st) {
     if (!base) base = { t: JSON.parse(JSON.stringify(S.today)), g: JSON.parse(JSON.stringify(S.guard)) };
+    S.algo = S.algo || { open: 0, float: 0, perHour: 0 };
     var T = JSON.parse(JSON.stringify(base.t)), G = JSON.parse(JSON.stringify(base.g));
     T = { net: 412, r: 1.6, n: 3, list: [[260, 1.1], [-250, -1], [402, 1.5]] };
     if (!G.daily) G.daily = { allow: 5000, used: 1600, pct: 5 }; else G.daily.used = 1600;
     G.trades = T.n; G.losses = T.list.filter(function (x) { return x[0] < 0; }).length;
     if (st === 'near') { T = { net: -3880, r: -3.9, n: 3, list: [[300, .3], [420, .4], [-4600, -4.6]] }; G.daily.used = 4300; G.losses = 1; G.trades = 3; }
     if (st === 'closed') { T.list = T.list.concat([[186, .7]]); T.n++; T.net += 186; T.r = (T.r || 0) + .7; G.trades = T.n; }
+    if (st === 'algo') { T = { net: 1864, r: null, n: 1042, won: 581, list: [] }; G.daily.used = 900; G.losses = 461; G.trades = 1042;
+      var e = 0, sd2 = 5; T.eq = [0]; for (var q = 0; q < 240; q++) { sd2 = (sd2 * 16807) % 2147483647; e += ((sd2 / 2147483647) - .47) * 60; T.eq.push(e); } var k2 = 1864 - e; T.eq = T.eq.map(function (v, j) { return v + k2 * j / 240; });
+      S.algo = { open: 6, float: 214, perHour: 87 }; }
     if (st === 'lock') { T = { net: -380, r: -1.5, n: 3, list: [[120, .5], [-250, -1], [-250, -1]] }; G.daily.used = 600; G.losses = 2; G.trades = 3; S.lockEnd = Date.now() + (24 * 60 + 10) * 1000; }
     S.today = T; S.guard = G;
     if (st === 'trade' || st === 'near' || st === 'closed') {
@@ -102,13 +119,17 @@
       for (var i = 0; i < 90; i++) { sd = (sd * 16807) % 2147483647; v += ((sd / 2147483647) - .44) * 16; v = Math.max(-140, v); S.hist.push(v); }
       var k = 140 - v; S.hist = S.hist.map(function (a, j) { return a + k * j / 89; });
       if (st === 'near') { S.pos.pnl = -150; S.hist = S.hist.map(function (a, j) { return a * .3 - j * 2; }); }
-      if (st === 'closed') { S.pos.pnl = 186; S.revEnd = Date.now() + 8000; $('revn').textContent = fmtM(186) + ' · +0.7R'; $('revn').style.color = 'var(--pos)'; $('revh').textContent = 'XAUUSD buy closed · 21 min'; }
+      if (st === 'closed') { S.pos.pnl = 186; S.revEnd = Date.now() + 8000; if (D.lastId) $('share').href = '/journal/studio?trade=' + D.lastId; $('revn').textContent = fmtM(186) + ' · +0.7R'; $('revn').style.color = 'var(--pos)'; $('revh').textContent = 'XAUUSD buy closed · 21 min'; }
       num.set(S.pos.pnl, true);
-    } else { S.pos = null; num.set(T.net, true); }
+    } else { S.pos = null; num.set(T.net + (st === 'algo' ? S.algo.float : 0), true); }
     S.news = { name: 'US CPI', cur: 'USD', t: Date.now() + (st === 'near' ? 4 * 60 + 12 : 18 * 60 + 4) * 1000 };
     $('conn').querySelector('span').textContent = st === 'flat' || st === 'lock' ? 'Sample · no open trade' : 'Sample trade · live';
   }
   function tick() {
+    if (S.state === 'algo' && S.today.eq) {   // a bot closes trades all the time: the day line and the count keep moving
+      if (Math.random() < .6) { var d = (Math.random() - .45) * 22; S.today.net += d; S.today.n++; if (d > 0) S.today.won++; S.today.eq.push(S.today.net); if (S.today.eq.length > 241) S.today.eq.shift(); }
+      S.algo.float = Math.max(-400, Math.min(600, S.algo.float + (Math.random() - .5) * 30)); paint(); return;
+    }
     if (!S.pos || (S.state !== 'trade' && S.state !== 'near')) return;
     var drift = S.state === 'near' ? -.53 : -.46;
     S.pos.pnl = Math.max(-S.pos.risk * .96, Math.min(S.pos.risk * S.pos.rr * .96, S.pos.pnl + (Math.random() + drift) * 14));
@@ -125,7 +146,7 @@
       box.classList.toggle('hot', left < 5 * 60);
     } else { nn.textContent = 'Next red news'; cd.textContent = 'None'; box.classList.remove('hot'); }
     if (S.state === 'lock') $('lcd').textContent = mmss((S.lockEnd - Date.now()) / 1000);
-    if (S.state === 'closed') { var r = Math.ceil((S.revEnd - Date.now()) / 1000); $('revt').textContent = r > 0 ? 'Closes by itself in ' + r + ' s · change it later in the journal' : 'Saved to the trade'; }
+    if (S.state === 'closed') { var r = Math.ceil((S.revEnd - Date.now()) / 1000); $('revt').textContent = r > 0 ? 'Closes by itself in ' + r + ' s · change it later in the journal' : 'Saved to the trade'; if (r <= -2 && !D.demo) go('flat'); }
     if (S.state === 'lock') $('bt').textContent = (Date.now() / 4000 | 0) % 2 ? 'Breathe out' : 'Breathe in';
     if (inTrade()) paint();
   }
@@ -135,6 +156,7 @@
     if (!document.hidden) {
       var c = $('line');
       if (inTrade() && S.state !== 'closed') line(c, S.hist, S.pos.pnl < 0 ? NEG : POS, true);
+      else if (S.today.eq) line(c, S.today.eq, S.today.net < 0 ? NEG : (S.state === 'algo' ? POS : ACC), S.state === 'algo');
       else { var eq = [0], a = 0; S.today.list.forEach(function (x) { a += x[0]; eq.push(a); }); line(c, eq.length > 2 ? eq : [], a < 0 ? NEG : ACC, false); }
     }
     requestAnimationFrame(frame);
@@ -144,8 +166,10 @@
   root.addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
     if (b.dataset.lvGo) { go(b.dataset.lvGo); return; }
+    if (b.closest('[data-lv-rev]')) S.revEnd = Math.max(S.revEnd, Date.now() + 8000);
     var grp = b.closest('.lv-feel, .lv-opts');
     if (grp) { var on = b.getAttribute('aria-pressed') === 'true'; grp.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); b.setAttribute('aria-pressed', String(!on)); return; }
+    if (b.hasAttribute('data-lv-done')) { go('flat'); return; }
     if (b.hasAttribute('data-lv-mark')) {
       var t = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(new Date());
       b.textContent = 'Marked ' + t; b.classList.add('done'); setTimeout(function () { b.textContent = 'Mark this moment'; b.classList.remove('done'); }, 1800); return;
@@ -161,7 +185,8 @@
 
   var st = D.demo ? (new URLSearchParams(location.search).get('m') || 'trade') : (S.guard.streak >= (S.guard.maxLosses || 2) ? 'lock' : 'flat');
   if (st === 'lock' && !D.demo) S.lockEnd = Date.now() + 30 * 60 * 1000;
-  go(['flat', 'trade', 'near', 'closed', 'lock'].indexOf(st) > -1 ? st : 'flat');
+  if (!D.demo && D.busy) st = 'algo';
+  go(['flat', 'trade', 'near', 'closed', 'lock', 'algo'].indexOf(st) > -1 ? st : 'flat');
   num.v = 0;
   clocks(); setInterval(clocks, 1000);
   if (D.demo) setInterval(tick, 700);

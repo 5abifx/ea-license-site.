@@ -66,6 +66,22 @@
   pk.innerHTML = '<input type="color" id="apAccPick" value="#ff5a1f" aria-label="Pick any accent colour">'; $('#apMatte').appendChild(pk);
   $('#apAccPick').oninput = (e) => set({ accent: 'c-' + e.target.value });
 
+  /* profit / loss colours: presets or any two colours */
+  $$('#apPL [data-pl]').forEach((b) => { b.onclick = () => { const [pos, neg] = (b.dataset.pl || ',').split(','); set({ pos: pos || '', neg: neg || '' }); }; });
+  $('#apPos').oninput = (e) => set({ pos: e.target.value, neg: S.neg || '#f0464b' });
+  $('#apNeg').oninput = (e) => set({ pos: S.pos || '#26c6a0', neg: e.target.value });
+  function syncPL() {
+    const pos = S.pos || '#26c6a0', neg = S.neg || '#f0464b', key = S.pos && S.neg ? S.pos + ',' + S.neg : '';
+    $$('#apPL [data-pl]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.pl === key)));
+    $('#apPos').value = pos; $('#apNeg').value = neg;
+    $('#apPLv .p').style.color = pos; $('#apPLv .n').style.color = neg;
+    // both must read on the dark panels and look different from each other
+    const bg = [11, 11, 14], P = LK.hex2(pos), N = LK.hex2(neg);
+    const dist = Math.hypot(P[0] - N[0], P[1] - N[1], P[2] - N[2]);
+    const h = $('#apPLh'), msg = LK.CR(P, bg) < 3 || LK.CR(N, bg) < 3 ? 'One of these is hard to read on the dark panels. Pick a lighter shade.' : dist < 90 ? 'These two look alike. Pick colours that are easy to tell apart.' : '';
+    h.textContent = msg; h.hidden = !msg;
+  }
+
   /* tabs (same as Share Studio); last tab remembered on this device */
   const showTab = (t) => { $$('.ap-tabs [data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === t))); $$('.ap-body [data-pane]').forEach((p) => { p.hidden = p.dataset.pane !== t; }); try { localStorage.setItem('apTab', t); } catch (e) {} };
   $$('.ap-tabs [data-tab]').forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
@@ -85,6 +101,7 @@
   [['apDepth', 'depth'], ['apDim', 'dim'], ['apBlur', 'blur']].forEach(([id, k]) => { const el = $('#' + id); el.value = S[k]; el.oninput = () => set({ [k]: +el.value }); });
 
   function sync() {
+    syncPL();
     $$('.ap-tile[data-bg]').forEach((b) => b.classList.toggle('on', b.dataset.bg === S.bg));
     $$('#apPanel button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === S.panel));
     $$('.ap-dot[data-acc]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.acc === S.accent));

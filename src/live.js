@@ -12,7 +12,7 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
     const { liveAccts, sel, where, args } = sc;
     const off = u.ny_offset ?? desk.NY_DEFAULT;
     const today = desk.serverToday(off);
-    const rows = db.prepare(`SELECT ${DESK_COLS} FROM journal_trades WHERE ${where} AND substr(close_time, 1, 10) = ? ORDER BY close_time`).all(...args, today);
+    const rows = db.prepare(`SELECT ${DESK_COLS}, magic FROM journal_trades WHERE ${where} AND substr(close_time, 1, 10) = ? ORDER BY close_time`).all(...args, today);
     const cur = (sel ? sel.cur : liveAccts[0]?.cur) || 'USD';
     const net = rows.reduce((s, t) => s + (t.net || 0), 0);
     const rs = rows.filter((t) => t.r !== null && t.r !== undefined);
@@ -32,16 +32,24 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
       const n = db.prepare('SELECT name, cur, t FROM news_events WHERE imp = 3 AND t > ? ORDER BY t LIMIT 1').get(Date.now());
       if (n) news = { name: n.name, cur: n.cur, t: n.t };
     } catch (e) { /* no news table yet */ }
+    // algo / bot days: past BUSY trades today, or most trades placed by an EA (magic number), the screen shows the day as a whole
+    const BUSY = 30;
+    const busy = rows.length > BUSY && (rows.length > 120 || rows.filter((t) => t.magic).length > rows.length / 2);
+    const thin = (list) => { let run = 0; const eq = [0, ...list.map((t) => (run += t.net))]; const step = Math.max(1, Math.ceil(eq.length / 240));
+      return eq.filter((v, i) => i % step === 0 || i === eq.length - 1).map((v) => Math.round(v * 100) / 100); };
     // losses in a row at the end of today
     let streak = 0;
     for (let i = rows.length - 1; i >= 0 && rows[i].net < 0; i--) streak++;
     const data = {
       cur, demo: req.query.demo === '1',
       acct: one ? `Account ••${String(one.account_number).slice(-2)}` : '',
-      today: { net, r: rs.length ? rs.reduce((s, t) => s + t.r, 0) : null, n: rows.length,
-        list: rows.map((t) => [Math.round(t.net * 100) / 100, t.r === null ? null : Math.round(t.r * 100) / 100]) },
+      today: { net, r: rs.length ? rs.reduce((s, t) => s + t.r, 0) : null, n: rows.length, won: rows.filter((t) => t.net > 0).length,
+        // a normal day sends every trade; a bot day (hundreds of trades) sends the equity line cut down to 240 points
+        list: busy ? [] : rows.map((t) => [Math.round(t.net * 100) / 100, t.r === null ? null : Math.round(t.r * 100) / 100]),
+        eq: busy ? thin(rows) : null, bots: rows.filter((t) => t.magic).length },
+      busy,
       guard: { daily, losses: rows.filter((t) => t.net < 0).length, streak, trades: rows.length, maxLosses: 2, maxTrades: 5 },
-      news,
+      news, lastId: rows.length ? rows[rows.length - 1].id : null,
     };
     req.noSide = true;   // the live screen uses the full width: no side cards
     const qs = (o) => '?' + new URLSearchParams(Object.entries({ account: sel ? sel.account_number : '', ...o }).filter(([, v]) => v)).toString();
@@ -96,6 +104,7 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
           <div class="lv-opts"><button type="button" class="ov-btn">Yes</button><button type="button" class="ov-btn">Partly</button><button type="button" class="ov-btn">No</button></div>
           <p class="lv-oq">Grade it</p>
           <div class="lv-opts"><button type="button" class="ov-btn">A+</button><button type="button" class="ov-btn">A</button><button type="button" class="ov-btn">B</button><button type="button" class="ov-btn">C</button><button type="button" class="ov-btn">F</button></div>
+          <div class="lv-share"><a class="ov-btn o" data-lv-share href="/journal/studio">Make a share card</a><button type="button" class="ov-btn" data-lv-done>Done</button></div>
           <p class="lv-fine" data-lv-revt>Closes by itself in 8 s</p>
         </div></div>
 
@@ -108,7 +117,7 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
 
         ${data.demo ? `<div class="lv-demo" role="group" aria-label="Sample moments"><span>Sample</span>
           <button type="button" data-lv-go="flat">Flat</button><button type="button" data-lv-go="trade" aria-pressed="true">In a trade</button>
-          <button type="button" data-lv-go="near">Near limit</button><button type="button" data-lv-go="closed">Just closed</button><button type="button" data-lv-go="lock">Cooldown</button></div>` : ''}
+          <button type="button" data-lv-go="near">Near limit</button><button type="button" data-lv-go="closed">Just closed</button><button type="button" data-lv-go="lock">Cooldown</button><button type="button" data-lv-go="algo">Algo day</button></div>` : ''}
       </div>
       <script src="/live.js"></script>`);
   });
