@@ -1,0 +1,158 @@
+/* Live screen (/journal/live, src/live.js + public/live.js): the journal on a second screen.
+   Same look as the Desk overview ("graphite"): one big number with its line glowing behind it, small mono labels,
+   stat rows, pill buttons, no boxed tiles. The layout follows the width of the live area (container queries),
+   so a shrunk window, an iPad, a phone or a side monitor each get their own arrangement. */
+.app-body:has(.lv) { padding-bottom: 20px; }
+html.sc-wide body .app-main > .app-body:has(.lv), html body .app-main > .app-body:has(.lv) { max-width: 1680px; }
+.lv { min-height: calc(100dvh - 120px); --pos: var(--ok, #26c6a0); --neg: var(--danger, #f0464b); --warn: #f5a524; position: relative; container: lv / inline-size; display: flex; flex-direction: column; color: #f4f4f5; }
+.lv .pos { color: var(--pos); } .lv .neg { color: var(--neg); }
+
+/* head: same as the Desk ("Desk" + small secondary buttons) */
+.lv-head h1 { display: flex; align-items: center; gap: 14px; }
+.lv-pulse { display: inline-flex; align-items: center; gap: 7px; font: 500 12px Manrope, Inter, sans-serif; letter-spacing: 0; color: #8b8b8f; }
+.lv-pulse em { width: 7px; height: 7px; border-radius: 50%; background: var(--pos); animation: lv-ping 1.8s ease-out infinite; }
+.lv[data-state="flat"] .lv-pulse em, .lv[data-state="lock"] .lv-pulse em { background: #8b8b8f; }
+@keyframes lv-ping { 0% { box-shadow: 0 0 0 0 rgba(38,198,160,.6); } 100% { box-shadow: 0 0 0 9px rgba(38,198,160,0); } }
+.lv-head .head-btns button[aria-pressed="true"] { color: #fff; background: rgba(255,255,255,.14); }
+
+/* hero: label, huge number, sub-line, stats on the right, the line glowing behind */
+.lv-hero { position: relative; isolation: isolate; padding: 30px 0 20px; flex: 1; min-height: clamp(240px, 40vh, 520px); display: flex; flex-direction: column; }
+.lv-line { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 48%; z-index: -1; pointer-events: none; }
+.lv-lbl { font: 500 11px/1 "JetBrains Mono", ui-monospace, monospace; letter-spacing: .2em; text-transform: uppercase; color: #a3a3a7; }
+.lv-num { font: 600 clamp(64px, min(13cqi, 17vh), 190px)/1 Manrope, Inter, system-ui, sans-serif; letter-spacing: -.05em; color: #f4f4f5; margin-top: 14px;
+  font-variant-numeric: tabular-nums; white-space: nowrap; text-shadow: 0 2px 24px rgba(0,0,0,.35); transition: color .5s; }
+.lv-subl { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; color: #8b8b8f; margin-top: 14px; }
+.lv-subl b { color: #dcdcde; font-weight: 600; }
+.lv-subl b.pos { color: var(--pos); } .lv-subl b.neg { color: var(--neg); }
+.lv-stats { position: absolute; right: 0; top: 30px; margin: 0; display: grid; grid-template-columns: repeat(3, auto); gap: 18px 38px; text-align: right; }
+.lv-stats dt { font: 500 10.5px/1 "JetBrains Mono", ui-monospace, monospace; letter-spacing: .16em; text-transform: uppercase; color: #a3a3a7; white-space: nowrap; }
+.lv-stats dd { margin: 7px 0 0; font: 600 22px/1.1 Sora, Manrope, system-ui, sans-serif; letter-spacing: -.01em; color: #f4f4f5; font-variant-numeric: tabular-nums; white-space: nowrap; transition: color .4s; }
+.lv-bar { display: block; height: 2px; margin-top: 8px; background: rgba(255,255,255,.1); border-radius: 2px; overflow: hidden; }
+.lv-bar b { display: block; height: 100%; width: 0; margin-left: auto; background: #f4f4f5; transition: width 1s ease, background .4s; }
+.lv[data-state="near"] [data-lv-dlw] dd, .lv[data-state="near"] [data-lv-dlw] dt { color: var(--warn); }
+.lv[data-state="near"] .lv-bar b { background: var(--warn); box-shadow: 0 0 10px var(--warn); }
+[data-lv-news].hot dd { color: var(--warn); animation: lv-blink 1s steps(2) infinite; }
+@keyframes lv-blink { 50% { opacity: .5; } }
+
+/* the trade between stop and target: one hairline, a glowing bead */
+.lv-run { display: none; margin-top: 6px; }
+.lv[data-state="trade"] .lv-run, .lv[data-state="near"] .lv-run, .lv[data-state="closed"] .lv-run { display: block; }
+.lv-track { position: relative; height: 2px; background: linear-gradient(90deg, rgba(240,70,75,.55), rgba(255,255,255,.12) 33.3%, rgba(255,255,255,.12) 33.4%, rgba(38,198,160,.55)); border-radius: 2px; }
+.lv-fill { position: absolute; top: -1px; height: 4px; border-radius: 4px; background: var(--pos); box-shadow: 0 0 12px var(--pos); transition: left .6s ease, width .6s ease, background .4s; }
+.lv-fill.dn { background: var(--neg); box-shadow: 0 0 12px var(--neg); }
+.lv-ent { position: absolute; left: 33.3%; top: -6px; width: 1px; height: 14px; background: rgba(255,255,255,.5); }
+.lv-dot { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 5px rgba(255,255,255,.1), 0 0 16px rgba(255,255,255,.7); transition: left .6s ease; }
+.lv-tl { display: flex; justify-content: space-between; margin-top: 12px; font: 500 10.5px/1 "JetBrains Mono", ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; color: #8b8b8f; }
+.lv-tl b { font: 600 13px Manrope, Inter, sans-serif; letter-spacing: 0; margin-left: 6px; color: #dcdcde; }
+.lv-tl b.pos { color: var(--pos); } .lv-tl b.neg { color: var(--neg); }
+
+/* flat: the checklist, plain rows like the Focus card */
+.lv-check { display: none; margin-top: 4px; }
+.lv[data-state="flat"] .lv-check, .lv[data-state="lock"] .lv-check { display: block; }
+.lv-chk { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 32px; margin-top: 12px; }
+.lv-chk label { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 14px; color: #c8c8cc; cursor: pointer; transition: color .25s; }
+.lv-chk input { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin: 0; flex: none; border-radius: 50%; border: 1.5px solid #5a5a60; display: grid; place-items: center; transition: all .25s; }
+.lv-chk input:checked { border-color: var(--accent, #ff5a1f); background: var(--accent, #ff5a1f); box-shadow: 0 0 12px rgba(255,90,31,.5); }
+.lv-chk input:checked::after { content: ""; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: translateY(-1px) rotate(45deg); }
+.lv-chk label:has(input:checked) { color: #f4f4f5; }
+
+/* pills: the Desk's own buttons */
+.lv-btns { align-items: center; margin-top: auto; padding-top: 26px; }
+.lv-feel { display: flex; flex-wrap: wrap; gap: 10px; flex: 1; }
+.app-body .lv button.ov-btn { min-height: 0; letter-spacing: 0; text-transform: none; border: 0; cursor: pointer; }
+.app-body .lv .ov-btn[aria-pressed="true"] { background: #f4f4f5; color: #0b0b0c; }
+.app-body .lv .lv-mark.done { background: #f4f4f5; color: #0b0b0c; box-shadow: none; }
+
+/* closed / cooldown: a Desk panel over a dimmed screen */
+.lv-ov { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(9,9,10,.6);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-radius: 18px; animation: lv-in .4s ease both; }
+.lv-ov[hidden] { display: none; }
+@keyframes lv-in { from { opacity: 0; } }
+.lv-box { width: min(520px, 100%); text-align: center; padding: 30px 26px; container-type: inline-size; }
+.lv-num-s { font-size: clamp(44px, 14cqi, 72px); margin-top: 12px; }
+.lv-oq { font-size: 13px; color: #8b8b8f; margin: 18px 0 10px; }
+.lv-opts { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.lv-fine { font-size: 12px; color: #6b6b70; margin: 14px 0 0; }
+.lv-share { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.06); }
+.lv-share .ov-btn { text-decoration: none; }
+.lv-box p { color: #c8c8cc; font-size: 14px; line-height: 1.55; margin: 0; }
+.lv-breath { position: relative; width: 120px; height: 120px; margin: 18px auto; display: grid; place-items: center; }
+.lv-breath i { position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); box-shadow: 0 0 30px rgba(255,255,255,.08) inset; animation: lv-br 8s ease-in-out infinite; }
+.lv-breath span { font-size: 12.5px; color: #c8c8cc; }
+@keyframes lv-br { 0%, 100% { transform: scale(.62); opacity: .6; } 50% { transform: scale(1); opacity: 1; } }
+
+/* sample switcher (only with ?demo=1) */
+.lv-demo { display: flex; gap: 4px; align-items: center; align-self: center; margin-top: 18px; padding: 4px; border-radius: 99px; background: rgba(255,255,255,.05); max-width: 100%; overflow-x: auto; }
+.lv-demo span { font-size: 11px; color: #6b6b70; padding: 0 8px; font-weight: 700; }
+.app-body .lv-demo button { min-height: 0; padding: 6px 12px; font: 600 12px Manrope, Inter, sans-serif; letter-spacing: 0; text-transform: none; border-radius: 99px; border: 0; background: transparent; color: #8b8b8f; box-shadow: none; cursor: pointer; white-space: nowrap; }
+.app-body .lv-demo button[aria-pressed="true"] { background: #f4f4f5; color: #0b0b0c; }
+
+/* Hide private info: money blurred, R and counts stay */
+.lv.lv-private [data-lv-num], .lv.lv-private [data-lv-today], .lv.lv-private [data-lv-sl], .lv.lv-private [data-lv-tp], .lv.lv-private [data-lv-revn] { filter: blur(14px); }
+
+/* ---------- widths of the live area ---------- */
+/* iPad upright / half a screen: stats move under the number */
+@media (max-width: 900px) { .lv { min-height: calc(100dvh - 210px); } }
+@container lv (max-width: 959px) {
+  .lv-stats { position: static; grid-template-columns: repeat(3, minmax(0, 1fr)); text-align: left; margin-top: 26px; gap: 18px 16px; }
+  .lv-bar b { margin-left: 0; }
+  .lv-hero > * { order: 2; } .lv-hero > .lv-line { order: 1; }
+  .lv-lbl, .lv-num, .lv-subl { order: 0; }
+  .lv-hero .lv-line { position: static; order: 1; flex: 1; height: auto; min-height: 140px; margin: 14px 0 0; }
+  .lv-hero { min-height: 0; padding-bottom: 6px; }
+}
+/* phone: smaller number, two stats per row, pills scroll sideways */
+@container lv (max-width: 559px) {
+  .lv-num { font-size: clamp(54px, 19cqi, 84px); }
+  .lv-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lv-stats dd { font-size: 19px; }
+  .lv-hero .lv-line { min-height: 100px; max-height: 150px; }
+  .lv-chk { grid-template-columns: 1fr; }
+  .lv-feel { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; flex-basis: 100%; }
+  .lv-mark { flex: 1; justify-content: center; }
+  .lv-head .head-btns button:last-child { display: none; }
+}
+/* Appearance > Reduce motion */
+html.calm .lv-pulse em, html.calm .lv-breath i { animation: none; }
+
+/* algo day (a bot placing hundreds of trades): the whole day, no checklist, no feelings, no per-trade review */
+.lv[data-state="algo"] .lv-feel, .lv[data-state="algo"] .lv-check, .lv[data-state="algo"] .lv-run { display: none; }
+.lv[data-state="algo"] .lv-btns { justify-content: flex-end; }
+
+/* background behind the P&L (Background button): a built-in look, a free clip or the member's own picture */
+.lv-bg { position: absolute; inset: 0; z-index: -2; border-radius: 22px; overflow: hidden; display: none; background: #0a0a0c; box-shadow: 0 0 0 1px rgba(255,255,255,.06); }
+.lv.has-bg .lv-bg { display: block; }
+.lv.has-bg .lv-hero { padding: 30px 30px 22px; margin-top: 6px; }
+.lv.has-bg .lv-stats { right: 30px; }
+.lv-bg > video, .lv-bg > img, .lv-bg > canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.lv-bg.bw > video, .lv-bg.bw > img { filter: grayscale(1) contrast(1.05); }
+/* darker on the left (the number) and at the bottom (the line), set by the Darken slider */
+.lv-bg .lv-sh { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,calc(var(--dim, .5) + .1)), rgba(0,0,0,calc(var(--dim, .5) - .1)) 60%, rgba(0,0,0,var(--dim, .5))),
+  linear-gradient(0deg, rgba(0,0,0,.45), transparent 45%); }
+.lv.has-bg .lv-lbl, .lv.has-bg .lv-stats dt { color: #c8c8cc; }
+.lv.has-bg .lv-subl { color: #b4b4b9; }
+.lv.has-bg .lv-stats dd, .lv.has-bg .lv-subl b { text-shadow: 0 1px 10px rgba(0,0,0,.5); }
+
+.lv-bgp { animation: none !important; opacity: 1 !important; position: fixed; z-index: 60; width: min(380px, calc(100vw - 24px)); box-sizing: border-box; max-height: calc(100dvh - 120px); overflow: auto; padding: 16px 16px 14px; box-shadow: 0 30px 60px -20px #000, 0 0 0 1px rgba(255,255,255,.08); }
+.lv-bgp-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.lv-bgp-h b { font: 600 15px Sora, Manrope, sans-serif; color: #f4f4f5; }
+.lv-x { width: 30px; height: 30px; padding: 0; border-radius: 50%; display: grid; place-items: center; font-size: 18px; line-height: 1; text-transform: none; letter-spacing: 0; background: rgba(255,255,255,.08); color: #ddd; border: 0; }
+.lv-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.lv-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0; background: none; border: 0; color: #a3a3a7; font: 600 11px/1.2 Manrope, sans-serif; text-transform: none; letter-spacing: 0; cursor: pointer; text-align: center; }
+.lv-tile i { width: 100%; aspect-ratio: 1; border-radius: 12px; display: grid; place-items: center; color: #fff; font-style: normal; font-size: 20px; box-shadow: 0 0 0 1px rgba(255,255,255,.08); transition: box-shadow .2s; }
+.lv-tile[aria-pressed="true"] { color: #fff; }
+.lv-tile[aria-pressed="true"] i { box-shadow: 0 0 0 2px var(--accent, #ff5a1f); }
+.lv-bgp-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 14px; font-size: 12.5px; color: #a3a3a7; font-weight: 600; }
+.lv-bgp-row label { display: inline-flex; align-items: center; gap: 8px; }
+.lv-bgp-row input[type=range] { width: 120px; accent-color: var(--accent, #ff5a1f); }
+.lv-bgp-n { margin: 10px 0 0; font-size: 11.5px; color: #77777d; line-height: 1.45; }
+.lv-bgp-n a { color: #c8c8cc; }
+@container lv (max-width: 559px) { .lv.has-bg .lv-hero { padding: 22px 18px 16px; } }
+@media (max-width: 559px) { .lv-bgp { width: auto; } }
+.lv-bg.built .lv-sh { opacity: .45; }   /* the built-in looks are dark already */
+.lv-devs { display: flex; align-items: center; gap: 6px; margin: -2px 0 6px; font-size: 12px; color: #8b8b8f; font-weight: 600; }
+.lv-devs span { margin-right: 4px; }
+.lv-devs button { padding: 6px 12px; border-radius: 99px; border: 0; background: rgba(255,255,255,.06); color: #c8c8cc; font: 600 12px Manrope, sans-serif; text-transform: none; letter-spacing: 0; cursor: pointer; }
+.lv-devs button.here::after { content: ' ·'; color: var(--accent, #ff5a1f); }
+.lv-devs button[aria-pressed="true"] { background: #f4f4f5; color: #0a0a0b; }
+.lv-devn { margin: 0 0 12px; font-size: 11.5px; line-height: 1.45; color: #8b8b8f; }

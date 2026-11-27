@@ -228,8 +228,19 @@
   const CLEAR = ['--card', '--card-2', '--bg', '--q-tile', '--q-tile-2', '--q-edge', '--lk-side', '--lk-surf', '--lk-eff', '--muted', '--q-label', '--accent', '--accent-text', '--accent-2', '--accent-ink', '--accent-hover', '--accent-soft', '--lk-acc-fill', '--lk-head', '--lk-head-2', '--lk-head-shadow', '--lk-blur', '--lk-sheet', '--lk-sheet-blur'];
 
   /* ---------- apply ---------- */
+  /* ---------- own profit / loss colours (also on the classic look) ---------- */
+  const PL = ['--ok', '--ok-rgb', '--ok-bg', '--danger', '--danger-rgb'];
+  function plColours() {
+    const ok = /^#[0-9a-f]{6}$/i;
+    if (!ok.test(S.pos || '') || !ok.test(S.neg || '')) { PL.forEach((k) => root.style.removeProperty(k)); root.classList.remove('pl-own'); return; }
+    const P = hex2(S.pos), N = hex2(S.neg);
+    root.style.setProperty('--ok', S.pos); root.style.setProperty('--ok-rgb', P.join(',')); root.style.setProperty('--ok-bg', rgba(P, 0.14));
+    root.style.setProperty('--danger', S.neg); root.style.setProperty('--danger-rgb', N.join(','));
+    root.classList.add('pl-own');
+  }
   async function apply(next) {
     if (next) S = Object.assign({}, DEF, S, next);
+    plColours();
     if (!VALID.has(S.bg)) S.bg = 'none';
     root.classList.toggle('calm', !!S.calm);
     if (S.bg === 'none') {   // classic look: remove everything we added

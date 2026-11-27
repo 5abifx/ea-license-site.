@@ -26,6 +26,7 @@ function smooth(P) {
 }
 
 const ICON = {
+  live: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8 14l2.5-3 2 2 3.5-4"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 17L17 7M9 7h8v8"/></svg>',
   plan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
@@ -86,6 +87,7 @@ function html(trades, accounts, opts) {
       <a class="ov-btn o" href="/journal/log">${ICON.plus}Log trade</a>
       <a class="ov-btn" href="/journal/studio">${ICON.share}Share</a>
       <a class="ov-btn" href="/journal/plan">${ICON.plan}Plan a trade</a>
+      <a class="ov-btn" href="/journal/live">${ICON.live}Second screen</a>
     </div>
   </section>`;
 

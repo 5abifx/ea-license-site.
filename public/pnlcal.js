@@ -27,7 +27,9 @@
     var tint = function (v) {   // stronger colour for bigger days, scaled to this member's own biggest day
       if (v == null) return '';
       var q = Math.abs(v) / mx, a = q >= 0.6 ? 1 : q >= 0.3 ? 0.75 : q >= 0.1 ? 0.5 : 0.3;   // 4 clear steps each side
-      return v > 0 ? 'background:rgba(38,198,160,' + a + ')' : v < 0 ? 'background:rgba(240,70,75,' + a + ')' : 'background:rgba(255,255,255,.14)';
+      // follows the member's own profit / loss colours (Appearance > Colours, or Accessibility)
+      var cs = getComputedStyle(document.documentElement), okr = (cs.getPropertyValue('--ok-rgb') || '').trim() || '38,198,160', dnr = (cs.getPropertyValue('--danger-rgb') || '').trim() || '240,70,75';
+      return v > 0 ? 'background:rgba(' + okr + ',' + a + ')' : v < 0 ? 'background:rgba(' + dnr + ',' + a + ')' : 'background:rgba(255,255,255,.14)';
     };
     var sum = function (a, b) { var t = 0, n = 0, g = 0, d = 0; for (var x = a; x < b; x += DAY) { var r = D[iso(x)]; if (r) { t += r[0]; n += r[1]; d++; if (r[0] > 0) g++; } } return { t: t, n: n, g: g, d: d }; };
     var monday = function (t) { return t - ((new Date(t).getUTCDay() + 6) % 7) * DAY; };

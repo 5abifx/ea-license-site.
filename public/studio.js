@@ -119,6 +119,9 @@
     quote: store.get('ss.quote') || '', layout: store.get('ss.layout') || 'center', len: Number(store.get('ss.len')) || 8, topic: 'racing' };
   Object.keys(DEF).forEach((k) => { A.pick[k] = DEF[k]; });
   if (!DEF.week) A.card = 'trade';
+  // ?trade=<id> (from the Live screen's "Share card" after a trade closes) opens that trade straight away
+  const want = new URLSearchParams(location.search).get('trade');
+  if (want && OPTS.trade.some((o) => o.k === want)) { A.card = 'trade'; A.pick.trade = want; }
   let show = {}; try { show = JSON.parse(store.get('ss.show') || '{}'); } catch { show = {}; }
   const kindOf = (c) => (c === 'trade' ? 'trade' : 'period');
   // owner-only extras: members keep the studio exactly as before

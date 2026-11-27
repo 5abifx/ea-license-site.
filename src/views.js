@@ -147,10 +147,11 @@ function appShell(req, u, flashHtml, body, title) {
   const adminPage = req.path.startsWith('/admin');
   const wnNew = require('./whatsnew').count(u);   // What's new lines this member has not seen (orange dot)
   const wnDot = wnNew ? '<em class="wn-dot" aria-label="new"></em>' : '';
-  const jOn = { desk: on('/journal/desk'), plan: on('/journal/plan'), ins: on('/journal/insights'), studio: on('/journal/studio'), mentor: on('/journal/mentor'), study: on('/journal/study') };
-  const journalOn = on('/journal') && !jOn.desk && !jOn.plan && !jOn.ins && !jOn.studio && !jOn.mentor && !jOn.study;
+  const jOn = { desk: on('/journal/desk'), plan: on('/journal/plan'), ins: on('/journal/insights'), studio: on('/journal/studio'), mentor: on('/journal/mentor'), study: on('/journal/study'), live: on('/journal/live') };
+  const journalOn = on('/journal') && !jOn.desk && !jOn.plan && !jOn.ins && !jOn.studio && !jOn.mentor && !jOn.study && !jOn.live;
   const mentor = req.mentorEligible && (req.hasJournal || u.mentor_share);
   const journalTiles = req.hasJournal ? `${tile('/journal/desk', 'desk', 'Desk', 'Today: plan, live trades, clock', jOn.desk)}
+      ${tile('/journal/live', 'pulse', 'Live', 'Second screen while you trade', jOn.live)}
       ${tile('/journal', 'journal', 'Journal', 'Calendar and every trade', journalOn)}
       ${tile('/journal/plan', 'plan', 'Plan a trade', 'Entry, stop and size before you click', jOn.plan)}
       ${tile('/journal/insights', 'insights', 'Insights', 'Edge score, leaks, what works', jOn.ins)}
@@ -224,7 +225,7 @@ function appShell(req, u, flashHtml, body, title) {
     <button type="button" class="tb-dk" data-tbp="m" aria-expanded="false" aria-controls="tbp-m"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg><span>More</span></button>
   </nav>
   <div class="tb-scrim" data-tb-close></div>
-  ${req.hasJournal ? '<div class="sc" data-sc hidden></div>' : ''}
+  ${req.hasJournal && !req.noSide ? '<div class="sc" data-sc hidden></div>' : ''}
 </header>
 <div class="app-main">
   <main class="app-body">${flashHtml}${body}</main>
