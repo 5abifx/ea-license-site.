@@ -46,8 +46,28 @@
     m.onerror = function () { if (fallback && m.src.indexOf(fallback) < 0) { m.src = fallback; if (isVid) m.play().catch(function () {}); } };
     m.src = src; layer.appendChild(m); if (isVid) m.play().catch(function () {});
   }
+  /* what shows on this screen (each item can be hidden; saved with the design for PC / iPad / phone) */
+  var SHOWS = [['accts', 'Account tabs'], ['sub', 'Line under the number'], ['line', 'Day line'], ['today', 'Today'], ['todayr', 'Today R'], ['trades', 'Trades'],
+    ['used', 'Daily loss used'], ['loss', 'Losses'], ['news', 'News countdown'], ['check', 'Pre-trade checklist'], ['feel', 'Feelings'], ['mark', 'Mark this moment']];
+  var showsEl = pn.querySelector('[data-lv-shows]');
+  function hides() {
+    var h = S.hide || [];
+    [].forEach.call(document.querySelectorAll('[data-h]'), function (el) { if (!pn.contains(el)) el.classList.toggle('lv-off', h.indexOf(el.dataset.h) > -1); });
+    root.classList.toggle('lv-nostats', ['today', 'todayr', 'trades', 'used', 'loss', 'news'].every(function (k) { return h.indexOf(k) > -1; }));
+  }
+  function drawShows() {
+    var h = S.hide || [];
+    showsEl.innerHTML = SHOWS.map(function (x) { return '<button type="button" data-hk="' + x[0] + '" aria-pressed="' + (h.indexOf(x[0]) < 0) + '">' + x[1] + '</button>'; }).join('');
+  }
+  showsEl.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-hk]'); if (!b) return;
+    var h = (S.hide || []).slice(), i = h.indexOf(b.dataset.hk);
+    if (i > -1) h.splice(i, 1); else h.push(b.dataset.hk);
+    S.hide = h; save(); drawShows(); hides();
+  });
   function paint() {
     clear();
+    hides();
     layer.classList.toggle('built', ['smoke', 'ember', 'floor'].indexOf(S.k) > -1);
     root.classList.toggle('has-bg', S.k !== 'none');
     layer.classList.toggle('bw', !!S.bw); layer.style.setProperty('--dim', S.dim);
@@ -129,7 +149,7 @@
     devn.textContent = EDIT === HERE ? 'This is your ' + NAMES[HERE] + ' design. It comes back on any ' + NAMES[HERE] + ' you sign in on.'
       : 'Editing your ' + NAMES[EDIT] + ' design, shown here as a preview. This screen goes back to its own design when you close this.';
   }
-  function edit(dev) { EDIT = dev; S = B[dev]; syncDevs(); dimIn.value = S.dim; bwIn.checked = !!S.bw; drawTiles(); paint(); credit(); }
+  function edit(dev) { EDIT = dev; S = B[dev]; syncDevs(); dimIn.value = S.dim; bwIn.checked = !!S.bw; drawTiles(); drawShows(); paint(); credit(); }
   devs.addEventListener('click', function (e) { var b = e.target.closest('[data-dev]'); if (b && b.dataset.dev !== EDIT) edit(b.dataset.dev); });
 
   /* ---------- the panel ---------- */
@@ -149,7 +169,7 @@
     syncDevs();
     var r = btn.getBoundingClientRect(); pn.style.top = (r.bottom + 8) + 'px';
     if (innerWidth < 560) { pn.style.left = '12px'; pn.style.right = '12px'; } else { pn.style.left = 'auto'; pn.style.right = Math.max(12, innerWidth - r.right) + 'px'; }
-    dimIn.value = S.dim; bwIn.checked = !!S.bw; drawTiles(); credit();
+    dimIn.value = S.dim; bwIn.checked = !!S.bw; drawTiles(); drawShows(); credit();
     if (D.stock && !thumbsAsked) {
       thumbsAsked = true;
       TOPICS.forEach(function (t) {
