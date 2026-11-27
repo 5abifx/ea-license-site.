@@ -41,6 +41,7 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
     let streak = 0;
     for (let i = rows.length - 1; i >= 0 && rows[i].net < 0; i--) streak++;
     const data = {
+      stock: !!(process.env.PEXELS_API_KEY || process.env.PIXABAY_API_KEY),   // clip tiles, same free clips as Share Studio
       cur, demo: req.query.demo === '1',
       acct: one ? `Account ••${String(one.account_number).slice(-2)}` : '',
       today: { net, r: rs.length ? rs.reduce((s, t) => s + t.r, 0) : null, n: rows.length, won: rows.filter((t) => t.net > 0).length,
@@ -59,10 +60,11 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
       <div class="lv" data-lv data-state="flat">
         <script type="application/json" data-lv-data>${JSON.stringify(data).replace(/</g, '\\u003c')}</script>
         <div class="row between page-head lv-head"><h1>Live <span class="lv-pulse" data-lv-conn><em></em><span>${data.demo ? 'Sample trade' : 'Waiting for MT5'}</span></span></h1>
-          <span class="head-btns">${btn('data-lv-priv aria-pressed="false"', 'Hide private info', 'Blurs the money amounts, so you can film or stream')}${btn('data-lv-full', 'Full screen', 'Fill the whole screen')}</span></div>
+          <span class="head-btns">${btn('data-lv-bgbtn aria-expanded="false"', 'Background', 'Put a look, a clip or your own picture behind your P&L')}${btn('data-lv-priv aria-pressed="false"', 'Hide private info', 'Blurs the money amounts, so you can film or stream')}${btn('data-lv-full', 'Full screen', 'Fill the whole screen')}</span></div>
         ${acctBar ? acctBar(req, '/journal/live', qs, sc, cur) : ''}
 
         <section class="lv-hero">
+          <div class="lv-bg" data-lv-bg aria-hidden="true"></div>
           <canvas class="lv-line" data-lv-line aria-hidden="true"></canvas>
           <div class="lv-lbl" data-lv-lbl>Today P&amp;L</div>
           <div class="lv-num" data-lv-num data-no-ig>$0</div>
@@ -119,6 +121,15 @@ module.exports = function registerLive(app, { db, page, requireUser, requireJour
           <button type="button" data-lv-go="flat">Flat</button><button type="button" data-lv-go="trade" aria-pressed="true">In a trade</button>
           <button type="button" data-lv-go="near">Near limit</button><button type="button" data-lv-go="closed">Just closed</button><button type="button" data-lv-go="lock">Cooldown</button><button type="button" data-lv-go="algo">Algo day</button></div>` : ''}
       </div>
-      <script src="/live.js"></script>`);
+      <div class="ov-pn lv-bgp" data-lv-bgp hidden role="dialog" aria-label="Background">
+        <div class="lv-bgp-h"><b>Background</b><button type="button" class="lv-x" data-lv-bgx aria-label="Close">×</button></div>
+        <div class="lv-tiles" data-lv-tiles></div>
+        <div class="lv-bgp-row"><label>Darken <input type="range" min="0.2" max="0.85" step="0.05" data-lv-dim></label>
+          <label class="lv-tog"><input type="checkbox" data-lv-bw> Black and white</label></div>
+        <p class="lv-bgp-n" data-lv-bgn>Your own picture or clip stays on this device. It is never uploaded.</p>
+        <input type="file" accept="image/*,video/*" data-lv-own hidden style="display:none">
+      </div>
+      <script src="/live.js"></script>
+      <script src="/live-bg.js"></script>`);
   });
 };

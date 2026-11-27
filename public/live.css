@@ -118,3 +118,35 @@ html.calm .lv-pulse em, html.calm .lv-breath i { animation: none; }
 /* algo day (a bot placing hundreds of trades): the whole day, no checklist, no feelings, no per-trade review */
 .lv[data-state="algo"] .lv-feel, .lv[data-state="algo"] .lv-check, .lv[data-state="algo"] .lv-run { display: none; }
 .lv[data-state="algo"] .lv-btns { justify-content: flex-end; }
+
+/* background behind the P&L (Background button): a built-in look, a free clip or the member's own picture */
+.lv-bg { position: absolute; inset: 0; z-index: -2; border-radius: 22px; overflow: hidden; display: none; background: #0a0a0c; box-shadow: 0 0 0 1px rgba(255,255,255,.06); }
+.lv.has-bg .lv-bg { display: block; }
+.lv.has-bg .lv-hero { padding: 30px 30px 22px; margin-top: 6px; }
+.lv.has-bg .lv-stats { right: 30px; }
+.lv-bg > video, .lv-bg > img, .lv-bg > canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.lv-bg.bw > video, .lv-bg.bw > img { filter: grayscale(1) contrast(1.05); }
+/* darker on the left (the number) and at the bottom (the line), set by the Darken slider */
+.lv-bg .lv-sh { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,calc(var(--dim, .5) + .1)), rgba(0,0,0,calc(var(--dim, .5) - .1)) 60%, rgba(0,0,0,var(--dim, .5))),
+  linear-gradient(0deg, rgba(0,0,0,.45), transparent 45%); }
+.lv.has-bg .lv-lbl, .lv.has-bg .lv-stats dt { color: #c8c8cc; }
+.lv.has-bg .lv-subl { color: #b4b4b9; }
+.lv.has-bg .lv-stats dd, .lv.has-bg .lv-subl b { text-shadow: 0 1px 10px rgba(0,0,0,.5); }
+
+.lv-bgp { animation: none !important; opacity: 1 !important; position: fixed; z-index: 60; width: min(380px, calc(100vw - 24px)); box-sizing: border-box; max-height: calc(100dvh - 120px); overflow: auto; padding: 16px 16px 14px; box-shadow: 0 30px 60px -20px #000, 0 0 0 1px rgba(255,255,255,.08); }
+.lv-bgp-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.lv-bgp-h b { font: 600 15px Sora, Manrope, sans-serif; color: #f4f4f5; }
+.lv-x { width: 30px; height: 30px; padding: 0; border-radius: 50%; display: grid; place-items: center; font-size: 18px; line-height: 1; text-transform: none; letter-spacing: 0; background: rgba(255,255,255,.08); color: #ddd; border: 0; }
+.lv-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.lv-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0; background: none; border: 0; color: #a3a3a7; font: 600 11px/1.2 Manrope, sans-serif; text-transform: none; letter-spacing: 0; cursor: pointer; text-align: center; }
+.lv-tile i { width: 100%; aspect-ratio: 1; border-radius: 12px; display: grid; place-items: center; color: #fff; font-style: normal; font-size: 20px; box-shadow: 0 0 0 1px rgba(255,255,255,.08); transition: box-shadow .2s; }
+.lv-tile[aria-pressed="true"] { color: #fff; }
+.lv-tile[aria-pressed="true"] i { box-shadow: 0 0 0 2px var(--accent, #ff5a1f); }
+.lv-bgp-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 14px; font-size: 12.5px; color: #a3a3a7; font-weight: 600; }
+.lv-bgp-row label { display: inline-flex; align-items: center; gap: 8px; }
+.lv-bgp-row input[type=range] { width: 120px; accent-color: var(--accent, #ff5a1f); }
+.lv-bgp-n { margin: 10px 0 0; font-size: 11.5px; color: #77777d; line-height: 1.45; }
+.lv-bgp-n a { color: #c8c8cc; }
+@container lv (max-width: 559px) { .lv.has-bg .lv-hero { padding: 22px 18px 16px; } }
+@media (max-width: 559px) { .lv-bgp { width: auto; } }
+.lv-bg.built .lv-sh { opacity: .45; }   /* the built-in looks are dark already */
